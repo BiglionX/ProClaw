@@ -5,6 +5,7 @@ import {
   Refresh as RefreshIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -180,6 +181,50 @@ export default function ProductsPage() {
     loadProducts();
   };
 
+  // 导出 CSV
+  const handleExportCSV = () => {
+    if (products.length === 0) {
+      setError('没有可导出的产品');
+      return;
+    }
+
+    // CSV 表头
+    const headers = ['SKU', '产品名称', '成本价', '销售价', '当前库存', '最低库存', '最高库存', '单位', '状态'];
+    
+    // CSV 数据行
+    const rows = products.map(product => [
+      product.sku,
+      product.name,
+      product.cost_price.toFixed(2),
+      product.sell_price.toFixed(2),
+      product.current_stock,
+      product.min_stock,
+      product.max_stock,
+      product.unit,
+      product.status === 'active' ? '活跃' : '停用',
+    ]);
+
+    // 组合 CSV 内容
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    // 创建 Blob 并下载
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `products_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setSuccessMessage(`成功导出 ${products.length} 个产品`);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
   return (
     <Box>
       {/* 页面标题 */}
@@ -285,6 +330,14 @@ export default function ProductsPage() {
           onClick={() => handleOpenDialog()}
         >
           添加产品
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={handleExportCSV}
+          disabled={products.length === 0}
+        >
+          导出 CSV
         </Button>
       </Paper>
 
