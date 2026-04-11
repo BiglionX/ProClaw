@@ -11,17 +11,20 @@
 ### 1. 基础功能测试 (无需配置)
 
 #### 访问应用
+
 ```
 打开浏览器访问: http://localhost:3001/
 ```
 
 **预期结果**:
+
 - ✅ 应该看到登录页面
 - ✅ MUI 组件正常渲染
 - ✅ Tailwind CSS 样式生效
 - ✅ 页面布局正确
 
 #### 测试路由
+
 ```
 访问以下 URL:
 - http://localhost:3001/login      → 登录页面
@@ -30,6 +33,7 @@
 ```
 
 **预期结果**:
+
 - ✅ 路由正常工作
 - ✅ 未登录访问 `/` 会自动重定向到 `/login`
 
@@ -38,6 +42,7 @@
 #### 配置步骤
 
 1. **创建 Supabase 项目**
+
    ```
    访问: https://supabase.com
    点击 "New Project"
@@ -45,6 +50,7 @@
    ```
 
 2. **获取凭证**
+
    ```
    进入 Settings → API
    复制:
@@ -53,8 +59,9 @@
    ```
 
 3. **配置环境变量**
-   
+
    编辑 `.env.local`:
+
    ```env
    VITE_SUPABASE_URL=https://your-project.supabase.co
    VITE_SUPABASE_ANON_KEY=your-anon-key-here
@@ -69,6 +76,7 @@
 #### 测试认证功能
 
 1. **注册新用户**
+
    ```
    访问: http://localhost:3001/register
    输入:
@@ -84,6 +92,7 @@
    - ✅ 显示用户信息
 
 2. **登录测试**
+
    ```
    如果已登录,先退出
    访问: http://localhost:3001/login
@@ -97,6 +106,7 @@
    - ✅ 显示欢迎信息
 
 3. **退出登录**
+
    ```
    在 Dashboard 页面
    点击 "退出登录" 按钮
@@ -117,6 +127,7 @@ npm run tauri dev
 ```
 
 **首次运行可能需要**:
+
 - 下载 Rust 依赖 (几分钟)
 - 编译 Rust 代码
 - 安装系统依赖
@@ -124,6 +135,7 @@ npm run tauri dev
 #### 测试数据库功能
 
 1. **访问数据库测试页面**
+
    ```
    登录后访问: http://localhost:3001/database-test
    ```
@@ -135,21 +147,22 @@ npm run tauri dev
    - 待同步记录数
 
 3. **测试 CRUD 操作** (需要实现前端界面)
+
    ```typescript
    // 在浏览器控制台测试
-   import { db } from './db/database'
-   
+   import { db } from './db/database';
+
    // 创建产品
    await db.createProduct({
      sku: 'TEST-001',
      name: '测试产品',
      sell_price: 99.99,
-     current_stock: 100
-   })
-   
+     current_stock: 100,
+   });
+
    // 获取产品列表
-   const products = await db.getProducts()
-   console.log(products)
+   const products = await db.getProducts();
+   console.log(products);
    ```
 
 ### 4. 同步功能测试
@@ -158,18 +171,19 @@ npm run tauri dev
 
 ```typescript
 // 在浏览器控制台
-import { db } from './db/database'
+import { db } from './db/database';
 
 // 获取同步状态
-const status = await db.getSyncStatus()
-console.log(status)
+const status = await db.getSyncStatus();
+console.log(status);
 
 // 启动同步
-const result = await db.startSync()
-console.log(result)
+const result = await db.startSync();
+console.log(result);
 ```
 
 **预期结果**:
+
 - ✅ 返回同步状态对象
 - ✅ 显示待处理操作数
 - ✅ 显示冲突数量
@@ -179,10 +193,12 @@ console.log(result)
 ### 问题 1: 页面空白
 
 **可能原因**:
+
 - JavaScript 错误
 - 依赖未正确安装
 
 **解决方法**:
+
 ```bash
 # 检查控制台错误
 # 重新安装依赖
@@ -196,11 +212,13 @@ npm run dev
 ### 问题 2: 认证失败
 
 **可能原因**:
+
 - Supabase 未配置
 - 环境变量错误
 - 网络问题
 
 **解决方法**:
+
 1. 检查 `.env.local` 配置
 2. 确认 Supabase 项目已创建
 3. 检查浏览器控制台错误信息
@@ -211,6 +229,7 @@ npm run dev
 **错误信息**: `Port 3000 is in use`
 
 **解决方法**:
+
 ```bash
 # 方法 1: 修改端口
 # 编辑 vite.config.ts
@@ -230,10 +249,12 @@ taskkill /PID <PID> /F
 ### 问题 4: Rust 编译错误
 
 **可能原因**:
+
 - 依赖版本冲突
 - 系统缺少构建工具
 
 **解决方法**:
+
 ```bash
 # 更新 Rust
 rustup update
@@ -284,7 +305,7 @@ npm run tauri dev
 
 测试完成后:
 
-1. **如果一切正常**: 
+1. **如果一切正常**:
    - 继续 Phase 1 开发
    - 完善产品库功能
    - 实现进销存模块
@@ -295,10 +316,11 @@ npm run tauri dev
    - 修复并重新测试
 
 3. **准备生产构建**:
+
    ```bash
    # 构建生产版本
    npm run build
-   
+
    # 构建 Tauri 安装包
    npm run tauri build
    ```

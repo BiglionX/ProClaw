@@ -76,7 +76,7 @@ export default function LoginPage() {
                 onChange={e => setEmail(e.target.value)}
                 required
                 variant="outlined"
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     backgroundColor: 'white',
                     '& fieldset': {
@@ -109,7 +109,7 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 variant="outlined"
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     backgroundColor: 'white',
                     '& fieldset': {

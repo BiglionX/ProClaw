@@ -82,7 +82,7 @@ export default function RegisterPage() {
                 onChange={e => setEmail(e.target.value)}
                 required
                 variant="outlined"
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     backgroundColor: 'white',
                     '& fieldset': {
@@ -115,7 +115,7 @@ export default function RegisterPage() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 variant="outlined"
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     backgroundColor: 'white',
                     '& fieldset': {
@@ -148,7 +148,7 @@ export default function RegisterPage() {
                 onChange={e => setConfirmPassword(e.target.value)}
                 required
                 variant="outlined"
-                sx={{ 
+                sx={{
                   '& .MuiOutlinedInput-root': {
                     backgroundColor: 'white',
                     '& fieldset': {
