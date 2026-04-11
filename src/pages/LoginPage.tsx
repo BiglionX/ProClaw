@@ -71,7 +71,28 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              sx={{ mb: 2 }}
+              sx={{ 
+                mb: 2,
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'white',
+                  '& fieldset': {
+                    borderColor: '#ccc',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: '#1976d2',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#1976d2',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: '#666',
+                },
+                '& .MuiInputBase-input': {
+                  color: '#333',
+                  fontSize: '16px',
+                },
+              }}
             />
 
             <TextField
@@ -81,7 +102,28 @@ export default function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              sx={{ mb: 3 }}
+              sx={{ 
+                mb: 3,
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'white',
+                  '& fieldset': {
+                    borderColor: '#ccc',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: '#1976d2',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#1976d2',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: '#666',
+                },
+                '& .MuiInputBase-input': {
+                  color: '#333',
+                  fontSize: '16px',
+                },
+              }}
             />
 
             <Button
