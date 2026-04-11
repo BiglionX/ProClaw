@@ -70,98 +70,104 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            <TextField
-              fullWidth
-              label="邮箱"
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              sx={{ 
-                mb: 2,
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'white',
-                  '& fieldset': {
-                    borderColor: '#ccc',
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                邮箱
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="请输入邮箱"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                variant="outlined"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'white',
+                    '& fieldset': {
+                      borderColor: '#ddd',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: '#1976d2',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#1976d2',
+                    },
                   },
-                  '&:hover fieldset': {
-                    borderColor: '#1976d2',
+                  '& .MuiInputBase-input': {
+                    color: '#333',
+                    fontSize: '15px',
                   },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#1976d2',
-                  },
-                },
-                '& .MuiInputLabel-root': {
-                  color: '#666',
-                },
-                '& .MuiInputBase-input': {
-                  color: '#333',
-                  fontSize: '16px',
-                },
-              }}
-            />
+                }}
+              />
+            </Box>
 
-            <TextField
-              fullWidth
-              label="密码"
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              sx={{ 
-                mb: 2,
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'white',
-                  '& fieldset': {
-                    borderColor: '#ccc',
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                密码
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="请输入密码"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                variant="outlined"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'white',
+                    '& fieldset': {
+                      borderColor: '#ddd',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: '#1976d2',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#1976d2',
+                    },
                   },
-                  '&:hover fieldset': {
-                    borderColor: '#1976d2',
+                  '& .MuiInputBase-input': {
+                    color: '#333',
+                    fontSize: '15px',
                   },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#1976d2',
-                  },
-                },
-                '& .MuiInputLabel-root': {
-                  color: '#666',
-                },
-                '& .MuiInputBase-input': {
-                  color: '#333',
-                  fontSize: '16px',
-                },
-              }}
-            />
+                }}
+              />
+            </Box>
 
-            <TextField
-              fullWidth
-              label="确认密码"
-              type="password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              required
-              sx={{ 
-                mb: 3,
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'white',
-                  '& fieldset': {
-                    borderColor: '#ccc',
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                确认密码
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="请再次输入密码"
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+                variant="outlined"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'white',
+                    '& fieldset': {
+                      borderColor: '#ddd',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: '#1976d2',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#1976d2',
+                    },
                   },
-                  '&:hover fieldset': {
-                    borderColor: '#1976d2',
+                  '& .MuiInputBase-input': {
+                    color: '#333',
+                    fontSize: '15px',
                   },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#1976d2',
-                  },
-                },
-                '& .MuiInputLabel-root': {
-                  color: '#666',
-                },
-                '& .MuiInputBase-input': {
-                  color: '#333',
-                  fontSize: '16px',
-                },
-              }}
-            />
+                }}
+              />
+            </Box>
 
             <Button
               fullWidth
