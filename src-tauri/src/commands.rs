@@ -144,7 +144,7 @@ pub fn get_products(db: tauri::State<Mutex<Database>>, options: Option<serde_jso
     // 执行查询
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
-    
+
     let products = stmt.query_map(params_refs.as_slice(), |row| {
         Ok(Product {
             id: row.get(0)?,

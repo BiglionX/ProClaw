@@ -1,42 +1,42 @@
-import { useState, useEffect } from 'react';
 import {
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Refresh as RefreshIcon,
+  Search as SearchIcon,
+} from '@mui/icons-material';
+import {
+  Alert,
   Box,
-  Paper,
-  Typography,
   Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  InputAdornment,
+  MenuItem,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  IconButton,
   TextField,
-  InputAdornment,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  MenuItem,
-  Grid,
-  Alert,
-  CircularProgress,
+  Typography,
 } from '@mui/material';
+import { useEffect, useState } from 'react';
 import {
-  Search as SearchIcon,
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
-import {
-  getProducts,
   createProduct,
-  updateProduct,
-  deleteProduct,
-  Product as ProductType,
   CreateProductInput,
+  deleteProduct,
+  getProducts,
+  Product as ProductType,
+  updateProduct,
 } from '../lib/productService';
 
 export default function ProductsPage() {
@@ -44,7 +44,9 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<ProductType | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductType | null>(
+    null
+  );
   const [formData, setFormData] = useState<CreateProductInput>({
     sku: '',
     name: '',
@@ -63,7 +65,10 @@ export default function ProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const data = await getProducts({ limit: 100, search: searchTerm || undefined });
+      const data = await getProducts({
+        limit: 100,
+        search: searchTerm || undefined,
+      });
       setProducts(data);
     } catch (err: any) {
       setError(err.message || '加载产品列表失败');
@@ -134,7 +139,7 @@ export default function ProductsPage() {
   // 删除产品
   const handleDelete = async (id: string) => {
     if (!confirm('确定要删除这个产品吗?')) return;
-    
+
     try {
       setLoading(true);
       await deleteProduct(id);
@@ -167,7 +172,11 @@ export default function ProductsPage() {
 
       {/* 成功提示 */}
       {successMessage && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMessage(null)}>
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setSuccessMessage(null)}
+        >
           {successMessage}
         </Alert>
       )}
@@ -180,12 +189,15 @@ export default function ProductsPage() {
       )}
 
       {/* 操作栏 */}
-      <Paper elevation={0} sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+      <Paper
+        elevation={0}
+        sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}
+      >
         <TextField
           placeholder="搜索产品 (SKU 或名称)"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onChange={e => setSearchTerm(e.target.value)}
+          onKeyPress={e => e.key === 'Enter' && handleSearch()}
           size="small"
           sx={{ flex: 1 }}
           InputProps={{
@@ -218,13 +230,27 @@ export default function ProductsPage() {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell><strong>SKU</strong></TableCell>
-              <TableCell><strong>产品名称</strong></TableCell>
-              <TableCell><strong>成本价</strong></TableCell>
-              <TableCell><strong>销售价</strong></TableCell>
-              <TableCell><strong>当前库存</strong></TableCell>
-              <TableCell><strong>状态</strong></TableCell>
-              <TableCell align="right"><strong>操作</strong></TableCell>
+              <TableCell>
+                <strong>SKU</strong>
+              </TableCell>
+              <TableCell>
+                <strong>产品名称</strong>
+              </TableCell>
+              <TableCell>
+                <strong>成本价</strong>
+              </TableCell>
+              <TableCell>
+                <strong>销售价</strong>
+              </TableCell>
+              <TableCell>
+                <strong>当前库存</strong>
+              </TableCell>
+              <TableCell>
+                <strong>状态</strong>
+              </TableCell>
+              <TableCell align="right">
+                <strong>操作</strong>
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -244,7 +270,7 @@ export default function ProductsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              products.map((product) => (
+              products.map(product => (
                 <TableRow key={product.id} hover>
                   <TableCell>
                     <Typography variant="body2" fontFamily="monospace">
@@ -261,8 +287,8 @@ export default function ProductsPage() {
                         product.current_stock <= product.min_stock
                           ? 'error'
                           : product.current_stock >= product.max_stock
-                          ? 'warning'
-                          : 'success'
+                            ? 'warning'
+                            : 'success'
                       }
                       size="small"
                     />
@@ -270,7 +296,9 @@ export default function ProductsPage() {
                   <TableCell>
                     <Chip
                       label={product.status === 'active' ? '活跃' : '停用'}
-                      color={product.status === 'active' ? 'success' : 'default'}
+                      color={
+                        product.status === 'active' ? 'success' : 'default'
+                      }
                       size="small"
                     />
                   </TableCell>
@@ -298,10 +326,13 @@ export default function ProductsPage() {
       </TableContainer>
 
       {/* 新建/编辑产品对话框 */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingProduct ? '编辑产品' : '添加产品'}
-        </DialogTitle>
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{editingProduct ? '编辑产品' : '添加产品'}</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
             <Grid container spacing={2}>
@@ -310,7 +341,9 @@ export default function ProductsPage() {
                   fullWidth
                   label="SKU"
                   value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, sku: e.target.value })
+                  }
                   required
                   size="small"
                 />
@@ -320,7 +353,9 @@ export default function ProductsPage() {
                   fullWidth
                   label="产品名称"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   required
                   size="small"
                 />
@@ -330,7 +365,9 @@ export default function ProductsPage() {
                   fullWidth
                   label="描述"
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   multiline
                   rows={2}
                   size="small"
@@ -342,10 +379,17 @@ export default function ProductsPage() {
                   label="成本价"
                   type="number"
                   value={formData.cost_price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      cost_price: parseFloat(e.target.value) || 0,
+                    })
                   }
-                  InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">¥</InputAdornment>
+                    ),
+                  }}
                   size="small"
                 />
               </Grid>
@@ -355,10 +399,17 @@ export default function ProductsPage() {
                   label="销售价"
                   type="number"
                   value={formData.sell_price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, sell_price: parseFloat(e.target.value) || 0 })
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      sell_price: parseFloat(e.target.value) || 0,
+                    })
                   }
-                  InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">¥</InputAdornment>
+                    ),
+                  }}
                   size="small"
                 />
               </Grid>
@@ -368,8 +419,11 @@ export default function ProductsPage() {
                   label="当前库存"
                   type="number"
                   value={formData.current_stock}
-                  onChange={(e) =>
-                    setFormData({ ...formData, current_stock: parseInt(e.target.value) || 0 })
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      current_stock: parseInt(e.target.value) || 0,
+                    })
                   }
                   size="small"
                 />
@@ -380,8 +434,11 @@ export default function ProductsPage() {
                   label="最低库存"
                   type="number"
                   value={formData.min_stock}
-                  onChange={(e) =>
-                    setFormData({ ...formData, min_stock: parseInt(e.target.value) || 0 })
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      min_stock: parseInt(e.target.value) || 0,
+                    })
                   }
                   size="small"
                 />
@@ -391,7 +448,9 @@ export default function ProductsPage() {
                   fullWidth
                   label="单位"
                   value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, unit: e.target.value })
+                  }
                   select
                   size="small"
                 >
