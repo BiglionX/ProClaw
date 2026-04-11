@@ -1,6 +1,6 @@
-import { Box, Typography, Paper } from '@mui/material';
-import AgentChat from '../../components/Agent/AgentChat';
-import QuickActions from '../../components/Agent/QuickActions';
+import { Box, Typography } from '@mui/material';
+import AgentChat from '../components/Agent/AgentChat';
+import QuickActions from '../components/Agent/QuickActions';
 
 export default function AgentPage() {
   return (
