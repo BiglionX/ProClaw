@@ -36,7 +36,9 @@ export interface ProductAnalytics {
 /**
  * 获取销售趋势数据
  */
-export async function getSalesTrend(period?: 'day' | 'week' | 'month'): Promise<SalesTrendData> {
+export async function getSalesTrend(
+  period?: 'day' | 'week' | 'month'
+): Promise<SalesTrendData> {
   return await invoke('get_sales_trend', { period });
 }
 

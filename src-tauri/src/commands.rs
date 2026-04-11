@@ -834,7 +834,7 @@ pub fn get_sales_trend(
     let conn = db.connection();
 
     let period = period.unwrap_or_else(|| "day".to_string());
-    
+
     // 根据周期选择 SQL 查询
     let (date_format, days_back) = match period.as_str() {
         "week" => ("%Y-W%W", 90),  // 最近 90 天 (约 13 周)
@@ -843,7 +843,7 @@ pub fn get_sales_trend(
     };
 
     let sql = format!(
-        "SELECT 
+        "SELECT
             strftime('{}', created_at) as date,
             COUNT(*) as transaction_count,
             SUM(CASE WHEN transaction_type = 'outbound' THEN quantity ELSE 0 END) as outbound_qty,
@@ -856,7 +856,7 @@ pub fn get_sales_trend(
     );
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    
+
     let trend_data: Vec<serde_json::Value> = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
@@ -910,11 +910,11 @@ pub fn get_product_analytics(db: tauri::State<Mutex<Database>>) -> Result<serde_
     let mut slow_moving_stmt = conn.prepare(
         "SELECT p.id, p.name, p.sku, p.current_stock, p.cost_price
          FROM products p
-         WHERE p.deleted_at IS NULL 
+         WHERE p.deleted_at IS NULL
            AND p.current_stock > 0
            AND p.id NOT IN (
-               SELECT DISTINCT product_id 
-               FROM inventory_transactions 
+               SELECT DISTINCT product_id
+               FROM inventory_transactions
                WHERE transaction_type = 'outbound'
            )
          ORDER BY p.current_stock * p.cost_price DESC
@@ -937,13 +937,13 @@ pub fn get_product_analytics(db: tauri::State<Mutex<Database>>) -> Result<serde_
 
     // 库存周转率 (按类别)
     let mut turnover_stmt = conn.prepare(
-        "SELECT 
+        "SELECT
             pc.name as category_name,
             COUNT(DISTINCT p.id) as product_count,
             COALESCE(SUM(p.current_stock), 0) as total_stock,
             COALESCE(SUM(
-                (SELECT SUM(it2.quantity) 
-                 FROM inventory_transactions it2 
+                (SELECT SUM(it2.quantity)
+                 FROM inventory_transactions it2
                  WHERE it2.product_id = p.id AND it2.transaction_type = 'outbound')
             ), 0) as total_sold
          FROM products p
@@ -962,7 +962,7 @@ pub fn get_product_analytics(db: tauri::State<Mutex<Database>>) -> Result<serde_
             } else {
                 0.0
             };
-            
+
             Ok(serde_json::json!({
                 "category": row.get::<_, Option<String>>(0)?.unwrap_or_else(|| "未分类".to_string()),
                 "product_count": row.get::<_, i32>(1)?,
@@ -980,4 +980,98 @@ pub fn get_product_analytics(db: tauri::State<Mutex<Database>>) -> Result<serde_
         "slow_moving": slow_moving,
         "turnover_by_category": turnover_by_category
     }))
+}
+
+// ==================== 采购管理命令 ====================
+
+/// 创建供应商
+#[tauri::command]
+pub fn create_supplier(db: tauri::State<Mutex<Database>>, supplier: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let id = Uuid::new_v4().to_string();
+    let name = supplier["name"].as_str().ok_or("Supplier name is required")?;
+    
+    // 自动生成 code
+    let code = supplier.get("code").and_then(|v| v.as_str()).unwrap_or(&format!("SUP-{}", &id[..8]));
+
+    conn.execute(
+        "INSERT INTO suppliers (id, name, code, contact_person, phone, email, address, website, payment_terms, tax_number, notes, is_active, sync_status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'pending')",
+        params![
+            id, name, code,
+            supplier.get("contact_person").and_then(|v| v.as_str()),
+            supplier.get("phone").and_then(|v| v.as_str()),
+            supplier.get("email").and_then(|v| v.as_str()),
+            supplier.get("address").and_then(|v| v.as_str()),
+            supplier.get("website").and_then(|v| v.as_str()),
+            supplier.get("payment_terms").and_then(|v| v.as_str()),
+            supplier.get("tax_number").and_then(|v| v.as_str()),
+            supplier.get("notes").and_then(|v| v.as_str()),
+            supplier.get("is_active").and_then(|v| v.as_bool()).unwrap_or(true),
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "id": id,
+        "name": name,
+        "code": code,
+        "message": "Supplier created successfully"
+    }))
+}
+
+/// 获取供应商列表
+#[tauri::command]
+pub fn get_suppliers(db: tauri::State<Mutex<Database>>, options: Option<serde_json::Value>) -> Result<Vec<serde_json::Value>, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let mut sql = String::from(
+        "SELECT id, name, code, contact_person, phone, email, address, website, 
+                payment_terms, tax_number, notes, is_active, created_at, updated_at
+         FROM suppliers WHERE deleted_at IS NULL"
+    );
+
+    let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(opts) = &options {
+        if let Some(search) = opts.get("search").and_then(|v| v.as_str()) {
+            sql.push_str(" AND (name LIKE ? OR code LIKE ? OR contact_person LIKE ?)");
+            let pattern = format!("%{}%", search);
+            params_vec.push(Box::new(pattern.clone()));
+            params_vec.push(Box::new(pattern.clone()));
+            params_vec.push(Box::new(pattern));
+        }
+    }
+
+    sql.push_str(" ORDER BY name ASC");
+
+    let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let suppliers: Vec<serde_json::Value> = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "code": row.get::<_, String>(2)?,
+                "contact_person": row.get::<_, Option<String>>(3)?,
+                "phone": row.get::<_, Option<String>>(4)?,
+                "email": row.get::<_, Option<String>>(5)?,
+                "address": row.get::<_, Option<String>>(6)?,
+                "website": row.get::<_, Option<String>>(7)?,
+                "payment_terms": row.get::<_, Option<String>>(8)?,
+                "tax_number": row.get::<_, Option<String>>(9)?,
+                "notes": row.get::<_, Option<String>>(10)?,
+                "is_active": row.get::<_, bool>(11)?,
+                "created_at": row.get::<_, String>(12)?,
+                "updated_at": row.get::<_, String>(13)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(suppliers)
 }

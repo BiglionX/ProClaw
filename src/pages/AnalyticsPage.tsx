@@ -1,13 +1,11 @@
 import {
-  TrendingUp as TrendingUpIcon,
   ShowChart as ChartIcon,
   Refresh as RefreshIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   FormControl,
   Grid,
   InputLabel,
@@ -35,11 +33,17 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ProductAnalytics, SalesTrendData, getProductAnalytics, getSalesTrend } from '../lib/analyticsService';
+import {
+  ProductAnalytics,
+  SalesTrendData,
+  getProductAnalytics,
+  getSalesTrend,
+} from '../lib/analyticsService';
 
 export default function AnalyticsPage() {
   const [salesTrend, setSalesTrend] = useState<SalesTrendData | null>(null);
-  const [productAnalytics, setProductAnalytics] = useState<ProductAnalytics | null>(null);
+  const [productAnalytics, setProductAnalytics] =
+    useState<ProductAnalytics | null>(null);
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +98,7 @@ export default function AnalyticsPage() {
           <Select
             value={period}
             label="时间周期"
-            onChange={(e) => setPeriod(e.target.value as any)}
+            onChange={e => setPeriod(e.target.value as any)}
           >
             <MenuItem value="day">按天 (30天)</MenuItem>
             <MenuItem value="week">按周 (13周)</MenuItem>
@@ -188,7 +192,11 @@ export default function AnalyticsPage() {
         {/* 畅销产品 */}
         <Grid item xs={12} md={6}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ color: 'success.main' }}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              sx={{ color: 'success.main' }}
+            >
               🔥 畅销产品 TOP 10
             </Typography>
             <TableContainer>
@@ -215,7 +223,14 @@ export default function AnalyticsPage() {
                           <Typography
                             sx={{
                               fontWeight: index < 3 ? 'bold' : 'normal',
-                              color: index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : 'inherit',
+                              color:
+                                index === 0
+                                  ? '#ffd700'
+                                  : index === 1
+                                    ? '#c0c0c0'
+                                    : index === 2
+                                      ? '#cd7f32'
+                                      : 'inherit',
                             }}
                           >
                             #{index + 1}
@@ -224,7 +239,9 @@ export default function AnalyticsPage() {
                         <TableCell>{product.name}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell align="right">
-                          <Typography sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                          <Typography
+                            sx={{ fontWeight: 'bold', color: 'success.main' }}
+                          >
                             {product.total_sold}
                           </Typography>
                         </TableCell>
@@ -240,7 +257,11 @@ export default function AnalyticsPage() {
         {/* 滞销产品 */}
         <Grid item xs={12} md={6}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ color: 'warning.main' }}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              sx={{ color: 'warning.main' }}
+            >
               ⚠️ 滞销产品 TOP 10
             </Typography>
             <TableContainer>
@@ -261,12 +282,14 @@ export default function AnalyticsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    productAnalytics?.slow_moving.map((product) => (
+                    productAnalytics?.slow_moving.map(product => (
                       <TableRow key={product.id} hover>
                         <TableCell>{product.name}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell align="right">
-                          <Typography sx={{ color: 'warning.main', fontWeight: 'bold' }}>
+                          <Typography
+                            sx={{ color: 'warning.main', fontWeight: 'bold' }}
+                          >
                             {product.current_stock}
                           </Typography>
                         </TableCell>
@@ -307,10 +330,12 @@ export default function AnalyticsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                productAnalytics?.turnover_by_category.map((category) => (
+                productAnalytics?.turnover_by_category.map(category => (
                   <TableRow key={category.category} hover>
                     <TableCell>{category.category}</TableCell>
-                    <TableCell align="right">{category.product_count}</TableCell>
+                    <TableCell align="right">
+                      {category.product_count}
+                    </TableCell>
                     <TableCell align="right">{category.total_stock}</TableCell>
                     <TableCell align="right">{category.total_sold}</TableCell>
                     <TableCell align="right">
@@ -321,8 +346,8 @@ export default function AnalyticsPage() {
                             parseFloat(category.turnover_rate) > 1
                               ? 'success.main'
                               : parseFloat(category.turnover_rate) > 0.5
-                              ? 'warning.main'
-                              : 'error.main',
+                                ? 'warning.main'
+                                : 'error.main',
                         }}
                       >
                         {category.turnover_rate}

@@ -161,3 +161,74 @@ CREATE TRIGGER IF NOT EXISTS update_categories_updated_at
     BEGIN
         UPDATE product_categories SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
     END;
+
+-- ============================================
+-- 供应商表
+-- ============================================
+CREATE TABLE IF NOT EXISTS suppliers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    code TEXT UNIQUE, -- 供应商编码
+    contact_person TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    website TEXT,
+    payment_terms TEXT, -- 付款条件 (e.g., "Net 30", "COD")
+    tax_number TEXT, -- 税号
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sync_status TEXT DEFAULT 'pending',
+    last_synced_at TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_code ON suppliers(code);
+
+-- ============================================
+-- 采购订单表
+-- ============================================
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id TEXT PRIMARY KEY,
+    po_number TEXT UNIQUE NOT NULL, -- 采购单号 (e.g., PO-2024-001)
+    supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+    order_date DATE NOT NULL,
+    expected_delivery_date DATE,
+    status TEXT DEFAULT 'draft' CHECK(status IN ('draft', 'confirmed', 'shipped', 'received', 'cancelled')),
+    total_amount REAL DEFAULT 0,
+    paid_amount REAL DEFAULT 0,
+    payment_status TEXT DEFAULT 'unpaid' CHECK(payment_status IN ('unpaid', 'partial', 'paid')),
+    notes TEXT,
+    created_by TEXT REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sync_status TEXT DEFAULT 'pending',
+    last_synced_at TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+CREATE INDEX IF NOT EXISTS idx_po_date ON purchase_orders(order_date);
+
+-- ============================================
+-- 采购订单明细表
+-- ============================================
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+    id TEXT PRIMARY KEY,
+    purchase_order_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    quantity INTEGER NOT NULL,
+    unit_price REAL NOT NULL, -- 单价
+    total_price REAL NOT NULL, -- 总价 = quantity * unit_price
+    received_quantity INTEGER DEFAULT 0, -- 已收货数量
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_poi_po ON purchase_order_items(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_poi_product ON purchase_order_items(product_id);

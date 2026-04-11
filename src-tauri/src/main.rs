@@ -47,6 +47,9 @@ fn main() {
             // 数据分析
             get_sales_trend,
             get_product_analytics,
+            // 采购管理
+            create_supplier,
+            get_suppliers,
             // 数据库和同步
             get_database_stats,
             get_pending_sync_records,
