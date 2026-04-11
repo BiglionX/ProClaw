@@ -18,6 +18,8 @@ rusqlite = { version = "0.31.0", features = ["bundled"] }
 libsqlite3-sys = { version = "0.28.0", features = ["bundled-sqlcipher"] }
 directories = "5.0.1"
 thiserror = "1.0.50"
+uuid = { version = "1.6.0", features = ["v4"] }
+tokio = { version = "1.35.0", features = ["time"] }
 
 [features]
 default = ["custom-protocol"]

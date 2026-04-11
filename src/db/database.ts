@@ -160,6 +160,27 @@ export class DatabaseService {
   }> {
     return await invoke('get_database_stats')
   }
+  
+  // ==================== 同步管理 ====================
+  
+  /**
+   * 启动数据同步
+   */
+  static async startSync(): Promise<string> {
+    return await invoke('start_sync')
+  }
+  
+  /**
+   * 获取同步状态
+   */
+  static async getSyncStatus(): Promise<{
+    pending_operations: number
+    conflicts: number
+    last_sync?: string
+    status: 'syncing' | 'synced'
+  }> {
+    return await invoke('get_sync_status')
+  }
 }
 
 // 导出默认实例
