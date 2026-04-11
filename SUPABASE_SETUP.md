@@ -3,6 +3,7 @@
 ## 📋 Phase 0 Week 2 完成
 
 Supabase 集成已完成,包括:
+
 - ✅ Supabase 客户端配置
 - ✅ 用户认证模块(登录/注册)
 - ✅ 认证页面组件
@@ -132,15 +133,19 @@ Phase 0 阶段我们只需要基本的认证功能。后续 Phase 将添加:
 ## ⚠️ 常见问题
 
 ### Q: 注册后收不到确认邮件?
+
 A: 在 Authentication → Providers → Email 中禁用 "Confirm email"
 
 ### Q: Realtime 连接失败?
+
 A: 检查:
+
 1. 项目 URL 和 Key 是否正确
 2. 网络是否正常
 3. 浏览器控制台是否有错误
 
 ### Q: 如何重置密码?
+
 A: 使用 `supabase.auth.resetPasswordForEmail(email)` API
 
 ## 🎯 下一步
@@ -149,5 +154,5 @@ Phase 0 Week 3 将集成 SQLite 本地数据库,实现离线优先架构。
 
 ---
 
-**当前进度**: Phase 0 Week 2 ✅  
+**当前进度**: Phase 0 Week 2 ✅
 **下一阶段**: Phase 0 Week 3 - 本地数据库 (SQLite + SQLCipher)

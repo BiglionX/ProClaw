@@ -1,28 +1,28 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Box, Typography, Button, Card, CardContent } from '@mui/material'
-import { useAuthStore } from '../lib/authStore'
-import RealtimeTest from '../components/RealtimeTest'
+import { Box, Button, Card, CardContent, Typography } from '@mui/material';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import RealtimeTest from '../components/RealtimeTest';
+import { useAuthStore } from '../lib/authStore';
 
 export default function DashboardPage() {
-  const navigate = useNavigate()
-  const { user, logout, checkAuth } = useAuthStore()
+  const navigate = useNavigate();
+  const { user, logout, checkAuth } = useAuthStore();
 
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    checkAuth();
+  }, [checkAuth]);
 
   const handleLogout = async () => {
-    await logout()
-    navigate('/login')
-  }
+    await logout();
+    navigate('/login');
+  };
 
   if (!user) {
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography>加载中...</Typography>
       </Box>
-    )
+    );
   }
 
   return (
@@ -57,7 +57,7 @@ export default function DashboardPage() {
             <li>Phase 0 Week 4: 数据同步引擎</li>
             <li>Phase 1: MVP 核心功能开发</li>
           </ul>
-          
+
           <Button
             variant="contained"
             color="error"
@@ -71,5 +71,5 @@ export default function DashboardPage() {
 
       <RealtimeTest />
     </Box>
-  )
+  );
 }

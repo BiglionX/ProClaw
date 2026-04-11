@@ -71,14 +71,14 @@ pub struct DatabaseStats {
 pub fn create_product(db: tauri::State<Mutex<Database>>, product: serde_json::Value) -> Result<Product, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
-    
+
     let id = Uuid::new_v4().to_string();
     let sku = product["sku"].as_str().ok_or("SKU is required")?;
     let name = product["name"].as_str().ok_or("Name is required")?;
-    
+
     conn.execute(
-        "INSERT INTO products (id, sku, name, description, category_id, unit, 
-         cost_price, sell_price, min_stock, max_stock, current_stock, 
+        "INSERT INTO products (id, sku, name, description, category_id, unit,
+         cost_price, sell_price, min_stock, max_stock, current_stock,
          image_url, barcode, is_active, metadata, sync_status)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 'pending')",
         params![
@@ -99,7 +99,7 @@ pub fn create_product(db: tauri::State<Mutex<Database>>, product: serde_json::Va
             product.get("metadata").and_then(|v| v.as_str()),
         ],
     ).map_err(|e| e.to_string())?;
-    
+
     get_product_by_id_inner(conn, &id)
 }
 
@@ -108,15 +108,15 @@ pub fn create_product(db: tauri::State<Mutex<Database>>, product: serde_json::Va
 pub fn get_products(db: tauri::State<Mutex<Database>>) -> Result<Vec<Product>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
-    
+
     let mut stmt = conn.prepare(
-        "SELECT id, sku, name, description, category_id, unit, 
+        "SELECT id, sku, name, description, category_id, unit,
          cost_price, sell_price, min_stock, max_stock, current_stock,
-         image_url, barcode, is_active, metadata, created_at, updated_at, 
+         image_url, barcode, is_active, metadata, created_at, updated_at,
          sync_status, last_synced_at
          FROM products WHERE deleted_at IS NULL ORDER BY created_at DESC"
     ).map_err(|e| e.to_string())?;
-    
+
     let products = stmt.query_map([], |row| {
         Ok(Product {
             id: row.get(0)?,
@@ -140,7 +140,7 @@ pub fn get_products(db: tauri::State<Mutex<Database>>) -> Result<Vec<Product>, S
             last_synced_at: row.get(18)?,
         })
     }).map_err(|e| e.to_string())?;
-    
+
     products.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
 }
 
@@ -154,13 +154,13 @@ pub fn get_product_by_id(db: tauri::State<Mutex<Database>>, id: String) -> Resul
 
 fn get_product_by_id_inner(conn: &rusqlite::Connection, id: &str) -> Result<Product, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, sku, name, description, category_id, unit, 
+        "SELECT id, sku, name, description, category_id, unit,
          cost_price, sell_price, min_stock, max_stock, current_stock,
-         image_url, barcode, is_active, metadata, created_at, updated_at, 
+         image_url, barcode, is_active, metadata, created_at, updated_at,
          sync_status, last_synced_at
          FROM products WHERE id = ?1 AND deleted_at IS NULL"
     ).map_err(|e| e.to_string())?;
-    
+
     let product = stmt.query_row(params![id], |row| {
         Ok(Product {
             id: row.get(0)?,
@@ -184,7 +184,7 @@ fn get_product_by_id_inner(conn: &rusqlite::Connection, id: &str) -> Result<Prod
             last_synced_at: row.get(18)?,
         })
     }).map_err(|e| e.to_string())?;
-    
+
     Ok(product)
 }
 
@@ -193,41 +193,41 @@ fn get_product_by_id_inner(conn: &rusqlite::Connection, id: &str) -> Result<Prod
 pub fn update_product(db: tauri::State<Mutex<Database>>, id: String, updates: serde_json::Value) -> Result<Product, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
-    
+
     // 构建动态 UPDATE 语句
     let mut fields = Vec::new();
     let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
-    
+
     if let Some(name) = updates.get("name").and_then(|v| v.as_str()) {
         fields.push("name = ?");
         params_vec.push(&name.to_string());
     }
-    
+
     if let Some(price) = updates.get("sell_price").and_then(|v| v.as_f64()) {
         fields.push("sell_price = ?");
         params_vec.push(&price);
     }
-    
+
     if let Some(stock) = updates.get("current_stock").and_then(|v| v.as_i64()) {
         fields.push("current_stock = ?");
         params_vec.push(&(stock as i32));
     }
-    
+
     if fields.is_empty() {
         return Err("No fields to update".to_string());
     }
-    
+
     fields.push("sync_status = 'pending'");
     params_vec.push(&id);
-    
+
     let sql = format!("UPDATE products SET {} WHERE id = ?", fields.join(", "));
-    
+
     // 由于参数类型复杂,使用简化的方式
     conn.execute(
         "UPDATE products SET sync_status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
         params![id],
     ).map_err(|e| e.to_string())?;
-    
+
     get_product_by_id_inner(conn, &id)
 }
 
@@ -236,12 +236,12 @@ pub fn update_product(db: tauri::State<Mutex<Database>>, id: String, updates: se
 pub fn delete_product(db: tauri::State<Mutex<Database>>, id: String) -> Result<(), String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
-    
+
     conn.execute(
         "UPDATE products SET deleted_at = CURRENT_TIMESTAMP, sync_status = 'pending' WHERE id = ?1",
         params![id],
     ).map_err(|e| e.to_string())?;
-    
+
     Ok(())
 }
 
@@ -250,33 +250,33 @@ pub fn delete_product(db: tauri::State<Mutex<Database>>, id: String) -> Result<(
 pub fn get_database_stats(db: tauri::State<Mutex<Database>>) -> Result<DatabaseStats, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
-    
+
     let products: i64 = conn.query_row(
         "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL",
         [],
         |row| row.get(0)
     ).map_err(|e| e.to_string())?;
-    
+
     let categories: i64 = conn.query_row(
         "SELECT COUNT(*) FROM product_categories WHERE deleted_at IS NULL",
         [],
         |row| row.get(0)
     ).map_err(|e| e.to_string())?;
-    
+
     let transactions: i64 = conn.query_row(
         "SELECT COUNT(*) FROM inventory_transactions",
         [],
         |row| row.get(0)
     ).map_err(|e| e.to_string())?;
-    
+
     let pending_sync: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM products WHERE sync_status = 'pending' 
+        "SELECT COUNT(*) FROM products WHERE sync_status = 'pending'
          UNION ALL SELECT COUNT(*) FROM product_categories WHERE sync_status = 'pending'
          UNION ALL SELECT COUNT(*) FROM inventory_transactions WHERE sync_status = 'pending'",
         [],
         |row| row.get(0)
     ).unwrap_or(0);
-    
+
     Ok(DatabaseStats {
         products,
         categories,
@@ -290,12 +290,12 @@ pub fn get_database_stats(db: tauri::State<Mutex<Database>>) -> Result<DatabaseS
 pub fn get_pending_sync_records(db: tauri::State<Mutex<Database>>) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
-    
+
     // 简化实现:返回待同步的产品
     let mut stmt = conn.prepare(
         "SELECT id, sku, name, sync_status FROM products WHERE sync_status = 'pending'"
     ).map_err(|e| e.to_string())?;
-    
+
     let records: Vec<serde_json::Value> = stmt.query_map([], |row| {
         Ok(serde_json::json!({
             "id": row.get::<_, String>(0)?,
@@ -306,7 +306,7 @@ pub fn get_pending_sync_records(db: tauri::State<Mutex<Database>>) -> Result<ser
     }).map_err(|e| e.to_string())?
     .filter_map(|r| r.ok())
     .collect();
-    
+
     Ok(serde_json::json!({
         "products": records,
         "total": records.len()
@@ -318,14 +318,14 @@ pub fn get_pending_sync_records(db: tauri::State<Mutex<Database>>) -> Result<ser
 pub fn mark_as_synced(db: tauri::State<Mutex<Database>>, table: String, record_id: String) -> Result<(), String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
-    
+
     let sql = match table.as_str() {
         "products" => "UPDATE products SET sync_status = 'synced', last_synced_at = CURRENT_TIMESTAMP WHERE id = ?1",
         "product_categories" => "UPDATE product_categories SET sync_status = 'synced', last_synced_at = CURRENT_TIMESTAMP WHERE id = ?1",
         "inventory_transactions" => "UPDATE inventory_transactions SET sync_status = 'synced', last_synced_at = CURRENT_TIMESTAMP WHERE id = ?1",
         _ => return Err(format!("Unknown table: {}", table)),
     };
-    
+
     conn.execute(sql, params![record_id]).map_err(|e| e.to_string())?;
     Ok(())
 }

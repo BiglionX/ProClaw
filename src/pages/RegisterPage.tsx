@@ -1,42 +1,42 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
-  TextField,
-  Button,
-  Typography,
-  Alert,
-  Link,
   CircularProgress,
-} from '@mui/material'
-import { useAuthStore } from '../lib/authStore'
+  Link,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../lib/authStore';
 
 export default function RegisterPage() {
-  const navigate = useNavigate()
-  const { register, isLoading, error, clearError } = useAuthStore()
-  
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const navigate = useNavigate();
+  const { register, isLoading, error, clearError } = useAuthStore();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    clearError()
-    
+    e.preventDefault();
+    clearError();
+
     if (password !== confirmPassword) {
-      alert('两次输入的密码不一致')
-      return
+      alert('两次输入的密码不一致');
+      return;
     }
 
     try {
-      await register(email, password)
-      navigate('/')
+      await register(email, password);
+      navigate('/');
     } catch (err) {
-      console.error('Register failed:', err)
+      console.error('Register failed:', err);
     }
-  }
+  };
 
   return (
     <Box
@@ -53,8 +53,13 @@ export default function RegisterPage() {
           <Typography variant="h5" component="h1" gutterBottom align="center">
             创建账号
           </Typography>
-          
-          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            align="center"
+            sx={{ mb: 3 }}
+          >
             开始使用 Proclaw Desktop
           </Typography>
 
@@ -70,7 +75,7 @@ export default function RegisterPage() {
               label="邮箱"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               required
               sx={{ mb: 2 }}
             />
@@ -80,7 +85,7 @@ export default function RegisterPage() {
               label="密码"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               required
               sx={{ mb: 2 }}
             />
@@ -90,7 +95,7 @@ export default function RegisterPage() {
               label="确认密码"
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={e => setConfirmPassword(e.target.value)}
               required
               sx={{ mb: 3 }}
             />
@@ -107,11 +112,7 @@ export default function RegisterPage() {
             </Button>
 
             <Box sx={{ textAlign: 'center' }}>
-              <Link
-                href="/login"
-                variant="body2"
-                underline="hover"
-              >
+              <Link href="/login" variant="body2" underline="hover">
                 已有账号? 立即登录
               </Link>
             </Box>
@@ -119,5 +120,5 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </Box>
-  )
+  );
 }

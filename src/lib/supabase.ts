@@ -1,10 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local')
+  console.warn(
+    'Supabase credentials not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local'
+  );
 }
 
 export const supabase = createClient(
@@ -17,18 +19,18 @@ export const supabase = createClient(
       detectSessionInUrl: true,
     },
   }
-)
+);
 
 // 类型定义
 export type User = {
-  id: string
-  email: string
-  created_at: string
-}
+  id: string;
+  email: string;
+  created_at: string;
+};
 
 export type Session = {
-  access_token: string
-  refresh_token: string
-  expires_at: number
-  user: User
-}
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  user: User;
+};

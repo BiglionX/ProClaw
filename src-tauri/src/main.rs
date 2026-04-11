@@ -13,17 +13,17 @@ fn main() {
     // 初始化数据库
     let db_path = get_database_path();
     println!("Database path: {:?}", db_path);
-    
+
     let db = Database::new(db_path).expect("Failed to create database");
     db.initialize().expect("Failed to initialize database");
     println!("Database initialized successfully");
-    
+
     // 创建同步引擎
     let sync_engine = SyncEngine::new(Database::new(db_path).expect("Failed to create database"));
-    
+
     // 将数据库包装在 Mutex 中以支持多线程访问
     let db = Mutex::new(db);
-    
+
     tauri::Builder::default()
         .manage(db)
         .manage(sync_engine)
