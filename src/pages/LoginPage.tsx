@@ -57,6 +57,17 @@ export default function LoginPage() {
             AI-Powered Business Operating System
           </Typography>
 
+          {/* 模拟账号提示 */}
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              🚀 <strong>快速体验账号</strong>
+              <br />
+              用户名: <code>boss</code>
+              <br />
+              密码: <code>IamBigBoss</code>
+            </Typography>
+          </Alert>
+
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={clearError}>
               {error}
@@ -139,6 +150,24 @@ export default function LoginPage() {
               sx={{ mb: 2 }}
             >
               {isLoading ? <CircularProgress size={24} /> : '登录'}
+            </Button>
+
+            {/* 快速登录按钮 */}
+            <Button
+              fullWidth
+              variant="outlined"
+              size="medium"
+              onClick={async () => {
+                try {
+                  await login('boss', 'IamBigBoss');
+                  navigate('/');
+                } catch (err) {
+                  console.error('Quick login failed:', err);
+                }
+              }}
+              sx={{ mb: 2, borderColor: '#1976d2', color: '#1976d2' }}
+            >
+              ⚡ 一键体验 (boss)
             </Button>
 
             <Box sx={{ textAlign: 'center' }}>

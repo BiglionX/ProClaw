@@ -49,21 +49,36 @@ export default function TopBar() {
             sx={{
               width: 32,
               height: 32,
-              bgcolor: '#1976d2',
+              bgcolor: user?.id?.startsWith('mock-') ? '#ff9800' : '#1976d2',
               fontSize: '0.9rem',
             }}
           >
             {user?.email?.charAt(0).toUpperCase() || 'U'}
           </Avatar>
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'rgba(255,255,255,0.9)',
-              fontSize: '0.85rem',
-            }}
-          >
-            {user?.email || '用户'}
-          </Typography>
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'rgba(255,255,255,0.9)',
+                fontSize: '0.85rem',
+                fontWeight: 500,
+              }}
+            >
+              {user?.email?.split('@')[0] || '用户'}
+            </Typography>
+            {user?.id?.startsWith('mock-') && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#ff9800',
+                  fontSize: '0.7rem',
+                  display: 'block',
+                }}
+              >
+                🎭 体验模式
+              </Typography>
+            )}
+          </Box>
           <Tooltip title="退出登录">
             <IconButton size="small" color="inherit" onClick={handleLogout}>
               <LogoutIcon />

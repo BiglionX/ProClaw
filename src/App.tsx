@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage';
 import ProductsPage from './pages/ProductsPage';
 import InventoryPage from './pages/InventoryPage';
 import SettingsPage from './pages/SettingsPage';
+import TestPage from './pages/TestPage';
 
 // 受保护的路由组件 - 使用 AppLayout 包装
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -74,6 +75,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+        
+        {/* 测试页面 - 开发环境使用 */}
+        <Route path="/test" element={<TestPage />} />
       </Routes>
     </BrowserRouter>
   );
