@@ -20,7 +20,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
-import { executeCommand, parseCommand } from '../lib/commandParser';
+import { executeCommand, parseCommand } from '../../lib/commandParser';
 
 interface Message {
   id: string;
