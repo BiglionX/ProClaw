@@ -1,13 +1,12 @@
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  Download as DownloadIcon,
   Edit as EditIcon,
+  FilterList as FilterIcon,
+  Image as ImageIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
-  FilterList as FilterIcon,
-  Download as DownloadIcon,
-  CloudUpload as UploadIcon,
-  Image as ImageIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -34,6 +33,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { Brand, getBrands } from '../lib/brandService';
+import { Category, getCategories } from '../lib/categoryService';
 import {
   createProduct,
   CreateProductInput,
@@ -42,8 +43,6 @@ import {
   Product as ProductType,
   updateProduct,
 } from '../lib/productService';
-import { Brand, getBrands } from '../lib/brandService';
-import { Category, getCategories } from '../lib/categoryService';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductType[]>([]);
@@ -95,10 +94,7 @@ export default function ProductsPage() {
   // 加载分类和品牌
   const loadFilters = async () => {
     try {
-      const [cats, brs] = await Promise.all([
-        getCategories(),
-        getBrands(),
-      ]);
+      const [cats, brs] = await Promise.all([getCategories(), getBrands()]);
       setCategories(cats);
       setBrands(brs);
     } catch (err) {
@@ -192,9 +188,9 @@ export default function ProductsPage() {
   const handleSave = async () => {
     try {
       setLoading(true);
-      
+
       let imageUrl = editingProduct?.image_url || undefined;
-      
+
       // 如果有新选择的图片，转换为 Base64
       if (imageFile) {
         const reader = new FileReader();
@@ -204,12 +200,12 @@ export default function ProductsPage() {
           reader.readAsDataURL(imageFile);
         });
       }
-      
+
       const productData = {
         ...formData,
         image_url: imageUrl,
       };
-      
+
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
         setSuccessMessage('产品更新成功!');
@@ -257,8 +253,18 @@ export default function ProductsPage() {
     }
 
     // CSV 表头
-    const headers = ['SKU', '产品名称', '成本价', '销售价', '当前库存', '最低库存', '最高库存', '单位', '状态'];
-    
+    const headers = [
+      'SKU',
+      '产品名称',
+      '成本价',
+      '销售价',
+      '当前库存',
+      '最低库存',
+      '最高库存',
+      '单位',
+      '状态',
+    ];
+
     // CSV 数据行
     const rows = products.map(product => [
       product.sku,
@@ -279,11 +285,16 @@ export default function ProductsPage() {
     ].join('\n');
 
     // 创建 Blob 并下载
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\ufeff${csvContent}`], {
+      type: 'text/csv;charset=utf-8;',
+    });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `products_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      'download',
+      `products_${new Date().toISOString().split('T')[0]}.csv`
+    );
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -326,7 +337,14 @@ export default function ProductsPage() {
       {/* 操作栏 */}
       <Paper
         elevation={0}
-        sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}
+        sx={{
+          p: 2,
+          mb: 3,
+          display: 'flex',
+          gap: 2,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
       >
         <TextField
           placeholder="搜索产品 (SKU 或名称)"
@@ -343,7 +361,7 @@ export default function ProductsPage() {
             ),
           }}
         />
-        
+
         {/* 分类筛选 */}
         <TextField
           select
@@ -362,7 +380,9 @@ export default function ProductsPage() {
         >
           <MenuItem value="">全部分类</MenuItem>
           {categories.map(cat => (
-            <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+            <MenuItem key={cat.id} value={cat.id}>
+              {cat.name}
+            </MenuItem>
           ))}
         </TextField>
 
@@ -377,7 +397,9 @@ export default function ProductsPage() {
         >
           <MenuItem value="">全部品牌</MenuItem>
           {brands.map(brand => (
-            <MenuItem key={brand.id} value={brand.id}>{brand.name}</MenuItem>
+            <MenuItem key={brand.id} value={brand.id}>
+              {brand.name}
+            </MenuItem>
           ))}
         </TextField>
 
@@ -555,11 +577,18 @@ export default function ProductsPage() {
                     borderRadius: 2,
                     p: 3,
                     cursor: 'pointer',
-                    '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: 'action.hover',
+                    },
                   }}
-                  onClick={() => document.getElementById('image-upload')?.click()}
+                  onClick={() =>
+                    document.getElementById('image-upload')?.click()
+                  }
                 >
-                  <ImageIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                  <ImageIcon
+                    sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }}
+                  />
                   <Typography variant="body2" color="text.secondary">
                     点击上传图片
                   </Typography>

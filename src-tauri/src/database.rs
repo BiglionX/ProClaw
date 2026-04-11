@@ -38,7 +38,7 @@ impl Database {
 
     /// 初始化数据库 Schema
     pub fn initialize(&self) -> DbResult<()> {
-        let schema = include_str!("../src/db/schema.sql");
+        let schema = include_str!("../../src/db/schema.sql");
         self.conn.execute_batch(schema)?;
         Ok(())
     }

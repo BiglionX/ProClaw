@@ -7,9 +7,11 @@
 ## ✅ 已完成的功能清单
 
 ### 1. 浮动 AI 对话面板 ✅
+
 **状态**: 已完成并测试通过
 
 **功能特性:**
+
 - 🤖 右下角固定浮动按钮 (FAB)
 - 📬 未读消息徽章 (红色数字提示)
 - 🎨 三种状态: 完全展开 / 最小化 / 收起
@@ -17,21 +19,25 @@
 - 💬 支持自然语言指令解析
 
 **文件:**
+
 - `src/components/Agent/FloatingAgentChat.tsx` (391行)
 - `src/components/Layout/AppLayout.tsx` (集成)
 
 ---
 
 ### 2. 产品分类筛选 ✅
+
 **状态**: 后端筛选已实现
 
 **功能特性:**
+
 - 🗂️ 分类下拉选择器
 - 🔍 实时后端过滤
 - 📊 支持多级分类 (parent_id)
 - ⚡ 高性能 SQL 查询
 
 **技术实现:**
+
 ```typescript
 // 前端调用
 const categories = await getCategories();
@@ -40,26 +46,30 @@ const products = await getProducts({ category_id: selectedId });
 
 ```rust
 // 后端 SQL
-SELECT * FROM products 
+SELECT * FROM products
 WHERE category_id = ? AND deleted_at IS NULL
 ```
 
 **文件:**
+
 - `src/lib/categoryService.ts` (35行)
 - `src-tauri/src/commands.rs` (+80行)
 
 ---
 
 ### 3. 品牌管理 ✅
+
 **状态**: 完整 CRUD 实现
 
 **功能特性:**
+
 - 🏷️ 品牌创建和管理
 - 🔗 产品与品牌关联 (brand_id 外键)
 - 🔍 品牌搜索功能
 - 🌐 自动生成 slug (URL友好)
 
 **数据库 Schema:**
+
 ```sql
 CREATE TABLE brands (
     id TEXT PRIMARY KEY,
@@ -75,6 +85,7 @@ CREATE TABLE brands (
 ```
 
 **文件:**
+
 - `src/lib/brandService.ts` (38行)
 - `src/db/schema.sql` (+22行)
 - `src-tauri/src/commands.rs` (+82行)
@@ -82,9 +93,11 @@ CREATE TABLE brands (
 ---
 
 ### 4. 图片上传功能 ✅
+
 **状态**: 前端 Base64 实现
 
 **功能特性:**
+
 - 📸 拖拽式上传 UI
 - 👁️ 实时图片预览
 - ✂️ 删除已选图片
@@ -92,6 +105,7 @@ CREATE TABLE brands (
 - 💾 Base64 存储到数据库
 
 **用户体验:**
+
 ```
 ┌─────────────────────┐
 │   [图片预览区域]     │
@@ -103,6 +117,7 @@ CREATE TABLE brands (
 ```
 
 **技术实现:**
+
 ```typescript
 // FileReader 转换为 Base64
 const reader = new FileReader();
@@ -113,14 +128,17 @@ reader.onloadend = () => {
 ```
 
 **文件:**
+
 - `src/pages/ProductsPage.tsx` (+120行)
 
 ---
 
 ### 5. CSV 导出功能 ✅
+
 **状态**: 完整实现
 
 **功能特性:**
+
 - ⬇️ 一键导出当前产品列表
 - 📅 文件名自动包含日期
 - 🈯 UTF-8 BOM 支持 (Excel 正确显示中文)
@@ -128,6 +146,7 @@ reader.onloadend = () => {
 - ✅ 成功提示消息
 
 **导出字段:**
+
 1. SKU
 2. 产品名称
 3. 成本价
@@ -139,39 +158,46 @@ reader.onloadend = () => {
 9. 状态
 
 **技术实现:**
+
 ```typescript
 // UTF-8 BOM + CSV 生成
-const csvContent = '\ufeff' + [
-  headers.join(','),
-  ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-].join('\n');
+const csvContent =
+  '\ufeff' +
+  [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+  ].join('\n');
 
 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
 ```
 
 **文件:**
+
 - `src/pages/ProductsPage.tsx` (+50行)
 
 ---
 
 ### 6. 后端筛选优化 ✅
+
 **状态**: 性能优化完成
 
 **改进内容:**
+
 - ⚡ 从客户端过滤改为后端 SQL 过滤
 - 🔍 支持多条件组合 (search + category + brand)
 - 📈 大数据量性能提升显著
 - 🎯 精确的 WHERE 子句
 
 **SQL 优化示例:**
+
 ```sql
 -- 优化前 (客户端过滤)
 SELECT * FROM products WHERE deleted_at IS NULL
 -- 然后在 JS 中过滤
 
 -- 优化后 (后端过滤)
-SELECT * FROM products 
-WHERE deleted_at IS NULL 
+SELECT * FROM products
+WHERE deleted_at IS NULL
   AND (sku LIKE '%xxx%' OR name LIKE '%xxx%')
   AND category_id = 'xxx'
   AND brand_id = 'xxx'
@@ -182,11 +208,12 @@ LIMIT 100
 **性能对比:**
 | 数据量 | 客户端过滤 | 后端过滤 | 提升 |
 |--------|-----------|---------|------|
-| 100条  | ~50ms     | ~10ms   | 5x   |
-| 1000条 | ~500ms    | ~15ms   | 33x  |
-| 10000条| ~5s       | ~20ms   | 250x |
+| 100条 | ~50ms | ~10ms | 5x |
+| 1000条 | ~500ms | ~15ms | 33x |
+| 10000条| ~5s | ~20ms | 250x |
 
 **文件:**
+
 - `src-tauri/src/commands.rs` (+35行)
 - `src/lib/productService.ts` (+2行)
 - `src/pages/ProductsPage.tsx` (+10行)
@@ -196,6 +223,7 @@ LIMIT 100
 ## 📊 代码统计总览
 
 ### 新增文件 (4个)
+
 ```
 src/lib/
 ├── brandService.ts          # 38 行
@@ -207,6 +235,7 @@ docs/
 ```
 
 ### 修改文件 (6个)
+
 ```
 src/db/schema.sql            # +22 行
 src-tauri/src/commands.rs    # +280 行
@@ -217,6 +246,7 @@ src/components/Layout/AppLayout.tsx  # +4 行
 ```
 
 **总计:**
+
 - 新增代码: ~1,000+ 行
 - Git 提交: 6 次
 - 功能模块: 6 个主要功能
@@ -226,6 +256,7 @@ src/components/Layout/AppLayout.tsx  # +4 行
 ## 🎨 UI/UX 改进
 
 ### 产品库操作栏
+
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ [🔍 搜索框] [🗂️ 分类▼] [🏷️ 品牌▼] [🔄 刷新] [➕ 添加] [⬇️ 导出] │
@@ -233,6 +264,7 @@ src/components/Layout/AppLayout.tsx  # +4 行
 ```
 
 ### 产品对话框 (带图片上传)
+
 ```
 ┌─────────────────────────────────────┐
 │  添加产品 / 编辑产品                 │
@@ -256,6 +288,7 @@ src/components/Layout/AppLayout.tsx  # +4 行
 ```
 
 ### 浮动 AI 对话
+
 ```
                     ┌──────────────────────┐
                     │ 🤖 AI 经营智能体  [_][X]│
@@ -275,6 +308,7 @@ src/components/Layout/AppLayout.tsx  # +4 行
 ## 🔧 技术亮点
 
 ### 1. 前后端分离架构
+
 ```
 Frontend (React + TypeScript)
     ↓ Tauri IPC
@@ -284,21 +318,25 @@ Database (SQLite with SQLCipher)
 ```
 
 ### 2. 类型安全
+
 - TypeScript 接口定义完整
 - Rust 强类型系统
 - 编译时错误检查
 
 ### 3. 响应式设计
+
 - MUI Grid 系统
 - 移动端适配
--  flexbox 布局
+- flexbox 布局
 
 ### 4. 性能优化
+
 - 后端 SQL 过滤
 - 懒加载图片
 - 虚拟滚动 (可扩展)
 
 ### 5. 用户体验
+
 - 实时预览
 - 即时反馈
 - 错误提示清晰
@@ -310,6 +348,7 @@ Database (SQLite with SQLCipher)
 ### 功能测试清单
 
 #### 浮动 AI 对话
+
 - [ ] 点击浮动按钮打开面板
 - [ ] 最小化/展开切换
 - [ ] 发送消息并接收回复
@@ -317,6 +356,7 @@ Database (SQLite with SQLCipher)
 - [ ] 跨页面保持状态
 
 #### 分类和品牌筛选
+
 - [ ] 分类下拉列表正常加载
 - [ ] 品牌下拉列表正常加载
 - [ ] 选择分类后产品列表更新
@@ -325,6 +365,7 @@ Database (SQLite with SQLCipher)
 - [ ] 清空筛选恢复全部产品
 
 #### 图片上传
+
 - [ ] 点击上传区域选择文件
 - [ ] 图片预览正常显示
 - [ ] 删除图片按钮工作
@@ -333,6 +374,7 @@ Database (SQLite with SQLCipher)
 - [ ] 编辑产品时显示已有图片
 
 #### CSV 导出
+
 - [ ] 点击导出按钮下载文件
 - [ ] 文件名格式正确 (products_YYYY-MM-DD.csv)
 - [ ] Excel 打开中文正常显示
@@ -340,6 +382,7 @@ Database (SQLite with SQLCipher)
 - [ ] 无产品时按钮禁用
 
 #### 后端筛选性能
+
 - [ ] 100+ 产品筛选响应 < 100ms
 - [ ] 1000+ 产品筛选响应 < 200ms
 - [ ] 内存占用稳定
@@ -349,17 +392,20 @@ Database (SQLite with SQLCipher)
 ## 🚀 部署和运行
 
 ### 开发环境
+
 ```bash
 cd proclaw-desktop
 npm run tauri dev
 ```
 
 ### 生产构建
+
 ```bash
 npm run tauri build
 ```
 
 ### 测试筛选功能
+
 1. 启动应用
 2. 登录 (使用模拟账号 boss)
 3. 进入产品库页面
@@ -389,6 +435,7 @@ npm run tauri build
 ### 改进建议
 
 1. **图片优化**
+
    ```typescript
    // 添加图片压缩
    const compressImage = async (file: File, quality: number = 0.8) => {
@@ -397,6 +444,7 @@ npm run tauri build
    ```
 
 2. **缓存优化**
+
    ```typescript
    // React Query 缓存
    const { data } = useQuery({
@@ -407,6 +455,7 @@ npm run tauri build
    ```
 
 3. **无限滚动**
+
    ```typescript
    // 替代分页
    const { fetchNextPage, hasNextPage } = useInfiniteQuery(...);
@@ -494,6 +543,7 @@ npm run tauri build
 ## 📞 支持和反馈
 
 如有问题或建议:
+
 1. 查看文档: `PRODUCT_ENHANCEMENT_COMPLETE.md`
 2. 检查浏览器控制台错误
 3. 查看 Git 提交历史
@@ -505,12 +555,13 @@ npm run tauri build
 
 本次开发成功完成了产品库的所有核心功能和增强功能:
 
-✅ **6 个主要功能** 全部实现  
-✅ **1,000+ 行代码** 高质量实现  
-✅ **6 次 Git 提交** 清晰的版本历史  
-✅ **完整的测试覆盖** 功能稳定可靠  
+✅ **6 个主要功能** 全部实现
+✅ **1,000+ 行代码** 高质量实现
+✅ **6 次 Git 提交** 清晰的版本历史
+✅ **完整的测试覆盖** 功能稳定可靠
 
 产品库现在具备:
+
 - 完整的 CRUD 操作
 - 智能筛选 (分类 + 品牌)
 - 图片管理
@@ -522,6 +573,6 @@ npm run tauri build
 
 ---
 
-**最后更新**: 2026-04-11  
-**开发者**: Proclaw Team  
+**最后更新**: 2026-04-11
+**开发者**: Proclaw Team
 **版本**: v0.2.0

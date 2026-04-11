@@ -9,6 +9,7 @@
 ### 1. 产品分类筛选
 
 **实现内容:**
+
 - ✅ 数据库添加 `product_categories` 表 (已存在)
 - ✅ Rust 后端命令: `create_category`, `get_categories`
 - ✅ TypeScript 服务层: `categoryService.ts`
@@ -16,6 +17,7 @@
 - ✅ 支持按分类过滤产品列表
 
 **使用方式:**
+
 ```typescript
 // 获取所有分类
 const categories = await getCategories();
@@ -34,6 +36,7 @@ await createCategory({
 ### 2. 品牌管理
 
 **实现内容:**
+
 - ✅ 数据库添加 `brands` 表
   - 字段: id, name, slug, logo_url, website_url, description, sort_order, is_active
 - ✅ Rust 后端命令: `create_brand`, `get_brands`
@@ -44,6 +47,7 @@ await createCategory({
 - ✅ products 表添加 `brand_id` 外键关联
 
 **使用方式:**
+
 ```typescript
 // 获取所有品牌
 const brands = await getBrands();
@@ -65,6 +69,7 @@ await createBrand({
 ### 3. CSV 导出功能
 
 **实现内容:**
+
 - ✅ 导出按钮添加到操作栏
 - ✅ 导出当前显示的所有产品
 - ✅ UTF-8 BOM 支持 (Excel 正确显示中文)
@@ -73,6 +78,7 @@ await createBrand({
 - ✅ 无数据时禁用导出按钮
 
 **导出字段:**
+
 - SKU
 - 产品名称
 - 成本价
@@ -91,6 +97,7 @@ await createBrand({
 ## 📊 代码变更统计
 
 ### 新增文件 (2个)
+
 ```
 src/lib/
 ├── brandService.ts          # 品牌管理服务 (38行)
@@ -98,6 +105,7 @@ src/lib/
 ```
 
 ### 修改文件 (4个)
+
 ```
 src/db/schema.sql            # +22行 (添加brands表和索引)
 src-tauri/src/commands.rs    # +162行 (品牌和分类命令)
@@ -106,6 +114,7 @@ src/pages/ProductsPage.tsx   # +120行 (筛选器和导出功能)
 ```
 
 **总计:**
+
 - 新增代码: ~350 行
 - Git 提交: 3 次
 
@@ -122,10 +131,12 @@ src/pages/ProductsPage.tsx   # +120行 (筛选器和导出功能)
 ```
 
 **响应式设计:**
+
 - 桌面端: 所有元素横向排列
 - 平板/移动端: 自动换行,保持可用性
 
 **筛选器特性:**
+
 - 分类筛选: 带 FilterIcon 图标
 - 品牌筛选: 简洁下拉菜单
 - 默认选项: "全部分类" / "全部品牌"
@@ -170,12 +181,12 @@ pub fn create_brand(
 ) -> Result<serde_json::Value, String> {
     let id = Uuid::new_v4().to_string();
     let name = brand["name"].as_str().ok_or("Brand name is required")?;
-    
+
     // 自动生成 slug
     let slug = name.to_lowercase()
         .replace(' ', '-')
         .replace(|c: char| !c.is_alphanumeric() && c != '-', "");
-    
+
     // 插入数据库...
     Ok(serde_json::json!({
         "id": id,
@@ -193,13 +204,13 @@ const handleExportCSV = () => {
   // 1. 准备表头和数据
   const headers = ['SKU', '产品名称', '成本价', ...];
   const rows = products.map(p => [p.sku, p.name, ...]);
-  
+
   // 2. 组合 CSV 内容 (添加 UTF-8 BOM)
   const csvContent = '\ufeff' + [
     headers.join(','),
     ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
   ].join('\n');
-  
+
   // 3. 创建 Blob 并触发下载
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
@@ -301,6 +312,7 @@ const handleExportCSV = () => {
 ## 🎯 总结
 
 本次更新成功为产品库添加了:
+
 - ✅ **分类筛选** - 提升产品查找效率
 - ✅ **品牌管理** - 完善产品元数据
 - ✅ **CSV 导出** - 方便数据分析和备份
@@ -309,6 +321,6 @@ const handleExportCSV = () => {
 
 ---
 
-**最后更新**: 2026-04-11  
-**Git Commits**: 3  
+**最后更新**: 2026-04-11
+**Git Commits**: 3
 **代码行数**: +350 行

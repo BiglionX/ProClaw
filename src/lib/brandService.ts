@@ -25,13 +25,17 @@ export interface CreateBrandInput {
 /**
  * 创建品牌
  */
-export async function createBrand(input: CreateBrandInput): Promise<{ id: string; name: string; slug: string }> {
+export async function createBrand(
+  input: CreateBrandInput
+): Promise<{ id: string; name: string; slug: string }> {
   return await invoke('create_brand', { brand: input });
 }
 
 /**
  * 获取品牌列表
  */
-export async function getBrands(options?: { search?: string }): Promise<Brand[]> {
+export async function getBrands(options?: {
+  search?: string;
+}): Promise<Brand[]> {
   return await invoke('get_brands', { options });
 }

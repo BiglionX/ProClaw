@@ -14,7 +14,7 @@ fn main() {
     let db_path = get_database_path();
     println!("Database path: {:?}", db_path);
 
-    let db = Database::new(db_path).expect("Failed to create database");
+    let db = Database::new(db_path.clone()).expect("Failed to create database");
     db.initialize().expect("Failed to initialize database");
     println!("Database initialized successfully");
 
@@ -40,6 +40,10 @@ fn main() {
             // 分类管理
             create_category,
             get_categories,
+            // 库存管理
+            create_inventory_transaction,
+            get_inventory_transactions,
+            get_inventory_stats,
             // 数据库和同步
             get_database_stats,
             get_pending_sync_records,

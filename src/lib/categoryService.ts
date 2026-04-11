@@ -22,7 +22,9 @@ export interface CreateCategoryInput {
 /**
  * 创建分类
  */
-export async function createCategory(input: CreateCategoryInput): Promise<{ id: string; name: string }> {
+export async function createCategory(
+  input: CreateCategoryInput
+): Promise<{ id: string; name: string }> {
   return await invoke('create_category', { category: input });
 }
 
