@@ -50,6 +50,9 @@ fn main() {
             // 采购管理
             create_supplier,
             get_suppliers,
+            create_purchase_order,
+            get_purchase_orders,
+            get_purchase_order_detail,
             // 数据库和同步
             get_database_stats,
             get_pending_sync_records,

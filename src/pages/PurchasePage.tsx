@@ -1,5 +1,6 @@
 import {
   Add as AddIcon,
+  Assignment as OrderIcon,
   Business as BusinessIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
@@ -8,12 +9,15 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Paper,
   Snackbar,
+  Tab,
+  Tabs,
   Table,
   TableBody,
   TableCell,
@@ -24,14 +28,31 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { CreateSupplierInput, Supplier, createSupplier, getSuppliers } from '../lib/purchaseService';
+import {
+  CreatePurchaseOrderInput,
+  CreateSupplierInput,
+  PurchaseOrder,
+  Supplier,
+  createPurchaseOrder,
+  createSupplier,
+  getPurchaseOrders,
+  getSuppliers,
+} from '../lib/purchaseService';
 
 export default function PurchasePage() {
+  const [tabValue, setTabValue] = useState(0);
+  
+  // 供应商状态
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // 采购订单状态
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [orderSearchTerm, setOrderSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
 
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -64,7 +85,24 @@ export default function PurchasePage() {
 
   useEffect(() => {
     loadSuppliers();
+    loadOrders();
   }, []);
+
+  // 加载采购订单
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const data = await getPurchaseOrders({
+        status: selectedStatus || undefined,
+        search: orderSearchTerm || undefined,
+      });
+      setOrders(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 处理搜索
   const handleSearch = () => {
@@ -123,7 +161,20 @@ export default function PurchasePage() {
         </Typography>
       </Box>
 
-      {/* 操作栏 */}
+      {/* 标签页 */}
+      <Paper sx={{ mb: 3 }}>
+        <Tabs
+          value={tabValue}
+          onChange={(e, newValue) => setTabValue(newValue)}
+          variant="fullWidth"
+        >
+          <Tab icon={<BusinessIcon />} label="供应商管理" />
+          <Tab icon={<OrderIcon />} label="采购订单" />
+        </Tabs>
+      </Paper>
+
+      {/* 供应商管理标签页 */}
+      {tabValue === 0 && (
       <Paper
         elevation={0}
         sx={{
@@ -138,17 +189,13 @@ export default function PurchasePage() {
         <TextField
           placeholder="搜索供应商 (名称/编码/联系人)"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onChange={e => setSearchTerm(e.target.value)}
+          onKeyPress={e => e.key === 'Enter' && handleSearch()}
           size="small"
           sx={{ minWidth: 300 }}
           InputProps={{
             endAdornment: (
-              <Button
-                size="small"
-                onClick={handleSearch}
-                disabled={loading}
-              >
+              <Button size="small" onClick={handleSearch} disabled={loading}>
                 <SearchIcon />
               </Button>
             ),
@@ -179,7 +226,9 @@ export default function PurchasePage() {
         <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography variant="h6">供应商列表 ({suppliers.length})</Typography>
+            <Typography variant="h6">
+              供应商列表 ({suppliers.length})
+            </Typography>
           </Box>
         </Box>
 
@@ -206,10 +255,12 @@ export default function PurchasePage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                suppliers.map((supplier) => (
+                suppliers.map(supplier => (
                   <TableRow key={supplier.id} hover>
                     <TableCell>
-                      <Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                      <Typography
+                        sx={{ fontWeight: 'bold', color: 'primary.main' }}
+                      >
                         {supplier.code}
                       </Typography>
                     </TableCell>
@@ -221,7 +272,9 @@ export default function PurchasePage() {
                     <TableCell>
                       <Typography
                         sx={{
-                          color: supplier.is_active ? 'success.main' : 'text.secondary',
+                          color: supplier.is_active
+                            ? 'success.main'
+                            : 'text.secondary',
                           fontWeight: 'bold',
                         }}
                       >
@@ -235,16 +288,22 @@ export default function PurchasePage() {
           </Table>
         </TableContainer>
       </Paper>
+      )}
 
       {/* 添加供应商对话框 */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>添加供应商</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="供应商名称 *"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
               required
               fullWidth
             />
@@ -252,7 +311,7 @@ export default function PurchasePage() {
             <TextField
               label="供应商编码"
               value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              onChange={e => setFormData({ ...formData, code: e.target.value })}
               placeholder="留空自动生成"
               fullWidth
             />
@@ -260,22 +319,30 @@ export default function PurchasePage() {
             <TextField
               label="联系人"
               value={formData.contact_person}
-              onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, contact_person: e.target.value })
+              }
               fullWidth
             />
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box
+              sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}
+            >
               <TextField
                 label="电话"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={e =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
                 fullWidth
               />
               <TextField
                 label="邮箱"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={e =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
                 fullWidth
               />
             </Box>
@@ -283,24 +350,32 @@ export default function PurchasePage() {
             <TextField
               label="地址"
               value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, address: e.target.value })
+              }
               multiline
               rows={2}
               fullWidth
             />
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box
+              sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}
+            >
               <TextField
                 label="网站"
                 value={formData.website}
-                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                onChange={e =>
+                  setFormData({ ...formData, website: e.target.value })
+                }
                 placeholder="https://example.com"
                 fullWidth
               />
               <TextField
                 label="税号"
                 value={formData.tax_number}
-                onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
+                onChange={e =>
+                  setFormData({ ...formData, tax_number: e.target.value })
+                }
                 fullWidth
               />
             </Box>
@@ -308,7 +383,9 @@ export default function PurchasePage() {
             <TextField
               label="付款条件"
               value={formData.payment_terms}
-              onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, payment_terms: e.target.value })
+              }
               placeholder="例如: Net 30, COD"
               fullWidth
             />
@@ -316,7 +393,9 @@ export default function PurchasePage() {
             <TextField
               label="备注"
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, notes: e.target.value })
+              }
               multiline
               rows={3}
               fullWidth
@@ -331,6 +410,141 @@ export default function PurchasePage() {
         </DialogActions>
       </Dialog>
 
+      {/* 采购订单标签页 */}
+      {tabValue === 1 && (
+        <Box>
+          {/* 操作栏 */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 3,
+              display: 'flex',
+              gap: 2,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <TextField
+              placeholder="搜索采购订单 (PO号/供应商)"
+              value={orderSearchTerm}
+              onChange={(e) => setOrderSearchTerm(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && loadOrders()}
+              size="small"
+              sx={{ minWidth: 300 }}
+              InputProps={{
+                endAdornment: (
+                  <Button size="small" onClick={loadOrders} disabled={loading}>
+                    <SearchIcon />
+                  </Button>
+                ),
+              }}
+            />
+
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => alert('创建采购订单功能开发中...')}
+              disabled={loading}
+            >
+              创建采购订单
+            </Button>
+
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={loadOrders}
+              disabled={loading}
+            >
+              刷新
+            </Button>
+          </Paper>
+
+          {/* 采购订单列表 */}
+          <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <OrderIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Typography variant="h6">
+                  采购订单列表 ({orders.length})
+                </Typography>
+              </Box>
+            </Box>
+
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>PO编号</TableCell>
+                    <TableCell>供应商</TableCell>
+                    <TableCell>订单日期</TableCell>
+                    <TableCell>状态</TableCell>
+                    <TableCell align="right">总金额</TableCell>
+                    <TableCell>付款状态</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {orders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">
+                          {loading ? '加载中...' : '暂无采购订单'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    orders.map((order) => (
+                      <TableRow key={order.id} hover>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                            {order.po_number}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{order.supplier_name || '-'}</TableCell>
+                        <TableCell>{order.order_date}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={order.status}
+                            size="small"
+                            color={
+                              order.status === 'received'
+                                ? 'success'
+                                : order.status === 'confirmed'
+                                ? 'primary'
+                                : order.status === 'shipped'
+                                ? 'info'
+                                : 'default'
+                            }
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography sx={{ fontWeight: 'bold' }}>
+                            ¥{order.total_amount.toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={order.payment_status}
+                            size="small"
+                            color={
+                              order.payment_status === 'paid'
+                                ? 'success'
+                                : order.payment_status === 'partial'
+                                ? 'warning'
+                                : 'default'
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Box>
+      )}
+
       {/* 错误提示 */}
       <Snackbar
         open={!!error}
@@ -338,7 +552,11 @@ export default function PurchasePage() {
         onClose={() => setError(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setError(null)}
+          severity="error"
+          sx={{ width: '100%' }}
+        >
           {error}
         </Alert>
       </Snackbar>
@@ -350,7 +568,11 @@ export default function PurchasePage() {
         onClose={() => setSuccessMessage(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setSuccessMessage(null)}
+          severity="success"
+          sx={{ width: '100%' }}
+        >
           {successMessage}
         </Alert>
       </Snackbar>
