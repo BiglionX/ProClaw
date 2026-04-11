@@ -14,6 +14,7 @@ import {
   SmartToy as BotIcon,
   Person as PersonIcon,
 } from '@mui/icons-material';
+import { parseCommand, executeCommand } from '../../lib/commandParser';
 
 interface Message {
   id: string;
@@ -59,18 +60,31 @@ export default function AgentChat() {
     setInput('');
     setIsLoading(true);
 
-    // TODO: 这里将调用 AI 后端 API
-    // 现在使用模拟响应
-    setTimeout(() => {
+    try {
+      // 解析用户指令
+      const command = parseCommand(userMessage.content);
+      
+      // 执行指令并获取响应
+      const response = await executeCommand(command);
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: '收到您的指令!我正在处理中... (这是模拟响应,实际将连接到 AI 后端)',
+        content: response,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '抱歉,处理您的指令时出现了错误。请稍后重试。',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
