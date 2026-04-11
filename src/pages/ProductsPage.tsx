@@ -6,6 +6,8 @@ import {
   Search as SearchIcon,
   FilterList as FilterIcon,
   Download as DownloadIcon,
+  CloudUpload as UploadIcon,
+  Image as ImageIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -66,6 +68,8 @@ export default function ProductsPage() {
     max_stock: 999999,
     unit: '个',
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -120,6 +124,8 @@ export default function ProductsPage() {
         max_stock: product.max_stock,
         unit: product.unit,
       });
+      setImagePreview(product.image_url || null);
+      setImageFile(null);
     } else {
       setEditingProduct(null);
       setFormData({
@@ -133,20 +139,73 @@ export default function ProductsPage() {
         max_stock: 999999,
         unit: '个',
       });
+      setImagePreview(null);
+      setImageFile(null);
     }
     setOpenDialog(true);
     setError(null);
+  };
+
+  // 处理图片选择
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 验证文件类型
+    if (!file.type.startsWith('image/')) {
+      setError('请选择图片文件');
+      return;
+    }
+
+    // 验证文件大小 (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('图片大小不能超过 5MB');
+      return;
+    }
+
+    setImageFile(file);
+
+    // 创建预览
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 清除图片
+  const handleClearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
   };
 
   // 保存产品
   const handleSave = async () => {
     try {
       setLoading(true);
+      
+      let imageUrl = editingProduct?.image_url || undefined;
+      
+      // 如果有新选择的图片，转换为 Base64
+      if (imageFile) {
+        const reader = new FileReader();
+        imageUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(imageFile);
+        });
+      }
+      
+      const productData = {
+        ...formData,
+        image_url: imageUrl,
+      };
+      
       if (editingProduct) {
-        await updateProduct(editingProduct.id, formData);
+        await updateProduct(editingProduct.id, productData);
         setSuccessMessage('产品更新成功!');
       } else {
-        await createProduct(formData);
+        await createProduct(productData);
         setSuccessMessage('产品创建成功!');
       }
       setOpenDialog(false);
@@ -451,6 +510,64 @@ export default function ProductsPage() {
         <DialogTitle>{editingProduct ? '编辑产品' : '添加产品'}</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
+            {/* 图片上传区域 */}
+            <Box sx={{ mb: 3, textAlign: 'center' }}>
+              {imagePreview ? (
+                <Box sx={{ position: 'relative', display: 'inline-block' }}>
+                  <img
+                    src={imagePreview}
+                    alt="Product preview"
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '200px',
+                      borderRadius: '8px',
+                      border: '1px solid #e0e0e0',
+                    }}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={handleClearImage}
+                    sx={{
+                      position: 'absolute',
+                      top: -8,
+                      right: -8,
+                      bgcolor: 'background.paper',
+                      boxShadow: 1,
+                      '&:hover': { bgcolor: 'background.paper' },
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" color="error" />
+                  </IconButton>
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    border: '2px dashed #ccc',
+                    borderRadius: 2,
+                    p: 3,
+                    cursor: 'pointer',
+                    '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+                  }}
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                >
+                  <ImageIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    点击上传图片
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    支持 JPG, PNG, GIF (最大 5MB)
+                  </Typography>
+                </Box>
+              )}
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                style={{ display: 'none' }}
+              />
+            </Box>
+
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <TextField
