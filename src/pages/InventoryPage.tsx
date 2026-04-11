@@ -1,10 +1,9 @@
 import {
   Add as AddIcon,
   ArrowDownward as InboundIcon,
-  ArrowUpward as OutboundIcon,
   TrendingDown as LowStockIcon,
+  ArrowUpward as OutboundIcon,
   Refresh as RefreshIcon,
-  Warning as WarningIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -34,7 +33,6 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { Product, getProducts } from '../lib/productService';
 import {
   CreateTransactionInput,
   InventoryStats,
@@ -43,6 +41,7 @@ import {
   getInventoryStats,
   getInventoryTransactions,
 } from '../lib/inventoryService';
+import { Product, getProducts } from '../lib/productService';
 
 export default function InventoryPage() {
   const [stats, setStats] = useState<InventoryStats | null>(null);
@@ -165,7 +164,9 @@ export default function InventoryPage() {
       {stats && (
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+            <Card
+              sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}
+            >
               <CardContent>
                 <Typography variant="h6" gutterBottom>
                   总产品数
@@ -176,7 +177,9 @@ export default function InventoryPage() {
           </Grid>
 
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+            <Card
+              sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}
+            >
               <CardContent>
                 <Typography variant="h6" gutterBottom>
                   低库存
@@ -209,12 +212,16 @@ export default function InventoryPage() {
           </Grid>
 
           <Grid item xs={12} sm={6} md={2.4}>
-            <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
+            <Card
+              sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}
+            >
               <CardContent>
                 <Typography variant="h6" gutterBottom>
                   库存总值
                 </Typography>
-                <Typography variant="h5">¥{stats.total_value.toFixed(2)}</Typography>
+                <Typography variant="h5">
+                  ¥{stats.total_value.toFixed(2)}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -241,7 +248,7 @@ export default function InventoryPage() {
             </Typography>
           </Box>
           <Grid container spacing={1}>
-            {stats.low_stock_products.map((product) => (
+            {stats.low_stock_products.map(product => (
               <Grid item key={product.id}>
                 <Chip
                   label={`${product.name} (${product.sku}): ${product.current_stock}/${product.min_stock}`}
@@ -311,8 +318,8 @@ export default function InventoryPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                transactions.map((tx) => {
-                  const product = products.find((p) => p.id === tx.product_id);
+                transactions.map(tx => {
+                  const product = products.find(p => p.id === tx.product_id);
                   return (
                     <TableRow key={tx.id} hover>
                       <TableCell>
@@ -333,7 +340,9 @@ export default function InventoryPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        {product ? `${product.name} (${product.sku})` : tx.product_id}
+                        {product
+                          ? `${product.name} (${product.sku})`
+                          : tx.product_id}
                       </TableCell>
                       <TableCell align="right">
                         <Typography
@@ -342,8 +351,8 @@ export default function InventoryPage() {
                               tx.transaction_type === 'inbound'
                                 ? 'success.main'
                                 : tx.transaction_type === 'outbound'
-                                ? 'error.main'
-                                : 'inherit',
+                                  ? 'error.main'
+                                  : 'inherit',
                             fontWeight: 'bold',
                           }}
                         >
@@ -355,8 +364,12 @@ export default function InventoryPage() {
                       <TableCell>{tx.reason || '-'}</TableCell>
                       <TableCell>
                         <Chip
-                          label={tx.sync_status === 'pending' ? '待同步' : '已同步'}
-                          color={tx.sync_status === 'pending' ? 'warning' : 'success'}
+                          label={
+                            tx.sync_status === 'pending' ? '待同步' : '已同步'
+                          }
+                          color={
+                            tx.sync_status === 'pending' ? 'warning' : 'success'
+                          }
                           size="small"
                           variant="outlined"
                         />
@@ -371,7 +384,12 @@ export default function InventoryPage() {
       </Paper>
 
       {/* 新建交易对话框 */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>新建库存交易</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -381,8 +399,11 @@ export default function InventoryPage() {
               <Select
                 value={formData.transaction_type}
                 label="交易类型"
-                onChange={(e) =>
-                  setFormData({ ...formData, transaction_type: e.target.value as any })
+                onChange={e =>
+                  setFormData({
+                    ...formData,
+                    transaction_type: e.target.value as any,
+                  })
                 }
               >
                 <MenuItem value="inbound">
@@ -408,11 +429,14 @@ export default function InventoryPage() {
               <Select
                 value={formData.product_id}
                 label="产品"
-                onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
+                onChange={e =>
+                  setFormData({ ...formData, product_id: e.target.value })
+                }
               >
-                {products.map((product) => (
+                {products.map(product => (
                   <MenuItem key={product.id} value={product.id}>
-                    {product.name} ({product.sku}) - 当前库存: {product.current_stock}
+                    {product.name} ({product.sku}) - 当前库存:{' '}
+                    {product.current_stock}
                   </MenuItem>
                 ))}
               </Select>
@@ -423,7 +447,12 @@ export default function InventoryPage() {
               label="数量"
               type="number"
               value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
+              onChange={e =>
+                setFormData({
+                  ...formData,
+                  quantity: parseInt(e.target.value) || 0,
+                })
+              }
               inputProps={{ min: 1 }}
               fullWidth
             />
@@ -432,7 +461,9 @@ export default function InventoryPage() {
             <TextField
               label="参考单号"
               value={formData.reference_no}
-              onChange={(e) => setFormData({ ...formData, reference_no: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, reference_no: e.target.value })
+              }
               placeholder="例如: PO-2024-001"
               fullWidth
             />
@@ -441,7 +472,9 @@ export default function InventoryPage() {
             <TextField
               label="原因"
               value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, reason: e.target.value })
+              }
               placeholder="例如: 采购入库、销售出库"
               fullWidth
             />
@@ -450,7 +483,9 @@ export default function InventoryPage() {
             <TextField
               label="备注"
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, notes: e.target.value })
+              }
               multiline
               rows={2}
               fullWidth
@@ -472,7 +507,11 @@ export default function InventoryPage() {
         onClose={() => setError(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setError(null)}
+          severity="error"
+          sx={{ width: '100%' }}
+        >
           {error}
         </Alert>
       </Snackbar>
@@ -484,7 +523,11 @@ export default function InventoryPage() {
         onClose={() => setSuccessMessage(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setSuccessMessage(null)}
+          severity="success"
+          sx={{ width: '100%' }}
+        >
           {successMessage}
         </Alert>
       </Snackbar>
