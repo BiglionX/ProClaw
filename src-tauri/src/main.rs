@@ -28,11 +28,19 @@ fn main() {
         .manage(db)
         .manage(sync_engine)
         .invoke_handler(tauri::generate_handler![
+            // 产品管理
             create_product,
             get_products,
             get_product_by_id,
             update_product,
             delete_product,
+            // 品牌管理
+            create_brand,
+            get_brands,
+            // 分类管理
+            create_category,
+            get_categories,
+            // 数据库和同步
             get_database_stats,
             get_pending_sync_records,
             mark_as_synced,

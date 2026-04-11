@@ -1,7 +1,7 @@
 import { Box } from '@mui/material';
+import FloatingAgentChat from '../Agent/FloatingAgentChat';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
-import FloatingAgentChat from '../Agent/FloatingAgentChat';
 
 const DRAWER_WIDTH = 240;
 const TOPBAR_HEIGHT = 64;

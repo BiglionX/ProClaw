@@ -1,10 +1,10 @@
 import {
   SmartToy as BotIcon,
+  ExpandLess as CollapseIcon,
+  ExpandMore as ExpandIcon,
+  Minimize as MinimizeIcon,
   Person as PersonIcon,
   Send as SendIcon,
-  ExpandMore as ExpandIcon,
-  ExpandLess as CollapseIcon,
-  Minimize as MinimizeIcon,
 } from '@mui/icons-material';
 import {
   Avatar,
@@ -16,8 +16,8 @@ import {
   Paper,
   Slide,
   TextField,
-  Typography,
   Tooltip,
+  Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { executeCommand, parseCommand } from '../../lib/commandParser';
@@ -81,7 +81,7 @@ export default function FloatingAgentChat() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       // 如果面板未打开,增加未读计数
       if (!isOpen) {
         setUnreadCount(prev => prev + 1);
@@ -118,8 +118,19 @@ export default function FloatingAgentChat() {
   return (
     <>
       {/* 浮动按钮 - 始终显示 */}
-      <Slide direction="up" in={!isOpen || isMinimized} mountOnEnter unmountOnExit>
-        <Tooltip title={isOpen ? '收起智能体' : `AI 经营智能体 ${unreadCount > 0 ? `(${unreadCount})` : ''}`}>
+      <Slide
+        direction="up"
+        in={!isOpen || isMinimized}
+        mountOnEnter
+        unmountOnExit
+      >
+        <Tooltip
+          title={
+            isOpen
+              ? '收起智能体'
+              : `AI 经营智能体 ${unreadCount > 0 ? `(${unreadCount})` : ''}`
+          }
+        >
           <Fab
             color="primary"
             onClick={toggleChat}
@@ -211,14 +222,24 @@ export default function FloatingAgentChat() {
               <IconButton
                 size="small"
                 onClick={toggleMinimize}
-                sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
+                sx={{
+                  color: 'white',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                }}
               >
-                {isMinimized ? <ExpandIcon fontSize="small" /> : <MinimizeIcon fontSize="small" />}
+                {isMinimized ? (
+                  <ExpandIcon fontSize="small" />
+                ) : (
+                  <MinimizeIcon fontSize="small" />
+                )}
               </IconButton>
               <IconButton
                 size="small"
                 onClick={toggleChat}
-                sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
+                sx={{
+                  color: 'white',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                }}
               >
                 <CollapseIcon fontSize="small" />
               </IconButton>
@@ -258,14 +279,16 @@ export default function FloatingAgentChat() {
                       display: 'flex',
                       gap: 1.5,
                       mb: 2,
-                      flexDirection: message.role === 'user' ? 'row-reverse' : 'row',
+                      flexDirection:
+                        message.role === 'user' ? 'row-reverse' : 'row',
                     }}
                   >
                     <Avatar
                       sx={{
                         width: 32,
                         height: 32,
-                        bgcolor: message.role === 'user' ? '#1976d2' : '#2e7d32',
+                        bgcolor:
+                          message.role === 'user' ? '#1976d2' : '#2e7d32',
                         flexShrink: 0,
                         fontSize: '0.9rem',
                       }}
@@ -276,9 +299,11 @@ export default function FloatingAgentChat() {
                       elevation={0}
                       sx={{
                         p: 1.5,
-                        backgroundColor: message.role === 'user' ? '#e3f2fd' : '#ffffff',
+                        backgroundColor:
+                          message.role === 'user' ? '#e3f2fd' : '#ffffff',
                         border: '1px solid',
-                        borderColor: message.role === 'user' ? '#bbdefb' : '#e0e0e0',
+                        borderColor:
+                          message.role === 'user' ? '#bbdefb' : '#e0e0e0',
                         borderRadius: 2,
                         maxWidth: '80%',
                       }}
@@ -307,7 +332,14 @@ export default function FloatingAgentChat() {
 
                 {isLoading && (
                   <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
-                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#2e7d32', fontSize: '0.9rem' }}>
+                    <Avatar
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        bgcolor: '#2e7d32',
+                        fontSize: '0.9rem',
+                      }}
+                    >
                       <BotIcon />
                     </Avatar>
                     <Paper

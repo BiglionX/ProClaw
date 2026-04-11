@@ -4,6 +4,7 @@ import {
   Edit as EditIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
+  FilterList as FilterIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -38,11 +39,17 @@ import {
   Product as ProductType,
   updateProduct,
 } from '../lib/productService';
+import { Brand, getBrands } from '../lib/brandService';
+import { Category, getCategories } from '../lib/categoryService';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductType[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedBrand, setSelectedBrand] = useState<string>('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductType | null>(
     null
@@ -78,8 +85,23 @@ export default function ProductsPage() {
     }
   };
 
+  // 加载分类和品牌
+  const loadFilters = async () => {
+    try {
+      const [cats, brs] = await Promise.all([
+        getCategories(),
+        getBrands(),
+      ]);
+      setCategories(cats);
+      setBrands(brs);
+    } catch (err) {
+      console.error('Failed to load filters:', err);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
+    loadFilters();
   }, []);
 
   // 打开新建/编辑对话框
@@ -191,7 +213,7 @@ export default function ProductsPage() {
       {/* 操作栏 */}
       <Paper
         elevation={0}
-        sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}
+        sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}
       >
         <TextField
           placeholder="搜索产品 (SKU 或名称)"
@@ -199,7 +221,7 @@ export default function ProductsPage() {
           onChange={e => setSearchTerm(e.target.value)}
           onKeyPress={e => e.key === 'Enter' && handleSearch()}
           size="small"
-          sx={{ flex: 1 }}
+          sx={{ minWidth: 250, flex: 1 }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -208,10 +230,51 @@ export default function ProductsPage() {
             ),
           }}
         />
+        
+        {/* 分类筛选 */}
+        <TextField
+          select
+          label="分类"
+          value={selectedCategory}
+          onChange={e => setSelectedCategory(e.target.value)}
+          size="small"
+          sx={{ minWidth: 150 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <FilterIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+        >
+          <MenuItem value="">全部分类</MenuItem>
+          {categories.map(cat => (
+            <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+          ))}
+        </TextField>
+
+        {/* 品牌筛选 */}
+        <TextField
+          select
+          label="品牌"
+          value={selectedBrand}
+          onChange={e => setSelectedBrand(e.target.value)}
+          size="small"
+          sx={{ minWidth: 150 }}
+        >
+          <MenuItem value="">全部品牌</MenuItem>
+          {brands.map(brand => (
+            <MenuItem key={brand.id} value={brand.id}>{brand.name}</MenuItem>
+          ))}
+        </TextField>
+
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
-          onClick={loadProducts}
+          onClick={() => {
+            loadProducts();
+            loadFilters();
+          }}
           disabled={loading}
         >
           刷新

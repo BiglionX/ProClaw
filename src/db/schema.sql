@@ -32,6 +32,25 @@ CREATE TABLE IF NOT EXISTS product_categories (
 );
 
 -- ============================================
+-- 产品库 - 品牌表
+-- ============================================
+CREATE TABLE IF NOT EXISTS brands (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    slug TEXT UNIQUE,
+    logo_url TEXT,
+    website_url TEXT,
+    description TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sync_status TEXT DEFAULT 'pending' CHECK(sync_status IN ('pending', 'synced', 'conflict')),
+    last_synced_at TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+-- ============================================
 -- 产品库 - 产品表
 -- ============================================
 CREATE TABLE IF NOT EXISTS products (
@@ -40,6 +59,7 @@ CREATE TABLE IF NOT EXISTS products (
     name TEXT NOT NULL,
     description TEXT,
     category_id TEXT REFERENCES product_categories(id),
+    brand_id TEXT REFERENCES brands(id),
     unit TEXT DEFAULT '件',
     cost_price REAL DEFAULT 0,
     sell_price REAL DEFAULT 0,
@@ -112,12 +132,14 @@ CREATE TABLE IF NOT EXISTS sync_log (
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand_id);
 CREATE INDEX IF NOT EXISTS idx_products_sync_status ON products(sync_status);
 CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_created ON inventory_transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_offline_queue_status ON offline_queue(status);
 CREATE INDEX IF NOT EXISTS idx_offline_queue_priority ON offline_queue(priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_sync_log_started ON sync_log(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_brands_name ON brands(name);
 
 -- ============================================
 -- 触发器 - 自动更新 updated_at
