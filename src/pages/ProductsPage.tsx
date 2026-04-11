@@ -1,34 +1,416 @@
-import { Box, Paper, Typography } from '@mui/material';
+import { useState, useEffect } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  TextField,
+  InputAdornment,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  MenuItem,
+  Grid,
+  Alert,
+  CircularProgress,
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
+import {
+  getProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  Product as ProductType,
+  CreateProductInput,
+} from '../lib/productService';
 
 export default function ProductsPage() {
+  const [products, setProducts] = useState<ProductType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [openDialog, setOpenDialog] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductType | null>(null);
+  const [formData, setFormData] = useState<CreateProductInput>({
+    sku: '',
+    name: '',
+    description: '',
+    cost_price: 0,
+    sell_price: 0,
+    current_stock: 0,
+    min_stock: 0,
+    max_stock: 999999,
+    unit: '个',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // 加载产品列表
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const data = await getProducts({ limit: 100, search: searchTerm || undefined });
+      setProducts(data);
+    } catch (err: any) {
+      setError(err.message || '加载产品列表失败');
+      console.error('Failed to load products:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  // 打开新建/编辑对话框
+  const handleOpenDialog = (product?: ProductType) => {
+    if (product) {
+      setEditingProduct(product);
+      setFormData({
+        sku: product.sku,
+        name: product.name,
+        description: product.description || '',
+        cost_price: product.cost_price,
+        sell_price: product.sell_price,
+        current_stock: product.current_stock,
+        min_stock: product.min_stock,
+        max_stock: product.max_stock,
+        unit: product.unit,
+      });
+    } else {
+      setEditingProduct(null);
+      setFormData({
+        sku: '',
+        name: '',
+        description: '',
+        cost_price: 0,
+        sell_price: 0,
+        current_stock: 0,
+        min_stock: 0,
+        max_stock: 999999,
+        unit: '个',
+      });
+    }
+    setOpenDialog(true);
+    setError(null);
+  };
+
+  // 保存产品
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, formData);
+        setSuccessMessage('产品更新成功!');
+      } else {
+        await createProduct(formData);
+        setSuccessMessage('产品创建成功!');
+      }
+      setOpenDialog(false);
+      await loadProducts();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || '保存失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 删除产品
+  const handleDelete = async (id: string) => {
+    if (!confirm('确定要删除这个产品吗?')) return;
+    
+    try {
+      setLoading(true);
+      await deleteProduct(id);
+      setSuccessMessage('产品已删除');
+      await loadProducts();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || '删除失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 搜索
+  const handleSearch = () => {
+    loadProducts();
+  };
+
   return (
     <Box>
+      {/* 页面标题 */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
           📦 产品库
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          管理您的产品、分类和 BOM
+          管理您的产品、库存和价格
         </Typography>
       </Box>
 
-      <Paper
-        elevation={0}
-        sx={{
-          p: 4,
-          textAlign: 'center',
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 2,
-        }}
-      >
-        <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
-          🚧 产品库模块开发中...
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          将从 Web 版产品库迁移到桌面端
-        </Typography>
+      {/* 成功提示 */}
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
+      )}
+
+      {/* 错误提示 */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {/* 操作栏 */}
+      <Paper elevation={0} sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <TextField
+          placeholder="搜索产品 (SKU 或名称)"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          size="small"
+          sx={{ flex: 1 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <Button
+          variant="outlined"
+          startIcon={<RefreshIcon />}
+          onClick={loadProducts}
+          disabled={loading}
+        >
+          刷新
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+        >
+          添加产品
+        </Button>
       </Paper>
+
+      {/* 产品列表 */}
+      <TableContainer component={Paper} elevation={0}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableCell><strong>SKU</strong></TableCell>
+              <TableCell><strong>产品名称</strong></TableCell>
+              <TableCell><strong>成本价</strong></TableCell>
+              <TableCell><strong>销售价</strong></TableCell>
+              <TableCell><strong>当前库存</strong></TableCell>
+              <TableCell><strong>状态</strong></TableCell>
+              <TableCell align="right"><strong>操作</strong></TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <CircularProgress size={24} />
+                  <Typography sx={{ mt: 1 }}>加载中...</Typography>
+                </TableCell>
+              </TableRow>
+            ) : products.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary">
+                    暂无产品,点击"添加产品"开始创建
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              products.map((product) => (
+                <TableRow key={product.id} hover>
+                  <TableCell>
+                    <Typography variant="body2" fontFamily="monospace">
+                      {product.sku}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{product.name}</TableCell>
+                  <TableCell>¥{product.cost_price.toFixed(2)}</TableCell>
+                  <TableCell>¥{product.sell_price.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={product.current_stock}
+                      color={
+                        product.current_stock <= product.min_stock
+                          ? 'error'
+                          : product.current_stock >= product.max_stock
+                          ? 'warning'
+                          : 'success'
+                      }
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={product.status === 'active' ? '活跃' : '停用'}
+                      color={product.status === 'active' ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => handleOpenDialog(product)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDelete(product.id)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* 新建/编辑产品对话框 */}
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {editingProduct ? '编辑产品' : '添加产品'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="SKU"
+                  value={formData.sku}
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  required
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="产品名称"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="描述"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  multiline
+                  rows={2}
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="成本价"
+                  type="number"
+                  value={formData.cost_price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })
+                  }
+                  InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="销售价"
+                  type="number"
+                  value={formData.sell_price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sell_price: parseFloat(e.target.value) || 0 })
+                  }
+                  InputProps={{ startAdornment: <InputAdornment position="start">¥</InputAdornment> }}
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="当前库存"
+                  type="number"
+                  value={formData.current_stock}
+                  onChange={(e) =>
+                    setFormData({ ...formData, current_stock: parseInt(e.target.value) || 0 })
+                  }
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="最低库存"
+                  type="number"
+                  value={formData.min_stock}
+                  onChange={(e) =>
+                    setFormData({ ...formData, min_stock: parseInt(e.target.value) || 0 })
+                  }
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  label="单位"
+                  value={formData.unit}
+                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  select
+                  size="small"
+                >
+                  <MenuItem value="个">个</MenuItem>
+                  <MenuItem value="件">件</MenuItem>
+                  <MenuItem value="箱">箱</MenuItem>
+                  <MenuItem value="千克">千克</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>取消</Button>
+          <Button onClick={handleSave} variant="contained" disabled={loading}>
+            {loading ? <CircularProgress size={20} /> : '保存'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

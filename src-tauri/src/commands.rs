@@ -103,21 +103,49 @@ pub fn create_product(db: tauri::State<Mutex<Database>>, product: serde_json::Va
     get_product_by_id_inner(conn, &id)
 }
 
-/// 获取所有产品
+/// 获取产品列表(支持搜索和分页)
 #[tauri::command]
-pub fn get_products(db: tauri::State<Mutex<Database>>) -> Result<Vec<Product>, String> {
+pub fn get_products(db: tauri::State<Mutex<Database>>, options: Option<serde_json::Value>) -> Result<Vec<Product>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let mut stmt = conn.prepare(
+    // 构建查询
+    let mut sql = String::from(
         "SELECT id, sku, name, description, category_id, unit,
          cost_price, sell_price, min_stock, max_stock, current_stock,
          image_url, barcode, is_active, metadata, created_at, updated_at,
          sync_status, last_synced_at
-         FROM products WHERE deleted_at IS NULL ORDER BY created_at DESC"
-    ).map_err(|e| e.to_string())?;
+         FROM products WHERE deleted_at IS NULL"
+    );
 
-    let products = stmt.query_map([], |row| {
+    // 添加搜索条件
+    let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+    if let Some(opts) = &options {
+        if let Some(search) = opts.get("search").and_then(|v| v.as_str()) {
+            sql.push_str(" AND (sku LIKE ? OR name LIKE ?)");
+            let search_pattern = format!("%{}%", search);
+            params_vec.push(Box::new(search_pattern.clone()));
+            params_vec.push(Box::new(search_pattern));
+        }
+    }
+
+    sql.push_str(" ORDER BY created_at DESC");
+
+    // 添加分页
+    if let Some(opts) = &options {
+        if let Some(limit) = opts.get("limit").and_then(|v| v.as_u64()) {
+            sql.push_str(&format!(" LIMIT {}", limit));
+            if let Some(offset) = opts.get("offset").and_then(|v| v.as_u64()) {
+                sql.push_str(&format!(" OFFSET {}", offset));
+            }
+        }
+    }
+
+    // 执行查询
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    
+    let products = stmt.query_map(params_refs.as_slice(), |row| {
         Ok(Product {
             id: row.get(0)?,
             sku: row.get(1)?,
@@ -194,39 +222,71 @@ pub fn update_product(db: tauri::State<Mutex<Database>>, id: String, updates: se
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
+    // 检查产品是否存在
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 AND deleted_at IS NULL)",
+        params![id],
+        |row| row.get(0)
+    ).map_err(|e| e.to_string())?;
+
+    if !exists {
+        return Err("Product not found".to_string());
+    }
+
     // 构建动态 UPDATE 语句
-    let mut fields = Vec::new();
-    let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    let mut set_clauses = Vec::new();
+    let mut values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
     if let Some(name) = updates.get("name").and_then(|v| v.as_str()) {
-        fields.push("name = ?");
-        params_vec.push(&name.to_string());
+        set_clauses.push("name = ?");
+        values.push(Box::new(name.to_string()));
     }
-
+    if let Some(desc) = updates.get("description").and_then(|v| v.as_str()) {
+        set_clauses.push("description = ?");
+        values.push(Box::new(desc.to_string()));
+    }
+    if let Some(cost) = updates.get("cost_price").and_then(|v| v.as_f64()) {
+        set_clauses.push("cost_price = ?");
+        values.push(Box::new(cost));
+    }
     if let Some(price) = updates.get("sell_price").and_then(|v| v.as_f64()) {
-        fields.push("sell_price = ?");
-        params_vec.push(&price);
+        set_clauses.push("sell_price = ?");
+        values.push(Box::new(price));
     }
-
     if let Some(stock) = updates.get("current_stock").and_then(|v| v.as_i64()) {
-        fields.push("current_stock = ?");
-        params_vec.push(&(stock as i32));
+        set_clauses.push("current_stock = ?");
+        values.push(Box::new(stock as i32));
+    }
+    if let Some(min) = updates.get("min_stock").and_then(|v| v.as_i64()) {
+        set_clauses.push("min_stock = ?");
+        values.push(Box::new(min as i32));
+    }
+    if let Some(max) = updates.get("max_stock").and_then(|v| v.as_i64()) {
+        set_clauses.push("max_stock = ?");
+        values.push(Box::new(max as i32));
+    }
+    if let Some(unit) = updates.get("unit").and_then(|v| v.as_str()) {
+        set_clauses.push("unit = ?");
+        values.push(Box::new(unit.to_string()));
+    }
+    if let Some(status) = updates.get("status").and_then(|v| v.as_str()) {
+        set_clauses.push("is_active = ?");
+        values.push(Box::new(status == "active"));
     }
 
-    if fields.is_empty() {
-        return Err("No fields to update".to_string());
+    if set_clauses.is_empty() {
+        return get_product_by_id_inner(conn, &id);
     }
 
-    fields.push("sync_status = 'pending'");
-    params_vec.push(&id);
+    // 添加更新时间和同步状态
+    set_clauses.push("updated_at = CURRENT_TIMESTAMP");
+    set_clauses.push("sync_status = 'pending'");
 
-    let sql = format!("UPDATE products SET {} WHERE id = ?", fields.join(", "));
+    let sql = format!("UPDATE products SET {} WHERE id = ?", set_clauses.join(", "));
+    values.push(Box::new(id.clone()));
 
-    // 由于参数类型复杂,使用简化的方式
-    conn.execute(
-        "UPDATE products SET sync_status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        params![id],
-    ).map_err(|e| e.to_string())?;
+    let params_refs: Vec<&dyn rusqlite::ToSql> = values.iter().map(|v| v.as_ref()).collect();
+    conn.execute(&sql, params_refs.as_slice()).map_err(|e| e.to_string())?;
 
     get_product_by_id_inner(conn, &id)
 }
