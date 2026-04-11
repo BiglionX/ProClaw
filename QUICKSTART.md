@@ -49,6 +49,7 @@ proclaw-desktop/
    - 获取项目 URL 和 Anon Key
 
 2. **配置环境变量**
+
    ```bash
    # 编辑 .env.local 文件
    VITE_SUPABASE_URL=your-project-url
@@ -88,12 +89,15 @@ npm run tauri build
 ## ⚠️ 常见问题
 
 ### Q: 端口 3000 被占用怎么办?
+
 A: 修改 `vite.config.ts` 中的 `server.port` 配置
 
 ### Q: Rust 编译很慢?
+
 A: 首次编译需要下载依赖,后续会快很多
 
 ### Q: 如何调试 Rust 代码?
+
 A: 使用 VS Code 的 Rust Analyzer 插件
 
 ## 🎉 恭喜!
@@ -103,5 +107,5 @@ A: 使用 VS Code 的 Rust Analyzer 插件
 
 ---
 
-**当前进度**: Phase 0 Week 1 ✅  
+**当前进度**: Phase 0 Week 1 ✅
 **下一阶段**: Phase 0 Week 2 - Supabase 集成
