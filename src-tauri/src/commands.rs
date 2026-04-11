@@ -13,6 +13,7 @@ pub struct Product {
     pub name: String,
     pub description: Option<String>,
     pub category_id: Option<String>,
+    pub brand_id: Option<String>,
     pub unit: String,
     pub cost_price: f64,
     pub sell_price: f64,
@@ -111,21 +112,38 @@ pub fn get_products(db: tauri::State<Mutex<Database>>, options: Option<serde_jso
 
     // 构建查询
     let mut sql = String::from(
-        "SELECT id, sku, name, description, category_id, unit,
+        "SELECT id, sku, name, description, category_id, brand_id, unit,
          cost_price, sell_price, min_stock, max_stock, current_stock,
          image_url, barcode, is_active, metadata, created_at, updated_at,
          sync_status, last_synced_at
          FROM products WHERE deleted_at IS NULL"
     );
 
-    // 添加搜索条件
+    // 添加搜索和筛选条件
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
     if let Some(opts) = &options {
+        // 搜索条件
         if let Some(search) = opts.get("search").and_then(|v| v.as_str()) {
             sql.push_str(" AND (sku LIKE ? OR name LIKE ?)");
             let search_pattern = format!("%{}%", search);
             params_vec.push(Box::new(search_pattern.clone()));
             params_vec.push(Box::new(search_pattern));
+        }
+        
+        // 分类筛选
+        if let Some(category_id) = opts.get("category_id").and_then(|v| v.as_str()) {
+            if !category_id.is_empty() {
+                sql.push_str(" AND category_id = ?");
+                params_vec.push(Box::new(category_id.to_string()));
+            }
+        }
+        
+        // 品牌筛选
+        if let Some(brand_id) = opts.get("brand_id").and_then(|v| v.as_str()) {
+            if !brand_id.is_empty() {
+                sql.push_str(" AND brand_id = ?");
+                params_vec.push(Box::new(brand_id.to_string()));
+            }
         }
     }
 
@@ -152,20 +170,21 @@ pub fn get_products(db: tauri::State<Mutex<Database>>, options: Option<serde_jso
             name: row.get(2)?,
             description: row.get(3)?,
             category_id: row.get(4)?,
-            unit: row.get(5)?,
-            cost_price: row.get(6)?,
-            sell_price: row.get(7)?,
-            min_stock: row.get(8)?,
-            max_stock: row.get(9)?,
-            current_stock: row.get(10)?,
-            image_url: row.get(11)?,
-            barcode: row.get(12)?,
-            is_active: row.get(13)?,
-            metadata: row.get(14)?,
-            created_at: row.get(15)?,
-            updated_at: row.get(16)?,
-            sync_status: row.get(17)?,
-            last_synced_at: row.get(18)?,
+            brand_id: row.get(5)?,
+            unit: row.get(6)?,
+            cost_price: row.get(7)?,
+            sell_price: row.get(8)?,
+            min_stock: row.get(9)?,
+            max_stock: row.get(10)?,
+            current_stock: row.get(11)?,
+            image_url: row.get(12)?,
+            barcode: row.get(13)?,
+            is_active: row.get(14)?,
+            metadata: row.get(15)?,
+            created_at: row.get(16)?,
+            updated_at: row.get(17)?,
+            sync_status: row.get(18)?,
+            last_synced_at: row.get(19)?,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -182,7 +201,7 @@ pub fn get_product_by_id(db: tauri::State<Mutex<Database>>, id: String) -> Resul
 
 fn get_product_by_id_inner(conn: &rusqlite::Connection, id: &str) -> Result<Product, String> {
     let mut stmt = conn.prepare(
-        "SELECT id, sku, name, description, category_id, unit,
+        "SELECT id, sku, name, description, category_id, brand_id, unit,
          cost_price, sell_price, min_stock, max_stock, current_stock,
          image_url, barcode, is_active, metadata, created_at, updated_at,
          sync_status, last_synced_at
@@ -196,20 +215,21 @@ fn get_product_by_id_inner(conn: &rusqlite::Connection, id: &str) -> Result<Prod
             name: row.get(2)?,
             description: row.get(3)?,
             category_id: row.get(4)?,
-            unit: row.get(5)?,
-            cost_price: row.get(6)?,
-            sell_price: row.get(7)?,
-            min_stock: row.get(8)?,
-            max_stock: row.get(9)?,
-            current_stock: row.get(10)?,
-            image_url: row.get(11)?,
-            barcode: row.get(12)?,
-            is_active: row.get(13)?,
-            metadata: row.get(14)?,
-            created_at: row.get(15)?,
-            updated_at: row.get(16)?,
-            sync_status: row.get(17)?,
-            last_synced_at: row.get(18)?,
+            brand_id: row.get(5)?,
+            unit: row.get(6)?,
+            cost_price: row.get(7)?,
+            sell_price: row.get(8)?,
+            min_stock: row.get(9)?,
+            max_stock: row.get(10)?,
+            current_stock: row.get(11)?,
+            image_url: row.get(12)?,
+            barcode: row.get(13)?,
+            is_active: row.get(14)?,
+            metadata: row.get(15)?,
+            created_at: row.get(16)?,
+            updated_at: row.get(17)?,
+            sync_status: row.get(18)?,
+            last_synced_at: row.get(19)?,
         })
     }).map_err(|e| e.to_string())?;
 

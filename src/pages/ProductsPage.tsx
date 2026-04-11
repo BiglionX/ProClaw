@@ -80,6 +80,8 @@ export default function ProductsPage() {
       const data = await getProducts({
         limit: 100,
         search: searchTerm || undefined,
+        category_id: selectedCategory || undefined,
+        brand_id: selectedBrand || undefined,
       });
       setProducts(data);
     } catch (err: any) {
@@ -108,6 +110,13 @@ export default function ProductsPage() {
     loadProducts();
     loadFilters();
   }, []);
+
+  // 当筛选条件改变时重新加载
+  useEffect(() => {
+    if (categories.length > 0 || brands.length > 0) {
+      loadProducts();
+    }
+  }, [selectedCategory, selectedBrand]);
 
   // 打开新建/编辑对话框
   const handleOpenDialog = (product?: ProductType) => {

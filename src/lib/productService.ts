@@ -72,6 +72,7 @@ export async function getProducts(options?: {
   limit?: number;
   offset?: number;
   category_id?: string;
+  brand_id?: string;
   search?: string;
 }): Promise<Product[]> {
   return await invoke<Product[]>('get_products', { options });
