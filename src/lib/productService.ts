@@ -50,7 +50,9 @@ export interface UpdateProductInput {
 /**
  * 创建产品
  */
-export async function createProduct(input: CreateProductInput): Promise<Product> {
+export async function createProduct(
+  input: CreateProductInput
+): Promise<Product> {
   const productData = {
     ...input,
     current_stock: input.current_stock || 0,

@@ -55,7 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       // 检查是否为模拟账号登录
       const mockAccount = MOCK_ACCOUNTS.find(
-        (acc) => acc.username === email && acc.password === password
+        acc => acc.username === email && acc.password === password
       );
 
       if (mockAccount) {

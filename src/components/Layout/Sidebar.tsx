@@ -1,22 +1,22 @@
 import {
+  SmartToy as AgentIcon,
+  Dashboard as DashboardIcon,
+  Inventory as InventoryIcon,
+  Storefront as ProductLibraryIcon,
+  Settings as SettingsIcon,
+} from '@mui/icons-material';
+import {
   Box,
+  Divider,
   Drawer,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider,
   Typography,
 } from '@mui/material';
-import {
-  Dashboard as DashboardIcon,
-  Inventory as InventoryIcon,
-  Storefront as ProductLibraryIcon,
-  SmartToy as AgentIcon,
-  Settings as SettingsIcon,
-} from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const DRAWER_WIDTH = 240;
 
@@ -79,7 +79,7 @@ export default function Sidebar() {
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
 
       <List sx={{ pt: 1 }}>
-        {navItems.map((item) => (
+        {navItems.map(item => (
           <ListItem key={item.path} disablePadding>
             <ListItemButton
               selected={location.pathname === item.path}

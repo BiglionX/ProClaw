@@ -1,4 +1,4 @@
-import { Box, Typography, Alert, Button } from '@mui/material';
+import { Alert, Box, Button, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { parseCommand } from '../lib/commandParser';
 
@@ -15,7 +15,7 @@ export default function TestPage() {
 
   const testParse = () => {
     console.log('=== 指令解析测试 ===');
-    testCommands.forEach((cmd) => {
+    testCommands.forEach(cmd => {
       const result = parseCommand(cmd);
       console.log(`\n输入: "${cmd}"`);
       console.log('识别:', result.action);
@@ -38,11 +38,7 @@ export default function TestPage() {
         <Typography variant="h6" sx={{ mb: 2 }}>
           测试指令解析
         </Typography>
-        <Button
-          variant="contained"
-          onClick={testParse}
-          sx={{ mr: 2, mb: 1 }}
-        >
+        <Button variant="contained" onClick={testParse} sx={{ mr: 2, mb: 1 }}>
           运行测试 (查看控制台)
         </Button>
       </Box>

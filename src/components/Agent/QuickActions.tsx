@@ -1,24 +1,22 @@
 import {
-  Box,
-  Paper,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  CardActionArea,
-  Avatar,
-  Chip,
-} from '@mui/material';
-import {
-  Inventory as InventoryIcon,
-  TrendingUp as TrendingUpIcon,
-  Warning as WarningIcon,
-  ShoppingCart as ShoppingCartIcon,
   Add as AddIcon,
-  Search as SearchIcon,
   Analytics as AnalyticsIcon,
   Assessment as AssessmentIcon,
+  Search as SearchIcon,
+  ShoppingCart as ShoppingCartIcon,
+  TrendingUp as TrendingUpIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
+import {
+  Avatar,
+  Box,
+  Card,
+  CardActionArea,
+  Chip,
+  Grid,
+  Paper,
+  Typography,
+} from '@mui/material';
 
 interface QuickAction {
   id: string;
@@ -106,7 +104,7 @@ export default function QuickActions() {
       </Box>
 
       <Grid container spacing={2}>
-        {actions.map((action) => (
+        {actions.map(action => (
           <Grid item xs={12} sm={6} md={4} key={action.id}>
             <Card
               elevation={0}
@@ -122,10 +120,7 @@ export default function QuickActions() {
                 },
               }}
             >
-              <CardActionArea
-                onClick={action.action}
-                sx={{ p: 2 }}
-              >
+              <CardActionArea onClick={action.action} sx={{ p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                   <Avatar
                     sx={{
@@ -144,10 +139,7 @@ export default function QuickActions() {
                     >
                       {action.title}
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                    >
+                    <Typography variant="body2" color="text.secondary">
                       {action.description}
                     </Typography>
                   </Box>

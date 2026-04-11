@@ -1,19 +1,19 @@
 import {
+  Logout as LogoutIcon,
+  Notifications as NotificationsIcon,
+} from '@mui/icons-material';
+import {
   AppBar,
-  Toolbar,
-  Typography,
-  IconButton,
   Avatar,
   Badge,
-  Tooltip,
   Box,
+  IconButton,
+  Toolbar,
+  Tooltip,
+  Typography,
 } from '@mui/material';
-import {
-  Notifications as NotificationsIcon,
-  Logout as LogoutIcon,
-} from '@mui/icons-material';
-import { useAuthStore } from '../../lib/authStore';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../lib/authStore';
 
 export default function TopBar() {
   const { user, logout } = useAuthStore();
@@ -28,7 +28,7 @@ export default function TopBar() {
     <AppBar
       position="fixed"
       sx={{
-        zIndex: (theme) => theme.zIndex.drawer + 1,
+        zIndex: theme => theme.zIndex.drawer + 1,
         backgroundColor: '#16213e',
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
       }}

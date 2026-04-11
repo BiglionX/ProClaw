@@ -17,6 +17,7 @@
 ## ✅ 完成的任务
 
 ### 1. 主界面布局 (AppLayout)
+
 - ✅ 侧边栏导航 (Sidebar)
   - 深色主题 (#1a1a2e)
   - Logo 和品牌标识
@@ -36,6 +37,7 @@
   - 浅灰色背景 (#f5f5f5)
 
 ### 2. 经营智能体页面 (AgentPage)
+
 - ✅ 快捷操作面板 (QuickActions)
   - 6个快捷操作卡片:
     - 添加产品
@@ -57,6 +59,7 @@
   - Enter 发送, Shift+Enter 换行
 
 ### 3. 自然语言指令解析 (CommandParser)
+
 - ✅ 指令解析器
   - 支持 8 种指令模式:
     - 添加产品 (create_product)
@@ -78,21 +81,25 @@
   - 扩展性设计 (易于添加新命令)
 
 ### 4. 产品库页面 (ProductsPage)
+
 - ✅ 占位页面
 - ✅ 提示开发中状态
 - ✅ 预留迁移路径
 
 ### 5. 进销存页面 (InventoryPage)
+
 - ✅ 占位页面
 - ✅ 提示开发中状态
 - ✅ 预留迁移路径
 
 ### 6. 设置页面 (SettingsPage)
+
 - ✅ 占位页面
 - ✅ 提示开发中状态
 - ✅ 预留配置入口
 
 ### 7. 路由集成 (App.tsx)
+
 - ✅ React Router v6 配置
 - ✅ 5个主要路由:
   - `/` - 经营智能体 (默认首页)
@@ -109,6 +116,7 @@
 ## 📁 新增文件清单
 
 ### 组件 (Components)
+
 ```
 src/components/
 ├── Agent/
@@ -121,6 +129,7 @@ src/components/
 ```
 
 ### 页面 (Pages)
+
 ```
 src/pages/
 ├── AgentPage.tsx              # 经营智能体页面 (35 行)
@@ -131,6 +140,7 @@ src/pages/
 ```
 
 ### 库 (Libs)
+
 ```
 src/lib/
 ├── commandParser.ts           # 指令解析器 (180 行)
@@ -142,6 +152,7 @@ src/lib/
 ## 🎨 UI/UX 设计亮点
 
 ### 色彩方案
+
 - **主色**: #1976d2 (蓝色 - MUI 默认)
 - **侧边栏背景**: #1a1a2e (深靛蓝)
 - **顶部栏背景**: #16213e (深蓝)
@@ -151,6 +162,7 @@ src/lib/
 - **错误色**: #d32f2f (红色)
 
 ### 交互效果
+
 - ✅ 卡片悬停阴影提升
 - ✅ 按钮悬停变色
 - ✅ 导航项选中高亮
@@ -158,6 +170,7 @@ src/lib/
 - ✅ 平滑滚动动画
 
 ### 响应式设计
+
 - ✅ 侧边栏固定 240px 宽度
 - ✅ 快捷操作卡片:
   - 移动端: 1列 (xs)
@@ -169,6 +182,7 @@ src/lib/
 ## 🔧 技术实现
 
 ### 核心依赖
+
 ```json
 {
   "@mui/material": "^5.15.0",
@@ -181,15 +195,16 @@ src/lib/
 ### 关键代码片段
 
 #### 1. 指令解析器核心逻辑
+
 ```typescript
 export function parseCommand(text: string): CommandResult {
   const lowerText = text.toLowerCase().trim();
-  
+
   for (const pattern of commandPatterns) {
     const matched = pattern.keywords.some(keyword =>
       lowerText.includes(keyword.toLowerCase())
     );
-    
+
     if (matched) {
       const params = pattern.extractParams(text);
       return {
@@ -200,7 +215,7 @@ export function parseCommand(text: string): CommandResult {
       };
     }
   }
-  
+
   return {
     action: 'unknown',
     params: { originalText: text },
@@ -211,6 +226,7 @@ export function parseCommand(text: string): CommandResult {
 ```
 
 #### 2. 智能体对话消息处理
+
 ```typescript
 const handleSend = async () => {
   const userMessage: Message = {
@@ -220,21 +236,21 @@ const handleSend = async () => {
     timestamp: new Date(),
   };
 
-  setMessages((prev) => [...prev, userMessage]);
+  setMessages(prev => [...prev, userMessage]);
   setInput('');
   setIsLoading(true);
 
   try {
     const command = parseCommand(userMessage.content);
     const response = await executeCommand(command);
-    
+
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
       content: response,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, assistantMessage]);
+    setMessages(prev => [...prev, assistantMessage]);
   } catch (error) {
     // 错误处理
   } finally {
@@ -244,6 +260,7 @@ const handleSend = async () => {
 ```
 
 #### 3. 路由布局集成
+
 ```typescript
 function App() {
   return (
@@ -251,7 +268,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        
+
         <Route
           path="/"
           element={
@@ -268,7 +285,7 @@ function App() {
 
 function ProtectedRoute({ children }) {
   const { user } = useAuthStore();
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -282,6 +299,7 @@ function ProtectedRoute({ children }) {
 ## 🧪 测试建议
 
 ### 功能测试
+
 1. **导航测试**
    - [ ] 点击侧边栏导航项,路由正确切换
    - [ ] 当前路由高亮显示
@@ -307,6 +325,7 @@ function ProtectedRoute({ children }) {
    - [ ] 退出登录返回登录页
 
 ### 性能测试
+
 - [ ] 页面加载时间 < 2s
 - [ ] 路由切换无卡顿
 - [ ] 消息列表滚动流畅
@@ -316,6 +335,7 @@ function ProtectedRoute({ children }) {
 ## 📝 已知问题
 
 ### 当前限制
+
 1. **Supabase 未配置**
    - 认证功能需要 Supabase 项目
    - 解决方案: 创建 Supabase 项目并配置环境变量
@@ -329,6 +349,7 @@ function ProtectedRoute({ children }) {
    - 解决方案: 使用 `npm run tauri dev` 测试
 
 ### 待完成
+
 1. **产品库模块迁移** (Phase 1 Week 3-4)
    - 从 Web 版迁移产品管理功能
    - 集成本地数据库
@@ -347,6 +368,7 @@ function ProtectedRoute({ children }) {
 ## 🚀 下一步计划
 
 ### Phase 1 Week 3-4: 产品库模块迁移
+
 - [ ] 迁移产品列表页面
 - [ ] 实现产品 CRUD 操作
 - [ ] 集成本地 SQLite 数据库
@@ -354,6 +376,7 @@ function ProtectedRoute({ children }) {
 - [ ] 实现图片上传功能
 
 ### Phase 1 Week 5-6: 进销存模块迁移
+
 - [ ] 迁移库存管理页面
 - [ ] 实现入库/出库操作
 - [ ] 集成 Tauri Commands
@@ -361,6 +384,7 @@ function ProtectedRoute({ children }) {
 - [ ] 实现数据可视化图表
 
 ### Phase 2: 智能体增强
+
 - [ ] 集成 Dify AI 平台
 - [ ] 实现多轮对话上下文
 - [ ] 添加技能商店框架
@@ -378,6 +402,7 @@ TSX (React): ~300 行
 ```
 
 ### 文件大小分布
+
 - 最大文件: AgentChat.tsx (244 行)
 - 最复杂文件: commandParser.ts (180 行, 8 种指令模式)
 - 平均文件大小: ~125 行/文件
@@ -387,12 +412,14 @@ TSX (React): ~300 行
 ## 💡 开发心得
 
 ### 成功经验
+
 1. **组件化设计** - 侧边栏、顶部栏、快捷操作、对话界面独立组件,易于维护
 2. **指令解析器** - 规则匹配方式简单有效,易于扩展新指令
 3. **TypeScript 类型安全** - 完整的接口定义,减少运行时错误
 4. **渐进式开发** - 先完成布局,再添加功能,最后集成 AI
 
 ### 改进建议
+
 1. **性能优化** - 消息列表可以使用虚拟滚动 (react-window)
 2. **代码复用** - 页面标题组件可以抽象为通用组件
 3. **国际化** - 预留 i18n 支持,便于后续多语言
@@ -400,9 +427,10 @@ TSX (React): ~300 行
 
 ---
 
-##  反馈与支持
+## 反馈与支持
 
 如有问题或建议,请:
+
 1. 查看相关文档
 2. 检查浏览器控制台错误
 3. 提交 Issue 到 GitHub
@@ -415,4 +443,4 @@ TSX (React): ~300 行
 
 ---
 
-*最后更新: 2026-04-11*
+_最后更新: 2026-04-11_

@@ -17,10 +17,7 @@ export default function AgentPage() {
         >
           🤖 经营智能体
         </Typography>
-        <Typography
-          variant="body1"
-          color="text.secondary"
-        >
+        <Typography variant="body1" color="text.secondary">
           AI 驱动的商业助手 - 管理您的产品、库存和销售
         </Typography>
       </Box>

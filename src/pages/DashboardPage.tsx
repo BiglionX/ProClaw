@@ -1,10 +1,10 @@
-import { Box, Typography, Grid, Paper, Card, CardContent } from '@mui/material';
 import {
   Inventory as InventoryIcon,
-  TrendingUp as TrendingUpIcon,
   ShoppingCart as ShoppingCartIcon,
+  TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
+import { Box, Card, CardContent, Grid, Paper, Typography } from '@mui/material';
 
 interface StatCardProps {
   title: string;
@@ -26,10 +26,17 @@ function StatCard({ title, value, icon, color, change }: StatCardProps) {
       }}
     >
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            mb: 2,
+          }}
+        >
           <Box
             sx={{
-              bgcolor: color + '20',
+              bgcolor: `${color}20`,
               borderRadius: 2,
               p: 1.5,
               display: 'flex',

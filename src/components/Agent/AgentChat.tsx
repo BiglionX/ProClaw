@@ -1,20 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
 import {
-  Box,
-  Paper,
-  TextField,
-  IconButton,
-  Avatar,
-  Typography,
-  CircularProgress,
-  Divider,
-} from '@mui/material';
-import {
-  Send as SendIcon,
   SmartToy as BotIcon,
   Person as PersonIcon,
+  Send as SendIcon,
 } from '@mui/icons-material';
-import { parseCommand, executeCommand } from '../../lib/commandParser';
+import {
+  Avatar,
+  Box,
+  CircularProgress,
+  Divider,
+  IconButton,
+  Paper,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { executeCommand, parseCommand } from '../../lib/commandParser';
 
 interface Message {
   id: string;
@@ -27,7 +27,8 @@ const initialMessages: Message[] = [
   {
     id: '1',
     role: 'assistant',
-    content: '你好!我是 Proclaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?',
+    content:
+      '你好!我是 Proclaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?',
     timestamp: new Date(),
   },
 ];
@@ -56,24 +57,24 @@ export default function AgentChat() {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
       // 解析用户指令
       const command = parseCommand(userMessage.content);
-      
+
       // 执行指令并获取响应
       const response = await executeCommand(command);
-      
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -81,7 +82,7 @@ export default function AgentChat() {
         content: '抱歉,处理您的指令时出现了错误。请稍后重试。',
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +117,7 @@ export default function AgentChat() {
           backgroundColor: '#fafafa',
         }}
       >
-        {messages.map((message) => (
+        {messages.map(message => (
           <Box
             key={message.id}
             sx={{
@@ -140,7 +141,8 @@ export default function AgentChat() {
               elevation={0}
               sx={{
                 p: 2,
-                backgroundColor: message.role === 'user' ? '#e3f2fd' : '#ffffff',
+                backgroundColor:
+                  message.role === 'user' ? '#e3f2fd' : '#ffffff',
                 border: '1px solid',
                 borderColor: message.role === 'user' ? '#bbdefb' : '#e0e0e0',
                 borderRadius: 2,
@@ -208,7 +210,7 @@ export default function AgentChat() {
             multiline
             maxRows={4}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={e => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="输入您的指令,例如:查询库存、添加新产品、分析销售趋势..."
             disabled={isLoading}
