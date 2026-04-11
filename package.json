@@ -26,7 +26,8 @@
     "react-router-dom": "^6.21.0",
     "zod": "^3.22.0",
     "date-fns": "^3.0.0",
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "@tauri-apps/api": "^2.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
