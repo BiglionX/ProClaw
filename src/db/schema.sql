@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS product_categories (
     description TEXT,
     parent_id TEXT REFERENCES product_categories(id),
     sort_order INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     sync_status TEXT DEFAULT 'pending' CHECK(sync_status IN ('pending', 'synced', 'conflict')),
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS brands (
     website_url TEXT,
     description TEXT,
     sort_order INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     sync_status TEXT DEFAULT 'pending' CHECK(sync_status IN ('pending', 'synced', 'conflict')),
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS products (
     current_stock INTEGER DEFAULT 0,
     image_url TEXT,
     barcode TEXT,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
     metadata TEXT, -- JSON 字符串
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
     payment_terms TEXT, -- 付款条件 (e.g., "Net 30", "COD")
     tax_number TEXT, -- 税号
     notes TEXT,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     sync_status TEXT DEFAULT 'pending',
@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS customers (
     tax_number TEXT, -- 税号
     credit_limit REAL DEFAULT 0, -- 信用额度
     notes TEXT,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     sync_status TEXT DEFAULT 'pending',
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     type TEXT NOT NULL CHECK(type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
     parent_id TEXT REFERENCES accounts(id), -- 父科目(用于层级结构)
     balance REAL DEFAULT 0,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
