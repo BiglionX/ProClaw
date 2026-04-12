@@ -175,6 +175,7 @@ export default function PurchasePage() {
 
       {/* 供应商管理标签页 */}
       {tabValue === 0 && (
+        <>
       <Paper
         elevation={0}
         sx={{
@@ -288,6 +289,7 @@ export default function PurchasePage() {
           </Table>
         </TableContainer>
       </Paper>
+      </>
       )}
 
       {/* 添加供应商对话框 */}

@@ -43,6 +43,7 @@ import {
   Product as ProductType,
   updateProduct,
 } from '../lib/productService';
+import { uploadImage } from '../lib/imageService';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductType[]>([]);
@@ -191,14 +192,15 @@ export default function ProductsPage() {
 
       let imageUrl = editingProduct?.image_url || undefined;
 
-      // 如果有新选择的图片，转换为 Base64
+      // 如果有新选择的图片，上传到后端
       if (imageFile) {
-        const reader = new FileReader();
-        imageUrl = await new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(imageFile);
-        });
+        try {
+          imageUrl = await uploadImage(imageFile);
+        } catch (err) {
+          setError('图片上传失败');
+          setLoading(false);
+          return;
+        }
       }
 
       const productData = {

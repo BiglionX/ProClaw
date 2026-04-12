@@ -1,6 +1,6 @@
 import {
-  Analytics as AnalyticsIcon,
   SmartToy as AgentIcon,
+  Analytics as AnalyticsIcon,
   Dashboard as DashboardIcon,
   AccountBalance as FinanceIcon,
   Inventory as InventoryIcon,

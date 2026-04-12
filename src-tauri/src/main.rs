@@ -62,6 +62,8 @@ fn main() {
             get_profit_loss_report,
             get_cash_flow_report,
             get_financial_summary,
+            // 文件上传
+            upload_image,
             // 数据库和同步
             get_database_stats,
             get_pending_sync_records,

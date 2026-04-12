@@ -82,26 +82,45 @@ export default function SettingsPage() {
               {loading ? (
                 <LinearProgress />
               ) : dbStats ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Box
+                  sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}
+                >
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <Typography color="text.secondary">产品数量</Typography>
-                    <Typography sx={{ fontWeight: 'bold' }}>{dbStats.products}</Typography>
+                    <Typography sx={{ fontWeight: 'bold' }}>
+                      {dbStats.products}
+                    </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <Typography color="text.secondary">分类数量</Typography>
-                    <Typography sx={{ fontWeight: 'bold' }}>{dbStats.categories}</Typography>
+                    <Typography sx={{ fontWeight: 'bold' }}>
+                      {dbStats.categories}
+                    </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <Typography color="text.secondary">库存交易</Typography>
-                    <Typography sx={{ fontWeight: 'bold' }}>{dbStats.transactions}</Typography>
+                    <Typography sx={{ fontWeight: 'bold' }}>
+                      {dbStats.transactions}
+                    </Typography>
                   </Box>
                   <Divider />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <Typography color="text.secondary">待同步记录</Typography>
                     <Typography
                       sx={{
                         fontWeight: 'bold',
-                        color: dbStats.pending_sync > 0 ? 'warning.main' : 'success.main',
+                        color:
+                          dbStats.pending_sync > 0
+                            ? 'warning.main'
+                            : 'success.main',
                       }}
                     >
                       {dbStats.pending_sync}
@@ -127,30 +146,43 @@ export default function SettingsPage() {
               {loading ? (
                 <LinearProgress />
               ) : syncStatus ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Box
+                  sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}
+                >
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <Typography color="text.secondary">同步状态</Typography>
                     <Typography
                       sx={{
                         fontWeight: 'bold',
-                        color: syncStatus.sync_enabled ? 'success.main' : 'warning.main',
+                        color: syncStatus.sync_enabled
+                          ? 'success.main'
+                          : 'warning.main',
                       }}
                     >
                       {syncStatus.sync_enabled ? '已启用' : '未启用'}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <Typography color="text.secondary">待同步操作</Typography>
                     <Typography
                       sx={{
                         fontWeight: 'bold',
-                        color: syncStatus.pending_operations > 0 ? 'warning.main' : 'success.main',
+                        color:
+                          syncStatus.pending_operations > 0
+                            ? 'warning.main'
+                            : 'success.main',
                       }}
                     >
                       {syncStatus.pending_operations}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box
+                    sx={{ display: 'flex', justifyContent: 'space-between' }}
+                  >
                     <Typography color="text.secondary">最后同步时间</Typography>
                     <Typography sx={{ fontWeight: 'bold' }}>
                       {syncStatus.last_sync_time || '从未同步'}
@@ -185,8 +217,12 @@ export default function SettingsPage() {
               <Divider sx={{ mb: 2 }} />
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.50' }}>
-                    <StorageIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                  <Paper
+                    sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.50' }}
+                  >
+                    <StorageIcon
+                      sx={{ fontSize: 40, color: 'primary.main', mb: 1 }}
+                    />
                     <Typography variant="body2" color="text.secondary">
                       应用版本
                     </Typography>
@@ -196,8 +232,12 @@ export default function SettingsPage() {
                   </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}>
-                    <DatabaseIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                  <Paper
+                    sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}
+                  >
+                    <DatabaseIcon
+                      sx={{ fontSize: 40, color: 'success.main', mb: 1 }}
+                    />
                     <Typography variant="body2" color="text.secondary">
                       数据库引擎
                     </Typography>
@@ -208,7 +248,9 @@ export default function SettingsPage() {
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.50' }}>
-                    <CloudIcon sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
+                    <CloudIcon
+                      sx={{ fontSize: 40, color: 'info.main', mb: 1 }}
+                    />
                     <Typography variant="body2" color="text.secondary">
                       云端服务
                     </Typography>
@@ -218,8 +260,12 @@ export default function SettingsPage() {
                   </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50' }}>
-                    <InfoIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                  <Paper
+                    sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50' }}
+                  >
+                    <InfoIcon
+                      sx={{ fontSize: 40, color: 'warning.main', mb: 1 }}
+                    />
                     <Typography variant="body2" color="text.secondary">
                       框架版本
                     </Typography>

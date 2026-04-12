@@ -3,6 +3,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use uuid::Uuid;
+use base64::{Engine as _, engine::general_purpose};
 
 // ==================== 数据类型定义 ====================
 
@@ -1668,4 +1669,14 @@ pub fn get_financial_summary(db: tauri::State<Mutex<Database>>) -> Result<serde_
         "inventory_value": inventory_value,
         "working_capital": accounts_receivable - accounts_payable + inventory_value
     }))
+}
+
+// ==================== 文件上传命令 ====================
+
+/// 上传图片并返回 Base64 编码
+#[tauri::command]
+pub fn upload_image(file_data: String) -> Result<String, String> {
+    // file_data 已经是 base64 格式，直接返回
+    // 在实际应用中，这里可以添加图片验证、压缩等逻辑
+    Ok(file_data)
 }
