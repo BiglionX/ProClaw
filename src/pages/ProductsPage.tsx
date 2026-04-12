@@ -35,6 +35,7 @@ import {
 import { useEffect, useState } from 'react';
 import { Brand, getBrands } from '../lib/brandService';
 import { Category, getCategories } from '../lib/categoryService';
+import { uploadImage } from '../lib/imageService';
 import {
   createProduct,
   CreateProductInput,
@@ -43,7 +44,6 @@ import {
   Product as ProductType,
   updateProduct,
 } from '../lib/productService';
-import { uploadImage } from '../lib/imageService';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductType[]>([]);

@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { getDatabaseStats, getSyncStatus } from '../lib/syncService';
+import { testSupabaseConnection, listTables } from '../lib/supabaseTest';
 
 interface DatabaseStats {
   products: number;
@@ -32,10 +33,18 @@ interface SyncStatus {
   sync_enabled: boolean;
 }
 
+interface SupabaseTestResult {
+  success: boolean;
+  message: string;
+  productCount?: number;
+}
+
 export default function SettingsPage() {
   const [dbStats, setDbStats] = useState<DatabaseStats | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [loading, setLoading] = useState(false);
+  const [supabaseTestResult, setSupabaseTestResult] = useState<SupabaseTestResult | null>(null);
+  const [testingConnection, setTestingConnection] = useState(false);
 
   const loadData = async () => {
     try {
@@ -56,6 +65,18 @@ export default function SettingsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleTestSupabase = async () => {
+    try {
+      setTestingConnection(true);
+      const result = await testSupabaseConnection();
+      setSupabaseTestResult(result);
+    } catch (err) {
+      console.error('Test failed:', err);
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   return (
     <Box>
@@ -275,6 +296,50 @@ export default function SettingsPage() {
                   </Paper>
                 </Grid>
               </Grid>
+
+              {/* Supabase 连接测试 */}
+              <Box sx={{ mt: 3 }}>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                  ☁️ Supabase 连接测试
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="info"
+                  onClick={handleTestSupabase}
+                  disabled={testingConnection}
+                  startIcon={<CloudIcon />}
+                >
+                  {testingConnection ? '测试中...' : '测试连接'}
+                </Button>
+                {supabaseTestResult && (
+                  <Box
+                    sx={{
+                      mt: 2,
+                      p: 2,
+                      borderRadius: 1,
+                      bgcolor: supabaseTestResult.success ? 'success.50' : 'error.50',
+                      border: '1px solid',
+                      borderColor: supabaseTestResult.success ? 'success.main' : 'error.main',
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: supabaseTestResult.success ? 'success.main' : 'error.main',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {supabaseTestResult.success ? '✅' : '❌'} {supabaseTestResult.message}
+                    </Typography>
+                    {supabaseTestResult.productCount !== undefined && (
+                      <Typography variant="caption" color="text.secondary">
+                        产品数量: {supabaseTestResult.productCount}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Box>
             </CardContent>
           </Card>
         </Grid>

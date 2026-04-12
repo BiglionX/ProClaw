@@ -26,7 +26,9 @@ export function fileToBase64(file: File): Promise<string> {
 export async function uploadImage(file: File): Promise<string> {
   try {
     const base64Data = await fileToBase64(file);
-    const result = await invoke<string>('upload_image', { fileData: base64Data });
+    const result = await invoke<string>('upload_image', {
+      fileData: base64Data,
+    });
     return result;
   } catch (error) {
     console.error('Upload image failed:', error);

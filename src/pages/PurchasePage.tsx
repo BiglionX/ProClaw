@@ -1,7 +1,7 @@
 import {
   Add as AddIcon,
-  Assignment as OrderIcon,
   Business as BusinessIcon,
+  Assignment as OrderIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
 } from '@mui/icons-material';
@@ -17,23 +17,21 @@ import {
   Paper,
   Snackbar,
   Tab,
-  Tabs,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import {
-  CreatePurchaseOrderInput,
   CreateSupplierInput,
   PurchaseOrder,
   Supplier,
-  createPurchaseOrder,
   createSupplier,
   getPurchaseOrders,
   getSuppliers,
@@ -176,120 +174,126 @@ export default function PurchasePage() {
       {/* 供应商管理标签页 */}
       {tabValue === 0 && (
         <>
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          mb: 3,
-          display: 'flex',
-          gap: 2,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <TextField
-          placeholder="搜索供应商 (名称/编码/联系人)"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          onKeyPress={e => e.key === 'Enter' && handleSearch()}
-          size="small"
-          sx={{ minWidth: 300 }}
-          InputProps={{
-            endAdornment: (
-              <Button size="small" onClick={handleSearch} disabled={loading}>
-                <SearchIcon />
-              </Button>
-            ),
-          }}
-        />
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 3,
+              display: 'flex',
+              gap: 2,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <TextField
+              placeholder="搜索供应商 (名称/编码/联系人)"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              onKeyPress={e => e.key === 'Enter' && handleSearch()}
+              size="small"
+              sx={{ minWidth: 300 }}
+              InputProps={{
+                endAdornment: (
+                  <Button
+                    size="small"
+                    onClick={handleSearch}
+                    disabled={loading}
+                  >
+                    <SearchIcon />
+                  </Button>
+                ),
+              }}
+            />
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
-          disabled={loading}
-        >
-          添加供应商
-        </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleOpenDialog}
+              disabled={loading}
+            >
+              添加供应商
+            </Button>
 
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={loadSuppliers}
-          disabled={loading}
-        >
-          刷新
-        </Button>
-      </Paper>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={loadSuppliers}
+              disabled={loading}
+            >
+              刷新
+            </Button>
+          </Paper>
 
-      {/* 供应商列表 */}
-      <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography variant="h6">
-              供应商列表 ({suppliers.length})
-            </Typography>
-          </Box>
-        </Box>
+          {/* 供应商列表 */}
+          <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+            <Box
+              sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Typography variant="h6">
+                  供应商列表 ({suppliers.length})
+                </Typography>
+              </Box>
+            </Box>
 
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>供应商编码</TableCell>
-                <TableCell>名称</TableCell>
-                <TableCell>联系人</TableCell>
-                <TableCell>电话</TableCell>
-                <TableCell>邮箱</TableCell>
-                <TableCell>付款条件</TableCell>
-                <TableCell>状态</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {suppliers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
-                      {loading ? '加载中...' : '暂无供应商数据'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                suppliers.map(supplier => (
-                  <TableRow key={supplier.id} hover>
-                    <TableCell>
-                      <Typography
-                        sx={{ fontWeight: 'bold', color: 'primary.main' }}
-                      >
-                        {supplier.code}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{supplier.name}</TableCell>
-                    <TableCell>{supplier.contact_person || '-'}</TableCell>
-                    <TableCell>{supplier.phone || '-'}</TableCell>
-                    <TableCell>{supplier.email || '-'}</TableCell>
-                    <TableCell>{supplier.payment_terms || '-'}</TableCell>
-                    <TableCell>
-                      <Typography
-                        sx={{
-                          color: supplier.is_active
-                            ? 'success.main'
-                            : 'text.secondary',
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        {supplier.is_active ? '活跃' : '停用'}
-                      </Typography>
-                    </TableCell>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>供应商编码</TableCell>
+                    <TableCell>名称</TableCell>
+                    <TableCell>联系人</TableCell>
+                    <TableCell>电话</TableCell>
+                    <TableCell>邮箱</TableCell>
+                    <TableCell>付款条件</TableCell>
+                    <TableCell>状态</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-      </>
+                </TableHead>
+                <TableBody>
+                  {suppliers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">
+                          {loading ? '加载中...' : '暂无供应商数据'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    suppliers.map(supplier => (
+                      <TableRow key={supplier.id} hover>
+                        <TableCell>
+                          <Typography
+                            sx={{ fontWeight: 'bold', color: 'primary.main' }}
+                          >
+                            {supplier.code}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{supplier.name}</TableCell>
+                        <TableCell>{supplier.contact_person || '-'}</TableCell>
+                        <TableCell>{supplier.phone || '-'}</TableCell>
+                        <TableCell>{supplier.email || '-'}</TableCell>
+                        <TableCell>{supplier.payment_terms || '-'}</TableCell>
+                        <TableCell>
+                          <Typography
+                            sx={{
+                              color: supplier.is_active
+                                ? 'success.main'
+                                : 'text.secondary',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {supplier.is_active ? '活跃' : '停用'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </>
       )}
 
       {/* 添加供应商对话框 */}
@@ -430,8 +434,8 @@ export default function PurchasePage() {
             <TextField
               placeholder="搜索采购订单 (PO号/供应商)"
               value={orderSearchTerm}
-              onChange={(e) => setOrderSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && loadOrders()}
+              onChange={e => setOrderSearchTerm(e.target.value)}
+              onKeyPress={e => e.key === 'Enter' && loadOrders()}
               size="small"
               sx={{ minWidth: 300 }}
               InputProps={{
@@ -464,7 +468,9 @@ export default function PurchasePage() {
 
           {/* 采购订单列表 */}
           <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box
+              sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <OrderIcon sx={{ mr: 1, color: 'primary.main' }} />
                 <Typography variant="h6">
@@ -495,10 +501,12 @@ export default function PurchasePage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    orders.map((order) => (
+                    orders.map(order => (
                       <TableRow key={order.id} hover>
                         <TableCell>
-                          <Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                          <Typography
+                            sx={{ fontWeight: 'bold', color: 'primary.main' }}
+                          >
                             {order.po_number}
                           </Typography>
                         </TableCell>
@@ -512,10 +520,10 @@ export default function PurchasePage() {
                               order.status === 'received'
                                 ? 'success'
                                 : order.status === 'confirmed'
-                                ? 'primary'
-                                : order.status === 'shipped'
-                                ? 'info'
-                                : 'default'
+                                  ? 'primary'
+                                  : order.status === 'shipped'
+                                    ? 'info'
+                                    : 'default'
                             }
                           />
                         </TableCell>
@@ -532,8 +540,8 @@ export default function PurchasePage() {
                               order.payment_status === 'paid'
                                 ? 'success'
                                 : order.payment_status === 'partial'
-                                ? 'warning'
-                                : 'default'
+                                  ? 'warning'
+                                  : 'default'
                             }
                           />
                         </TableCell>
