@@ -3,7 +3,6 @@ import FloatingAgentChat from '../Agent/FloatingAgentChat';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 
-const DRAWER_WIDTH = 240;
 const TOPBAR_HEIGHT = 64;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -17,9 +16,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         component="main"
         sx={{
           flexGrow: 1,
-          ml: `${DRAWER_WIDTH}px`,
           mt: `${TOPBAR_HEIGHT}px`,
-          p: 3,
+          p: 2,
           pb: 8, // 为浮动按钮留出空间
         }}
       >

@@ -20,7 +20,7 @@ export default function RealtimeTest() {
           table: 'test_table',
         },
         payload => {
-          console.log('Realtime event received:', payload);
+          // Realtime event received
           setMessages(prev => [
             ...prev,
             `Event: ${payload.eventType} at ${new Date().toLocaleTimeString()}`,

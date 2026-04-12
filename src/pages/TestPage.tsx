@@ -14,13 +14,10 @@ export default function TestPage() {
   ];
 
   const testParse = () => {
-    console.log('=== 指令解析测试 ===');
+    // === 指令解析测试 ===
     testCommands.forEach(cmd => {
-      const result = parseCommand(cmd);
-      console.log(`\n输入: "${cmd}"`);
-      console.log('识别:', result.action);
-      console.log('参数:', result.params);
-      console.log('置信度:', result.confidence);
+      parseCommand(cmd);
+      // 输出: 输入、识别结果、参数、置信度
     });
   };
 
@@ -39,7 +36,7 @@ export default function TestPage() {
           测试指令解析
         </Typography>
         <Button variant="contained" onClick={testParse} sx={{ mr: 2, mb: 1 }}>
-          运行测试 (查看控制台)
+          运行测试 (查看浏览器开发者工具)
         </Button>
       </Box>
 

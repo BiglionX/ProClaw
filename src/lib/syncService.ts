@@ -17,9 +17,13 @@ export async function getSyncStatus(): Promise<{
   sync_enabled: boolean;
 }> {
   const stats = await getDatabaseStats();
+
+  // 从 localStorage 获取最后同步时间
+  const lastSyncTime = localStorage.getItem('proclaw_last_sync_time');
+
   return {
     pending_operations: stats.pending_sync,
-    last_sync_time: undefined, // TODO: 实现最后同步时间跟踪
+    last_sync_time: lastSyncTime || undefined,
     sync_enabled: true,
   };
 }

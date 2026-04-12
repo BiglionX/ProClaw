@@ -10,7 +10,6 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import {
-  Box,
   Divider,
   Drawer,
   List,
@@ -18,11 +17,11 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Typography,
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const DRAWER_WIDTH = 240;
+const TOPBAR_HEIGHT = 64;
 
 interface NavItem {
   text: string;
@@ -57,36 +56,12 @@ export default function Sidebar() {
           backgroundColor: '#1a1a2e',
           color: 'white',
           borderRight: 'none',
+          top: `${TOPBAR_HEIGHT}px`,
+          height: `calc(100vh - ${TOPBAR_HEIGHT}px)`,
         },
       }}
     >
-      <Box sx={{ p: 2, textAlign: 'center' }}>
-        <Typography
-          variant="h6"
-          component="div"
-          sx={{
-            fontWeight: 700,
-            color: '#fff',
-            fontSize: '1.2rem',
-          }}
-        >
-          🦞 Proclaw
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            color: 'rgba(255,255,255,0.6)',
-            display: 'block',
-            mt: 0.5,
-          }}
-        >
-          AI 商业操作系统
-        </Typography>
-      </Box>
-
-      <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
-
-      <List sx={{ pt: 1 }}>
+      <List sx={{ pt: 2 }}>
         {navItems.map(item => (
           <ListItem key={item.path} disablePadding>
             <ListItemButton

@@ -64,7 +64,7 @@ const commandPatterns: CommandPattern[] = [
       'stock query',
     ],
     action: 'query_inventory',
-    extractParams: text => {
+    extractParams: _text => {
       return {
         type: 'inventory',
       };
@@ -134,7 +134,7 @@ const commandPatterns: CommandPattern[] = [
   {
     keywords: ['库存预警', '低库存', '库存不足', 'stock alert', 'low stock'],
     action: 'check_stock_alert',
-    extractParams: text => {
+    extractParams: _text => {
       return {
         type: 'inventory',
       };
@@ -179,7 +179,7 @@ export function parseCommand(text: string): CommandResult {
  * 执行解析后的命令
  */
 export async function executeCommand(command: CommandResult): Promise<string> {
-  console.log('执行命令:', command.action, command.params);
+  // 执行命令
 
   // TODO: 这里将连接到实际的 AI 后端或 Tauri Commands
   // 现在返回模拟响应

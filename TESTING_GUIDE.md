@@ -1,4 +1,4 @@
-# 🧪 Proclaw Desktop 测试指南
+# 🧪 ProClaw Desktop 测试指南
 
 ## 📍 当前状态
 

@@ -498,7 +498,12 @@ export interface Database {
           customer_id: string;
           order_date: string;
           expected_delivery_date?: string | null;
-          status?: 'draft' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+          status?:
+            | 'draft'
+            | 'confirmed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled';
           total_amount?: number;
           paid_amount?: number;
           payment_status?: 'unpaid' | 'partial' | 'paid';
@@ -517,7 +522,12 @@ export interface Database {
           customer_id?: string;
           order_date?: string;
           expected_delivery_date?: string | null;
-          status?: 'draft' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+          status?:
+            | 'draft'
+            | 'confirmed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled';
           total_amount?: number;
           paid_amount?: number;
           payment_status?: 'unpaid' | 'partial' | 'paid';

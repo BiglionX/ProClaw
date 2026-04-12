@@ -44,7 +44,7 @@ interface AuthState {
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>(set => ({
   user: null,
   session: null,
   isLoading: false,
@@ -60,7 +60,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (mockAccount) {
         // 模拟账号登录成功
-        console.log('✅ 使用模拟账号登录:', mockAccount.username);
         set({
           user: mockAccount.user,
           session: mockAccount.session,

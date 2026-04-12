@@ -17,6 +17,7 @@ import {
   Paper,
   Typography,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 
 interface QuickAction {
   id: string;
@@ -28,6 +29,8 @@ interface QuickAction {
 }
 
 export default function QuickActions() {
+  const navigate = useNavigate();
+
   const actions: QuickAction[] = [
     {
       id: 'add-product',
@@ -35,7 +38,9 @@ export default function QuickActions() {
       description: '快速录入新产品',
       icon: <AddIcon />,
       color: '#1976d2',
-      action: () => console.log('添加产品'),
+      action: () => {
+        navigate('/products');
+      },
     },
     {
       id: 'search-inventory',
@@ -43,7 +48,9 @@ export default function QuickActions() {
       description: '查看当前库存状态',
       icon: <SearchIcon />,
       color: '#2e7d32',
-      action: () => console.log('查询库存'),
+      action: () => {
+        navigate('/inventory');
+      },
     },
     {
       id: 'sales-analysis',
@@ -51,7 +58,9 @@ export default function QuickActions() {
       description: '分析销售数据和趋势',
       icon: <AnalyticsIcon />,
       color: '#ed6c02',
-      action: () => console.log('销售分析'),
+      action: () => {
+        navigate('/analytics');
+      },
     },
     {
       id: 'stock-alert',
@@ -59,7 +68,9 @@ export default function QuickActions() {
       description: '查看低库存警告',
       icon: <WarningIcon />,
       color: '#d32f2f',
-      action: () => console.log('库存预警'),
+      action: () => {
+        navigate('/inventory');
+      },
     },
     {
       id: 'create-order',
@@ -67,7 +78,10 @@ export default function QuickActions() {
       description: '新建采购或销售订单',
       icon: <ShoppingCartIcon />,
       color: '#9c27b0',
-      action: () => console.log('创建订单'),
+      action: () => {
+        // Beta 版本暂不支持
+        alert('订单功能将在 v1.0 正式版中提供');
+      },
     },
     {
       id: 'reports',
@@ -75,7 +89,10 @@ export default function QuickActions() {
       description: '查看业务报表',
       icon: <AssessmentIcon />,
       color: '#0097a7',
-      action: () => console.log('生成报表'),
+      action: () => {
+        // Beta 版本暂不支持
+        alert('报表功能将在 v1.0 正式版中提供');
+      },
     },
   ];
 

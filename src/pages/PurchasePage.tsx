@@ -50,7 +50,6 @@ export default function PurchasePage() {
   // 采购订单状态
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [orderSearchTerm, setOrderSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
 
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -91,7 +90,6 @@ export default function PurchasePage() {
     try {
       setLoading(true);
       const data = await getPurchaseOrders({
-        status: selectedStatus || undefined,
         search: orderSearchTerm || undefined,
       });
       setOrders(data);
@@ -163,7 +161,7 @@ export default function PurchasePage() {
       <Paper sx={{ mb: 3 }}>
         <Tabs
           value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
+          onChange={(_, newValue) => setTabValue(newValue)}
           variant="fullWidth"
         >
           <Tab icon={<BusinessIcon />} label="供应商管理" />

@@ -5,12 +5,12 @@ import { supabase } from '../lib/supabase';
  */
 export async function testSupabaseConnection() {
   try {
-    console.log('Testing Supabase connection...');
+    // Testing Supabase connection...
 
     // 测试 1: 检查是否可以查询表
-    const { data: tables, error: tableError } = await supabase
+    const { count, error: tableError } = await supabase
       .from('products')
-      .select('count', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true });
 
     if (tableError) {
       console.error('❌ Table query failed:', tableError);
@@ -20,21 +20,19 @@ export async function testSupabaseConnection() {
       };
     }
 
-    console.log('✅ Table query successful');
+    // Table query successful
 
     // 测试 2: 获取数据库信息
-    const { data: rpcResult, error: rpcError } = await supabase.rpc(
-      'version'
-    );
+    const { error: rpcError } = await supabase.rpc('version');
 
     if (!rpcError) {
-      console.log('✅ Database version:', rpcResult);
+      // Database version retrieved
     }
 
     return {
       success: true,
       message: 'Connection successful',
-      productCount: tables,
+      productCount: count || 0,
     };
   } catch (error: any) {
     console.error('❌ Connection test failed:', error);
@@ -74,14 +72,14 @@ export async function listTables() {
         .select('*', { count: 'exact', head: true });
 
       if (error) {
-        console.warn(`⚠️  Table ${tableName}: ${error.message}`);
+        // Table query failed
         results.push({
           name: tableName,
           exists: false,
           error: error.message,
         });
       } else {
-        console.log(`✅ Table ${tableName}: ${count} records`);
+        // Table query successful
         results.push({
           name: tableName,
           exists: true,

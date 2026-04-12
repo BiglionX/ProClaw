@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../lib/authStore';
+import TokenDisplay from './TokenDisplay';
 
 export default function TopBar() {
   const { user, logout } = useAuthStore();
@@ -34,7 +35,23 @@ export default function TopBar() {
       }}
     >
       <Toolbar>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{
+              fontWeight: 700,
+              color: '#fff',
+              fontSize: '1.3rem',
+            }}
+          >
+            🦞 Proclaw
+          </Typography>
+        </Box>
+
         <Box sx={{ flexGrow: 1 }} />
+
+        <TokenDisplay />
 
         <Tooltip title="通知">
           <IconButton size="large" color="inherit" sx={{ mr: 1 }}>

@@ -13,6 +13,7 @@ import PurchasePage from './pages/PurchasePage';
 import RegisterPage from './pages/RegisterPage';
 import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
+import SetupPage from './pages/SetupPage';
 import TestPage from './pages/TestPage';
 
 // 受保护的路由组件 - 使用 AppLayout 包装
@@ -39,6 +40,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* 公开路由 */}
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 

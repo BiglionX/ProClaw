@@ -147,7 +147,7 @@ export default function SalesPage() {
       <Paper sx={{ mb: 3 }}>
         <Tabs
           value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
+          onChange={(_, newValue) => setTabValue(newValue)}
           variant="fullWidth"
         >
           <Tab icon={<CustomerIcon />} label="客户管理" />

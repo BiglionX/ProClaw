@@ -33,25 +33,20 @@ export default function FinancePage() {
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [profitLoss, setProfitLoss] = useState<ProfitLossReport | null>(null);
   const [cashFlow, setCashFlow] = useState<CashFlowReport | null>(null);
-  const [loading, setLoading] = useState(false);
 
   // 加载财务概览
   const loadSummary = async () => {
     try {
-      setLoading(true);
       const data = await getFinancialSummary();
       setSummary(data);
     } catch (err) {
       console.error('Failed to load summary:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   // 加载利润表
   const loadProfitLoss = async () => {
     try {
-      setLoading(true);
       const now = new Date();
       const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
         .toISOString()
@@ -61,15 +56,12 @@ export default function FinancePage() {
       setProfitLoss(data);
     } catch (err) {
       console.error('Failed to load profit/loss:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   // 加载现金流量表
   const loadCashFlow = async () => {
     try {
-      setLoading(true);
       const now = new Date();
       const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
         .toISOString()
@@ -79,8 +71,6 @@ export default function FinancePage() {
       setCashFlow(data);
     } catch (err) {
       console.error('Failed to load cash flow:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -110,7 +100,7 @@ export default function FinancePage() {
       <Paper sx={{ mb: 3 }}>
         <Tabs
           value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
+          onChange={(_, newValue) => setTabValue(newValue)}
           variant="fullWidth"
         >
           <Tab icon={<BalanceIcon />} label="财务概览" />
