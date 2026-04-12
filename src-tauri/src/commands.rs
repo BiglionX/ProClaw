@@ -1533,3 +1533,139 @@ pub fn get_sales_orders(db: tauri::State<Mutex<Database>>, options: Option<serde
 
     Ok(orders)
 }
+
+// ==================== 财务报表命令 ====================
+
+/// 获取利润表数据
+#[tauri::command]
+pub fn get_profit_loss_report(db: tauri::State<Mutex<Database>>, start_date: String, end_date: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let total_revenue: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders 
+         WHERE order_date >= ?1 AND order_date <= ?2 AND status != 'cancelled' AND deleted_at IS NULL",
+        params![start_date, end_date],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let total_cogs: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders 
+         WHERE order_date >= ?1 AND order_date <= ?2 AND status != 'cancelled' AND deleted_at IS NULL",
+        params![start_date, end_date],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let gross_profit = total_revenue - total_cogs;
+
+    let operating_expenses: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions 
+         WHERE transaction_date >= ?1 AND transaction_date <= ?2 
+         AND transaction_type = 'expense' AND deleted_at IS NULL",
+        params![start_date, end_date],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let net_profit = gross_profit - operating_expenses;
+
+    Ok(serde_json::json!({
+        "period": {"start": start_date, "end": end_date},
+        "revenue": total_revenue,
+        "cost_of_goods_sold": total_cogs,
+        "gross_profit": gross_profit,
+        "operating_expenses": operating_expenses,
+        "net_profit": net_profit,
+        "profit_margin": if total_revenue > 0.0 { (net_profit / total_revenue) * 100.0 } else { 0.0 }
+    }))
+}
+
+/// 获取现金流量表数据
+#[tauri::command]
+pub fn get_cash_flow_report(db: tauri::State<Mutex<Database>>, start_date: String, end_date: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let operating_inflow: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions 
+         WHERE transaction_date >= ?1 AND transaction_date <= ?2 
+         AND transaction_type = 'income' AND deleted_at IS NULL",
+        params![start_date, end_date],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let operating_outflow: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions 
+         WHERE transaction_date >= ?1 AND transaction_date <= ?2 
+         AND transaction_type = 'expense' AND deleted_at IS NULL",
+        params![start_date, end_date],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let net_operating_cash = operating_inflow - operating_outflow;
+
+    Ok(serde_json::json!({
+        "period": {"start": start_date, "end": end_date},
+        "operating_activities": {
+            "inflow": operating_inflow,
+            "outflow": operating_outflow,
+            "net": net_operating_cash
+        },
+        "investing_activities": 0.0,
+        "financing_activities": 0.0,
+        "net_cash_flow": net_operating_cash
+    }))
+}
+
+/// 获取财务概览
+#[tauri::command]
+pub fn get_financial_summary(db: tauri::State<Mutex<Database>>) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let monthly_revenue: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders 
+         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now') 
+         AND status != 'cancelled' AND deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let monthly_expense: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders 
+         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now') 
+         AND status != 'cancelled' AND deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let accounts_receivable: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM sales_orders 
+         WHERE payment_status != 'paid' AND status != 'cancelled' AND deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let accounts_payable: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM purchase_orders 
+         WHERE payment_status != 'paid' AND status != 'cancelled' AND deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    let inventory_value: f64 = conn.query_row(
+        "SELECT COALESCE(SUM(current_stock * cost_price), 0.0) FROM products 
+         WHERE deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "monthly_revenue": monthly_revenue,
+        "monthly_expense": monthly_expense,
+        "monthly_profit": monthly_revenue - monthly_expense,
+        "accounts_receivable": accounts_receivable,
+        "accounts_payable": accounts_payable,
+        "inventory_value": inventory_value,
+        "working_capital": accounts_receivable - accounts_payable + inventory_value
+    }))
+}

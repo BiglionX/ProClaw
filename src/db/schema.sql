@@ -305,3 +305,46 @@ CREATE TABLE IF NOT EXISTS sales_order_items (
 
 CREATE INDEX IF NOT EXISTS idx_soi_so ON sales_order_items(sales_order_id);
 CREATE INDEX IF NOT EXISTS idx_soi_product ON sales_order_items(product_id);
+
+-- ============================================
+-- 会计科目表
+-- ============================================
+CREATE TABLE IF NOT EXISTS accounts (
+    id TEXT PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL, -- 科目编码 (e.g., 1001, 5001)
+    name TEXT NOT NULL, -- 科目名称
+    type TEXT NOT NULL CHECK(type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
+    parent_id TEXT REFERENCES accounts(id), -- 父科目(用于层级结构)
+    balance REAL DEFAULT 0,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_code ON accounts(code);
+CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type);
+
+-- ============================================
+-- 财务交易记录表
+-- ============================================
+CREATE TABLE IF NOT EXISTS financial_transactions (
+    id TEXT PRIMARY KEY,
+    transaction_date DATE NOT NULL,
+    description TEXT NOT NULL,
+    transaction_type TEXT NOT NULL CHECK(transaction_type IN ('income', 'expense', 'transfer')),
+    amount REAL NOT NULL,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    reference_type TEXT, -- 关联类型 (e.g., 'sales_order', 'purchase_order')
+    reference_id TEXT, -- 关联ID
+    notes TEXT,
+    created_by TEXT REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sync_status TEXT DEFAULT 'pending',
+    last_synced_at TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ft_date ON financial_transactions(transaction_date);
+CREATE INDEX IF NOT EXISTS idx_ft_type ON financial_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_ft_account ON financial_transactions(account_id);
