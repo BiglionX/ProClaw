@@ -41,7 +41,7 @@ import {
 
 export default function PurchasePage() {
   const [tabValue, setTabValue] = useState(0);
-  
+
   // 供应商状态
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchTerm, setSearchTerm] = useState('');

@@ -53,6 +53,11 @@ fn main() {
             create_purchase_order,
             get_purchase_orders,
             get_purchase_order_detail,
+            // 销售管理
+            create_customer,
+            get_customers,
+            create_sales_order,
+            get_sales_orders,
             // 数据库和同步
             get_database_stats,
             get_pending_sync_records,

@@ -232,3 +232,76 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
 
 CREATE INDEX IF NOT EXISTS idx_poi_po ON purchase_order_items(purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_poi_product ON purchase_order_items(product_id);
+
+-- ============================================
+-- 客户表
+-- ============================================
+CREATE TABLE IF NOT EXISTS customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    code TEXT UNIQUE, -- 客户编码
+    contact_person TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    website TEXT,
+    customer_type TEXT DEFAULT 'individual' CHECK(customer_type IN ('individual', 'company')),
+    tax_number TEXT, -- 税号
+    credit_limit REAL DEFAULT 0, -- 信用额度
+    notes TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sync_status TEXT DEFAULT 'pending',
+    last_synced_at TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_customers_code ON customers(code);
+
+-- ============================================
+-- 销售订单表
+-- ============================================
+CREATE TABLE IF NOT EXISTS sales_orders (
+    id TEXT PRIMARY KEY,
+    so_number TEXT UNIQUE NOT NULL, -- 销售单号 (e.g., SO-2024-001)
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    order_date DATE NOT NULL,
+    expected_delivery_date DATE,
+    status TEXT DEFAULT 'draft' CHECK(status IN ('draft', 'confirmed', 'shipped', 'delivered', 'cancelled')),
+    total_amount REAL DEFAULT 0,
+    paid_amount REAL DEFAULT 0,
+    payment_status TEXT DEFAULT 'unpaid' CHECK(payment_status IN ('unpaid', 'partial', 'paid')),
+    shipping_address TEXT,
+    notes TEXT,
+    created_by TEXT REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sync_status TEXT DEFAULT 'pending',
+    last_synced_at TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_so_customer ON sales_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_so_status ON sales_orders(status);
+CREATE INDEX IF NOT EXISTS idx_so_date ON sales_orders(order_date);
+
+-- ============================================
+-- 销售订单明细表
+-- ============================================
+CREATE TABLE IF NOT EXISTS sales_order_items (
+    id TEXT PRIMARY KEY,
+    sales_order_id TEXT NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    quantity INTEGER NOT NULL,
+    unit_price REAL NOT NULL, -- 单价
+    total_price REAL NOT NULL, -- 总价 = quantity * unit_price
+    shipped_quantity INTEGER DEFAULT 0, -- 已发货数量
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_soi_so ON sales_order_items(sales_order_id);
+CREATE INDEX IF NOT EXISTS idx_soi_product ON sales_order_items(product_id);

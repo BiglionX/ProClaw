@@ -121,6 +121,8 @@ export async function getPurchaseOrders(options?: {
 /**
  * 获取采购订单详情
  */
-export async function getPurchaseOrderDetail(orderId: string): Promise<PurchaseOrderDetail> {
+export async function getPurchaseOrderDetail(
+  orderId: string
+): Promise<PurchaseOrderDetail> {
   return await invoke('get_purchase_order_detail', { orderId });
 }
