@@ -144,23 +144,49 @@ CREATE INDEX IF NOT EXISTS idx_brands_name ON brands(name);
 -- ============================================
 -- 触发器 - 自动更新 updated_at
 -- ============================================
-CREATE TRIGGER IF NOT EXISTS update_users_updated_at
-    AFTER UPDATE ON users
-    BEGIN
-        UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-    END;
+-- 注意: PostgreSQL 不支持 IF NOT EXISTS，需要先检查再创建
 
-CREATE TRIGGER IF NOT EXISTS update_products_updated_at
-    AFTER UPDATE ON products
-    BEGIN
-        UPDATE products SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-    END;
+-- 创建通用的 updated_at 更新函数
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
 
-CREATE TRIGGER IF NOT EXISTS update_categories_updated_at
-    AFTER UPDATE ON product_categories
-    BEGIN
-        UPDATE product_categories SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-    END;
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at'
+    ) THEN
+        CREATE TRIGGER update_users_updated_at
+            BEFORE UPDATE ON users
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_products_updated_at'
+    ) THEN
+        CREATE TRIGGER update_products_updated_at
+            BEFORE UPDATE ON products
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_categories_updated_at'
+    ) THEN
+        CREATE TRIGGER update_categories_updated_at
+            BEFORE UPDATE ON product_categories
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 
 -- ============================================
 -- 供应商表
