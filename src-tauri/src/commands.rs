@@ -1413,7 +1413,7 @@ pub fn create_sales_order(db: tauri::State<Mutex<Database>>, order: serde_json::
         .as_str()
         .ok_or("Customer ID is required")?
         .to_string();
-    
+
     let order_date = order.get("order_date")
         .and_then(|v| v.as_str())
         .unwrap_or("2024-01-01")
@@ -1494,7 +1494,7 @@ pub fn get_sales_orders(db: tauri::State<Mutex<Database>>, options: Option<serde
             sql.push_str(" AND so.status = ?");
             params_vec.push(Box::new(status.to_string()));
         }
-        
+
         if let Some(search) = opts.get("search").and_then(|v| v.as_str()) {
             sql.push_str(" AND (so.so_number LIKE ? OR c.name LIKE ?)");
             let pattern = format!("%{}%", search);
@@ -1543,14 +1543,14 @@ pub fn get_profit_loss_report(db: tauri::State<Mutex<Database>>, start_date: Str
     let conn = db.connection();
 
     let total_revenue: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders 
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders
          WHERE order_date >= ?1 AND order_date <= ?2 AND status != 'cancelled' AND deleted_at IS NULL",
         params![start_date, end_date],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
 
     let total_cogs: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders 
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders
          WHERE order_date >= ?1 AND order_date <= ?2 AND status != 'cancelled' AND deleted_at IS NULL",
         params![start_date, end_date],
         |row| row.get(0),
@@ -1559,8 +1559,8 @@ pub fn get_profit_loss_report(db: tauri::State<Mutex<Database>>, start_date: Str
     let gross_profit = total_revenue - total_cogs;
 
     let operating_expenses: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions 
-         WHERE transaction_date >= ?1 AND transaction_date <= ?2 
+        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions
+         WHERE transaction_date >= ?1 AND transaction_date <= ?2
          AND transaction_type = 'expense' AND deleted_at IS NULL",
         params![start_date, end_date],
         |row| row.get(0),
@@ -1586,16 +1586,16 @@ pub fn get_cash_flow_report(db: tauri::State<Mutex<Database>>, start_date: Strin
     let conn = db.connection();
 
     let operating_inflow: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions 
-         WHERE transaction_date >= ?1 AND transaction_date <= ?2 
+        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions
+         WHERE transaction_date >= ?1 AND transaction_date <= ?2
          AND transaction_type = 'income' AND deleted_at IS NULL",
         params![start_date, end_date],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
 
     let operating_outflow: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions 
-         WHERE transaction_date >= ?1 AND transaction_date <= ?2 
+        "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions
+         WHERE transaction_date >= ?1 AND transaction_date <= ?2
          AND transaction_type = 'expense' AND deleted_at IS NULL",
         params![start_date, end_date],
         |row| row.get(0),
@@ -1623,37 +1623,37 @@ pub fn get_financial_summary(db: tauri::State<Mutex<Database>>) -> Result<serde_
     let conn = db.connection();
 
     let monthly_revenue: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders 
-         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now') 
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders
+         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now')
          AND status != 'cancelled' AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
 
     let monthly_expense: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders 
-         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now') 
+        "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders
+         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now')
          AND status != 'cancelled' AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
 
     let accounts_receivable: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM sales_orders 
+        "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM sales_orders
          WHERE payment_status != 'paid' AND status != 'cancelled' AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
 
     let accounts_payable: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM purchase_orders 
+        "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM purchase_orders
          WHERE payment_status != 'paid' AND status != 'cancelled' AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
 
     let inventory_value: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(current_stock * cost_price), 0.0) FROM products 
+        "SELECT COALESCE(SUM(current_stock * cost_price), 0.0) FROM products
          WHERE deleted_at IS NULL",
         [],
         |row| row.get(0),

@@ -3,11 +3,15 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/Layout/AppLayout';
 import { useAuthStore } from './lib/authStore';
 import AgentPage from './pages/AgentPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import DashboardPage from './pages/DashboardPage';
+import FinancePage from './pages/FinancePage';
 import InventoryPage from './pages/InventoryPage';
 import LoginPage from './pages/LoginPage';
 import ProductsPage from './pages/ProductsPage';
+import PurchasePage from './pages/PurchasePage';
 import RegisterPage from './pages/RegisterPage';
+import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
 import TestPage from './pages/TestPage';
 
@@ -68,6 +72,38 @@ function App() {
           element={
             <ProtectedRoute>
               <InventoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <AnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/purchase"
+          element={
+            <ProtectedRoute>
+              <PurchasePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sales"
+          element={
+            <ProtectedRoute>
+              <SalesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/finance"
+          element={
+            <ProtectedRoute>
+              <FinancePage />
             </ProtectedRoute>
           }
         />

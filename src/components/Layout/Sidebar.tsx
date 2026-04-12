@@ -1,8 +1,12 @@
 import {
+  Analytics as AnalyticsIcon,
   SmartToy as AgentIcon,
   Dashboard as DashboardIcon,
+  AccountBalance as FinanceIcon,
   Inventory as InventoryIcon,
   Storefront as ProductLibraryIcon,
+  ShoppingCart as PurchaseIcon,
+  PointOfSale as SalesIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import {
@@ -31,6 +35,10 @@ const navItems: NavItem[] = [
   { text: '仪表盘', icon: <DashboardIcon />, path: '/dashboard' },
   { text: '产品库', icon: <ProductLibraryIcon />, path: '/products' },
   { text: '进销存', icon: <InventoryIcon />, path: '/inventory' },
+  { text: '数据分析', icon: <AnalyticsIcon />, path: '/analytics' },
+  { text: '采购管理', icon: <PurchaseIcon />, path: '/purchase' },
+  { text: '销售管理', icon: <SalesIcon />, path: '/sales' },
+  { text: '财务报表', icon: <FinanceIcon />, path: '/finance' },
 ];
 
 export default function Sidebar() {
