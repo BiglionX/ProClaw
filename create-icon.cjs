@@ -4,8 +4,11 @@ const sharp = require('sharp');
 
 async function convertPngToIco(pngPath, icoPath) {
   try {
+    // eslint-disable-next-line no-console
     console.log('Converting PNG to ICO...');
+    // eslint-disable-next-line no-console
     console.log('Source:', pngPath);
+    // eslint-disable-next-line no-console
     console.log('Target:', icoPath);
 
     // Ensure icons directory exists
@@ -22,6 +25,7 @@ async function convertPngToIco(pngPath, icoPath) {
 
     // For ICO format, we need to use a different approach
     // Convert PNG to ICO using sharp's raw output
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
     const pngBuffer = await sharp(pngPath).toBuffer();
 
     // Create ICO file with proper header
@@ -72,12 +76,18 @@ async function convertPngToIco(pngPath, icoPath) {
 
     // Write ICO file
     fs.writeFileSync(icoPath, icoBuffer);
+    // eslint-disable-next-line no-console
     console.log('✓ ICO file created successfully!');
+    // eslint-disable-next-line no-console
     console.log('  Path:', icoPath);
+    // eslint-disable-next-line no-console
     console.log('  Size:', icoBuffer.length, 'bytes');
+    // eslint-disable-next-line no-console
     console.log('  Images:', numImages, 'sizes (', sizes.join('x'), ')');
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('✗ Error creating ICO:', error.message);
+    // eslint-disable-next-line no-console
     console.error(error.stack);
     process.exit(1);
   }
