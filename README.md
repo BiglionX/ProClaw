@@ -1,4 +1,4 @@
-﻿# 🦞 ProClaw Desktop
+# 🦞 ProClaw Desktop
 
 > AI-Powered Business Operating System for Small and Medium Businesses
 
@@ -10,7 +10,7 @@
 ## ✨ 核心特性
 
 - 🤖 **经营智能体** - AI 驱动的统一业务管理界面
-- 📦 **产品库管理** - 五库设计(BOM/原料/成品/半成品/包材)
+- 📦 **产品库管理** - 基础产品CRUD、品牌分类、库存跟踪
 - 📊 **进销存 AI** - 自动化库存管理和销量预测
 - 🔌 **技能商店** - 可扩展的功能模块生态
 - 💾 **离线优先** - SQLite 本地存储 + Supabase 云端同步
