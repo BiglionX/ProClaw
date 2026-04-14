@@ -132,7 +132,7 @@ export default function FloatingAgentChat() {
           }
         >
           <Fab
-            color="primary"
+            color="default"
             onClick={toggleChat}
             sx={{
               position: 'fixed',
@@ -141,11 +141,11 @@ export default function FloatingAgentChat() {
               zIndex: 1200,
               width: 56,
               height: 56,
-              bgcolor: unreadCount > 0 ? '#ff9800' : '#1976d2',
+              bgcolor: unreadCount > 0 ? '#ff3b30' : '#ff3b30',
               '&:hover': {
-                bgcolor: unreadCount > 0 ? '#f57c00' : '#1565c0',
+                bgcolor: unreadCount > 0 ? '#ff5549' : '#ff5549',
               },
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              boxShadow: '0 4px 12px rgba(255,59,48,0.3)',
             }}
           >
             <Box sx={{ position: 'relative' }}>
@@ -156,7 +156,7 @@ export default function FloatingAgentChat() {
                     position: 'absolute',
                     top: -4,
                     right: -8,
-                    bgcolor: '#f44336',
+                    bgcolor: '#999',
                     color: 'white',
                     borderRadius: '50%',
                     width: 18,
@@ -202,20 +202,30 @@ export default function FloatingAgentChat() {
           <Box
             sx={{
               p: 2,
-              bgcolor: '#16213e',
+              bgcolor: '#1a1a1a',
               color: 'white',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexShrink: 0,
+              borderBottom: '1px solid #333',
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar sx={{ bgcolor: '#2e7d32', width: 32, height: 32 }}>
+              <Avatar sx={{ bgcolor: '#ff3b30', width: 32, height: 32 }}>
                 <BotIcon />
               </Avatar>
               <Typography variant="subtitle2" fontWeight={600}>
-                AI 经营智能体
+                AI
+                <Typography
+                  component="span"
+                  sx={{
+                    color: '#ff3b30',
+                    fontWeight: 700,
+                  }}
+                >
+                  claw
+                </Typography>
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -259,7 +269,7 @@ export default function FloatingAgentChat() {
               }}
               onClick={toggleMinimize}
             >
-              <BotIcon sx={{ fontSize: 24, color: '#1976d2' }} />
+              <BotIcon sx={{ fontSize: 24, color: '#666' }} />
             </Box>
           ) : (
             <>
@@ -288,7 +298,7 @@ export default function FloatingAgentChat() {
                         width: 32,
                         height: 32,
                         bgcolor:
-                          message.role === 'user' ? '#1976d2' : '#2e7d32',
+                          message.role === 'user' ? '#666' : '#888',
                         flexShrink: 0,
                         fontSize: '0.9rem',
                       }}
@@ -300,10 +310,10 @@ export default function FloatingAgentChat() {
                       sx={{
                         p: 1.5,
                         backgroundColor:
-                          message.role === 'user' ? '#e3f2fd' : '#ffffff',
+                          message.role === 'user' ? '#f0f0f0' : '#ffffff',
                         border: '1px solid',
                         borderColor:
-                          message.role === 'user' ? '#bbdefb' : '#e0e0e0',
+                          message.role === 'user' ? '#ddd' : '#e0e0e0',
                         borderRadius: 2,
                         maxWidth: '80%',
                       }}
@@ -336,7 +346,7 @@ export default function FloatingAgentChat() {
                       sx={{
                         width: 32,
                         height: 32,
-                        bgcolor: '#2e7d32',
+                        bgcolor: '#888',
                         fontSize: '0.9rem',
                       }}
                     >
@@ -391,14 +401,13 @@ export default function FloatingAgentChat() {
                     }}
                   />
                   <IconButton
-                    color="primary"
                     onClick={handleSend}
                     disabled={!input.trim() || isLoading}
                     sx={{
-                      bgcolor: 'primary.main',
+                      bgcolor: '#666',
                       color: 'white',
                       '&:hover': {
-                        bgcolor: 'primary.dark',
+                        bgcolor: '#777',
                       },
                       '&.Mui-disabled': {
                         bgcolor: 'action.disabledBackground',

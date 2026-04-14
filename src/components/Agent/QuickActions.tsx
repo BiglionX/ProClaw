@@ -37,7 +37,7 @@ export default function QuickActions() {
       title: '添加产品',
       description: '快速录入新产品',
       icon: <AddIcon />,
-      color: '#1976d2',
+      color: '#666',
       action: () => {
         navigate('/products');
       },
@@ -47,7 +47,7 @@ export default function QuickActions() {
       title: '查询库存',
       description: '查看当前库存状态',
       icon: <SearchIcon />,
-      color: '#2e7d32',
+      color: '#777',
       action: () => {
         navigate('/inventory');
       },
@@ -57,7 +57,7 @@ export default function QuickActions() {
       title: '销售分析',
       description: '分析销售数据和趋势',
       icon: <AnalyticsIcon />,
-      color: '#ed6c02',
+      color: '#888',
       action: () => {
         navigate('/analytics');
       },
@@ -67,7 +67,7 @@ export default function QuickActions() {
       title: '库存预警',
       description: '查看低库存警告',
       icon: <WarningIcon />,
-      color: '#d32f2f',
+      color: '#555',
       action: () => {
         navigate('/inventory');
       },
@@ -77,7 +77,7 @@ export default function QuickActions() {
       title: '创建订单',
       description: '新建采购或销售订单',
       icon: <ShoppingCartIcon />,
-      color: '#9c27b0',
+      color: '#999',
       action: () => {
         // Beta 版本暂不支持
         alert('订单功能将在 v1.0 正式版中提供');
@@ -88,7 +88,7 @@ export default function QuickActions() {
       title: '生成报表',
       description: '查看业务报表',
       icon: <AssessmentIcon />,
-      color: '#0097a7',
+      color: '#aaa',
       action: () => {
         // Beta 版本暂不支持
         alert('报表功能将在 v1.0 正式版中提供');
@@ -107,16 +107,19 @@ export default function QuickActions() {
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <TrendingUpIcon sx={{ color: '#1976d2', mr: 1 }} />
+        <TrendingUpIcon sx={{ color: '#ff3b30', mr: 1 }} />
         <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
           快捷操作
         </Typography>
         <Chip
           label="智能推荐"
           size="small"
-          color="primary"
-          variant="outlined"
-          sx={{ ml: 'auto' }}
+          sx={{ 
+            ml: 'auto',
+            bgcolor: 'rgba(255,59,48,0.1)',
+            color: '#ff3b30',
+            border: '1px solid rgba(255,59,48,0.3)'
+          }}
         />
       </Box>
 

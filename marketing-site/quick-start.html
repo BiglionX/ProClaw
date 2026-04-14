@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>快速开始 - ProClaw</title>
+    <link rel="icon" type="image/png" href="../public/proclaw-logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body { font-family: 'Inter', system-ui, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 flex flex-col min-h-screen">
+    <nav class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <a href="index.html" class="flex items-center gap-2">
+                    <img src="../public/proclaw-logo.png" alt="ProClaw Logo" class="h-8 w-auto">
+                    <span class="text-xl font-bold tracking-tight hover:text-gray-600">ProClaw</span>
+                </a>
+                <div class="space-x-4">
+                    <a href="index.html" class="text-gray-600 hover:text-black">首页</a>
+                    <a href="use-cases.html" class="text-gray-600 hover:text-black">应用场景</a>
+                    <a href="faq.html" class="text-gray-600 hover:text-black">常见问题</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-3xl mx-auto px-4 py-16 flex-grow">
+        <h1 class="text-4xl font-bold mb-8">快速开始指南</h1>
+        
+        <div class="space-y-12">
+            <div class="flex gap-6">
+                <div class="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold shrink-0">1</div>
+                <div>
+                    <h2 class="text-xl font-semibold mb-2">下载并安装</h2>
+                    <p class="text-gray-600 mb-4">前往 GitHub Releases 页面下载适合你操作系统的安装包（Windows/macOS/Linux）。</p>
+                    <a href="https://github.com/BigLionX/ProClaw/releases" target="_blank" class="text-blue-600 hover:underline">前往下载 &rarr;</a>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold shrink-0">2</div>
+                <div>
+                    <h2 class="text-xl font-semibold mb-2">配置 AI 智能体</h2>
+                    <p class="text-gray-600 mb-4">首次启动后，进入“设置”页面，输入你的 LLM API Key（支持 OpenAI, Anthropic, 或本地模型）。</p>
+                    <div class="bg-gray-100 p-4 rounded-lg text-sm font-mono">
+                        设置 > Token 管理 > 添加新密钥
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold shrink-0">3</div>
+                <div>
+                    <h2 class="text-xl font-semibold mb-2">开始对话经营</h2>
+                    <p class="text-gray-600">现在你可以尝试对 AI 说：“帮我分析一下上周的销量趋势”，或者“创建一个新商品：可口可乐，进价 3 元，售价 5 元”。</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-900 text-white py-8 text-center mt-auto">
+        <p class="text-gray-400">&copy; 2026 ProClaw Team.</p>
+    </footer>
+</body>
+</html>

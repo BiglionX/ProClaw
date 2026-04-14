@@ -1,12 +1,11 @@
 import {
   SmartToy as AgentIcon,
-  Analytics as AnalyticsIcon,
   Dashboard as DashboardIcon,
-  AccountBalance as FinanceIcon,
   Inventory as InventoryIcon,
-  Storefront as ProductLibraryIcon,
   ShoppingCart as PurchaseIcon,
   PointOfSale as SalesIcon,
+  AccountBalance as FinanceIcon,
+  Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import {
@@ -30,14 +29,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { text: '经营智能体', icon: <AgentIcon />, path: '/' },
+  { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
   { text: '仪表盘', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: '产品库', icon: <ProductLibraryIcon />, path: '/products' },
   { text: '进销存', icon: <InventoryIcon />, path: '/inventory' },
-  { text: '数据分析', icon: <AnalyticsIcon />, path: '/analytics' },
   { text: '采购管理', icon: <PurchaseIcon />, path: '/purchase' },
   { text: '销售管理', icon: <SalesIcon />, path: '/sales' },
   { text: '财务报表', icon: <FinanceIcon />, path: '/finance' },
+  { text: '数据分析', icon: <AnalyticsIcon />, path: '/analytics' },
 ];
 
 export default function Sidebar() {
@@ -53,9 +51,9 @@ export default function Sidebar() {
         '& .MuiDrawer-paper': {
           width: DRAWER_WIDTH,
           boxSizing: 'border-box',
-          backgroundColor: '#1a1a2e',
-          color: 'white',
-          borderRight: 'none',
+          backgroundColor: '#242424',
+          color: '#e0e0e0',
+          borderRight: '1px solid #333',
           top: `${TOPBAR_HEIGHT}px`,
           height: `calc(100vh - ${TOPBAR_HEIGHT}px)`,
         },
@@ -72,9 +70,9 @@ export default function Sidebar() {
                 borderRadius: 1,
                 mb: 0.5,
                 '&.Mui-selected': {
-                  backgroundColor: 'rgba(25, 118, 210, 0.2)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
                   '&:hover': {
-                    backgroundColor: 'rgba(25, 118, 210, 0.3)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
                   },
                 },
                 '&:hover': {

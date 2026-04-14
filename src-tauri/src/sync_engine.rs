@@ -17,6 +17,7 @@ impl SyncEngine {
     }
 
     /// 添加操作到离线队列
+    #[allow(dead_code)]
     pub fn enqueue_operation(
         &self,
         table_name: &str,
@@ -69,7 +70,7 @@ impl SyncEngine {
 
         let mut processed_count = 0;
 
-        for (id, table_name, record_id, operation, payload, retry_count) in operations {
+        for (id, table_name, record_id, _operation, _payload, retry_count) in operations {
             // 标记为处理中
             conn.execute(
                 "UPDATE offline_queue SET status = 'processing' WHERE id = ?1",
@@ -109,12 +110,13 @@ impl SyncEngine {
     }
 
     /// 同步到 Supabase (简化实现)
+    #[allow(dead_code)]
     async fn sync_to_supabase(
         &self,
         table_name: &str,
         record_id: &str,
         operation: &str,
-        payload: &str,
+        _payload: &str,
     ) -> Result<(), String> {
         // TODO: 实际实现应该调用 Supabase REST API
         // 这里只是模拟成功

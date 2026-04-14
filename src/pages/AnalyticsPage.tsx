@@ -141,7 +141,7 @@ export default function AnalyticsPage() {
                 type="monotone"
                 dataKey="outbound_qty"
                 name="出库量"
-                stroke="#f44336"
+                stroke="#666"
                 strokeWidth={2}
                 dot={{ r: 3 }}
               />
@@ -149,7 +149,7 @@ export default function AnalyticsPage() {
                 type="monotone"
                 dataKey="inbound_qty"
                 name="入库量"
-                stroke="#4caf50"
+                stroke="#999"
                 strokeWidth={2}
                 dot={{ r: 3 }}
               />
@@ -181,7 +181,7 @@ export default function AnalyticsPage() {
               />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="transaction_count" name="交易次数" fill="#1976d2" />
+              <Bar dataKey="transaction_count" name="交易次数" fill="#666" />
             </BarChart>
           </ResponsiveContainer>
         </Paper>
@@ -225,11 +225,11 @@ export default function AnalyticsPage() {
                               fontWeight: index < 3 ? 'bold' : 'normal',
                               color:
                                 index === 0
-                                  ? '#ffd700'
+                                  ? '#666'
                                   : index === 1
-                                    ? '#c0c0c0'
+                                    ? '#888'
                                     : index === 2
-                                      ? '#cd7f32'
+                                      ? '#999'
                                       : 'inherit',
                             }}
                           >

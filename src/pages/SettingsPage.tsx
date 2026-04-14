@@ -1,4 +1,4 @@
-import { Info as InfoIcon } from '@mui/icons-material';
+import { Info as InfoIcon, Person as PersonIcon } from '@mui/icons-material';
 import {
   Box,
   Card,
@@ -13,6 +13,7 @@ import {
 import { useState } from 'react';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
+import UserCenterPage from './UserCenterPage';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -66,24 +67,30 @@ export default function SettingsPage() {
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab label="🤖 AI 模型设置" {...a11yProps(0)} />
-          <Tab label="🗄️ 数据库设置" {...a11yProps(1)} />
-          <Tab label="ℹ️ 系统信息" {...a11yProps(2)} />
+          <Tab label="👤 用户中心" {...a11yProps(0)} />
+          <Tab label="🤖 AI 模型设置" {...a11yProps(1)} />
+          <Tab label="🗄️ 数据库设置" {...a11yProps(2)} />
+          <Tab label="ℹ️ 系统信息" {...a11yProps(3)} />
         </Tabs>
       </Paper>
 
-      {/* Tab 0: AI 模型设置 */}
+      {/* Tab 0: 用户中心 */}
       <TabPanel value={tabValue} index={0}>
+        <UserCenterPage />
+      </TabPanel>
+
+      {/* Tab 1: AI 模型设置 */}
+      <TabPanel value={tabValue} index={1}>
         <AISettings />
       </TabPanel>
 
-      {/* Tab 1: 数据库设置 */}
-      <TabPanel value={tabValue} index={1}>
+      {/* Tab 2: 数据库设置 */}
+      <TabPanel value={tabValue} index={2}>
         <DatabaseSettings />
       </TabPanel>
 
-      {/* Tab 2: 系统信息 */}
-      <TabPanel value={tabValue} index={2}>
+      {/* Tab 3: 系统信息 */}
+      <TabPanel value={tabValue} index={3}>
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>

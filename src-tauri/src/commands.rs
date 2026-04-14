@@ -3,7 +3,6 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use uuid::Uuid;
-use base64::{Engine as _, engine::general_purpose};
 
 // ==================== 数据类型定义 ====================
 
@@ -29,19 +28,6 @@ pub struct Product {
     pub updated_at: String,
     pub sync_status: String,
     pub last_synced_at: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProductCategory {
-    pub id: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub parent_id: Option<String>,
-    pub sort_order: i32,
-    pub is_active: bool,
-    pub created_at: String,
-    pub updated_at: String,
-    pub sync_status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

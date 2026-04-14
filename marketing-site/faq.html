@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>常见问题 - ProClaw</title>
+    <link rel="icon" type="image/png" href="../public/proclaw-logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body { font-family: 'Inter', system-ui, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 flex flex-col min-h-screen">
+    <nav class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <a href="index.html" class="flex items-center gap-2">
+                    <img src="../public/proclaw-logo.png" alt="ProClaw Logo" class="h-8 w-auto">
+                    <span class="text-xl font-bold tracking-tight hover:text-gray-600">ProClaw</span>
+                </a>
+                <div class="space-x-4">
+                    <a href="index.html" class="text-gray-600 hover:text-black">首页</a>
+                    <a href="quick-start.html" class="text-gray-600 hover:text-black">快速开始</a>
+                    <a href="use-cases.html" class="text-gray-600 hover:text-black">应用场景</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-3xl mx-auto px-4 py-16 flex-grow">
+        <h1 class="text-4xl font-bold mb-12">常见问题 (FAQ)</h1>
+            
+        <div class="space-y-8">
+            <div>
+                <h3 class="text-lg font-semibold mb-2">我的数据安全吗？会上传到云端吗？</h3>
+                <p class="text-gray-600">非常安全。ProClaw 采用"本地优先"架构，所有业务数据默认加密存储在你本地的 SQLite 数据库中。除非你主动开启云同步功能，否则数据永远不会离开你的设备。</p>
+            </div>
+    
+            <div>
+                <h3 class="text-lg font-semibold mb-2">使用 ProClaw 需要付费吗？</h3>
+                <p class="text-gray-600">ProClaw 桌面端应用本身是开源且免费的（GPL-3.0 协议）。但你如果使用 AI 智能体功能，需要自行配置 LLM API Key，这部分费用由模型提供商收取。</p>
+            </div>
+    
+            <div>
+                <h3 class="text-lg font-semibold mb-2">支持哪些操作系统？</h3>
+                <p class="text-gray-600">基于 Tauri 2.0 构建，目前完美支持 Windows 10/11、macOS (Intel & Apple Silicon) 以及主流 Linux 发行版。</p>
+            </div>
+    
+            <div>
+                <h3 class="text-lg font-semibold mb-2">如何反馈 Bug 或提交建议？</h3>
+                <p class="text-gray-600">欢迎前往我们的 <a href="https://github.com/BigLionX/ProClaw/issues" class="text-blue-600 hover:underline">GitHub Issues</a> 页面提交反馈。我们非常重视社区的每一条建议。</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-900 text-white py-8 text-center mt-auto">
+        <p class="text-gray-400">&copy; 2026 ProClaw Team.</p>
+    </footer>
+</body>
+</html>

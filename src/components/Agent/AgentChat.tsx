@@ -131,7 +131,7 @@ export default function AgentChat() {
               sx={{
                 width: 36,
                 height: 36,
-                bgcolor: message.role === 'user' ? '#1976d2' : '#2e7d32',
+                bgcolor: message.role === 'user' ? '#666' : '#888',
                 flexShrink: 0,
               }}
             >
@@ -142,9 +142,9 @@ export default function AgentChat() {
               sx={{
                 p: 2,
                 backgroundColor:
-                  message.role === 'user' ? '#e3f2fd' : '#ffffff',
+                  message.role === 'user' ? '#f0f0f0' : '#ffffff',
                 border: '1px solid',
-                borderColor: message.role === 'user' ? '#bbdefb' : '#e0e0e0',
+                borderColor: message.role === 'user' ? '#ddd' : '#e0e0e0',
                 borderRadius: 2,
                 maxWidth: '70%',
               }}
@@ -172,7 +172,7 @@ export default function AgentChat() {
 
         {isLoading && (
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <Avatar sx={{ width: 36, height: 36, bgcolor: '#2e7d32' }}>
+            <Avatar sx={{ width: 36, height: 36, bgcolor: '#888' }}>
               <BotIcon />
             </Avatar>
             <Paper

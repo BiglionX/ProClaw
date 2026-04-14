@@ -1,6 +1,7 @@
 import {
   Logout as LogoutIcon,
-  Notifications as NotificationsIcon,
+  GitHub as GitHubIcon,
+  HelpOutline as HelpIcon,
 } from '@mui/icons-material';
 import {
   AppBar,
@@ -30,8 +31,9 @@ export default function TopBar() {
       position="fixed"
       sx={{
         zIndex: theme => theme.zIndex.drawer + 1,
-        backgroundColor: '#16213e',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        backgroundColor: '#1a1a1a',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+        borderBottom: '1px solid #333',
       }}
     >
       <Toolbar>
@@ -45,28 +47,64 @@ export default function TopBar() {
               fontSize: '1.3rem',
             }}
           >
-            🦞 Proclaw
+            Proclaw
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '0.7rem',
+              ml: 1,
+            }}
+          >
+            AI Business OS
           </Typography>
         </Box>
 
         <Box sx={{ flexGrow: 1 }} />
 
-        <TokenDisplay />
-
-        <Tooltip title="通知">
-          <IconButton size="large" color="inherit" sx={{ mr: 1 }}>
-            <Badge badgeContent={3} color="error">
-              <NotificationsIcon />
-            </Badge>
+        {/* GitHub链接 */}
+        <Tooltip title="GitHub">
+          <IconButton 
+            size="large" 
+            color="inherit" 
+            sx={{ 
+              mr: 1,
+              '&:hover': {
+                color: '#ff3b30',
+              }
+            }}
+            onClick={() => window.open('https://github.com/your-org/proclaw', '_blank')}
+          >
+            <GitHubIcon />
           </IconButton>
         </Tooltip>
+
+        {/* 帮助文档 */}
+        <Tooltip title="帮助文档">
+          <IconButton 
+            size="large" 
+            color="inherit" 
+            sx={{ 
+              mr: 1,
+              '&:hover': {
+                color: '#ff3b30',
+              }
+            }}
+            onClick={() => window.open('https://docs.proclaw.dev', '_blank')}
+          >
+            <HelpIcon />
+          </IconButton>
+        </Tooltip>
+
+        <TokenDisplay />
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Avatar
             sx={{
               width: 32,
               height: 32,
-              bgcolor: user?.id?.startsWith('mock-') ? '#ff9800' : '#1976d2',
+              bgcolor: user?.id?.startsWith('mock-') ? '#888' : '#666',
               fontSize: '0.9rem',
             }}
           >
@@ -87,17 +125,26 @@ export default function TopBar() {
               <Typography
                 variant="caption"
                 sx={{
-                  color: '#ff9800',
+                  color: '#aaa',
                   fontSize: '0.7rem',
                   display: 'block',
                 }}
               >
-                🎭 体验模式
+                体验模式
               </Typography>
             )}
           </Box>
           <Tooltip title="退出登录">
-            <IconButton size="small" color="inherit" onClick={handleLogout}>
+            <IconButton 
+              size="small" 
+              color="inherit" 
+              onClick={handleLogout}
+              sx={{
+                '&:hover': {
+                  color: '#ff3b30',
+                }
+              }}
+            >
               <LogoutIcon />
             </IconButton>
           </Tooltip>

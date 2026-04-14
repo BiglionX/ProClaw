@@ -9,9 +9,6 @@ pub enum DatabaseError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-
-    #[error("Database not initialized")]
-    NotInitialized,
 }
 
 pub type DbResult<T> = Result<T, DatabaseError>;
@@ -49,11 +46,13 @@ impl Database {
     }
 
     /// 获取可变的数据库连接引用
+    #[allow(dead_code)]
     pub fn connection_mut(&mut self) -> &mut Connection {
         &mut self.conn
     }
 
     /// 关闭数据库连接
+    #[allow(dead_code)]
     pub fn close(self) -> DbResult<()> {
         // Connection 会在 drop 时自动关闭
         Ok(())
@@ -78,7 +77,7 @@ mod tests {
         let temp_dir = env::temp_dir().join("proclaw_test");
         let db_path = temp_dir.join("test.db");
 
-        let db = Database::new(db_path.clone()).unwrap();
+        let _db = Database::new(db_path.clone()).unwrap();
         assert!(db_path.exists());
 
         // 清理
@@ -95,7 +94,7 @@ mod tests {
         db.initialize().unwrap();
 
         // 验证表是否创建
-        let table_count: i64 = db.conn
+        let table_count: i64 = db.connection()
             .query_row(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type='table'",
                 [],

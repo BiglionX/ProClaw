@@ -45,7 +45,16 @@ export default function LoginPage() {
       <Card sx={{ maxWidth: 400, width: '100%', mx: 2 }}>
         <CardContent sx={{ p: 4 }}>
           <Typography variant="h5" component="h1" gutterBottom align="center">
-            🦞 Proclaw Desktop
+            Pro
+            <Typography
+              component="span"
+              sx={{
+                color: '#ff3b30',
+                fontWeight: 800,
+              }}
+            >
+              claw
+            </Typography>
           </Typography>
 
           <Typography
@@ -58,9 +67,9 @@ export default function LoginPage() {
           </Typography>
 
           {/* 模拟账号提示 */}
-          <Alert severity="info" sx={{ mb: 2 }}>
+          <Alert severity="info" sx={{ mb: 2, bgcolor: 'rgba(0,0,0,0.03)', border: '1px solid #ddd' }}>
             <Typography variant="body2">
-              🚀 <strong>快速体验账号</strong>
+              <strong>快速体验账号</strong>
               <br />
               用户名: <code>boss</code>
               <br />
@@ -94,10 +103,10 @@ export default function LoginPage() {
                       borderColor: '#ddd',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#999',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#666',
                     },
                   },
                   '& .MuiInputBase-input': {
@@ -127,10 +136,10 @@ export default function LoginPage() {
                       borderColor: '#ddd',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#999',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#666',
                     },
                   },
                   '& .MuiInputBase-input': {
@@ -165,7 +174,7 @@ export default function LoginPage() {
                   console.error('Quick login failed:', err);
                 }
               }}
-              sx={{ mb: 2, borderColor: '#1976d2', color: '#1976d2' }}
+              sx={{ mb: 2, borderColor: '#666', color: '#666' }}
             >
               ⚡ 一键体验 (boss)
             </Button>

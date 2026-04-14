@@ -36,9 +36,10 @@ function StatCard({ title, value, icon, color, change }: StatCardProps) {
         >
           <Box
             sx={{
-              bgcolor: `${color}20`,
+              width: 56,
+              height: 56,
+              bgcolor: `${color}.light`,
               borderRadius: 2,
-              p: 1.5,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -72,10 +73,20 @@ export default function DashboardPage() {
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          📊 仪表盘
+          仪表盘
         </Typography>
         <Typography variant="body1" color="text.secondary">
           业务概览和关键指标
+          <Typography
+            component="span"
+            sx={{
+              ml: 1,
+              color: '#ff3b30',
+              fontSize: '0.9em',
+            }}
+          >
+            🦞
+          </Typography>
         </Typography>
       </Box>
 
@@ -84,8 +95,8 @@ export default function DashboardPage() {
           <StatCard
             title="产品总数"
             value="1,234"
-            icon={<InventoryIcon sx={{ color: '#1976d2', fontSize: 28 }} />}
-            color="#1976d2"
+            icon={<InventoryIcon sx={{ fontSize: 32, color: 'primary.main' }} />}
+            color="primary"
             change="+12%"
           />
         </Grid>
@@ -93,8 +104,8 @@ export default function DashboardPage() {
           <StatCard
             title="本月销售"
             value="¥45.6K"
-            icon={<TrendingUpIcon sx={{ color: '#2e7d32', fontSize: 28 }} />}
-            color="#2e7d32"
+            icon={<TrendingUpIcon sx={{ fontSize: 32, color: 'success.main' }} />}
+            color="success"
             change="+8%"
           />
         </Grid>
@@ -102,8 +113,8 @@ export default function DashboardPage() {
           <StatCard
             title="库存交易"
             value="856"
-            icon={<ShoppingCartIcon sx={{ color: '#ed6c02', fontSize: 28 }} />}
-            color="#ed6c02"
+            icon={<ShoppingCartIcon sx={{ fontSize: 32, color: 'warning.main' }} />}
+            color="warning"
             change="+15%"
           />
         </Grid>
@@ -111,8 +122,8 @@ export default function DashboardPage() {
           <StatCard
             title="低库存预警"
             value="23"
-            icon={<WarningIcon sx={{ color: '#d32f2f', fontSize: 28 }} />}
-            color="#d32f2f"
+            icon={<WarningIcon sx={{ fontSize: 32, color: 'info.main' }} />}
+            color="info"
           />
         </Grid>
       </Grid>
@@ -128,7 +139,7 @@ export default function DashboardPage() {
         }}
       >
         <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
-          🚧 仪表盘功能开发中...
+          仪表盘功能开发中...
         </Typography>
         <Typography variant="body2" color="text.secondary">
           正在集成产品库和进销存模块的数据可视化

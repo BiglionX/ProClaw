@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>应用场景 - ProClaw</title>
+    <link rel="icon" type="image/png" href="../public/proclaw-logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body { font-family: 'Inter', system-ui, sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 flex flex-col min-h-screen">
+    <nav class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <a href="index.html" class="flex items-center gap-2">
+                    <img src="../public/proclaw-logo.png" alt="ProClaw Logo" class="h-8 w-auto">
+                    <span class="text-xl font-bold tracking-tight hover:text-gray-600">ProClaw</span>
+                </a>
+                <div class="space-x-4">
+                    <a href="index.html" class="text-gray-600 hover:text-black">首页</a>
+                    <a href="quick-start.html" class="text-gray-600 hover:text-black">快速开始</a>
+                    <a href="faq.html" class="text-gray-600 hover:text-black">常见问题</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-16 flex-grow">
+        <h1 class="text-4xl font-bold mb-12 text-center">ProClaw 能帮谁解决问题？</h1>
+        
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-xl font-bold mb-4">🏪 便利店/超市老板</h3>
+                <ul class="space-y-2 text-gray-600">
+                    <li>• <strong>智能补货：</strong>AI 根据历史销量预测下周进货量。</li>
+                    <li>• <strong>临期预警：</strong>自动提醒即将过期的商品，减少损耗。</li>
+                    <li>• <strong>快速收银：</strong>语音录入商品，解放双手。</li>
+                </ul>
+            </div>
+
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-xl font-bold mb-4">🏢 连锁店管理者</h3>
+                <ul class="space-y-2 text-gray-600">
+                    <li>• <strong>多店汇总：</strong>一句话查看 10 家分店的今日总营收。</li>
+                    <li>• <strong>库存调拨：</strong>AI 建议从 A 店调货给缺货的 B 店。</li>
+                    <li>• <strong>统一配置：</strong>一键同步所有门店的商品价格策略。</li>
+                </ul>
+            </div>
+
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-xl font-bold mb-4">💻 开发者/极客</h3>
+                <ul class="space-y-2 text-gray-600">
+                    <li>• <strong>技能开发：</strong>使用 SDK 编写自定义业务插件。</li>
+                    <li>• <strong>数据自主：</strong>基于本地 SQLite 数据库进行二次分析。</li>
+                    <li>• <strong>开源贡献：</strong>参与 GitHub 社区，共建商业 OS。</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-900 text-white py-8 text-center mt-auto">
+        <p class="text-gray-400">&copy; 2026 ProClaw Team.</p>
+    </footer>
+</body>
+</html>

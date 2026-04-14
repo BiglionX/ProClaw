@@ -223,10 +223,10 @@ export default function AISettings() {
       string,
       { text: string; color: string; bg: string }
     > = {
-      openai: { text: 'O', color: '#10a37f', bg: '#e8f5e9' },
-      azure: { text: 'A', color: '#0078d4', bg: '#e3f2fd' },
-      aliyun: { text: 'A', color: '#ff6a00', bg: '#fff3e0' },
-      zhipu: { text: 'Z', color: '#7c3aed', bg: '#f3e8ff' },
+      openai: { text: 'O', color: '#666', bg: '#f0f0f0' },
+      azure: { text: 'A', color: '#777', bg: '#f5f5f5' },
+      aliyun: { text: 'A', color: '#888', bg: '#fafafa' },
+      zhipu: { text: 'Z', color: '#999', bg: '#f8f8f8' },
       custom: { text: 'C', color: '#666', bg: '#f5f5f5' },
     };
 

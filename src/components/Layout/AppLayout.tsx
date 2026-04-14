@@ -8,7 +8,7 @@ const TOPBAR_HEIGHT = 64;
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <Box
-      sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f5f5f5' }}
+      sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8f8f8' }}
     >
       <TopBar />
       <Sidebar />

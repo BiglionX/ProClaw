@@ -14,13 +14,22 @@ export default function AgentPage() {
             mb: 1,
           }}
         >
-          🤖 经营智能体
+          AI{' '}
+          <Typography
+            component="span"
+            sx={{
+              color: '#ff3b30',
+              fontWeight: 800,
+            }}
+          >
+            claw
+          </Typography>
         </Typography>
         <Typography variant="body1" color="text.secondary">
           AI 驱动的商业助手 - 管理您的产品、库存和销售
           <br />
-          <Typography variant="body2" sx={{ mt: 0.5, color: '#1976d2' }}>
-            💡 点击右下角 🤖 按钮打开 AI 对话面板
+          <Typography variant="body2" sx={{ mt: 0.5, color: '#ff3b30' }}>
+            点击右下角按钮打开 AI 对话面板
           </Typography>
         </Typography>
       </Box>

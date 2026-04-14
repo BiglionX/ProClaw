@@ -25,16 +25,25 @@ export default function RegisterPage() {
     e.preventDefault();
     clearError();
 
+    // 验证密码
     if (password !== confirmPassword) {
       alert('两次输入的密码不一致');
       return;
     }
 
+    if (password.length < 6) {
+      alert('密码长度至少为6位');
+      return;
+    }
+
     try {
       await register(email, password);
-      navigate('/');
-    } catch (err) {
+      // 注册成功后显示提示
+      alert('注册成功！请登录');
+      navigate('/login');
+    } catch (err: any) {
       console.error('Register failed:', err);
+      // 错误信息已在 authStore 中设置，会通过 Alert 显示
     }
   };
 
@@ -60,7 +69,16 @@ export default function RegisterPage() {
             align="center"
             sx={{ mb: 3 }}
           >
-            开始使用 Proclaw Desktop
+            开始使用 Pro
+            <Typography
+              component="span"
+              sx={{
+                color: '#ff3b30',
+                fontWeight: 700,
+              }}
+            >
+              claw
+            </Typography>
           </Typography>
 
           {error && (
@@ -89,10 +107,10 @@ export default function RegisterPage() {
                       borderColor: '#ddd',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#999',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#666',
                     },
                   },
                   '& .MuiInputBase-input': {
@@ -122,10 +140,10 @@ export default function RegisterPage() {
                       borderColor: '#ddd',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#999',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#666',
                     },
                   },
                   '& .MuiInputBase-input': {
@@ -155,10 +173,10 @@ export default function RegisterPage() {
                       borderColor: '#ddd',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#999',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#1976d2',
+                      borderColor: '#666',
                     },
                   },
                   '& .MuiInputBase-input': {
