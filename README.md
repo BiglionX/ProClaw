@@ -1,3 +1,5 @@
+[![Latest Release](https://img.shields.io/github/v/release/BiglionX/ProClaw?include_prereleases)](https://github.com/BiglionX/ProClaw/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/BiglionX/ProClaw/total)](https://github.com/BiglionX/ProClaw/releases)
 # 🦞 ProClaw Desktop
 
 > 开源AI驱动的商户经营操作系统 | Open-Source AI-Powered Business OS
