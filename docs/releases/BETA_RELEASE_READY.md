@@ -1,4 +1,4 @@
-# 🎉 Proclaw Desktop v0.1.0-beta 发布准备完成报告
+# 🎉 ProClaw Desktop v0.1.0-beta 发布准备完成报告
 
 > **完成日期**: 2026-04-12
 > **状态**: ✅ 代码和文档准备就绪，可以开始打包测试
@@ -358,7 +358,7 @@ cd proclaw-desktop
 
 ---
 
-**Proclaw Desktop v0.1.0-beta 发布准备已全部完成！**
+**ProClaw Desktop v0.1.0-beta 发布准备已全部完成！**
 
 **现在可以开始打包测试，预计 3 天内正式发布！** 🚀
 

@@ -1,6 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 
-// 产品类型定义
+// 导出新的SPU-SKU类型(从productService)
+export type { ProductSPU, ProductSKU } from '../lib/productService';
+
+// 旧的Product类型(已废弃,仅用于兼容)
+/**
+ * @deprecated 使用 ProductSPU 和 ProductSKU 代替
+ */
 export interface Product {
   id: string;
   sku: string;

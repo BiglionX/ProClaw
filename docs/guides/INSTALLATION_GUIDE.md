@@ -1,4 +1,4 @@
-# 📦 Proclaw Desktop 安装指南
+# 📦 ProClaw Desktop 安装指南
 
 > 适用于 v0.1.0-beta 版本
 
@@ -37,13 +37,13 @@
 1. 访问 [GitHub Releases 页面](https://github.com/your-org/proclaw-desktop/releases)
 2. 找到 `v0.1.0-beta` 版本
 3. 根据您的操作系统下载对应的安装包:
-   - Windows: `Proclaw_0.1.0_x64_en-US.msi`
-   - macOS: `Proclaw_0.1.0_x64.dmg`
+   - Windows: `ProClaw_0.1.0_x64_en-US.msi`
+   - macOS: `ProClaw_0.1.0_x64.dmg`
    - Linux: `proclaw_0.1.0_amd64.deb`
 
 ### 方法 2: 官方网站
 
-1. 访问 Proclaw 官方网站
+1. 访问 ProClaw 官方网站
 2. 点击"下载桌面客户端"
 3. 选择您的操作系统
 4. 开始下载
@@ -76,7 +76,7 @@
 
 #### 步骤 4: 启动应用
 
-- 勾选"运行 Proclaw Desktop"
+- 勾选"运行 ProClaw Desktop"
 - 点击"完成"
 
 **或者**: 从开始菜单或桌面快捷方式启动
@@ -91,12 +91,12 @@
 
 #### 步骤 2: 拖拽到应用程序文件夹
 
-将 Proclaw 图标拖拽到 Applications 文件夹
+将 ProClaw 图标拖拽到 Applications 文件夹
 
 #### 步骤 3: 首次启动
 
 1. 打开"应用程序"文件夹
-2. 双击 Proclaw 图标
+2. 双击 ProClaw 图标
 
 #### 步骤 4: 绕过 Gatekeeper
 
@@ -140,7 +140,7 @@ sudo apt-get install -f
 proclaw
 ```
 
-**或者**: 从应用程序菜单中搜索 "Proclaw"
+**或者**: 从应用程序菜单中搜索 "ProClaw"
 
 ---
 
@@ -171,7 +171,7 @@ proclaw
 1. 注册 [Supabase](https://supabase.com) 免费账号
 2. 创建新项目
 3. 获取 API URL 和 Anon Key
-4. 在 Proclaw 设置页面配置
+4. 在 ProClaw 设置页面配置
 
 详细教程: [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
@@ -237,7 +237,7 @@ proclaw
 
 ```bash
 # 在终端执行
-xattr -cr /Applications/Proclaw.app
+xattr -cr /Applications/ProClaw.app
 ```
 
 ---
@@ -265,7 +265,7 @@ sudo dnf install webkit2gtk3 gtk3 libappindicator-gtk3
 **解决方法**:
 
 1. 下载并安装 [Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
-2. 重启 Proclaw
+2. 重启 ProClaw
 
 ---
 
@@ -274,13 +274,13 @@ sudo dnf install webkit2gtk3 gtk3 libappindicator-gtk3
 **Windows**:
 
 1. 设置 → 应用 → 安装的应用
-2. 找到 Proclaw Desktop
+2. 找到 ProClaw Desktop
 3. 点击"卸载"
 
 **macOS**:
 
 1. 打开"应用程序"文件夹
-2. 将 Proclaw.app 拖到废纸篓
+2. 将 ProClaw.app 拖到废纸篓
 3. 清空废纸篓
 
 **Linux**:
@@ -307,15 +307,15 @@ sudo dpkg -r proclaw
 
 **手动备份**:
 
-1. 关闭 Proclaw
+1. 关闭 ProClaw
 2. 复制上述位置的 `proclaw.db` 文件
 3. 保存到安全位置
 
 **恢复数据**:
 
-1. 关闭 Proclaw
+1. 关闭 ProClaw
 2. 将备份的 `proclaw.db` 复制回原位置
-3. 启动 Proclaw
+3. 启动 ProClaw
 
 ---
 

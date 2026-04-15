@@ -42,7 +42,7 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key-here
 
 # Application Configuration
-VITE_APP_NAME=Proclaw
+VITE_APP_NAME=ProClaw
 VITE_APP_VERSION=0.1.0
 ```
 

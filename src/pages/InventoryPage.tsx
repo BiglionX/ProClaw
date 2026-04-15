@@ -43,18 +43,20 @@ import {
   getInventoryStats,
   getInventoryTransactions,
 } from '../lib/inventoryService';
-import { Product, getProducts } from '../lib/productService';
+import { ProductSPU, getProductSPUs } from '../lib/productService';
 import {
   CreateSupplierInput,
   Supplier,
   createSupplier,
   getSuppliers,
+  generateSupplierCode, // 新增：自动生成供应商编码
 } from '../lib/purchaseService';
 import {
   CreateCustomerInput,
   Customer,
   createCustomer,
   getCustomers,
+  generateCustomerCode, // 新增：自动生成客户编码
 } from '../lib/salesService';
 
 interface TabPanelProps {
@@ -92,7 +94,7 @@ export default function InventoryPage() {
   // 库存管理状态
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductSPU[]>([]);
 
   // 供应商管理状态
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -155,7 +157,7 @@ export default function InventoryPage() {
       const [statsData, transactionsData, productsData] = await Promise.all([
         getInventoryStats(),
         getInventoryTransactions(),
-        getProducts({ limit: 100 }),
+        getProductSPUs({ limit: 100 }),
       ]);
       setStats(statsData);
       setTransactions(transactionsData);
@@ -240,6 +242,43 @@ export default function InventoryPage() {
       reason: '',
       notes: '',
     });
+  };
+
+  // 打开供应商对话框（自动生成编码）
+  const handleOpenSupplierDialog = () => {
+    setSupplierForm({
+      name: '',
+      code: generateSupplierCode(), // 自动生成编码
+      contact_person: '',
+      phone: '',
+      email: '',
+      address: '',
+      website: '',
+      payment_terms: '月结30天',
+      tax_number: '',
+      notes: '',
+      is_active: true,
+    });
+    setSupplierDialogOpen(true);
+  };
+
+  // 打开客户对话框（自动生成编码）
+  const handleOpenCustomerDialog = () => {
+    setCustomerForm({
+      name: '',
+      code: generateCustomerCode(), // 自动生成编码
+      contact_person: '',
+      phone: '',
+      email: '',
+      address: '',
+      website: '',
+      customer_type: 'company',
+      tax_number: '',
+      credit_limit: 0,
+      notes: '',
+      is_active: true,
+    });
+    setCustomerDialogOpen(true);
   };
 
   // 供应商表单提交
@@ -500,7 +539,7 @@ export default function InventoryPage() {
               {stats.low_stock_products.map(product => (
                 <Grid item key={product.id}>
                   <Chip
-                    label={`${product.name} (${product.sku}): ${product.current_stock}/${product.min_stock}`}
+                    label={`${product.name} (SPU: ${product.spu_code}): ${product.total_stock}/${product.min_stock} (${product.sku_count}个SKU)`}
                     color="warning"
                     variant="outlined"
                     size="small"
@@ -592,7 +631,7 @@ export default function InventoryPage() {
                         </TableCell>
                         <TableCell>
                           {product
-                            ? `${product.name} (${product.sku})`
+                            ? `${product.name} (SPU: ${product.spu_code})`
                             : tx.product_id}
                         </TableCell>
                         <TableCell align="right">
@@ -661,7 +700,7 @@ export default function InventoryPage() {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => setSupplierDialogOpen(true)}
+            onClick={handleOpenSupplierDialog}
             disabled={loading}
           >
             新增供应商
@@ -752,7 +791,7 @@ export default function InventoryPage() {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => setCustomerDialogOpen(true)}
+            onClick={handleOpenCustomerDialog}
             disabled={loading}
           >
             新增客户
@@ -888,12 +927,15 @@ export default function InventoryPage() {
                   })
                 }
               >
-                {products.map(product => (
-                  <MenuItem key={product.id} value={product.id}>
-                    {product.name} ({product.sku}) - 当前库存:{' '}
-                    {product.current_stock}
-                  </MenuItem>
-                ))}
+                {products.map(product => {
+                  // 计算总库存
+                  const totalStock = product.skus?.reduce((sum, sku) => sum + sku.current_stock, 0) || 0;
+                  return (
+                    <MenuItem key={product.id} value={product.id}>
+                      {product.name} (SPU: {product.spu_code}) - 总库存: {totalStock}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
 
@@ -990,14 +1032,28 @@ export default function InventoryPage() {
               fullWidth
               required
             />
-            <TextField
-              label="供应商编码"
-              value={supplierForm.code}
-              onChange={e =>
-                setSupplierForm({ ...supplierForm, code: e.target.value })
-              }
-              fullWidth
-            />
+            <Box>
+              <Box sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
+                <TextField
+                  label="供应商编码（自动生成）"
+                  value={supplierForm.code}
+                  onChange={e =>
+                    setSupplierForm({ ...supplierForm, code: e.target.value })
+                  }
+                  fullWidth
+                  size="small"
+                  helperText="格式: SUP-日期-随机码"
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setSupplierForm({ ...supplierForm, code: generateSupplierCode() })}
+                  sx={{ whiteSpace: 'nowrap' }}
+                >
+                  重新生成
+                </Button>
+              </Box>
+            </Box>
             <TextField
               label="联系人"
               value={supplierForm.contact_person}
@@ -1125,14 +1181,28 @@ export default function InventoryPage() {
                 <MenuItem value="individual">个人</MenuItem>
               </Select>
             </FormControl>
-            <TextField
-              label="客户编码"
-              value={customerForm.code}
-              onChange={e =>
-                setCustomerForm({ ...customerForm, code: e.target.value })
-              }
-              fullWidth
-            />
+            <Box>
+              <Box sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
+                <TextField
+                  label="客户编码（自动生成）"
+                  value={customerForm.code}
+                  onChange={e =>
+                    setCustomerForm({ ...customerForm, code: e.target.value })
+                  }
+                  fullWidth
+                  size="small"
+                  helperText="格式: CUS-日期-随机码"
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setCustomerForm({ ...customerForm, code: generateCustomerCode() })}
+                  sx={{ whiteSpace: 'nowrap' }}
+                >
+                  重新生成
+                </Button>
+              </Box>
+            </Box>
             <TextField
               label="联系人"
               value={customerForm.contact_person}

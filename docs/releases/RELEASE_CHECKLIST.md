@@ -1,7 +1,7 @@
-# 🚀 Proclaw Desktop v0.1.0-beta 发布检查清单
+# 🚀 ProClaw Desktop v0.1.0-beta 发布检查清单
 
 > **目标发布日期**: 2026-04-15
-> **负责人**: Proclaw Team
+> **负责人**: ProClaw Team
 > **状态**: 🟡 进行中
 
 ---
@@ -212,14 +212,14 @@
 - [ ] 访问 GitHub Releases 页面
 - [ ] 点击 "Draft a new release"
 - [ ] Tag version: `v0.1.0-beta`
-- [ ] Release title: `Proclaw Desktop v0.1.0-beta - 首个公开测试版`
+- [ ] Release title: `ProClaw Desktop v0.1.0-beta - 首个公开测试版`
 
 ### 填写发布说明
 
 复制以下内容到 Release description:
 
 ```markdown
-🎉 **Proclaw Desktop 首个公开测试版本！**
+🎉 **ProClaw Desktop 首个公开测试版本！**
 
 ## 亮点功能
 
@@ -358,7 +358,7 @@
 #### Twitter/X
 
 ```
-🦞 Proclaw Desktop v0.1.0-beta 正式发布！
+🦞 ProClaw Desktop v0.1.0-beta 正式发布！
 
 ✨ 开源的 AI 驱动商业管理系统
 ✅ 产品库 + 进销存 + AI 智能体
@@ -373,7 +373,7 @@
 #### LinkedIn
 
 ```
-我们很高兴宣布 Proclaw Desktop 首个公开测试版发布！
+我们很高兴宣布 ProClaw Desktop 首个公开测试版发布！
 
 🎯 为中小企业设计的一体化商业管理平台
 🔧 基于 Tauri + React + Rust 构建
@@ -387,7 +387,7 @@
 
 #### Reddit (r/opensource, r/SideProject)
 
-标题: `[Showcase] Proclaw Desktop - Open-source AI-powered business management system built with Tauri + Rust`
+标题: `[Showcase] ProClaw Desktop - Open-source AI-powered business management system built with Tauri + Rust`
 
 内容: 详细介绍项目背景、技术栈、功能特性，附上截图和下载链接。
 

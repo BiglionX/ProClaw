@@ -1,4 +1,4 @@
-import { getProducts } from './productService';
+import { getProductSPUs, ProductSPU } from './productService';
 import {
   createInventoryTransaction,
   getInventoryStats,
@@ -306,11 +306,11 @@ export async function executeCommand(command: CommandResult): Promise<string> {
 
       case 'query_products': {
         const searchQuery = command.params.search || '';
-        const products = await getProducts({
+        const spus = await getProductSPUs({
           limit: 20,
           search: searchQuery || undefined,
         });
-        return formatProductList(products);
+        return formatProductList(spus);
       }
 
       case 'query_product_stock': {
@@ -319,33 +319,42 @@ export async function executeCommand(command: CommandResult): Promise<string> {
           return '❓ 请指定要查询的产品名称，例如：“iPhone 还有多少库存？”';
         }
 
-        const products = await getProducts({
+        const spus = await getProductSPUs({
           limit: 10,
           search: productName,
         });
 
-        if (products.length === 0) {
+        if (spus.length === 0) {
           return `🔍 未找到名为 "${productName}" 的产品。请检查产品名称是否正确。`;
         }
 
         let result = `📦 **"${productName}" 的库存信息：**\n\n`;
-        products.forEach(product => {
+        spus.forEach((spu: ProductSPU) => {
+          // 计算总库存(所有SKU之和)
+          const totalStock = spu.skus?.reduce((sum, sku) => sum + sku.current_stock, 0) || 0;
+          const minStock = spu.skus?.reduce((sum, sku) => sum + sku.min_stock, 0) || 0;
+          const maxStock = spu.skus?.reduce((sum, sku) => sum + sku.max_stock, 0) || 0;
+          
           const stockPercent =
-            product.max_stock > 0
-              ? ((product.current_stock / product.max_stock) * 100).toFixed(0)
+            maxStock > 0
+              ? ((totalStock / maxStock) * 100).toFixed(0)
               : 0;
           const statusIcon =
-            product.current_stock === 0
+            totalStock === 0
               ? '❌'
-              : product.current_stock <= product.min_stock
+              : totalStock <= minStock
                 ? '⚠️'
                 : '✅';
 
-          result += `• **${product.name}** (${product.sku})\n`;
-          result += `  当前库存: ${product.current_stock} ${product.unit} ${statusIcon}\n`;
-          result += `  最低库存: ${product.min_stock} ${product.unit}\n`;
-          result += `  最高库存: ${product.max_stock} ${product.unit}\n`;
-          result += `  库存使用率: ${stockPercent}%\n\n`;
+          result += `• **${spu.name}** (SPU: ${spu.spu_code})\n`;
+          result += `  当前库存: ${totalStock} ${spu.unit} ${statusIcon}\n`;
+          result += `  最低库存: ${minStock} ${spu.unit}\n`;
+          result += `  最高库存: ${maxStock} ${spu.unit}\n`;
+          result += `  库存使用率: ${stockPercent}%\n`;
+          if (spu.skus && spu.skus.length > 0) {
+            result += `  SKU数量: ${spu.skus.length}个\n`;
+          }
+          result += '\n';
         });
 
         return result;
@@ -368,33 +377,39 @@ export async function executeCommand(command: CommandResult): Promise<string> {
         }
 
         // 查找产品
-        const products = await getProducts({
+        const spus = await getProductSPUs({
           limit: 5,
           search: productName,
         });
 
-        if (products.length === 0) {
+        if (spus.length === 0) {
           return `🔍 未找到名为 "${productName}" 的产品。请先添加该产品。`;
         }
 
         // 使用第一个匹配的产品
-        const product = products[0];
+        const spu = spus[0];
+        // 使用第一个SKU作为默认
+        const defaultSku = spu.skus?.[0];
+        if (!defaultSku) {
+          return `⚠️ 产品 "${spu.name}" 还没有SKU，请先添加SKU。`;
+        }
 
         try {
           await createInventoryTransaction({
-            product_id: product.id,
+            product_id: defaultSku.id,
             transaction_type: 'inbound',
             quantity: quantity,
             reason: 'AI助手入库',
-            notes: `通过 AI Chat 入库 ${quantity} ${product.unit}`,
+            notes: `通过 AI Chat 入库 ${quantity} ${spu.unit}`,
           });
 
           return (
             `✅ **入库成功！**\n\n` +
-            `产品: ${product.name} (${product.sku})\n` +
-            `数量: +${quantity} ${product.unit}\n` +
-            `原库存: ${product.current_stock} ${product.unit}\n` +
-            `新库存: ${product.current_stock + quantity} ${product.unit}\n\n` +
+            `产品: ${spu.name} (SPU: ${spu.spu_code})\n` +
+            `SKU: ${defaultSku.sku_code}\n` +
+            `数量: +${quantity} ${spu.unit}\n` +
+            `原库存: ${defaultSku.current_stock} ${spu.unit}\n` +
+            `新库存: ${defaultSku.current_stock + quantity} ${spu.unit}\n\n` +
             `📝 交易记录已保存。`
           );
         } catch (error: any) {
@@ -414,44 +429,50 @@ export async function executeCommand(command: CommandResult): Promise<string> {
         }
 
         // 查找产品
-        const products = await getProducts({
+        const spus = await getProductSPUs({
           limit: 5,
           search: productName,
         });
 
-        if (products.length === 0) {
+        if (spus.length === 0) {
           return `🔍 未找到名为 "${productName}" 的产品。`;
         }
 
         // 使用第一个匹配的产品
-        const product = products[0];
+        const spu = spus[0];
+        const defaultSku = spu.skus?.[0];
+        if (!defaultSku) {
+          return `⚠️ 产品 "${spu.name}" 还没有SKU。`;
+        }
 
         // 检查库存是否充足
-        if (product.current_stock < quantity) {
+        if (defaultSku.current_stock < quantity) {
           return (
             `⚠️ **库存不足！**\n\n` +
-            `产品: ${product.name} (${product.sku})\n` +
-            `请求出库: ${quantity} ${product.unit}\n` +
-            `当前库存: ${product.current_stock} ${product.unit}\n\n` +
+            `产品: ${spu.name} (SPU: ${spu.spu_code})\n` +
+            `SKU: ${defaultSku.sku_code}\n` +
+            `请求出库: ${quantity} ${spu.unit}\n` +
+            `当前库存: ${defaultSku.current_stock} ${spu.unit}\n\n` +
             `建议: 请先入库补充库存。`
           );
         }
 
         try {
           await createInventoryTransaction({
-            product_id: product.id,
+            product_id: defaultSku.id,
             transaction_type: 'outbound',
             quantity: quantity,
             reason: 'AI助手出库',
-            notes: `通过 AI Chat 出库 ${quantity} ${product.unit}`,
+            notes: `通过 AI Chat 出库 ${quantity} ${spu.unit}`,
           });
 
           return (
             `✅ **出库成功！**\n\n` +
-            `产品: ${product.name} (${product.sku})\n` +
-            `数量: -${quantity} ${product.unit}\n` +
-            `原库存: ${product.current_stock} ${product.unit}\n` +
-            `新库存: ${product.current_stock - quantity} ${product.unit}\n\n` +
+            `产品: ${spu.name} (SPU: ${spu.spu_code})\n` +
+            `SKU: ${defaultSku.sku_code}\n` +
+            `数量: -${quantity} ${spu.unit}\n` +
+            `原库存: ${defaultSku.current_stock} ${spu.unit}\n` +
+            `新库存: ${defaultSku.current_stock - quantity} ${spu.unit}\n\n` +
             `📝 交易记录已保存。`
           );
         } catch (error: any) {

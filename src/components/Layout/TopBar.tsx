@@ -6,7 +6,6 @@ import {
 import {
   AppBar,
   Avatar,
-  Badge,
   Box,
   IconButton,
   Toolbar,
@@ -47,7 +46,7 @@ export default function TopBar() {
               fontSize: '1.3rem',
             }}
           >
-            Proclaw
+            ProClaw
           </Typography>
           <Typography
             variant="caption"
@@ -91,7 +90,7 @@ export default function TopBar() {
                 color: '#ff3b30',
               }
             }}
-            onClick={() => window.open('https://docs.proclaw.dev', '_blank')}
+            onClick={() => window.open('https://docs.proclaw.cc', '_blank')}
           >
             <HelpIcon />
           </IconButton>

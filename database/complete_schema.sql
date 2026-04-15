@@ -248,40 +248,119 @@ CREATE TABLE IF NOT EXISTS brands (
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
--- 11. 产品
-CREATE TABLE IF NOT EXISTS products (
+-- 11. 产品 SPU (标准产品单位)
+CREATE TABLE IF NOT EXISTS product_spu (
     id TEXT PRIMARY KEY,
-    sku TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
+    spu_code TEXT UNIQUE NOT NULL, -- SPU编码
+    name TEXT NOT NULL, -- 商品名称
+    subtitle TEXT, -- 副标题/卖点
+    description TEXT, -- 商品详情
     category_id TEXT REFERENCES product_categories(id),
     brand_id TEXT REFERENCES brands(id),
+    
+    -- 基础信息
     unit TEXT DEFAULT '件',
-    cost_price REAL DEFAULT 0,
-    sell_price REAL DEFAULT 0,
-    min_stock INTEGER DEFAULT 0,
-    max_stock INTEGER DEFAULT 0,
-    current_stock INTEGER DEFAULT 0,
-    image_url TEXT,
-    barcode TEXT,
-    is_active BOOLEAN DEFAULT TRUE,
-    metadata TEXT, -- JSON 字符串
+    weight DECIMAL(10, 3), -- 重量(kg)
+    length DECIMAL(10, 2), -- 长度(cm)
+    width DECIMAL(10, 2), -- 宽度(cm)
+    height DECIMAL(10, 2), -- 高度(cm)
+    
+    -- SEO优化
+    seo_title TEXT,
+    seo_description TEXT,
+    seo_keywords TEXT,
+    
+    -- 销售控制
+    is_on_sale BOOLEAN DEFAULT TRUE, -- 是否上架
+    is_featured BOOLEAN DEFAULT FALSE, -- 是否推荐
+    sort_order INTEGER DEFAULT 0,
+    
+    -- 状态
+    status TEXT DEFAULT 'draft' CHECK(status IN ('draft', 'on_sale', 'off_sale', 'deleted')),
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    sync_status TEXT DEFAULT 'pending' CHECK(sync_status IN ('pending', 'synced', 'conflict')),
-    last_synced_at TIMESTAMP WITH TIME ZONE,
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand_id);
-CREATE INDEX IF NOT EXISTS idx_products_sync_status ON products(sync_status);
+CREATE INDEX IF NOT EXISTS idx_spu_code ON product_spu(spu_code);
+CREATE INDEX IF NOT EXISTS idx_spu_category ON product_spu(category_id);
+CREATE INDEX IF NOT EXISTS idx_spu_brand ON product_spu(brand_id);
+CREATE INDEX IF NOT EXISTS idx_spu_status ON product_spu(status);
 
--- 12. 库存交易
+-- 12. 产品 SKU (库存量单位)
+CREATE TABLE IF NOT EXISTS product_sku (
+    id TEXT PRIMARY KEY,
+    spu_id TEXT NOT NULL REFERENCES product_spu(id) ON DELETE CASCADE,
+    sku_code TEXT UNIQUE NOT NULL, -- SKU编码
+    
+    -- 规格信息(JSON存储,如: {"颜色": "红色", "尺寸": "XL"})
+    specifications JSONB,
+    spec_text TEXT, -- 规格文本展示(如: "红色/XL")
+    
+    -- 价格库存
+    cost_price DECIMAL(10, 2) DEFAULT 0,
+    sell_price DECIMAL(10, 2) DEFAULT 0,
+    market_price DECIMAL(10, 2), -- 市场价
+    current_stock INTEGER DEFAULT 0,
+    min_stock INTEGER DEFAULT 0,
+    max_stock INTEGER DEFAULT 999999,
+    
+    -- SKU级别的控制
+    barcode TEXT, -- 条形码
+    is_default BOOLEAN DEFAULT FALSE, -- 是否默认SKU
+    
+    status TEXT DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sku_spu ON product_sku(spu_id);
+CREATE INDEX IF NOT EXISTS idx_sku_code ON product_sku(sku_code);
+
+-- 13. 商品图片
+CREATE TABLE IF NOT EXISTS product_images (
+    id TEXT PRIMARY KEY,
+    spu_id TEXT NOT NULL REFERENCES product_spu(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    image_type TEXT DEFAULT 'main' CHECK(image_type IN ('main', 'gallery')), -- 主图或轮播图
+    sort_order INTEGER DEFAULT 0,
+    alt_text TEXT, -- 图片描述
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_images_spu ON product_images(spu_id);
+
+-- 14. 商品属性定义
+CREATE TABLE IF NOT EXISTS product_attributes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL, -- 属性名(如: 颜色、尺寸、材质)
+    type TEXT DEFAULT 'select' CHECK(type IN ('text', 'select', 'number', 'boolean')),
+    options TEXT[], -- 可选值数组(用于select类型)
+    is_required BOOLEAN DEFAULT FALSE,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 15. SPU属性值关联
+CREATE TABLE IF NOT EXISTS product_spu_attributes (
+    id TEXT PRIMARY KEY,
+    spu_id TEXT NOT NULL REFERENCES product_spu(id) ON DELETE CASCADE,
+    attribute_id TEXT NOT NULL REFERENCES product_attributes(id),
+    value_text TEXT, -- 文本值
+    value_number DECIMAL(10, 2), -- 数值
+    value_boolean BOOLEAN, -- 布尔值
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(spu_id, attribute_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spu_attr_spu ON product_spu_attributes(spu_id);
+CREATE INDEX IF NOT EXISTS idx_spu_attr_attribute ON product_spu_attributes(attribute_id);
+
+-- 16. 库存交易
 CREATE TABLE IF NOT EXISTS inventory_transactions (
     id TEXT PRIMARY KEY,
-    product_id TEXT NOT NULL REFERENCES products(id),
+    product_id TEXT NOT NULL REFERENCES product_sku(id),
     transaction_type TEXT NOT NULL CHECK(transaction_type IN ('inbound', 'outbound', 'adjustment', 'transfer')),
     quantity INTEGER NOT NULL,
     reference_no TEXT, -- 参考单号
@@ -296,7 +375,7 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
 CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_created ON inventory_transactions(created_at);
 
--- 13. 供应商
+-- 17. 供应商
 CREATE TABLE IF NOT EXISTS suppliers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -320,7 +399,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
 CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
 CREATE INDEX IF NOT EXISTS idx_suppliers_code ON suppliers(code);
 
--- 14. 采购订单
+-- 18. 采购订单
 CREATE TABLE IF NOT EXISTS purchase_orders (
     id TEXT PRIMARY KEY,
     po_number TEXT UNIQUE NOT NULL, -- 采购单号
@@ -344,11 +423,11 @@ CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
 CREATE INDEX IF NOT EXISTS idx_po_date ON purchase_orders(order_date);
 
--- 15. 采购订单明细
+-- 19. 采购订单明细
 CREATE TABLE IF NOT EXISTS purchase_order_items (
     id TEXT PRIMARY KEY,
     purchase_order_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-    product_id TEXT NOT NULL REFERENCES products(id),
+    product_id TEXT NOT NULL REFERENCES product_sku(id),
     quantity INTEGER NOT NULL,
     unit_price REAL NOT NULL,
     total_price REAL NOT NULL,
@@ -361,7 +440,7 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
 CREATE INDEX IF NOT EXISTS idx_poi_po ON purchase_order_items(purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_poi_product ON purchase_order_items(product_id);
 
--- 16. 客户
+-- 20. 客户
 CREATE TABLE IF NOT EXISTS customers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -386,7 +465,7 @@ CREATE TABLE IF NOT EXISTS customers (
 CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
 CREATE INDEX IF NOT EXISTS idx_customers_code ON customers(code);
 
--- 17. 销售订单
+-- 21. 销售订单
 CREATE TABLE IF NOT EXISTS sales_orders (
     id TEXT PRIMARY KEY,
     so_number TEXT UNIQUE NOT NULL, -- 销售单号
@@ -411,11 +490,11 @@ CREATE INDEX IF NOT EXISTS idx_so_customer ON sales_orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_so_status ON sales_orders(status);
 CREATE INDEX IF NOT EXISTS idx_so_date ON sales_orders(order_date);
 
--- 18. 销售订单明细
+-- 22. 销售订单明细
 CREATE TABLE IF NOT EXISTS sales_order_items (
     id TEXT PRIMARY KEY,
     sales_order_id TEXT NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
-    product_id TEXT NOT NULL REFERENCES products(id),
+    product_id TEXT NOT NULL REFERENCES product_sku(id),
     quantity INTEGER NOT NULL,
     unit_price REAL NOT NULL,
     total_price REAL NOT NULL,
@@ -428,7 +507,7 @@ CREATE TABLE IF NOT EXISTS sales_order_items (
 CREATE INDEX IF NOT EXISTS idx_soi_so ON sales_order_items(sales_order_id);
 CREATE INDEX IF NOT EXISTS idx_soi_product ON sales_order_items(product_id);
 
--- 19. 会计科目
+-- 23. 会计科目
 CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE NOT NULL, -- 科目编码
@@ -444,7 +523,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE INDEX IF NOT EXISTS idx_accounts_code ON accounts(code);
 CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type);
 
--- 20. 财务交易记录
+-- 24. 财务交易记录
 CREATE TABLE IF NOT EXISTS financial_transactions (
     id TEXT PRIMARY KEY,
     transaction_date DATE NOT NULL,
@@ -484,7 +563,11 @@ ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 -- 主应用表也启用 RLS
 ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE brands ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_spu ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_sku ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_attributes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_spu_attributes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
@@ -583,9 +666,37 @@ CREATE POLICY "Admins can manage system settings"
     );
 
 -- 主应用表策略 - 允许认证用户访问
-DROP POLICY IF EXISTS "Authenticated users can access product data" ON products;
-CREATE POLICY "Authenticated users can access product data"
-    ON products FOR ALL
+DROP POLICY IF EXISTS "Authenticated users can access product spu" ON product_spu;
+CREATE POLICY "Authenticated users can access product spu"
+    ON product_spu FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Authenticated users can access product sku" ON product_sku;
+CREATE POLICY "Authenticated users can access product sku"
+    ON product_sku FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Authenticated users can access product images" ON product_images;
+CREATE POLICY "Authenticated users can access product images"
+    ON product_images FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Authenticated users can access product attributes" ON product_attributes;
+CREATE POLICY "Authenticated users can access product attributes"
+    ON product_attributes FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Authenticated users can access spu attributes" ON product_spu_attributes;
+CREATE POLICY "Authenticated users can access spu attributes"
+    ON product_spu_attributes FOR ALL
     TO authenticated
     USING (true)
     WITH CHECK (true);

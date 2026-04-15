@@ -261,16 +261,6 @@ export default function AISettings() {
 
   return (
     <Box>
-      {/* 页面标题 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          🤖 AI 模型设置
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          配置大语言模型 API，为 AI 智能体提供动力
-        </Typography>
-      </Box>
-
       {/* 当前默认提供商 */}
       <Card sx={{ mb: 3 }}>
         <CardContent>

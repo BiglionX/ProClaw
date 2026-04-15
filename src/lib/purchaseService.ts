@@ -1,5 +1,29 @@
 import { invoke } from '@tauri-apps/api/core';
 
+/**
+ * 生成供应商编码
+ * 格式: SUP-{YYYYMMDD}-{随机4位}
+ * 示例: SUP-20260415-A3F7
+ */
+export function generateSupplierCode(): string {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `SUP-${dateStr}-${randomStr}`;
+}
+
+/**
+ * 生成采购订单号
+ * 格式: PO-{YYYYMMDD}-{随机4位}
+ * 示例: PO-20260415-A3F7
+ */
+export function generatePurchaseOrderNumber(): string {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `PO-${dateStr}-${randomStr}`;
+}
+
 export interface Supplier {
   id: string;
   name: string;
@@ -37,7 +61,12 @@ export interface CreateSupplierInput {
 export async function createSupplier(
   input: CreateSupplierInput
 ): Promise<{ id: string; name: string; code: string }> {
-  return await invoke('create_supplier', { supplier: input });
+  // 如果未提供编码，自动生成
+  const finalInput = {
+    ...input,
+    code: input.code || generateSupplierCode(),
+  };
+  return await invoke('create_supplier', { supplier: finalInput });
 }
 
 /**
@@ -105,7 +134,12 @@ export interface PurchaseOrderDetail {
 export async function createPurchaseOrder(
   input: CreatePurchaseOrderInput
 ): Promise<{ id: string; po_number: string; total_amount: number }> {
-  return await invoke('create_purchase_order', { order: input });
+  // 如果未提供订单号，自动生成
+  const finalInput = {
+    ...input,
+    po_number: input.po_number || generatePurchaseOrderNumber(),
+  };
+  return await invoke('create_purchase_order', { order: finalInput });
 }
 
 /**

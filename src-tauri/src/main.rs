@@ -1,13 +1,28 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod database;
-mod commands;
 mod sync_engine;
 
+// 模块化命令文件
+pub mod types;
+pub mod product_commands;
+pub mod inventory_commands;
+pub mod purchase_commands;
+pub mod sales_commands;
+pub mod finance_commands;
+pub mod common_commands;
+
 use database::{Database, get_database_path};
-use commands::*;
 use sync_engine::{SyncEngine, start_sync, get_sync_status};
 use std::sync::Mutex;
+
+// 重新导出所有命令
+use product_commands::*;
+use inventory_commands::*;
+use purchase_commands::*;
+use sales_commands::*;
+use finance_commands::*;
+use common_commands::*;
 
 fn main() {
     // 初始化数据库
@@ -34,6 +49,16 @@ fn main() {
             get_product_by_id,
             update_product,
             delete_product,
+            // SPU-SKU 电商架构
+            create_product_spu,
+            get_product_spus,
+            get_product_spu_by_id,
+            update_product_spu,
+            delete_product_spu,
+            // 商品库模式迁移
+            get_library_mode,
+            migrate_to_ecommerce_mode,
+            downgrade_to_simple_mode,
             // 品牌管理
             create_brand,
             get_brands,

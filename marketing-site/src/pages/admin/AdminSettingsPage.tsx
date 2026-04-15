@@ -26,7 +26,7 @@ const AdminSettingsPage: React.FC = () => {
     maxApiKeysPerUser: 5,
     tokenExpiryDays: 365,
     enableNotifications: true,
-    supportEmail: 'support@proclaw.com',
+    supportEmail: 'support@proclaw.cc',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);

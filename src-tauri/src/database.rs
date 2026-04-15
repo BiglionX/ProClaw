@@ -35,8 +35,14 @@ impl Database {
 
     /// 初始化数据库 Schema
     pub fn initialize(&self) -> DbResult<()> {
+        // 加载基础schema
         let schema = include_str!("../../src/db/schema.sql");
         self.conn.execute_batch(schema)?;
+        
+        // 加载SPU-SKU电商架构schema (SQLite版本)
+        let spu_sku_schema = include_str!("../../database/spu_sku_schema_sqlite.sql");
+        self.conn.execute_batch(spu_sku_schema)?;
+        
         Ok(())
     }
 

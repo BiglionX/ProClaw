@@ -153,16 +153,6 @@ export default function DatabaseSettings() {
 
   return (
     <Box>
-      {/* 页面标题 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          🗄️ 数据库设置
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          配置本地数据库和云端同步
-        </Typography>
-      </Box>
-
       {/* 本地数据库信息 */}
       <Card sx={{ mb: 3 }}>
         <CardContent>

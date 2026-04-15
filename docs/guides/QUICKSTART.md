@@ -1,8 +1,8 @@
-# 🦞 Proclaw Desktop - 快速启动指南
+# 🦞 ProClaw Desktop - 快速启动指南
 
-## ✅ Phase 0 Week 1 完成
+## ✅ 当前版本: v3.0.0 (电商商品库)
 
-项目已成功初始化,所有基础配置完成!
+产品库已升级为标准电商SPU-SKU结构,支持多规格、多图管理!
 
 ## 🚀 立即开始
 
@@ -102,10 +102,29 @@ A: 使用 VS Code 的 Rust Analyzer 插件
 
 ## 🎉 恭喜!
 
-你已经成功启动了 Proclaw Desktop 项目!
+你已经成功启动了 ProClaw Desktop 项目!
 继续按照开发计划推进,我们将在 26 周内完成整个项目。
+
+## 🆕 v3.0.0 电商商品库升级
+
+### 主要变更
+- ✅ 产品库升级为 SPU-SKU 结构
+- ✅ 支持多规格、多图管理
+- ✅ 新增商品属性系统
+- ✅ SEO 优化字段支持
+
+### 迁移指南
+如需升级到新版本,请执行:
+```bash
+# 1. 备份数据
+# 2. 执行迁移脚本
+psql -h db.xxx.supabase.co -U postgres -d postgres -f database/migrate_to_ecommerce.sql
+```
+
+详细升级说明请查看: [ECOMMERCE_UPGRADE_NOTES.md](../ECOMMERCE_UPGRADE_NOTES.md)
 
 ---
 
-**当前进度**: Phase 0 Week 1 ✅
-**下一阶段**: Phase 0 Week 2 - Supabase 集成
+**当前进度**: Phase 0 Week 1 ✅  
+**下一阶段**: Phase 0 Week 2 - Supabase 集成  
+**最新版本**: v3.0.0 - 电商商品库

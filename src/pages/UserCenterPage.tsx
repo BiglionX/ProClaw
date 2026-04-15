@@ -1,12 +1,8 @@
 import {
-  AccountCircle as AccountCircleIcon,
-  Api as ApiIcon,
   AttachMoney as MoneyIcon,
   BarChart as BarChartIcon,
-  ExitToApp as LogoutIcon,
-  Key as KeyIcon,
   Settings as SettingsIcon,
-  ShowChart as ShowChartIcon,
+  TrendingUp as TrendingUpIcon,
   Webhook as WebhookIcon,
 } from '@mui/icons-material';
 import {
@@ -14,7 +10,6 @@ import {
   Button,
   Card,
   CardContent,
-  Divider,
   Grid,
   Paper,
   Tab,
@@ -22,7 +17,6 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
-import { useAuthStore } from '../lib/authStore';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -55,16 +49,6 @@ function a11yProps(index: number) {
 
 export default function UserCenterPage() {
   const [tabValue, setTabValue] = useState(0);
-  const { user, logout } = useAuthStore();
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
 
   // 模拟统计数据（演示模式）
   const stats = {
@@ -76,46 +60,6 @@ export default function UserCenterPage() {
 
   return (
     <Box>
-      {/* 页面标题 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          👤 用户中心
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          管理您的 API 密钥、Token 余额和账户设置
-        </Typography>
-      </Box>
-
-      {/* 用户信息卡片 */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <AccountCircleIcon sx={{ fontSize: 60, color: 'primary.main', mr: 2 }} />
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {user?.email?.split('@')[0] || '用户'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {user?.email}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  注册时间: {user?.created_at ? new Date(user.created_at).toLocaleDateString('zh-CN') : '-'}
-                </Typography>
-              </Box>
-            </Box>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-            >
-              退出登录
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
-
       {/* 统计卡片 */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
@@ -171,7 +115,7 @@ export default function UserCenterPage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <ShowChartIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+                  <TrendingUpIcon sx={{ fontSize: 32, color: 'primary.main' }} />
                 </Box>
               </Box>
             </CardContent>
@@ -201,7 +145,7 @@ export default function UserCenterPage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <KeyIcon sx={{ fontSize: 32, color: 'warning.main' }} />
+                  <BarChartIcon sx={{ fontSize: 32, color: 'warning.main' }} />
                 </Box>
               </Box>
             </CardContent>
@@ -247,36 +191,15 @@ export default function UserCenterPage() {
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab label="🔑 API 密钥" {...a11yProps(0)} />
-          <Tab label="💰 Token 管理" {...a11yProps(1)} />
-          <Tab label="📊 使用统计" {...a11yProps(2)} />
-          <Tab label="🔗 外部集成" {...a11yProps(3)} />
-          <Tab label="⚙️ 账户设置" {...a11yProps(4)} />
+          <Tab label="💰 Token 管理" {...a11yProps(0)} />
+          <Tab label="📊 使用统计" {...a11yProps(1)} />
+          <Tab label="🔗 外部集成" {...a11yProps(2)} />
+          <Tab label="⚙️ 账户设置" {...a11yProps(3)} />
         </Tabs>
       </Paper>
 
-      {/* Tab 0: API 密钥管理 */}
+      {/* Tab 0: Token 管理 */}
       <TabPanel value={tabValue} index={0}>
-        <Card>
-          <CardContent>
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <ApiIcon sx={{ fontSize: 64, color: 'action.disabled', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                API 密钥管理
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                管理和配置您的 AI API 密钥（OpenAI、Anthropic、Azure 等）
-              </Typography>
-              <Button variant="contained" size="large">
-                添加 API 密钥
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
-      </TabPanel>
-
-      {/* Tab 1: Token 管理 */}
-      <TabPanel value={tabValue} index={1}>
         <Card>
           <CardContent>
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -298,8 +221,8 @@ export default function UserCenterPage() {
         </Card>
       </TabPanel>
 
-      {/* Tab 2: 使用统计 */}
-      <TabPanel value={tabValue} index={2}>
+      {/* Tab 1: 使用统计 */}
+      <TabPanel value={tabValue} index={1}>
         <Card>
           <CardContent>
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -318,8 +241,8 @@ export default function UserCenterPage() {
         </Card>
       </TabPanel>
 
-      {/* Tab 3: 外部集成 */}
-      <TabPanel value={tabValue} index={3}>
+      {/* Tab 2: 外部集成 */}
+      <TabPanel value={tabValue} index={2}>
         <Card>
           <CardContent>
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -338,8 +261,8 @@ export default function UserCenterPage() {
         </Card>
       </TabPanel>
 
-      {/* Tab 4: 账户设置 */}
-      <TabPanel value={tabValue} index={4}>
+      {/* Tab 3: 账户设置 */}
+      <TabPanel value={tabValue} index={3}>
         <Card>
           <CardContent>
             <Box sx={{ textAlign: 'center', py: 4 }}>

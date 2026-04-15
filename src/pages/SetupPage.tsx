@@ -27,11 +27,11 @@ export default function SetupPage() {
     <Container maxWidth="md" sx={{ mt: 8 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
         <Typography variant="h4" gutterBottom>
-          🔧 Proclaw 首次设置
+          🔧 ProClaw 首次设置
         </Typography>
 
         <Typography variant="body1" paragraph sx={{ mb: 3 }}>
-          欢迎使用 Proclaw Desktop！在开始之前，请选择您的使用模式：
+          欢迎使用 ProClaw Desktop！在开始之前，请选择您的使用模式：
         </Typography>
 
         {/* 演示模式 */}

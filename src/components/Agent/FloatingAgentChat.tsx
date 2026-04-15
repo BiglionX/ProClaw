@@ -1,8 +1,9 @@
 import {
   SmartToy as BotIcon,
   ExpandLess as CollapseIcon,
-  ExpandMore as ExpandIcon,
   Minimize as MinimizeIcon,
+  OpenInFull as MaximizeIcon,
+  CloseFullscreen as RestoreIcon,
   Person as PersonIcon,
   Send as SendIcon,
 } from '@mui/icons-material';
@@ -36,7 +37,7 @@ const initialMessages: Message[] = [
     id: '1',
     role: 'assistant',
     content:
-      '你好!我是 Proclaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?',
+      '你好!我是 ProClaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?',
     timestamp: new Date(),
   },
 ];
@@ -44,11 +45,18 @@ const initialMessages: Message[] = [
 export default function FloatingAgentChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  
+  // 窗口尺寸状态
+  const [windowHeight, setWindowHeight] = useState(600);
+  const [windowWidth, setWindowWidth] = useState(420);
+  const resizeRef = useRef<HTMLDivElement>(null);
+  const isResizing = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,6 +65,61 @@ export default function FloatingAgentChat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // 从 localStorage 加载窗口尺寸偏好
+  useEffect(() => {
+    const savedHeight = localStorage.getItem('agent-chat-height');
+    const savedWidth = localStorage.getItem('agent-chat-width');
+    if (savedHeight) setWindowHeight(parseInt(savedHeight));
+    if (savedWidth) setWindowWidth(parseInt(savedWidth));
+  }, []);
+
+  // 保存窗口尺寸到 localStorage
+  useEffect(() => {
+    if (!isMaximized && !isMinimized) {
+      localStorage.setItem('agent-chat-height', windowHeight.toString());
+      localStorage.setItem('agent-chat-width', windowWidth.toString());
+    }
+  }, [windowHeight, windowWidth, isMaximized, isMinimized]);
+
+  // 处理窗口拖拽调整大小
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      
+      const newHeight = window.innerHeight - e.clientY - 24;
+      const newWidth = window.innerWidth - e.clientX - 24;
+      
+      // 限制最小和最大尺寸
+      if (newHeight >= 300 && newHeight <= window.innerHeight - 150) {
+        setWindowHeight(newHeight);
+      }
+      if (newWidth >= 350 && newWidth <= window.innerWidth - 100) {
+        setWindowWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = 'nw-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   // 检查LLM连接状态
   useEffect(() => {
@@ -171,6 +234,11 @@ export default function FloatingAgentChat() {
 
   const toggleMinimize = () => {
     setIsMinimized(prev => !prev);
+    if (isMaximized) setIsMaximized(false);
+  };
+
+  const toggleMaximize = () => {
+    setIsMaximized(prev => !prev);
   };
 
   return (
@@ -242,15 +310,17 @@ export default function FloatingAgentChat() {
             position: 'fixed',
             bottom: 24,
             right: 24,
-            width: isMinimized ? 64 : 420,
-            height: isMinimized ? 64 : 600,
-            maxHeight: 'calc(100vh - 100px)',
+            width: isMinimized ? 64 : isMaximized ? 'calc(100vw - 240px - 48px)' : windowWidth,
+            height: isMinimized ? 64 : isMaximized ? 'calc(100vh - 48px)' : windowHeight,
+            maxHeight: isMaximized ? 'calc(100vh - 48px)' : 'calc(100vh - 100px)',
+            maxWidth: isMaximized ? 'calc(100vw - 240px - 48px)' : '100vw',
+            left: isMaximized ? 240 : 'auto',
             zIndex: 1199,
             display: 'flex',
             flexDirection: 'column',
             borderRadius: isMinimized ? '50%' : 3,
             overflow: 'hidden',
-            transition: 'all 0.3s ease',
+            transition: isResizing.current ? 'none' : 'all 0.3s ease',
             border: '1px solid',
             borderColor: 'divider',
             boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
@@ -287,23 +357,40 @@ export default function FloatingAgentChat() {
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <IconButton
-                size="small"
-                onClick={toggleMinimize}
-                sx={{
-                  color: 'white',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
-                }}
-              >
-                {isMinimized ? (
-                  <ExpandIcon fontSize="small" />
-                ) : (
-                  <MinimizeIcon fontSize="small" />
-                )}
-              </IconButton>
+              {!isMinimized && (
+                <>
+                  <IconButton
+                    size="small"
+                    onClick={toggleMaximize}
+                    title={isMaximized ? '恢复窗口' : '最大化'}
+                    sx={{
+                      color: 'white',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                    }}
+                  >
+                    {isMaximized ? (
+                      <RestoreIcon fontSize="small" />
+                    ) : (
+                      <MaximizeIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={toggleMinimize}
+                    title="最小化"
+                    sx={{
+                      color: 'white',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                    }}
+                  >
+                    <MinimizeIcon fontSize="small" />
+                  </IconButton>
+                </>
+              )}
               <IconButton
                 size="small"
                 onClick={toggleChat}
+                title="关闭"
                 sx={{
                   color: 'white',
                   '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
@@ -534,6 +621,26 @@ export default function FloatingAgentChat() {
                 </Box>
               </Box>
             </>
+          )}
+          
+          {/* 拖拽调整大小的手柄 */}
+          {!isMinimized && !isMaximized && (
+            <Box
+              ref={resizeRef}
+              onMouseDown={handleResizeStart}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 8,
+                cursor: 'ns-resize',
+                zIndex: 10,
+                '&:hover': {
+                  bgcolor: 'rgba(255,59,48,0.1)',
+                },
+              }}
+            />
           )}
         </Paper>
       </Slide>

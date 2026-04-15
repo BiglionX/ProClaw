@@ -287,7 +287,7 @@ async function notifyAdmins(newFAQCount: number) {
   
   // 发送邮件通知
   await sendEmail({
-    to: 'admin@proclaw.cn',
+    to: 'admin@proclaw.cc',
     subject: `📝 有 ${newFAQCount} 个FAQ等待审核`,
     body: `请登录管理后台查看并审核新收集的FAQ问题。`,
   });
@@ -446,7 +446,7 @@ CREATE POLICY "Anyone can submit feedback"
    ```
 
 7. **用户看到答案**
-   - 访问 https://proclaw.cn/faq
+   - 访问 https://proclaw.cc/faq
    - 在"数据管理"分类下找到该问题
    - 阅读详细的答案和步骤
 

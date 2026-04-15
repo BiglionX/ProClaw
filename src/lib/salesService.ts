@@ -1,5 +1,29 @@
 import { invoke } from '@tauri-apps/api/core';
 
+/**
+ * 生成客户编码
+ * 格式: CUS-{YYYYMMDD}-{随机4位}
+ * 示例: CUS-20260415-A3F7
+ */
+export function generateCustomerCode(): string {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `CUS-${dateStr}-${randomStr}`;
+}
+
+/**
+ * 生成销售订单号
+ * 格式: SO-{YYYYMMDD}-{随机4位}
+ * 示例: SO-20260415-A3F7
+ */
+export function generateSalesOrderNumber(): string {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `SO-${dateStr}-${randomStr}`;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -36,7 +60,12 @@ export interface CreateCustomerInput {
 export async function createCustomer(
   input: CreateCustomerInput
 ): Promise<{ id: string; name: string; code: string }> {
-  return await invoke('create_customer', { customer: input });
+  // 如果未提供编码，自动生成
+  const finalInput = {
+    ...input,
+    code: input.code || generateCustomerCode(),
+  };
+  return await invoke('create_customer', { customer: finalInput });
 }
 
 export async function getCustomers(options?: {
@@ -95,7 +124,12 @@ export interface CreateSalesOrderInput {
 export async function createSalesOrder(
   input: CreateSalesOrderInput
 ): Promise<{ id: string; so_number: string; total_amount: number }> {
-  return await invoke('create_sales_order', { order: input });
+  // 如果未提供订单号，自动生成
+  const finalInput = {
+    ...input,
+    so_number: input.so_number || generateSalesOrderNumber(),
+  };
+  return await invoke('create_sales_order', { order: finalInput });
 }
 
 export async function getSalesOrders(options?: {

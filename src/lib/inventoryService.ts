@@ -32,9 +32,10 @@ export interface InventoryStats {
   low_stock_products: Array<{
     id: string;
     name: string;
-    sku: string;
-    current_stock: number;
+    spu_code: string;
+    total_stock: number;
     min_stock: number;
+    sku_count: number;
   }>;
 }
 

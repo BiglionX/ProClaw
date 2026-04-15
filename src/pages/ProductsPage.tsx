@@ -43,9 +43,29 @@ import {
   getProducts,
   Product as ProductType,
   updateProduct,
+  // 新增：迁移相关 API
+  getLibraryMode,
+  migrateToEcommerceMode,
+  downgradeToSimpleMode,
+  MigrationResult,
+  // 新增：自动生成SKU
+  generateSimpleSKU,
 } from '../lib/productService';
+// 新增：导入模式切换组件
+import {
+  UpgradeConfirmDialog,
+  DowngradeConfirmDialog,
+  LibraryModeToggle,
+} from '../components/Products';
 
 export default function ProductsPage() {
+  // ==================== 商品库模式状态 ====================
+  const [libraryMode, setLibraryMode] = useState<'simple' | 'ecommerce'>('simple');
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
+
+  // ==================== 原有状态 ====================
   const [products, setProducts] = useState<ProductType[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,8 +88,9 @@ export default function ProductsPage() {
     max_stock: 999999,
     unit: '个',
   });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // 新增：多图上传支持
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -104,8 +125,20 @@ export default function ProductsPage() {
   };
 
   useEffect(() => {
+    // 加载商品库模式
+    const initMode = async () => {
+      try {
+        const mode = await getLibraryMode();
+        setLibraryMode(mode);
+      } catch (err) {
+        console.error('Failed to get library mode:', err);
+        setLibraryMode('simple'); // 默认简单模式
+      }
+    };
+    
     loadProducts();
     loadFilters();
+    initMode();
   }, []);
 
   // 当筛选条件改变时重新加载
@@ -130,12 +163,20 @@ export default function ProductsPage() {
         max_stock: product.max_stock,
         unit: product.unit,
       });
-      setImagePreview(product.image_url || null);
-      setImageFile(null);
+      // 兼容旧数据：如果有image_url，转换为数组
+      if (product.image_url) {
+        setImagePreviews([product.image_url]);
+        setImageFiles([]); // 编辑时不保留文件对象，只保留预览
+      } else {
+        setImagePreviews([]);
+        setImageFiles([]);
+      }
     } else {
       setEditingProduct(null);
+      // 新建时自动生成SKU
+      const autoSKU = generateSimpleSKU();
       setFormData({
-        sku: '',
+        sku: autoSKU,
         name: '',
         description: '',
         cost_price: 0,
@@ -145,44 +186,71 @@ export default function ProductsPage() {
         max_stock: 999999,
         unit: '个',
       });
-      setImagePreview(null);
-      setImageFile(null);
+      setImagePreviews([]);
+      setImageFiles([]);
     }
     setOpenDialog(true);
     setError(null);
   };
 
-  // 处理图片选择
+  // 处理图片选择（支持多图）
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    // 验证文件类型
-    if (!file.type.startsWith('image/')) {
-      setError('请选择图片文件');
+    // 验证文件数量
+    const totalImages = imageFiles.length + files.length;
+    if (totalImages > 5) {
+      setError(`最多只能上传5张图片，当前已选择${imageFiles.length}张，还能选择${5 - imageFiles.length}张`);
       return;
     }
 
-    // 验证文件大小 (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('图片大小不能超过 5MB');
-      return;
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+
+    // 验证每张图片
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // 验证文件类型
+      if (!file.type.startsWith('image/')) {
+        setError(`${file.name} 不是有效的图片文件`);
+        return;
+      }
+
+      // 电商标准：单张图片不超过2MB
+      if (file.size > 2 * 1024 * 1024) {
+        setError(`${file.name} 超过2MB限制（当前${(file.size / 1024 / 1024).toFixed(2)}MB）`);
+        return;
+      }
+
+      newFiles.push(file);
+
+      // 创建预览
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        newPreviews.push(reader.result as string);
+        
+        // 当所有图片都加载完成后更新状态
+        if (newPreviews.length === newFiles.length) {
+          setImageFiles(prev => [...prev, ...newFiles]);
+          setImagePreviews(prev => [...prev, ...newPreviews]);
+        }
+      };
+      reader.readAsDataURL(file);
     }
-
-    setImageFile(file);
-
-    // 创建预览
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
-  // 清除图片
-  const handleClearImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
+  // 删除指定图片
+  const handleRemoveImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 清除所有图片
+  const handleClearAllImages = () => {
+    setImageFiles([]);
+    setImagePreviews([]);
   };
 
   // 保存产品
@@ -192,10 +260,21 @@ export default function ProductsPage() {
 
       let imageUrl = editingProduct?.image_url || undefined;
 
-      // 如果有新选择的图片，上传到后端
-      if (imageFile) {
+      // 如果有新选择的图片，上传到后端（取第一张作为主图）
+      if (imageFiles.length > 0) {
         try {
-          imageUrl = await uploadImage(imageFile);
+          // 上传所有新图片
+          const uploadPromises = imageFiles.map(file => uploadImage(file));
+          const uploadedUrls = await Promise.all(uploadPromises);
+          
+          // 第一张作为主图
+          imageUrl = uploadedUrls[0];
+          
+          // TODO: 如果有多图字段，可以存储所有URL
+          // 目前先以逗号分隔存储在image_url中
+          if (uploadedUrls.length > 1) {
+            imageUrl = uploadedUrls.join(',');
+          }
         } catch (err) {
           setError('图片上传失败');
           setLoading(false);
@@ -239,6 +318,44 @@ export default function ProductsPage() {
       setError(err.message || '删除失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ==================== 商品库模式迁移处理函数 ====================
+
+  /**
+   * 升级到电商商品库
+   */
+  const handleUpgrade = async () => {
+    try {
+      const result = await migrateToEcommerceMode();
+      setMigrationResult(result);
+      setLibraryMode('ecommerce');
+      setSuccessMessage(`成功升级！迁移了${result.migrated_products}个商品`);
+      
+      // 重新加载商品列表
+      await loadProducts();
+    } catch (err: any) {
+      setError(err.message || '升级失败');
+    } finally {
+      setShowUpgradeDialog(false);
+    }
+  };
+
+  /**
+   * 降级回简单商品库
+   */
+  const handleDowngrade = async () => {
+    try {
+      await downgradeToSimpleMode();
+      setLibraryMode('simple');
+      setMigrationResult(null); // 清除迁移结果
+      setSuccessMessage('已返回简单商品库模式');
+      await loadProducts();
+    } catch (err: any) {
+      setError(err.message || '降级失败');
+    } finally {
+      setShowDowngradeDialog(false);
     }
   };
 
@@ -308,14 +425,32 @@ export default function ProductsPage() {
 
   return (
     <Box>
-      {/* 页面标题 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          📦 产品库
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          管理您的产品、库存和价格
-        </Typography>
+      {/* 页面标题和模式切换 */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-start',
+        mb: 3 
+      }}>
+        <Box>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+            {libraryMode === 'simple' ? '📦 商品管理' : '🛍️ 电商商品库'}
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            {libraryMode === 'simple' 
+              ? '适合小商家、农场、手工作坊' 
+              : '支持多规格、多图、精细化库存管理'}
+          </Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          {/* 模式切换按钮 */}
+          <LibraryModeToggle
+            currentMode={libraryMode}
+            onUpgrade={() => setShowUpgradeDialog(true)}
+            onDowngrade={() => setShowDowngradeDialog(true)}
+          />
+        </Box>
       </Box>
 
       {/* 成功提示 */}
@@ -544,34 +679,97 @@ export default function ProductsPage() {
         <DialogContent>
           <Box sx={{ pt: 2 }}>
             {/* 图片上传区域 */}
-            <Box sx={{ mb: 3, textAlign: 'center' }}>
-              {imagePreview ? (
-                <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                  <img
-                    src={imagePreview}
-                    alt="Product preview"
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: '200px',
-                      borderRadius: '8px',
-                      border: '1px solid #e0e0e0',
-                    }}
-                  />
-                  <IconButton
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  商品图片（最多5张，每张不超过2MB）
+                </Typography>
+                {imagePreviews.length > 0 && (
+                  <Button
                     size="small"
-                    onClick={handleClearImage}
-                    sx={{
-                      position: 'absolute',
-                      top: -8,
-                      right: -8,
-                      bgcolor: 'background.paper',
-                      boxShadow: 1,
-                      '&:hover': { bgcolor: 'background.paper' },
-                    }}
+                    color="error"
+                    onClick={handleClearAllImages}
+                    startIcon={<DeleteIcon fontSize="small" />}
                   >
-                    <DeleteIcon fontSize="small" color="error" />
-                  </IconButton>
-                </Box>
+                    清除所有
+                  </Button>
+                )}
+              </Box>
+              
+              {imagePreviews.length > 0 ? (
+                <Grid container spacing={2}>
+                  {imagePreviews.map((preview, index) => (
+                    <Grid item xs={6} sm={4} md={2.4} key={index}>
+                      <Box sx={{ position: 'relative' }}>
+                        <img
+                          src={preview}
+                          alt={`Product ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '120px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            border: '1px solid #e0e0e0',
+                          }}
+                        />
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveImage(index)}
+                          sx={{
+                            position: 'absolute',
+                            top: -8,
+                            right: -8,
+                            bgcolor: 'background.paper',
+                            boxShadow: 1,
+                            '&:hover': { bgcolor: 'error.light', color: 'white' },
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                        {index === 0 && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              bgcolor: 'rgba(0,0,0,0.6)',
+                              color: 'white',
+                              textAlign: 'center',
+                              fontSize: '10px',
+                              py: 0.5,
+                              borderRadius: '0 0 8px 8px',
+                            }}
+                          >
+                            主图
+                          </Box>
+                        )}
+                      </Box>
+                    </Grid>
+                  ))}
+                  {imagePreviews.length < 5 && (
+                    <Grid item xs={6} sm={4} md={2.4}>
+                      <Box
+                        sx={{
+                          border: '2px dashed #ccc',
+                          borderRadius: 2,
+                          height: '120px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          '&:hover': {
+                            borderColor: 'primary.main',
+                            bgcolor: 'action.hover',
+                          },
+                        }}
+                        onClick={() => document.getElementById('image-upload')?.click()}
+                      >
+                        <AddIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
               ) : (
                 <Box
                   sx={{
@@ -595,7 +793,7 @@ export default function ProductsPage() {
                     点击上传图片
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    支持 JPG, PNG, GIF (最大 5MB)
+                    支持 JPG, PNG, GIF (每张最大 2MB)
                   </Typography>
                 </Box>
               )}
@@ -603,6 +801,7 @@ export default function ProductsPage() {
                 id="image-upload"
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageChange}
                 style={{ display: 'none' }}
               />
@@ -610,16 +809,29 @@ export default function ProductsPage() {
 
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="SKU"
-                  value={formData.sku}
-                  onChange={e =>
-                    setFormData({ ...formData, sku: e.target.value })
-                  }
-                  required
-                  size="small"
-                />
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    fullWidth
+                    label="SKU（自动生成，可修改）"
+                    value={formData.sku}
+                    onChange={e =>
+                      setFormData({ ...formData, sku: e.target.value })
+                    }
+                    required
+                    size="small"
+                    helperText="格式: SKU-日期-随机码"
+                  />
+                  {!editingProduct && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setFormData({ ...formData, sku: generateSimpleSKU() })}
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      重新生成
+                    </Button>
+                  )}
+                </Box>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
@@ -743,6 +955,33 @@ export default function ProductsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ==================== 迁移相关组件 ==================== */}
+      
+      {/* 升级确认对话框 */}
+      <UpgradeConfirmDialog
+        open={showUpgradeDialog}
+        onClose={() => setShowUpgradeDialog(false)}
+        onConfirm={handleUpgrade}
+        productCount={products.length}
+      />
+
+      {/* 降级确认对话框 */}
+      <DowngradeConfirmDialog
+        open={showDowngradeDialog}
+        onClose={() => setShowDowngradeDialog(false)}
+        onConfirm={handleDowngrade}
+      />
+
+      {/* 迁移结果提示 */}
+      {migrationResult && (
+        <Alert severity="success" sx={{ mt: 2 }} onClose={() => setMigrationResult(null)}>
+          迁移完成！创建了 {migrationResult.created_spus} 个SPU，
+          {migrationResult.created_skus} 个SKU，
+          迁移了 {migrationResult.migrated_images} 张图片
+          （耗时 {migrationResult.duration_ms}ms）
+        </Alert>
+      )}
     </Box>
   );
 }

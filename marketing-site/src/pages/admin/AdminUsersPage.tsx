@@ -31,7 +31,7 @@ const AdminUsersPage: React.FC = () => {
     },
     {
       id: '2',
-      email: 'admin@proclaw.com',
+      email: 'admin@proclaw.cc',
       username: '管理员',
       role: 'admin',
       status: 'active',

@@ -28,7 +28,7 @@ const initialMessages: Message[] = [
     id: '1',
     role: 'assistant',
     content:
-      '你好!我是 Proclaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?',
+      '你好!我是 ProClaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?',
     timestamp: new Date(),
   },
 ];

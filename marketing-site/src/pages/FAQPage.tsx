@@ -213,7 +213,7 @@ const FAQPage: React.FC = () => {
               </a>{' '}
               提交问题
             </li>
-            <li>发送邮件至 support@proclaw.cn</li>
+            <li>发送邮件至 support@proclaw.cc</li>
             <li>加入我们的社区讨论组</li>
           </ul>
         </div>

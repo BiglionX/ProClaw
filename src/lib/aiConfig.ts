@@ -38,7 +38,7 @@ const DEFAULT_CONFIG: AIConfig = {
       id: 'default-service',
       name: 'ProClaw 集成 LLM（默认）',
       type: 'default',
-      endpoint: 'https://ai.proclaw.cn/api/v1',
+      endpoint: 'https://ai.proclaw.cc/api/v1',
       apiKey: '',
       model: 'proclaw-gpt-4',
       isActive: true,
