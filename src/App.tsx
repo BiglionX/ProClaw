@@ -4,7 +4,9 @@ import AppLayout from './components/Layout/AppLayout';
 import { useAuthStore } from './lib/authStore';
 import AgentPage from './pages/AgentPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import AIDemoPage from './pages/AIDemoPage';
 import DashboardPage from './pages/DashboardPage';
+import FAQManagementPage from './pages/FAQManagementPage';
 import FinancePage from './pages/FinancePage';
 import InventoryPage from './pages/InventoryPage';
 import LoginPage from './pages/LoginPage';
@@ -15,6 +17,7 @@ import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
 import SetupPage from './pages/SetupPage';
 import TestPage from './pages/TestPage';
+import UnrecognizedCommandsPage from './pages/UnrecognizedCommandsPage';
 
 // 受保护的路由组件 - 使用 AppLayout 包装
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -114,6 +117,30 @@ function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/unrecognized-commands"
+          element={
+            <ProtectedRoute>
+              <UnrecognizedCommandsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/faq-management"
+          element={
+            <ProtectedRoute>
+              <FAQManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai-demo"
+          element={
+            <ProtectedRoute>
+              <AIDemoPage />
             </ProtectedRoute>
           }
         />

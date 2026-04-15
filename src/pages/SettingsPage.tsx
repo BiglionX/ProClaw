@@ -1,6 +1,7 @@
-import { Info as InfoIcon, Person as PersonIcon } from '@mui/icons-material';
+import { Info as InfoIcon, Analytics as AnalyticsIcon, Help as HelpIcon } from '@mui/icons-material';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Divider,
@@ -10,6 +11,7 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
@@ -46,6 +48,7 @@ function a11yProps(index: number) {
 
 export default function SettingsPage() {
   const [tabValue, setTabValue] = useState(0);
+  const navigate = useNavigate();
 
   return (
     <Box>
@@ -70,7 +73,8 @@ export default function SettingsPage() {
           <Tab label="👤 用户中心" {...a11yProps(0)} />
           <Tab label="🤖 AI 模型设置" {...a11yProps(1)} />
           <Tab label="🗄️ 数据库设置" {...a11yProps(2)} />
-          <Tab label="ℹ️ 系统信息" {...a11yProps(3)} />
+          <Tab label="🔍 指令分析" {...a11yProps(3)} />
+          <Tab label="ℹ️ 系统信息" {...a11yProps(4)} />
         </Tabs>
       </Paper>
 
@@ -89,8 +93,81 @@ export default function SettingsPage() {
         <DatabaseSettings />
       </TabPanel>
 
-      {/* Tab 3: 系统信息 */}
+      {/* Tab 3: 指令分析 */}
       <TabPanel value={tabValue} index={3}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <AnalyticsIcon sx={{ mr: 1, color: 'info.main' }} />
+              <Typography variant="h6">未识别指令分析</Typography>
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="body2" color="text.secondary" paragraph>
+              查看和分析用户输入但 AI Chat 无法识别的自然语言指令，帮助优化命令解析器。
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" gutterBottom>
+                💡 <strong>使用说明：</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary" component="div">
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  <li>系统会自动收集所有未识别的用户指令</li>
+                  <li>可以查看高频指令，优先优化这些场景</li>
+                  <li>支持导出为 JSON 或 CSV 格式进行分析</li>
+                  <li>定期清理旧数据，保持系统性能</li>
+                </ul>
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AnalyticsIcon />}
+                onClick={() => navigate('/unrecognized-commands')}
+                sx={{ mt: 2, mr: 2 }}
+              >
+                查看详细分析
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+        
+        {/* FAQ 管理 */}
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <HelpIcon sx={{ mr: 1, color: 'primary.main' }} />
+              <Typography variant="h6">FAQ 常见问题管理</Typography>
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="body2" color="text.secondary" paragraph>
+              自动从用户对话中收集高频问题，经审核后同步到营销网站FAQ页面。
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" gutterBottom>
+                🎯 <strong>功能特点：</strong>
+              </Typography>
+              <Typography variant="body2" color="text.secondary" component="div">
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  <li>自动记录用户查询并检测高频问题</li>
+                  <li>智能分类和生成FAQ草稿</li>
+                  <li>人工审核确保质量</li>
+                  <li>一键导出同步到营销网站</li>
+                  <li>统计分析和用户反馈追踪</li>
+                </ul>
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<HelpIcon />}
+                onClick={() => navigate('/faq-management')}
+                sx={{ mt: 2 }}
+              >
+                管理FAQ
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      </TabPanel>
+
+      {/* Tab 4: 系统信息 */}
+      <TabPanel value={tabValue} index={4}>
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>

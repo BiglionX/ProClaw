@@ -1,18 +1,32 @@
 export interface AIProvider {
   id: string;
   name: string;
-  type: 'default' | 'openai' | 'azure' | 'aliyun' | 'zhipu' | 'custom';
+  type: 'default' | 'openai' | 'azure' | 'aliyun' | 'zhipu' | 'anthropic' | 'ollama' | 'custom';
   endpoint: string;
   apiKey: string;
   model: string;
   isActive: boolean;
 }
 
+export type TaskType = 
+  | 'sales_forecast'
+  | 'inventory_optimization'
+  | 'anomaly_detection'
+  | 'purchase_suggestion'
+  | 'business_insight';
+
 export interface AIConfig {
   defaultProvider: string;
   providers: AIProvider[];
   temperature: number;
   maxTokens: number;
+  
+  // 新增字段 - AI决策系统配置
+  ollamaEndpoint?: string; // 本地Ollama地址
+  defaultModelForTask?: Record<TaskType, string>; // 任务到模型的映射
+  enableStreaming?: boolean; // 是否启用流式响应
+  maxContextLength?: number; // 最大上下文长度
+  temperatureByTask?: Record<TaskType, number>; // 不同任务的温度参数
 }
 
 const DEFAULT_CONFIG: AIConfig = {

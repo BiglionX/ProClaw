@@ -7,6 +7,7 @@ import {
   AccountBalance as FinanceIcon,
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
+  Category as ProductsIcon,
 } from '@mui/icons-material';
 import {
   Divider,
@@ -31,6 +32,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
   { text: '仪表盘', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: '商品库', icon: <ProductsIcon />, path: '/products' },
   { text: '进销存', icon: <InventoryIcon />, path: '/inventory' },
   { text: '采购管理', icon: <PurchaseIcon />, path: '/purchase' },
   { text: '销售管理', icon: <SalesIcon />, path: '/sales' },

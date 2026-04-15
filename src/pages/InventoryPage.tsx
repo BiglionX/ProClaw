@@ -372,7 +372,15 @@ export default function InventoryPage() {
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={2.4}>
               <Card
-                sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}
+                sx={{ 
+                  bgcolor: 'primary.light', 
+                  color: 'primary.contrastText',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  minHeight: 120
+                }}
               >
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
@@ -384,7 +392,15 @@ export default function InventoryPage() {
             </Grid>
             <Grid item xs={12} sm={6} md={2.4}>
               <Card
-                sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}
+                sx={{ 
+                  bgcolor: 'warning.light', 
+                  color: 'warning.contrastText',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  minHeight: 120
+                }}
               >
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
@@ -396,7 +412,15 @@ export default function InventoryPage() {
             </Grid>
             <Grid item xs={12} sm={6} md={2.4}>
               <Card
-                sx={{ bgcolor: 'error.light', color: 'error.contrastText' }}
+                sx={{ 
+                  bgcolor: 'error.light', 
+                  color: 'error.contrastText',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  minHeight: 120
+                }}
               >
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
@@ -407,7 +431,17 @@ export default function InventoryPage() {
               </Card>
             </Grid>
             <Grid item xs={12} sm={6} md={2.4}>
-              <Card sx={{ bgcolor: 'info.light', color: 'info.contrastText' }}>
+              <Card 
+                sx={{ 
+                  bgcolor: 'info.light', 
+                  color: 'info.contrastText',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  minHeight: 120
+                }}
+              >
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
                     今日交易
@@ -420,13 +454,21 @@ export default function InventoryPage() {
             </Grid>
             <Grid item xs={12} sm={6} md={2.4}>
               <Card
-                sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}
+                sx={{ 
+                  bgcolor: 'success.light', 
+                  color: 'success.contrastText',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  minHeight: 120
+                }}
               >
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
                     库存总值
                   </Typography>
-                  <Typography variant="h5">
+                  <Typography variant="h4" sx={{ wordBreak: 'break-all', lineHeight: 1.2 }}>
                     ¥{stats.total_value.toFixed(2)}
                   </Typography>
                 </CardContent>

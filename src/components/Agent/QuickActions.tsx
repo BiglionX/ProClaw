@@ -25,6 +25,7 @@ interface QuickAction {
   description: string;
   icon: React.ReactNode;
   color: string;
+  bgColor: string;
   action: () => void;
 }
 
@@ -37,7 +38,8 @@ export default function QuickActions() {
       title: '添加产品',
       description: '快速录入新产品',
       icon: <AddIcon />,
-      color: '#666',
+      color: '#1976d2',
+      bgColor: 'rgba(25, 118, 210, 0.1)',
       action: () => {
         navigate('/products');
       },
@@ -47,7 +49,8 @@ export default function QuickActions() {
       title: '查询库存',
       description: '查看当前库存状态',
       icon: <SearchIcon />,
-      color: '#777',
+      color: '#2e7d32',
+      bgColor: 'rgba(46, 125, 50, 0.1)',
       action: () => {
         navigate('/inventory');
       },
@@ -57,7 +60,8 @@ export default function QuickActions() {
       title: '销售分析',
       description: '分析销售数据和趋势',
       icon: <AnalyticsIcon />,
-      color: '#888',
+      color: '#ed6c02',
+      bgColor: 'rgba(237, 108, 2, 0.1)',
       action: () => {
         navigate('/analytics');
       },
@@ -67,7 +71,8 @@ export default function QuickActions() {
       title: '库存预警',
       description: '查看低库存警告',
       icon: <WarningIcon />,
-      color: '#555',
+      color: '#d32f2f',
+      bgColor: 'rgba(211, 47, 47, 0.1)',
       action: () => {
         navigate('/inventory');
       },
@@ -77,7 +82,8 @@ export default function QuickActions() {
       title: '创建订单',
       description: '新建采购或销售订单',
       icon: <ShoppingCartIcon />,
-      color: '#999',
+      color: '#7b1fa2',
+      bgColor: 'rgba(123, 31, 162, 0.1)',
       action: () => {
         // Beta 版本暂不支持
         alert('订单功能将在 v1.0 正式版中提供');
@@ -88,7 +94,8 @@ export default function QuickActions() {
       title: '生成报表',
       description: '查看业务报表',
       icon: <AssessmentIcon />,
-      color: '#aaa',
+      color: '#0288d1',
+      bgColor: 'rgba(2, 136, 209, 0.1)',
       action: () => {
         // Beta 版本暂不支持
         alert('报表功能将在 v1.0 正式版中提供');
@@ -144,7 +151,8 @@ export default function QuickActions() {
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                   <Avatar
                     sx={{
-                      bgcolor: action.color,
+                      bgcolor: action.bgColor,
+                      color: action.color,
                       width: 48,
                       height: 48,
                       flexShrink: 0,

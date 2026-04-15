@@ -9,6 +9,7 @@ import {
 import {
   Avatar,
   Box,
+  Chip,
   CircularProgress,
   Divider,
   Fab,
@@ -21,6 +22,7 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { executeCommand, parseCommand } from '../../lib/commandParser';
+import { handleUserInput, checkLLMConnectionStatus, getConnectionGuideMessage, getPersonalizedRecommendations, recordUserBehavior } from '../../lib/aiGuide';
 
 interface Message {
   id: string;
@@ -56,6 +58,43 @@ export default function FloatingAgentChat() {
     scrollToBottom();
   }, [messages]);
 
+  // 检查LLM连接状态
+  useEffect(() => {
+    if (isOpen && messages.length === 1) {
+      checkLLMAndGuide();
+    }
+  }, [isOpen]);
+
+  const checkLLMAndGuide = async () => {
+    try {
+      const status = await checkLLMConnectionStatus();
+      if (!status.isConnected) {
+        const guideMessage = await getConnectionGuideMessage();
+        const guideMsg: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: guideMessage,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, guideMsg]);
+      } else {
+        // 如果已连接，显示个性化推荐
+        const recommendations = getPersonalizedRecommendations();
+        if (recommendations) {
+          const recMsg: Message = {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: recommendations,
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, recMsg]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check LLM connection:', error);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -67,20 +106,39 @@ export default function FloatingAgentChat() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = input.trim();
     setInput('');
     setIsLoading(true);
 
-    try {
-      const command = parseCommand(userMessage.content);
-      const response = await executeCommand(command);
+    // 记录用户查询行为
+    recordUserBehavior('query');
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, assistantMessage]);
+    try {
+      // 先检查是否是引导类问题
+      const guideResult = await handleUserInput(userInput);
+      
+      if (guideResult.response) {
+        // 引导类问题，直接返回响应
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: guideResult.response,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      } else {
+        // 业务查询，使用commandParser处理
+        const command = parseCommand(userInput);
+        const response = await executeCommand(command);
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: response,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      }
 
       // 如果面板未打开,增加未读计数
       if (!isOpen) {
@@ -318,7 +376,17 @@ export default function FloatingAgentChat() {
                         maxWidth: '80%',
                       }}
                     >
-                      <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          lineHeight: 1.6,
+                          whiteSpace: 'pre-wrap',
+                          '& strong': {
+                            fontWeight: 600,
+                            color: 'text.primary',
+                          },
+                        }}
+                      >
                         {message.content}
                       </Typography>
                       <Typography
@@ -368,6 +436,49 @@ export default function FloatingAgentChat() {
                 )}
 
                 <div ref={messagesEndRef} />
+              </Box>
+
+              <Divider />
+
+              {/* 快捷指令按钮 */}
+              <Box
+                sx={{
+                  p: 1.5,
+                  backgroundColor: '#f9f9f9',
+                  borderTop: '1px solid',
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{ display: 'block', mb: 1, color: 'text.secondary' }}
+                >
+                  💡 快捷指令：
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {[
+                    { label: '📦 所有产品', command: '查询产品' },
+                    { label: '📊 库存统计', command: '查询库存' },
+                    { label: '⚠️ 库存预警', command: '库存预警' },
+                    { label: '📥 入库', command: '入库' },
+                  ].map(item => (
+                    <Chip
+                      key={item.command}
+                      label={item.label}
+                      size="small"
+                      onClick={() => {
+                        setInput(item.command);
+                      }}
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
               </Box>
 
               <Divider />
