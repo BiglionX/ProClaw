@@ -16,8 +16,12 @@ import RegisterPage from './pages/RegisterPage';
 import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
 import SetupPage from './pages/SetupPage';
+import TeamsPage from './pages/TeamsPage';
 import TestPage from './pages/TestPage';
 import UnrecognizedCommandsPage from './pages/UnrecognizedCommandsPage';
+
+// 添加启动日志
+console.log('App component rendering...');
 
 // 受保护的路由组件 - 使用 AppLayout 包装
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -141,6 +145,14 @@ function App() {
           element={
             <ProtectedRoute>
               <AIDemoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teams"
+          element={
+            <ProtectedRoute>
+              <TeamsPage />
             </ProtectedRoute>
           }
         />

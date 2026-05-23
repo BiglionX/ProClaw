@@ -11,6 +11,7 @@ pub mod purchase_commands;
 pub mod sales_commands;
 pub mod finance_commands;
 pub mod common_commands;
+pub mod team_commands;
 
 use database::{Database, get_database_path};
 use sync_engine::{SyncEngine, start_sync, get_sync_status};
@@ -23,6 +24,7 @@ use purchase_commands::*;
 use sales_commands::*;
 use finance_commands::*;
 use common_commands::*;
+use team_commands::*;
 
 fn main() {
     // 初始化数据库
@@ -95,6 +97,10 @@ fn main() {
             mark_as_synced,
             start_sync,
             get_sync_status,
+            // AI 团队导入
+            import_team,
+            get_teams,
+            delete_team,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 /**
  * 生成客户编码
@@ -71,6 +72,9 @@ export async function createCustomer(
 export async function getCustomers(options?: {
   search?: string;
 }): Promise<Customer[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke('get_customers', { options });
 }
 
@@ -136,5 +140,8 @@ export async function getSalesOrders(options?: {
   status?: string;
   search?: string;
 }): Promise<SalesOrder[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke('get_sales_orders', { options });
 }

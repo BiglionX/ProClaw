@@ -119,3 +119,24 @@ pub struct MigrationResult {
     pub migrated_images: i32,
     pub duration_ms: u64,
 }
+
+// ==================== AI 团队类型 ====================
+
+/// 从 NvwaX 导入的 AI 团队配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedTeam {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub config_json: String,
+    pub source: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportTeamPayload {
+    pub team_name: String,
+    pub team_config: serde_json::Value,
+    pub metadata: Option<serde_json::Value>,
+}

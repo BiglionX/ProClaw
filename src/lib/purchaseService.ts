@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 /**
  * 生成供应商编码
@@ -75,6 +76,9 @@ export async function createSupplier(
 export async function getSuppliers(options?: {
   search?: string;
 }): Promise<Supplier[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke('get_suppliers', { options });
 }
 
@@ -149,6 +153,9 @@ export async function getPurchaseOrders(options?: {
   status?: string;
   search?: string;
 }): Promise<PurchaseOrder[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke('get_purchase_orders', { options });
 }
 

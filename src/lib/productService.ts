@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 /**
  * 生成SPU编码
@@ -198,6 +199,9 @@ export async function getProductSPUs(options?: {
   search?: string;
   status?: string;
 }): Promise<ProductSPU[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke<ProductSPU[]>('get_product_spus', { options });
 }
 
@@ -205,6 +209,9 @@ export async function getProductSPUs(options?: {
  * 根据 ID 获取商品SPU详情(含SKU和图片)
  */
 export async function getProductSPUById(id: string): Promise<ProductSPU> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   return await invoke<ProductSPU>('get_product_spu_by_id', { id });
 }
 
@@ -212,6 +219,9 @@ export async function getProductSPUById(id: string): Promise<ProductSPU> {
  * 根据 SPU Code 获取商品
  */
 export async function getProductSPUByCode(spuCode: string): Promise<ProductSPU> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   return await invoke<ProductSPU>('get_product_spu_by_code', { spuCode });
 }
 
@@ -229,6 +239,9 @@ export async function updateProductSPU(
  * 删除商品SPU (软删除)
  */
 export async function deleteProductSPU(id: string): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   await invoke<void>('delete_product_spu', { id });
 }
 
@@ -259,6 +272,9 @@ export async function updateProductSKU(
  * 删除SKU
  */
 export async function deleteProductSKU(id: string): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   await invoke<void>('delete_product_sku', { id });
 }
 
@@ -279,6 +295,9 @@ export async function uploadProductImages(
  * 删除商品图片
  */
 export async function deleteProductImage(imageId: string): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   await invoke<void>('delete_product_image', { imageId });
 }
 
@@ -292,6 +311,15 @@ export async function getDatabaseStats(): Promise<{
   transactions_count: number;
   pending_sync: number;
 }> {
+  if (!isTauri()) {
+    return {
+      spu_count: 0,
+      sku_count: 0,
+      categories_count: 0,
+      transactions_count: 0,
+      pending_sync: 0,
+    };
+  }
   return await invoke<any>('get_database_stats');
 }
 
@@ -299,6 +327,9 @@ export async function getDatabaseStats(): Promise<{
  * 获取待同步记录
  */
 export async function getPendingSyncRecords(limit?: number): Promise<any[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke<any[]>('get_pending_sync_records', { limit });
 }
 
@@ -489,6 +520,10 @@ export interface MigrationResult {
  * @returns 'simple' - 简单商品库模式, 'ecommerce' - 电商商品库模式
  */
 export async function getLibraryMode(): Promise<'simple' | 'ecommerce'> {
+  if (!isTauri()) {
+    // 默认返回简单模式
+    return 'simple';
+  }
   return await invoke<'simple' | 'ecommerce'>('get_library_mode');
 }
 
@@ -498,6 +533,9 @@ export async function getLibraryMode(): Promise<'simple' | 'ecommerce'> {
  * @returns 迁移结果统计
  */
 export async function migrateToEcommerceMode(): Promise<MigrationResult> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   return await invoke<MigrationResult>('migrate_to_ecommerce_mode');
 }
 
@@ -506,5 +544,8 @@ export async function migrateToEcommerceMode(): Promise<MigrationResult> {
  * 警告：此操作会删除所有SPU、SKU和图片数据，但保留原Product数据
  */
 export async function downgradeToSimpleMode(): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   await invoke<void>('downgrade_to_simple_mode');
 }

@@ -356,3 +356,20 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
 CREATE INDEX IF NOT EXISTS idx_ft_date ON financial_transactions(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_ft_type ON financial_transactions(transaction_type);
 CREATE INDEX IF NOT EXISTS idx_ft_account ON financial_transactions(account_id);
+
+-- ============================================
+-- AI 团队导入表 (从 NvwaX 市场导入)
+-- ============================================
+CREATE TABLE IF NOT EXISTS teams (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    config_json TEXT NOT NULL,
+    source TEXT DEFAULT 'nvwax-marketplace',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_teams_name ON teams(name);
+CREATE INDEX IF NOT EXISTS idx_teams_source ON teams(source);

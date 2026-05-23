@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 export interface SalesTrendData {
   period: 'day' | 'week' | 'month';
@@ -39,6 +40,12 @@ export interface ProductAnalytics {
 export async function getSalesTrend(
   period?: 'day' | 'week' | 'month'
 ): Promise<SalesTrendData> {
+  if (!isTauri()) {
+    return {
+      period: period || 'day',
+      data: [],
+    };
+  }
   return await invoke('get_sales_trend', { period });
 }
 
@@ -46,5 +53,12 @@ export async function getSalesTrend(
  * 获取产品分析数据
  */
 export async function getProductAnalytics(): Promise<ProductAnalytics> {
+  if (!isTauri()) {
+    return {
+      best_selling: [],
+      slow_moving: [],
+      turnover_by_category: [],
+    };
+  }
   return await invoke('get_product_analytics');
 }

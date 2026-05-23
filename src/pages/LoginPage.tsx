@@ -44,18 +44,16 @@ export default function LoginPage() {
     >
       <Card sx={{ maxWidth: 400, width: '100%', mx: 2 }}>
         <CardContent sx={{ p: 4 }}>
-          <Typography variant="h5" component="h1" gutterBottom align="center">
-            Pro
-            <Typography
-              component="span"
-              sx={{
-                color: '#ff3b30',
-                fontWeight: 800,
-              }}
-            >
-              claw
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+            <img 
+              src="/proclaw-logo.png" 
+              alt="ProClaw Logo" 
+              style={{ width: 40, height: 40, marginRight: 12 }} 
+            />
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: 'text.primary' }}>
+              ProClaw
             </Typography>
-          </Typography>
+          </Box>
 
           <Typography
             variant="body2"

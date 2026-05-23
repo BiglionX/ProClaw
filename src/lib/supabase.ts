@@ -5,6 +5,9 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
+console.log('Supabase URL configured:', !!supabaseUrl);
+console.log('Demo mode:', isDemoMode);
+
 // 检查 Supabase 配置
 export const isSupabaseConfigured = !!(
   supabaseUrl &&
@@ -26,7 +29,7 @@ export const supabase = createClient<Database>(
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false,
     },
   }
 );

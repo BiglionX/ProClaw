@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 export interface DatabaseStats {
   products: number;
@@ -8,6 +9,14 @@ export interface DatabaseStats {
 }
 
 export async function getDatabaseStats(): Promise<DatabaseStats> {
+  if (!isTauri()) {
+    return {
+      products: 0,
+      categories: 0,
+      transactions: 0,
+      pending_sync: 0,
+    };
+  }
   return await invoke('get_database_stats');
 }
 

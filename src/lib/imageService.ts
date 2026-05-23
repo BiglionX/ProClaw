@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 /**
  * 将文件转换为 Base64 字符串
@@ -24,6 +25,11 @@ export function fileToBase64(file: File): Promise<string> {
  * 上传图片到后端
  */
 export async function uploadImage(file: File): Promise<string> {
+  if (!isTauri()) {
+    console.warn('Image upload is not available in browser mode');
+    throw new Error('图片上传功能仅在桌面应用中可用');
+  }
+  
   try {
     const base64Data = await fileToBase64(file);
     const result = await invoke<string>('upload_image', {

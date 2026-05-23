@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 export interface Category {
   id: string;
@@ -32,5 +33,8 @@ export async function createCategory(
  * 获取分类列表
  */
 export async function getCategories(): Promise<Category[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke('get_categories');
 }

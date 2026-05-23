@@ -8,6 +8,7 @@ import {
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
   Category as ProductsIcon,
+  Groups as TeamsIcon,
 } from '@mui/icons-material';
 import {
   Divider,
@@ -31,6 +32,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
+  { text: 'AI团队', icon: <TeamsIcon />, path: '/teams' },
   { text: '仪表盘', icon: <DashboardIcon />, path: '/dashboard' },
   { text: '商品库', icon: <ProductsIcon />, path: '/products' },
   { text: '进销存', icon: <InventoryIcon />, path: '/inventory' },

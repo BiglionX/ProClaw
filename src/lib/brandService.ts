@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 export interface Brand {
   id: string;
@@ -37,5 +38,8 @@ export async function createBrand(
 export async function getBrands(options?: {
   search?: string;
 }): Promise<Brand[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke('get_brands', { options });
 }

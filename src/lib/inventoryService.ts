@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 export interface InventoryTransaction {
   id: string;
@@ -64,5 +65,16 @@ export async function getInventoryTransactions(options?: {
  * 获取库存统计信息
  */
 export async function getInventoryStats(): Promise<InventoryStats> {
+  if (!isTauri()) {
+    // 在非 Tauri 环境中返回模拟数据
+    return {
+      total_products: 0,
+      low_stock_count: 0,
+      zero_stock_count: 0,
+      today_transactions: 0,
+      total_value: 0,
+      low_stock_products: [],
+    };
+  }
   return await invoke('get_inventory_stats');
 }

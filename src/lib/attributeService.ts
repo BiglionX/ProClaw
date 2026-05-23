@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './tauri';
 
 // 商品属性定义
 export interface ProductAttribute {
@@ -15,6 +16,9 @@ export interface ProductAttribute {
  * 获取所有商品属性
  */
 export async function getProductAttributes(): Promise<ProductAttribute[]> {
+  if (!isTauri()) {
+    return [];
+  }
   return await invoke<ProductAttribute[]>('get_product_attributes');
 }
 
@@ -41,5 +45,8 @@ export async function updateProductAttribute(
  * 删除商品属性
  */
 export async function deleteProductAttribute(id: string): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('此功能仅在桌面应用中可用');
+  }
   await invoke<void>('delete_product_attribute', { id });
 }
