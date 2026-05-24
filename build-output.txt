@@ -1,0 +1,8 @@
+﻿cargo :    Compiling proclaw-desktop v0.1.0 (D:\BigLionX\ProClaw\src-tauri)
+所在位置 行:1 字符: 198
++ ... ng]::UTF8; cd d:\BigLionX\ProClaw\src-tauri; cargo check 2>&1 | Out-F ...
++                                                  ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling pr...Claw\src-tauri):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.79s

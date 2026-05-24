@@ -303,50 +303,7 @@ pub fn get_database_stats(db: tauri::State<Mutex<Database>>) -> Result<DatabaseS
     })
 }
 
-/// 获取待同步记录
-#[tauri::command]
-pub fn get_pending_sync_records(db: tauri::State<Mutex<Database>>) -> Result<serde_json::Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
-
-    // 简化实现:返回待同步的产品
-    let mut stmt = conn.prepare(
-        "SELECT id, sku, name, sync_status FROM products WHERE sync_status = 'pending'"
-    ).map_err(|e| e.to_string())?;
-
-    let records: Vec<serde_json::Value> = stmt.query_map([], |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, String>(0)?,
-            "sku": row.get::<_, String>(1)?,
-            "name": row.get::<_, String>(2)?,
-            "sync_status": row.get::<_, String>(3)?,
-        }))
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
-
-    Ok(serde_json::json!({
-        "products": records,
-        "total": records.len()
-    }))
-}
-
-/// 标记为已同步
-#[tauri::command]
-pub fn mark_as_synced(db: tauri::State<Mutex<Database>>, table: String, record_id: String) -> Result<(), String> {
-    let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
-
-    let sql = match table.as_str() {
-        "products" => "UPDATE products SET sync_status = 'synced', last_synced_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        "product_categories" => "UPDATE product_categories SET sync_status = 'synced', last_synced_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        "inventory_transactions" => "UPDATE inventory_transactions SET sync_status = 'synced', last_synced_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        _ => return Err(format!("Unknown table: {}", table)),
-    };
-
-    conn.execute(sql, params![record_id]).map_err(|e| e.to_string())?;
-    Ok(())
-}
+// get_pending_sync_records 和 mark_as_synced 已移至 sync_engine.rs (Phase 5)
 
 // ==================== SPU-SKU 电商架构命令 ====================
 

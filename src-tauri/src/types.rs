@@ -122,21 +122,90 @@ pub struct MigrationResult {
 
 // ==================== AI 团队类型 ====================
 
-/// 从 NvwaX 导入的 AI 团队配置
+/// AI 团队成员定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImportedTeam {
+pub struct TeamMember {
+    #[serde(default)]
+    pub agent_id: String,
+    pub role: String,
+    #[serde(default)]
+    pub responsibilities: Option<String>,
+    #[serde(default)]
+    pub config: Option<serde_json::Value>,
+    #[serde(default)]
+    pub sort_order: i32,
+}
+
+/// 完整的 AiTeam 模型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiTeam {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
     pub category: Option<String>,
     pub config_json: String,
     pub source: String,
+    pub version: String,
+    pub publish_status: String,
+    pub tags: Vec<String>,
+    pub members: Vec<TeamMember>,
+    pub workflow: serde_json::Value,
+    pub triggers: serde_json::Value,
+    pub thumbnail_url: Option<String>,
     pub created_at: String,
+    pub updated_at: String,
 }
 
+/// 创建 AiTeam 的请求体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateTeamPayload {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub members: Vec<TeamMember>,
+    #[serde(default)]
+    pub workflow: Option<serde_json::Value>,
+    #[serde(default)]
+    pub triggers: Option<serde_json::Value>,
+}
+
+/// 更新 AiTeam 的请求体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateTeamPayload {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub members: Option<Vec<TeamMember>>,
+    #[serde(default)]
+    pub workflow: Option<serde_json::Value>,
+    #[serde(default)]
+    pub triggers: Option<serde_json::Value>,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub publish_status: Option<String>,
+    #[serde(default)]
+    pub thumbnail_url: Option<String>,
+}
+
+/// 用于向后兼容的导入结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportTeamPayload {
     pub team_name: String,
     pub team_config: serde_json::Value,
     pub metadata: Option<serde_json::Value>,
 }
+
+/// 旧的 ImportedTeam 类型别名（向后兼容）
+pub type ImportedTeam = AiTeam;

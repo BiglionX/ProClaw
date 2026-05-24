@@ -1,0 +1,470 @@
+﻿cargo :    Compiling proclaw-desktop v0.1.0 (D:\BigLionX\ProClaw\src-tauri)
+所在位置 行:1 字符: 198
++ ... ionX\ProClaw\src-tauri; cargo test --bin proclaw-desktop 2>&1 | Out-F ...
++                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling pr...Claw\src-tauri):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: variable does not need to be mutable
+   --> src\api\users.rs:277:9
+    |
+277 |     let mut sql = format!("UPDATE users SET {} WHERE id = ?{}", updates.join(", "), param_idx);
+    |         ----^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `name`
+   --> src\api\users.rs:254:17
+    |
+254 |     if let Some(ref name) = payload.name {
+    |                 ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `phone`
+   --> src\api\users.rs:258:17
+    |
+258 |     if let Some(ref phone) = payload.phone {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_phone`
+
+warning: unused variable: `email`
+   --> src\api\users.rs:262:17
+    |
+262 |     if let Some(ref email) = payload.email {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_email`
+
+warning: unused variable: `is_active`
+   --> src\api\users.rs:266:17
+    |
+266 |     if let Some(is_active) = payload.is_active {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_active`
+
+warning: fields `operation` and `payload` are never read
+  --> src\sync_engine.rs:30:5
+   |
+26 | struct PendingRecord {
+   |        ------------- fields in this struct
+...
+30 |     operation: String,
+   |     ^^^^^^^^^
+31 |     payload: String,
+   |     ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `cipher` and `cloud_backup` are never read
+  --> src\api\mod.rs:31:9
+   |
+27 | pub struct AppState {
+   |            -------- fields in this struct
+...
+31 |     pub cipher: Arc<Aes256GcmCipher>,
+   |         ^^^^^^
+...
+35 |     pub cloud_backup: Arc<CloudBackupService>,
+   |         ^^^^^^^^^^^^
+   |
+   = note: `AppState` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code anal
+ysis
+
+warning: struct `PairResponse` is never constructed
+  --> src\api\auth.rs:40:12
+   |
+40 | pub struct PairResponse {
+   |            ^^^^^^^^^^^^
+
+warning: struct `LoginResponse` is never constructed
+  --> src\api\auth.rs:62:12
+   |
+62 | pub struct LoginResponse {
+   |            ^^^^^^^^^^^^^
+
+warning: struct `UserResponse` is never constructed
+  --> src\api\auth.rs:72:12
+   |
+72 | pub struct UserResponse {
+   |            ^^^^^^^^^^^^
+
+warning: function `generate_pairing_code` is never used
+   --> src\api\auth.rs:287:8
+    |
+287 | pub fn generate_pairing_code() -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_local_ip` is never used
+   --> src\api\auth.rs:293:8
+    |
+293 | pub fn get_local_ip() -> Vec<String> {
+    |        ^^^^^^^^^^^^
+
+warning: function `generate_qr_content` is never used
+   --> src\api\auth.rs:298:8
+    |
+298 | pub fn generate_qr_content(ip: &str, port: u16, code: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_inventory_stats` is never used
+   --> src\api\inventory.rs:296:14
+    |
+296 | pub async fn get_inventory_stats(
+    |              ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `GeneratePairingCodeRequest` is never constructed
+  --> src\api\devices.rs:15:12
+   |
+15 | pub struct GeneratePairingCodeRequest {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_pairing_code` is never used
+  --> src\api\devices.rs:30:14
+   |
+30 | pub async fn generate_pairing_code(
+   |              ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_random_code` is never used
+   --> src\api\devices.rs:165:4
+    |
+165 | fn generate_random_code() -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_local_ip` is never used
+   --> src\api\devices.rs:172:4
+    |
+172 | fn get_local_ip() -> Vec<String> {
+    |    ^^^^^^^^^^^^
+
+warning: methods `get_online_users` and `broadcast` are never used
+  --> src\api\websocket.rs:80:12
+   |
+32 | impl WebSocketManager {
+   | --------------------- methods in this implementation
+...
+80 |     pub fn get_online_users(&self) -> Vec<String> {
+   |            ^^^^^^^^^^^^^^^^
+...
+85 |     pub fn broadcast(&self, message: &str) {
+   |            ^^^^^^^^^
+
+warning: struct `OrderNotification` is never constructed
+   --> src\api\websocket.rs:119:12
+    |
+119 | pub struct OrderNotification {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: field `id` is never read
+   --> src\api\websocket.rs:135:5
+    |
+131 | struct WsRequest {
+    |        --------- field in this struct
+...
+135 |     id: Option<String>,
+    |     ^^
+    |
+    = note: `WsRequest` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code an
+alysis
+
+warning: struct `WsResponse` is never constructed
+   --> src\api\websocket.rs:144:8
+    |
+144 | struct WsResponse {
+    |        ^^^^^^^^^^
+
+warning: function `extract_user_id_from_token` is never used
+   --> src\api\websocket.rs:452:8
+    |
+452 | pub fn extract_user_id_from_token(token: &str) -> Option<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `encrypt_response` is never used
+  --> src\api\encryption.rs:13:14
+   |
+13 | pub async fn encrypt_response(
+   |              ^^^^^^^^^^^^^^^^
+
+warning: function `decrypt_request` is never used
+  --> src\api\encryption.rs:29:14
+   |
+29 | pub async fn decrypt_request(
+   |              ^^^^^^^^^^^^^^^
+
+warning: struct `RelaySendResponse` is never constructed
+  --> src\api\relay.rs:24:12
+   |
+24 | pub struct RelaySendResponse {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: field `since` is never read
+  --> src\api\relay.rs:42:9
+   |
+41 | pub struct SyncStatusQuery {
+   |            --------------- field in this struct
+42 |     pub since: Option<String>,
+   |         ^^^^^
+   |
+   = note: `SyncStatusQuery` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead co
+de analysis
+
+warning: fields `db`, `cipher`, and `supabase` are never read
+  --> src\services\cloud_backup_service.rs:15:5
+   |
+14 | pub struct CloudBackupService {
+   |            ------------------ fields in this struct
+15 |     db: Mutex<Database>,
+   |     ^^
+16 |     cipher: Aes256GcmCipher,
+   |     ^^^^^^
+17 |     supabase: SupabaseClient,
+   |     ^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\services\cloud_backup_service.rs:30:12
+    |
+ 20 | impl CloudBackupService {
+    | ----------------------- associated items in this implementation
+...
+ 30 |     pub fn is_available(&self) -> bool {
+    |            ^^^^^^^^^^^^
+...
+ 35 |     pub async fn backup_data_async(&self, table_name: &str, record_id: &str) -> Result<(), String> {
+    |                  ^^^^^^^^^^^^^^^^^
+...
+ 84 |     pub async fn restore_data_async(&self, backup_id: &str) -> Result<Value, String> {
+    |                  ^^^^^^^^^^^^^^^^^^
+...
+107 |     pub async fn backup_pending_changes_async(&self) -> Result<usize, String> {
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+163 |     pub async fn download_changes_async(&self, table_name: &str) -> Result<usize, String> {
+    |                  ^^^^^^^^^^^^^^^^^^^^^^
+...
+220 |     pub async fn relay_message_async(&self, receiver_id: &str, message_type: &str, content: &Value) -> Result<(),
+ String> {
+    |                  ^^^^^^^^^^^^^^^^^^^
+...
+256 |     pub async fn fetch_relay_messages_async(&self, local_user_id: &str) -> Result<Vec<Value>, String> {
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+324 |     pub async fn full_sync_async(&self) -> Result<String, String> {
+    |                  ^^^^^^^^^^^^^^^
+...
+371 |     fn get_full_record_data(&self, conn: &rusqlite::Connection, table_name: &str, record_id: &str) -> Result<Valu
+e, String> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+387 |     fn query_single(&self, conn: &rusqlite::Connection, table: &str, id: &str) -> Result<Value, String> {
+    |        ^^^^^^^^^^^^
+...
+415 |     fn apply_remote_data(
+    |        ^^^^^^^^^^^^^^^^^
+...
+501 |     fn get_current_user_id(&self, _conn: &rusqlite::Connection) -> Result<String, String> {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+506 |     fn get_sender_id(&self) -> String {
+    |        ^^^^^^^^^^^^^
+...
+511 |     fn calculate_hash(&self, data: &str) -> String {
+    |        ^^^^^^^^^^^^^^
+...
+518 |     fn mark_as_backed_up(
+    |        ^^^^^^^^^^^^^^^^^
+...
+544 |     fn resolve_conflicts_all(conn: &rusqlite::Connection) -> Result<usize, String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> src\services\cloud_backup_service.rs:566:12
+    |
+564 | impl CloudBackupService {
+    | ----------------------- methods in this implementation
+565 |     /// 同步版备份（用于Tauri Command等同步上下文）
+566 |     pub fn backup_data(&self, table_name: &str, record_id: &str) -> Result<(), String> {
+    |            ^^^^^^^^^^^
+...
+573 |     pub fn upload_to_supabase(&self, table: &str, payload: &Value) -> Result<(), String> {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+581 |     pub fn download_from_supabase(&self, table: &str, id: &str) -> Result<Vec<u8>, String> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+588 |     pub fn restore_data(&self, backup_id: &str) -> Result<Value, String> {
+    |            ^^^^^^^^^^^^
+...
+595 |     pub fn backup_pending_changes(&self) -> Result<usize, String> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+602 |     pub fn relay_message(&self, message: &Value) -> Result<(), String> {
+    |            ^^^^^^^^^^^^^
+...
+612 |     pub fn connect_realtime(&self) -> Result<(), String> {
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `QueryFilter` is never constructed
+  --> src\services\supabase_client.rs:20:12
+   |
+20 | pub struct QueryFilter {
+   |            ^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> src\services\supabase_client.rs:63:8
+    |
+ 26 | impl SupabaseClient {
+    | ------------------- methods in this implementation
+...
+ 63 |     fn rest_url(&self, table: &str) -> String {
+    |        ^^^^^^^^
+...
+ 80 |     pub async fn insert(&self, table: &str, data: &Value) -> Result<Value, String> {
+    |                  ^^^^^^
+...
+ 98 |     pub async fn insert_batch(&self, table: &str, data: &[Value]) -> Result<Value, String> {
+    |                  ^^^^^^^^^^^^
+...
+116 |     pub async fn select(
+    |                  ^^^^^^
+...
+143 |     pub async fn select_by_id(&self, table: &str, id: &str) -> Result<Value, String> {
+    |                  ^^^^^^^^^^^^
+...
+160 |     pub async fn update(
+    |                  ^^^^^^
+...
+188 |     pub async fn update_by_id(
+    |                  ^^^^^^^^^^^^
+...
+211 |     pub async fn delete_by_id(&self, table: &str, id: &str) -> Result<(), String> {
+    |                  ^^^^^^^^^^^^
+...
+252 |     pub async fn download_raw(&self, table: &str, id: &str) -> Result<Vec<u8>, String> {
+    |                  ^^^^^^^^^^^^
+...
+290 |     pub async fn select_changes_since(
+    |                  ^^^^^^^^^^^^^^^^^^^^
+...
+320 |     pub async fn test_connection(&self) -> Result<bool, String> {
+    |                  ^^^^^^^^^^^^^^^
+
+warning: fields `action_type` and `tokens` are never read
+  --> src\services\subscription_service.rs:12:9
+   |
+11 | pub struct TokenCost {
+   |            --------- fields in this struct
+12 |     pub action_type: &'static str,
+   |         ^^^^^^^^^^^
+13 |     pub tokens: i64,
+   |         ^^^^^^
+   |
+   = note: `TokenCost` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during
+ dead code analysis
+
+warning: function `get_plan_by_key` is never used
+  --> src\services\subscription_service.rs:99:8
+   |
+99 | pub fn get_plan_by_key(db: &Database, plan_key: &str) -> Result<Option<Plan>, String> {
+   |        ^^^^^^^^^^^^^^^
+
+warning: function `check_and_consume` is never used
+   --> src\services\subscription_service.rs:276:8
+    |
+276 | pub fn check_and_consume(db: &Database, user_id: &str, action_type: &str, resource_path: &str, ip: Option<&str>) 
+-> Result<bool, St...
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: function `init_free_plan` is never used
+   --> src\services\subscription_service.rs:342:8
+    |
+342 | pub fn init_free_plan(db: &Database, user_id: &str) -> Result<(), String> {
+    |        ^^^^^^^^^^^^^^
+
+warning: associated function `from_password` is never used
+  --> src\utils\crypto.rs:21:12
+   |
+12 | impl Aes256GcmCipher {
+   | -------------------- associated function in this implementation
+...
+21 |     pub fn from_password(password: &str, salt: &[u8]) -> Self {
+   |            ^^^^^^^^^^^^^
+
+warning: struct `Role` is never constructed
+  --> src\auth\permissions.rs:45:12
+   |
+45 | pub struct Role {
+   |            ^^^^
+
+warning: constant `VIEW_USERS` is never used
+  --> src\auth\permissions.rs:31:15
+   |
+31 |     pub const VIEW_USERS: &str = "view_users";
+   |               ^^^^^^^^^^
+
+warning: constant `VIEW_APPROVALS` is never used
+  --> src\auth\permissions.rs:35:15
+   |
+35 |     pub const VIEW_APPROVALS: &str = "view_approvals";
+   |               ^^^^^^^^^^^^^^
+
+warning: `proclaw-desktop` (bin "proclaw-desktop" test) generated 40 warnings (run `cargo fix --bin "proclaw-desktop" -
+p proclaw-desktop --tests` to apply 5 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.53s
+     Running unittests src\main.rs (target\debug\deps\proclaw_desktop-cdea1ed283c3c21a.exe)
+
+running 54 tests
+test api::ai::tests::test_calculate_cost ... ok
+test api::ai::tests::test_detect_image_format ... ok
+test api::ai::tests::test_base64_decode_with_prefix ... ok
+test api::ai::tests::test_extract_items_from_code_block ... ok
+test api::ai::tests::test_extract_items_from_json_response ... ok
+test api::ai::tests::test_extract_items_from_markdown_json ... ok
+test api::files::tests::test_is_image_mime ... ok
+test api::files::tests::test_mime_from_ext ... ok
+test api::encryption::tests::test_encrypt_decrypt_json ... ok
+test api::finance::tests::test_get_profit_loss_report ... ok
+test auth::permissions::tests::test_boss_has_all_permissions ... ok
+test auth::permissions::tests::test_get_role_permissions_boss ... ok
+test auth::permissions::tests::test_get_role_permissions_customer ... ok
+test auth::permissions::tests::test_get_role_permissions_finance ... ok
+test auth::permissions::tests::test_get_role_permissions_purchase ... ok
+test auth::permissions::tests::test_get_role_permissions_sales ... ok
+test auth::permissions::tests::test_get_role_permissions_unknown ... ok
+test auth::permissions::tests::test_get_role_permissions_warehouse ... ok
+test auth::permissions::tests::test_has_any_permission ... ok
+test auth::permissions::tests::test_parse_permissions_empty ... ok
+test auth::permissions::tests::test_parse_permissions_invalid_json ... ok
+test auth::permissions::tests::test_parse_permissions_valid_json ... ok
+test auth::permissions::tests::test_permission_denied_response ... ok
+test auth::permissions::tests::test_required_permission_for_ai_no_restriction ... ok
+test auth::permissions::tests::test_required_permission_for_approvals ... ok
+test auth::permissions::tests::test_required_permission_for_finance_get ... ok
+test auth::permissions::tests::test_required_permission_for_inventory_get ... ok
+test api::files::tests::test_file_upload_endpoint_exists ... ok
+test auth::permissions::tests::test_required_permission_for_products_get ... ok
+test auth::permissions::tests::test_required_permission_for_products_post ... ok
+test auth::permissions::tests::test_required_permission_for_sales_get ... ok
+test auth::permissions::tests::test_required_permission_for_users ... ok
+test auth::permissions::tests::test_specific_permission_check ... ok
+test services::cloud_backup_service::tests::test_cipher_and_hash ... ok
+test services::supabase_client::tests::test_client_configured ... ok
+test services::supabase_client::tests::test_client_not_configured ... ok
+test types_tests::tests::test_create_team_payload ... ok
+test types_tests::tests::test_database_stats_serialization ... ok
+test types_tests::tests::test_inventory_transaction_serialization ... ok
+test types_tests::tests::test_migration_result_serialization ... ok
+test types_tests::tests::test_product_serialization ... ok
+test types_tests::tests::test_sku_serialization ... ok
+test types_tests::tests::test_spu_serialization ... ok
+test database::tests::test_database_creation ... ok
+test utils::crypto::tests::test_encrypt_decrypt ... ok
+test utils::crypto::tests::test_encrypt_decrypt_string ... ok
+test utils::key_manager::tests::test_as_bytes ... ok
+test utils::key_manager::tests::test_from_env_or_default_with_env_var ... ok
+test utils::key_manager::tests::test_from_env_or_default_with_invalid_env_var ... ok
+test utils::key_manager::tests::test_load_or_generate_creates_new_key ... ok
+test utils::key_manager::tests::test_load_or_generate_loads_existing_key ... ok
+test api::ai::tests::test_parse_ocr_text_to_items ... ok
+test database::tests::test_database_initialization ... ok
+test utils::crypto::tests::test_derive_key_from_password ... ok
+
+test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.99s
+

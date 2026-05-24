@@ -1,14 +1,12 @@
 import {
   SmartToy as AgentIcon,
-  Dashboard as DashboardIcon,
-  Inventory as InventoryIcon,
-  ShoppingCart as PurchaseIcon,
-  PointOfSale as SalesIcon,
-  AccountBalance as FinanceIcon,
-  Analytics as AnalyticsIcon,
+  Hub as DataCenterIcon,
+  Inventory as SupplyChainIcon,
   Settings as SettingsIcon,
   Category as ProductsIcon,
   Groups as TeamsIcon,
+  People as ContactsIcon,
+  Chat as ChatIcon,
 } from '@mui/icons-material';
 import {
   Divider,
@@ -33,13 +31,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
   { text: 'AI团队', icon: <TeamsIcon />, path: '/teams' },
-  { text: '仪表盘', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: '联系人', icon: <ContactsIcon />, path: '/contacts' },
+  { text: '消息', icon: <ChatIcon />, path: '/messages' },
+  { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter' },
   { text: '商品库', icon: <ProductsIcon />, path: '/products' },
-  { text: '进销存', icon: <InventoryIcon />, path: '/inventory' },
-  { text: '采购管理', icon: <PurchaseIcon />, path: '/purchase' },
-  { text: '销售管理', icon: <SalesIcon />, path: '/sales' },
-  { text: '财务报表', icon: <FinanceIcon />, path: '/finance' },
-  { text: '数据分析', icon: <AnalyticsIcon />, path: '/analytics' },
+  { text: '供应链', icon: <SupplyChainIcon />, path: '/supplychain' },
 ];
 
 export default function Sidebar() {

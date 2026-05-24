@@ -1,0 +1,99 @@
+{
+  "name": "proclaw-mobile",
+  "version": "1.0.0",
+  "description": "ProClaw Mobile App - 商务通移动端",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "eject": "expo eject"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~4.0.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-navigation/bottom-tabs": "^6.5.11",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/stack": "^6.3.20",
+    "axios": "^1.7.0",
+    "crypto-js": "^4.2.0",
+    "expo": "~52.0.0",
+    "expo-camera": "~16.0.0",
+    "expo-file-system": "~18.0.0",
+    "expo-image-picker": "~16.0.0",
+    "expo-network": "~7.0.0",
+    "expo-secure-store": "~14.0.0",
+    "expo-sqlite": "~15.1.4",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "0.76.9",
+    "react-native-gesture-handler": "~2.20.0",
+    "react-native-incall-manager": "^4.2.1",
+    "react-native-paper": "^5.12.0",
+    "react-native-qrcode-svg": "^6.3.0",
+    "react-native-reanimated": "~3.16.0",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
+    "react-native-toast-message": "^2.2.0",
+    "react-native-vector-icons": "^10.0.0",
+    "react-native-web": "~0.19.13",
+    "react-native-webrtc": "^124.0.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/crypto-js": "^4.2.2",
+    "@types/react": "~18.3.0",
+    "@types/react-native-vector-icons": "^6.4.18",
+    "typescript": "^5.3.0"
+  },
+  "private": true,
+  "expo": {
+    "name": "ProClaw Mobile",
+    "slug": "proclaw-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6366f1"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.proclaw.mobile",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "ProClaw 需要使用麦克风进行语音通话",
+        "NSCameraUsageDescription": "ProClaw 需要使用摄像头进行视频通话"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#6366f1"
+      },
+      "package": "com.proclaw.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      ["react-native-webrtc", {
+        "cameraPermission": "ProClaw 需要使用摄像头进行视频通话",
+        "microphonePermission": "ProClaw 需要使用麦克风进行语音通话"
+      }]
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    }
+  }
+}

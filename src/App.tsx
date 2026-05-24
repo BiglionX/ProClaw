@@ -1,24 +1,28 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/Layout/AppLayout';
 import { useAuthStore } from './lib/authStore';
 import AgentPage from './pages/AgentPage';
-import AnalyticsPage from './pages/AnalyticsPage';
 import AIDemoPage from './pages/AIDemoPage';
-import DashboardPage from './pages/DashboardPage';
+import DataCenterPage from './pages/DataCenterPage';
 import FAQManagementPage from './pages/FAQManagementPage';
-import FinancePage from './pages/FinancePage';
-import InventoryPage from './pages/InventoryPage';
+import SupplyChainPage from './pages/SupplyChainPage';
 import LoginPage from './pages/LoginPage';
 import ProductsPage from './pages/ProductsPage';
-import PurchasePage from './pages/PurchasePage';
 import RegisterPage from './pages/RegisterPage';
-import SalesPage from './pages/SalesPage';
 import SettingsPage from './pages/SettingsPage';
 import SetupPage from './pages/SetupPage';
 import TeamsPage from './pages/TeamsPage';
 import TestPage from './pages/TestPage';
 import UnrecognizedCommandsPage from './pages/UnrecognizedCommandsPage';
+import UserManagementPage from './pages/UserManagementPage';
+import DevicePairingPage from './pages/DevicePairingPage';
+import AISalesOrderPage from './pages/AISalesOrderPage';
+import ContactsPage from './pages/ContactsPage';
+import ChatPage from './pages/ChatPage';
+import MessagesPage from './pages/MessagesPage';
+import CallPage from './pages/CallPage';
+import IncomingCallDialog from './components/Call/IncomingCallDialog';
 
 // 添加启动日志
 console.log('App component rendering...');
@@ -44,7 +48,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
+      {/* 全局来电弹窗 */}
+      <IncomingCallDialog />
       <Routes>
         {/* 公开路由 */}
         <Route path="/setup" element={<SetupPage />} />
@@ -61,13 +67,17 @@ function App() {
           }
         />
         <Route
-          path="/dashboard"
+          path="/datacenter"
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <DataCenterPage />
             </ProtectedRoute>
           }
         />
+        {/* 旧路由重定向 */}
+        <Route path="/dashboard" element={<Navigate to="/datacenter" replace />} />
+        <Route path="/analytics" element={<Navigate to="/datacenter" replace />} />
+        <Route path="/finance" element={<Navigate to="/datacenter" replace />} />
         <Route
           path="/products"
           element={
@@ -77,45 +87,17 @@ function App() {
           }
         />
         <Route
-          path="/inventory"
+          path="/supplychain"
           element={
             <ProtectedRoute>
-              <InventoryPage />
+              <SupplyChainPage />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
-              <AnalyticsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/purchase"
-          element={
-            <ProtectedRoute>
-              <PurchasePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/sales"
-          element={
-            <ProtectedRoute>
-              <SalesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/finance"
-          element={
-            <ProtectedRoute>
-              <FinancePage />
-            </ProtectedRoute>
-          }
-        />
+        {/* 旧路由重定向 */}
+        <Route path="/inventory" element={<Navigate to="/supplychain" replace />} />
+        <Route path="/purchase" element={<Navigate to="/supplychain" replace />} />
+        <Route path="/sales" element={<Navigate to="/supplychain" replace />} />
         <Route
           path="/settings"
           element={
@@ -156,11 +138,67 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/user-management"
+          element={
+            <ProtectedRoute>
+              <UserManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/device-pairing"
+          element={
+            <ProtectedRoute>
+              <DevicePairingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai-sales-order"
+          element={
+            <ProtectedRoute>
+              <AISalesOrderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/contacts"
+          element={
+            <ProtectedRoute>
+              <ContactsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <MessagesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat/:contactId"
+          element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/call"
+          element={
+            <ProtectedRoute>
+              <CallPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* 测试页面 - 开发环境使用 */}
         <Route path="/test" element={<TestPage />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

@@ -320,3 +320,111 @@ pub fn get_purchase_order_detail(db: tauri::State<Mutex<Database>>, order_id: St
         "items": items
     }))
 }
+
+/// 更新采购订单 (Tauri command)
+#[tauri::command]
+pub fn update_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String, order: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Purchase order not found".to_string())?;
+
+    if status != "draft" {
+        return Err("Only draft orders can be updated".to_string());
+    }
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "UPDATE purchase_orders SET supplier_id = ?1, order_date = ?2, expected_delivery_date = ?3, notes = ?4, updated_at = CURRENT_TIMESTAMP WHERE id = ?5",
+        params![
+            order["supplier_id"].as_str().unwrap_or(""),
+            order.get("order_date").and_then(|v| v.as_str()),
+            order.get("expected_delivery_date").and_then(|v| v.as_str()),
+            order.get("notes").and_then(|v| v.as_str()),
+            order_id,
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    tx.execute("DELETE FROM purchase_order_items WHERE purchase_order_id = ?1", params![order_id]).map_err(|e| e.to_string())?;
+
+    if let Some(items) = order.get("items").and_then(|v| v.as_array()) {
+        for item in items {
+            let item_id = Uuid::new_v4().to_string();
+            let quantity = item["quantity"].as_i64().unwrap_or(0) as i32;
+            let unit_price = item["unit_price"].as_f64().unwrap_or(0.0);
+            tx.execute(
+                "INSERT INTO purchase_order_items (id, purchase_order_id, product_id, quantity, unit_price, total_price, received_quantity, notes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
+                params![item_id, order_id, item["product_id"].as_str().unwrap_or(""), quantity, unit_price, quantity as f64 * unit_price, item.get("notes").and_then(|v| v.as_str())],
+            ).map_err(|e| e.to_string())?;
+        }
+    }
+
+    let total: f64 = tx.query_row("SELECT COALESCE(SUM(total_price),0.0) FROM purchase_order_items WHERE purchase_order_id = ?1", params![order_id], |row| row.get(0)).unwrap_or(0.0);
+    tx.execute("UPDATE purchase_orders SET total_amount = ?1 WHERE id = ?2", params![total, order_id]).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "message": "Purchase order updated"}))
+}
+
+/// 删除采购订单 (软删除)
+#[tauri::command]
+pub fn delete_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Purchase order not found".to_string())?;
+
+    if status != "draft" && status != "cancelled" {
+        return Err("Only draft or cancelled orders can be deleted".to_string());
+    }
+
+    conn.execute("UPDATE purchase_orders SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "message": "Purchase order deleted"}))
+}
+
+/// 确认收货 (增加库存)
+#[tauri::command]
+pub fn receive_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Purchase order not found".to_string())?;
+
+    if status != "confirmed" && status != "draft" && status != "approved" {
+        return Err(format!("Cannot receive order with status '{}'", status));
+    }
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    let items: Vec<(String, i32)> = {
+        let mut stmt = tx.prepare("SELECT product_id, quantity FROM purchase_order_items WHERE purchase_order_id = ?1").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![order_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)))
+            .map_err(|e| e.to_string())?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+
+    for (pid, qty) in &items {
+        tx.execute("UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", params![qty, pid]).map_err(|e| e.to_string())?;
+        let txn_id = Uuid::new_v4().to_string();
+        tx.execute("INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, reference_no, reason) VALUES (?1, ?2, 'inbound', ?3, ?4, 'purchase_order')",
+            params![txn_id, pid, qty, order_id]).map_err(|e| e.to_string())?;
+        tx.execute("UPDATE purchase_order_items SET received_quantity = received_quantity + ?1 WHERE purchase_order_id = ?2 AND product_id = ?3", params![qty, order_id, pid]).map_err(|e| e.to_string())?;
+    }
+
+    tx.execute("UPDATE purchase_orders SET status = 'received', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id]).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "status": "received", "message": "Purchase order received. Inventory updated."}))
+}

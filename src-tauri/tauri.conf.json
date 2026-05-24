@@ -15,10 +15,14 @@
         "title": "ProClaw Desktop",
         "width": 1200,
         "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
+        "center": true,
         "visible": true,
-        "focus": true
+        "focus": true,
+        "decorations": true
       }
     ],
     "security": {
@@ -27,11 +31,50 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi"],
-    "icon": ["icons/icon.ico"],
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "copyright": "Copyright © 2026 ProClaw",
+    "category": "Business",
+    "shortDescription": "ProClaw - AI-Powered Business Operating System",
+    "longDescription": "ProClaw is an AI-powered business operating system for small merchants. It features local-first data storage, AI order recognition, inventory management, and optional cloud backup.",
     "windows": {
-      "wix": {
-        "language": "en-US"
+      "nsis": {
+        "languages": ["English", "SimpChinese"],
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      }
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "gtk3",
+          "libappindicator-gtk3"
+        ]
       }
     }
   }

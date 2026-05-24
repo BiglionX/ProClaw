@@ -1,0 +1,18 @@
+{
+  "name": "av-call-implementation",
+  "leadAgentId": "3b4fc00263384f2a817551e4a41dbd59",
+  "workspacePath": "d:/BigLionX/ProClaw",
+  "createdAt": "2026-05-24T11:59:00.935Z",
+  "options": {
+    "workspacePath": "d:/BigLionX/ProClaw",
+    "isAutoTeam": false
+  },
+  "members": [
+    {
+      "memberId": "team-lead@av-call-implementation",
+      "name": "team-lead",
+      "role": "Team Lead - coordinates the team and interacts with the user"
+    }
+  ],
+  "isAutoTeam": false
+}

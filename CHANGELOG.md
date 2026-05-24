@@ -8,27 +8,45 @@
 ## [Unreleased]
 
 ### Added
-- 完善的仪表盘页面功能
-  - 实时数据集成（库存、销售、财务）
-  - 关键指标卡片（产品总数、本月销售、今日交易、库存预警）
-  - 财务概览卡片（应收账款、应付账款、营运资金）
-  - 销售趋势折线图（最近7天）
-  - 库存状态分布饼图
-  - 畅销产品 TOP 5 列表
-  - 低库存预警列表
-  - 加载状态和错误处理
-  - 手动刷新功能
-  - 响应式设计
-- 仪表盘单元测试
-- 完整的仪表盘文档
-  - 功能说明文档
-  - 测试指南
-  - 快速启动指南
-  - 完成总结
+- **Phase 8: 测试与文档** - 全面质量保证
+- 前端服务单元测试 (15 个测试模块, ~200+ 测试用例)
+  - purchaseService: 供应商、采购订单 CRUD 及编码生成测试
+  - financeService: 损益报表、现金流、财务概览测试
+  - analyticsService: 销售趋势、产品分析测试
+  - authStore: 模拟登录、注册、登出、认证检查测试
+  - apiClient: token 管理、HTTP 方法、文件上传测试
+  - categoryService: 分类创建、列表获取测试
+  - brandService: 品牌创建、列表获取测试
+  - subscriptionService: 套餐、订阅、token 用量、账单测试
+  - syncService: 数据库统计、同步状态测试
+  - aiConfig: 配置存取、多提供商连接测试
+- Rust 后端单元测试
+  - permissions: RBAC 权限检查（22 个测试用例）
+  - key_manager: JWT 密钥生成/加载/环境变量（5 个测试用例）
+  - types: 序列化/反序列化正确性（8 个测试用例）
+  - crypto: AES-256-GCM 加解密验证（已有，3 个测试用例）
+  - database: 数据库创建和初始化（已有，2 个测试用例）
+- E2E 测试增强 (9 个 spec 文件)
+  - purchase.spec.ts: 采购管理流程
+  - finance.spec.ts: 财务报表和统计
+  - inventory.spec.ts: 库存管理和交易
+  - settings.spec.ts: 系统设置和配置
+- 用户手册
+  - 部署与使用指南（10 章节，含系统要求、部署、功能指南、故障排除）
+  - Pro 版开通指南（6 章节，含 Supabase 配置、AI 模型、Token 计费）
+- 打包配置优化
+  - 增强 Windows 构建脚本
+  - 多平台目标配置准备
 
 ### Changed
-- 重构 DashboardPage 组件，从占位符升级为完整功能页面
-- 优化数据加载性能（并行请求）
+- 完善权限模块测试覆盖
+- 优化 CHANGELOG 格式规范
+
+### Technical
+- 前端测试覆盖率目标 > 60%（branches/functions/lines/statements）
+- Rust 测试覆盖: auth, utils, types 模块
+- E2E 测试覆盖: 登录、仪表盘、产品、销售、采购、财务、库存、设置、双模式库
+- 测试框架: Vitest + Playwright + Rust #[test]
 
 ## [1.0.0-beta.1] - 2026-04-13
 
@@ -36,17 +54,21 @@
 - 初始版本发布
 - Tauri 2.0 + React 18 桌面应用框架
 - 经营智能体主界面
-- 产品库管理模块
+- 产品库管理模块 (简单模式 + SPU-SKU 电商模式)
 - 进销存 AI 模块
 - 技能商店基础架构
 - SQLite 本地数据库 + Supabase 云端同步
 - MUI + Tailwind CSS UI 系统
 - 离线优先架构
 - 数据加密(SQLCipher)
+- 仪表盘页面功能（实时数据、图表、预警）
+- 仪表盘单元测试
 
 ### Changed
 - 从 ProCYC 单体项目中提取
 - 独立为开源项目
+- 重构 DashboardPage 组件，从占位符升级为完整功能页面
+- 优化数据加载性能（并行请求）
 
 ### Technical
 - 3,000+ 行 TypeScript 代码
