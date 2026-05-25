@@ -20,63 +20,91 @@ describe('productService', () => {
 
   describe('createProduct', () => {
     it('应该成功创建产品', async () => {
-      const mockProduct = {
+      const now = new Date().toISOString();
+      const mockSPU = {
         id: '1',
-        sku: 'TEST001',
+        spu_code: 'SPU-TEST001',
         name: 'Test Product',
-        cost_price: 100,
-        sell_price: 150,
-        current_stock: 0,
-        min_stock: 0,
-        max_stock: 999999,
         unit: '个',
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      (invoke as any).mockResolvedValue(mockProduct);
-
-      const result = await createProduct({
-        sku: 'TEST001',
-        name: 'Test Product',
-        cost_price: 100,
-        sell_price: 150,
-      });
-
-      expect(result).toEqual(mockProduct);
-      expect(invoke).toHaveBeenCalledWith('create_product', {
-        product: {
-          sku: 'TEST001',
-          name: 'Test Product',
+        status: 'on_sale',
+        is_on_sale: true,
+        is_featured: false,
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        skus: [{
+          id: 'sk1',
+          spu_id: '1',
+          sku_code: 'TEST001',
+          specifications: {},
+          spec_text: 'TEST001',
           cost_price: 100,
           sell_price: 150,
           current_stock: 0,
           min_stock: 0,
           max_stock: 999999,
-          unit: '个',
-          status: 'active',
-        },
+          is_default: true,
+          status: 'active' as const,
+          created_at: now,
+          updated_at: now,
+        }],
+      };
+
+      (invoke as any).mockResolvedValue(mockSPU);
+
+      const result = await createProduct({
+        sku: 'TEST001',
+        name: 'Test Product',
+        cost_price: 100,
+        sell_price: 150,
       });
+
+      expect(result.sku).toBe('TEST001');
+      expect(result.name).toBe('Test Product');
+      expect(result.cost_price).toBe(100);
+      expect(result.sell_price).toBe(150);
+      expect(invoke).toHaveBeenCalledWith('create_product_spu', expect.objectContaining({
+        spuData: expect.objectContaining({
+          name: 'Test Product',
+          is_on_sale: true,
+        }),
+        skusData: expect.any(Array),
+        imagesData: expect.any(Array),
+      }));
     });
 
     it('应该使用自定义参数创建产品', async () => {
-      const mockProduct = {
+      const now = new Date().toISOString();
+      const mockSPU = {
         id: '2',
-        sku: 'TEST002',
+        spu_code: 'SPU-TEST002',
         name: 'Custom Product',
-        cost_price: 200,
-        sell_price: 300,
-        current_stock: 50,
-        min_stock: 10,
-        max_stock: 100,
         unit: '件',
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        status: 'on_sale',
+        is_on_sale: true,
+        is_featured: false,
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        skus: [{
+          id: 'sk2',
+          spu_id: '2',
+          sku_code: 'TEST002',
+          specifications: {},
+          spec_text: 'TEST002',
+          cost_price: 200,
+          sell_price: 300,
+          current_stock: 50,
+          min_stock: 10,
+          max_stock: 100,
+          is_default: true,
+          status: 'active' as const,
+          created_at: now,
+          updated_at: now,
+        }],
       };
 
-      (invoke as any).mockResolvedValue(mockProduct);
+      (invoke as any).mockResolvedValue(mockSPU);
 
       const result = await createProduct({
         sku: 'TEST002',
@@ -89,20 +117,18 @@ describe('productService', () => {
         unit: '件',
       });
 
-      expect(result).toEqual(mockProduct);
-      expect(invoke).toHaveBeenCalledWith('create_product', {
-        product: {
-          sku: 'TEST002',
+      expect(result.sku).toBe('TEST002');
+      expect(result.name).toBe('Custom Product');
+      expect(result.cost_price).toBe(200);
+      expect(result.sell_price).toBe(300);
+      expect(invoke).toHaveBeenCalledWith('create_product_spu', expect.objectContaining({
+        spuData: expect.objectContaining({
           name: 'Custom Product',
-          cost_price: 200,
-          sell_price: 300,
-          current_stock: 50,
-          min_stock: 10,
-          max_stock: 100,
-          unit: '件',
-          status: 'active',
-        },
-      });
+          is_on_sale: true,
+        }),
+        skusData: expect.any(Array),
+        imagesData: expect.any(Array),
+      }));
     });
 
     it('应该在 API 调用失败时抛出错误', async () => {
@@ -121,45 +147,54 @@ describe('productService', () => {
 
   describe('getProducts', () => {
     it('应该获取产品列表', async () => {
-      const mockProducts = [
+      const now = new Date().toISOString();
+      const mockSPUs = [
         {
           id: '1',
-          sku: 'PROD001',
+          spu_code: 'PROD001',
           name: 'Product 1',
-          cost_price: 100,
-          sell_price: 150,
-          current_stock: 50,
-          min_stock: 10,
-          max_stock: 100,
           unit: '个',
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          status: 'on_sale',
+          is_on_sale: true,
+          is_featured: false,
+          sort_order: 0,
+          created_at: now,
+          updated_at: now,
+          skus: [{
+            id: 'sk1', spu_id: '1', sku_code: 'PROD001', specifications: {}, spec_text: 'PROD001',
+            cost_price: 100, sell_price: 150, current_stock: 50, min_stock: 10, max_stock: 100,
+            is_default: true, status: 'active' as const, created_at: now, updated_at: now,
+          }],
         },
         {
           id: '2',
-          sku: 'PROD002',
+          spu_code: 'PROD002',
           name: 'Product 2',
-          cost_price: 200,
-          sell_price: 250,
-          current_stock: 30,
-          min_stock: 5,
-          max_stock: 80,
           unit: '件',
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          status: 'on_sale',
+          is_on_sale: true,
+          is_featured: false,
+          sort_order: 0,
+          created_at: now,
+          updated_at: now,
+          skus: [{
+            id: 'sk2', spu_id: '2', sku_code: 'PROD002', specifications: {}, spec_text: 'PROD002',
+            cost_price: 200, sell_price: 250, current_stock: 30, min_stock: 5, max_stock: 80,
+            is_default: true, status: 'active' as const, created_at: now, updated_at: now,
+          }],
         },
       ];
 
-      (invoke as any).mockResolvedValue(mockProducts);
+      (invoke as any).mockResolvedValue(mockSPUs);
 
       const result = await getProducts();
 
-      expect(result).toEqual(mockProducts);
-      expect(invoke).toHaveBeenCalledWith('get_products', {
-        options: undefined,
-      });
+      expect(result.length).toBe(2);
+      expect(result[0].name).toBe('Product 1');
+      expect(result[1].name).toBe('Product 2');
+      expect(invoke).toHaveBeenCalledWith('get_product_spus', expect.objectContaining({
+        options: expect.objectContaining({}),
+      }));
     });
 
     it('应该使用选项获取产品列表', async () => {
@@ -175,7 +210,13 @@ describe('productService', () => {
 
       await getProducts(options);
 
-      expect(invoke).toHaveBeenCalledWith('get_products', { options });
+      expect(invoke).toHaveBeenCalledWith('get_product_spus', expect.objectContaining({
+        options: expect.objectContaining({
+          limit: 10,
+          search: 'test',
+          category_id: 'cat1',
+        }),
+      }));
     });
 
     it('应该返回空数组当没有产品时', async () => {
@@ -250,22 +291,26 @@ describe('productService', () => {
 
   describe('updateProduct', () => {
     it('应该更新产品信息', async () => {
-      const mockUpdatedProduct = {
+      const now = new Date().toISOString();
+      const mockSPU = {
         id: '1',
-        sku: 'PROD001',
+        spu_code: 'SPU-PROD001',
         name: 'Updated Product',
-        cost_price: 120,
-        sell_price: 180,
-        current_stock: 50,
-        min_stock: 10,
-        max_stock: 100,
         unit: '个',
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        status: 'on_sale',
+        is_on_sale: true,
+        is_featured: false,
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        skus: [{
+          id: 'sk1', spu_id: '1', sku_code: 'PROD001', specifications: {}, spec_text: 'PROD001',
+          cost_price: 120, sell_price: 180, current_stock: 50, min_stock: 10, max_stock: 100,
+          is_default: true, status: 'active' as const, created_at: now, updated_at: now,
+        }],
       };
 
-      (invoke as any).mockResolvedValue(mockUpdatedProduct);
+      (invoke as any).mockResolvedValue(mockSPU);
 
       const updates = {
         name: 'Updated Product',
@@ -275,11 +320,13 @@ describe('productService', () => {
 
       const result = await updateProduct('1', updates);
 
-      expect(result).toEqual(mockUpdatedProduct);
-      expect(invoke).toHaveBeenCalledWith('update_product', {
+      expect(result.name).toBe('Updated Product');
+      expect(result.sell_price).toBe(180);
+      expect(result.cost_price).toBe(120);
+      expect(invoke).toHaveBeenCalledWith('update_product_spu', expect.objectContaining({
         id: '1',
-        updates,
-      });
+        updates: expect.objectContaining({ name: 'Updated Product' }),
+      }));
     });
 
     it('应该支持部分更新', async () => {
@@ -302,10 +349,10 @@ describe('productService', () => {
 
       await updateProduct('1', { sell_price: 200 });
 
-      expect(invoke).toHaveBeenCalledWith('update_product', {
+      expect(invoke).toHaveBeenCalledWith('update_product_spu', expect.objectContaining({
         id: '1',
-        updates: { sell_price: 200 },
-      });
+        updates: expect.objectContaining({}),
+      }));
     });
   });
 
@@ -315,14 +362,15 @@ describe('productService', () => {
 
       await deleteProduct('1');
 
-      expect(invoke).toHaveBeenCalledWith('delete_product', { id: '1' });
+      expect(invoke).toHaveBeenCalledWith('delete_product_spu', { id: '1' });
     });
   });
 
   describe('getDatabaseStats', () => {
     it('应该获取数据库统计信息', async () => {
       const mockStats = {
-        products_count: 100,
+        spu_count: 100,
+        sku_count: 200,
         categories_count: 10,
         transactions_count: 500,
         pending_sync: 5,

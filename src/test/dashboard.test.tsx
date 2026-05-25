@@ -71,6 +71,7 @@ describe('DashboardPage', () => {
   const mockDbStats = {
     spu_count: 50,
     sku_count: 100,
+    products_count: 100,
     categories_count: 10,
     transactions_count: 500,
     pending_sync: 5,
@@ -92,8 +93,10 @@ describe('DashboardPage', () => {
   it('应该渲染仪表盘标题', async () => {
     render(<DashboardPage />);
     
-    expect(screen.getByText('仪表盘')).toBeInTheDocument();
-    expect(screen.getByText(/业务概览和关键指标/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('仪表盘')).toBeInTheDocument();
+      expect(screen.getByText(/业务概览和关键指标/)).toBeInTheDocument();
+    });
   });
 
   it('应该显示加载状态', () => {
@@ -164,10 +167,12 @@ describe('DashboardPage', () => {
     });
   });
 
-  it('应该显示刷新按钮', () => {
+  it('应该显示刷新按钮', async () => {
     render(<DashboardPage />);
     
-    expect(screen.getByText('刷新数据')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('刷新数据')).toBeInTheDocument();
+    });
   });
 
   it('应该在数据加载完成后隐藏加载状态', async () => {
@@ -204,8 +209,9 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
     
     await waitFor(() => {
-      // 应该显示空状态提示
-      expect(screen.getByText(/暂无销售数据|库存充足，无预警/)).toBeInTheDocument();
+      // 两个空状态提示都应该存在
+      expect(screen.getByText('暂无销售数据')).toBeInTheDocument();
+      expect(screen.getByText(/库存充足，无预警/)).toBeInTheDocument();
     });
   });
 
@@ -213,8 +219,11 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
     
     await waitFor(() => {
-      // 100000 应该显示为 ¥10.0万
-      expect(screen.getByText(/¥[\d.]+万?/)).toBeInTheDocument();
+      // 检查至少有一个 ¥X.X万 格式的货币值存在
+      const currencyElements = screen.getAllByText(/¥[\d.]+万/);
+      expect(currencyElements.length).toBeGreaterThan(0);
+      // 100000 的销售额应该显示为 ¥10.0万
+      expect(screen.getByText('¥10.0万')).toBeInTheDocument();
     });
   });
 });

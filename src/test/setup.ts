@@ -1,11 +1,5 @@
-import '@testing-library/jest-dom';
-import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
-
-// 自动清理
-afterEach(() => {
-  cleanup();
-});
+import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -16,6 +10,12 @@ vi.mock('@tauri-apps/api/core', () => ({
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(),
   emit: vi.fn(),
+}));
+
+// Mock isTauri to return true so service functions don't short-circuit in tests
+vi.mock('../lib/tauri', () => ({
+  isTauri: () => true,
+  safeInvoke: vi.fn(),
 }));
 
 // Global test utilities

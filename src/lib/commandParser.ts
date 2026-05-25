@@ -67,26 +67,7 @@ const commandPatterns: CommandPattern[] = [
       };
     },
   },
-  // 查询特定产品库存
-  {
-    keywords: [
-      '库存',
-      '还有多少',
-      '剩余库存',
-      'stock',
-      'inventory',
-    ],
-    action: 'query_product_stock',
-    extractParams: text => {
-      // 尝试提取产品名称
-      const productMatch = text.match(/(.+?)(?:的|还有|剩余|库存|$)/);
-      return {
-        productName: productMatch ? productMatch[1].trim() : '',
-        type: 'inventory',
-      };
-    },
-  },
-  // 查询库存统计
+  // 查询库存统计（放在 query_product_stock 之前，优先匹配具体命令）
   {
     keywords: [
       '查询库存',
@@ -157,7 +138,6 @@ const commandPatterns: CommandPattern[] = [
     keywords: [
       '生成报表',
       '创建报表',
-      '报表',
       'generate report',
       'create report',
     ],
@@ -184,6 +164,27 @@ const commandPatterns: CommandPattern[] = [
     action: 'check_stock_alert',
     extractParams: _text => {
       return {
+        type: 'inventory',
+      };
+    },
+  },
+  // 查询特定产品库存（放最后，避免"库存"关键词干扰更具体的命令）
+  {
+    keywords: [
+      '还有多少',
+      '剩余库存',
+      '库存多少',
+      '库存数量',
+      '还有库存',
+      '库存还有',
+      '还有货',
+    ],
+    action: 'query_product_stock',
+    extractParams: text => {
+      // 尝试提取产品名称
+      const productMatch = text.match(/(.+?)(?:的|还有|剩余|库存|$)/);
+      return {
+        productName: productMatch ? productMatch[1].trim() : '',
         type: 'inventory',
       };
     },

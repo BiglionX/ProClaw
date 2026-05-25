@@ -32,11 +32,12 @@ describe('salesService', () => {
 
       expect(result).toEqual(mockCustomer);
       expect(invoke).toHaveBeenCalledWith('create_customer', {
-        customer: {
+        customer: expect.objectContaining({
           name: 'Test Customer',
           phone: '1234567890',
           email: 'test@example.com',
-        },
+          code: expect.any(String),
+        }),
       });
     });
 
@@ -172,7 +173,7 @@ describe('salesService', () => {
 
       expect(result).toEqual(mockOrder);
       expect(invoke).toHaveBeenCalledWith('create_sales_order', {
-        order: {
+        order: expect.objectContaining({
           customer_id: 'cust1',
           items: [
             {
@@ -181,7 +182,8 @@ describe('salesService', () => {
               unit_price: 150,
             },
           ],
-        },
+          so_number: expect.any(String),
+        }),
       });
     });
 
