@@ -147,7 +147,7 @@ export const resetApiClient = (): void => {
 export const pairDevice = async (
   serverUrl: string,
   pairingCode: string
-): Promise<{ token: string; refresh_token: string; user: { name: string } }> => {
+): Promise<{ token: string; refresh_token: string; user: { name: string; roles?: string[] } }> => {
   try {
     console.log('Pairing with server:', serverUrl, 'code:', pairingCode);
     
@@ -167,8 +167,22 @@ export const pairDevice = async (
 
     resetApiClient();
 
-    console.log('Pairing successful, tokens saved');
-    return { token: access_token, refresh_token, user: { name: '测试用户' } };
+    // 获取用户角色并保存
+    let roles: string[] = [];
+    try {
+      const api = await getApiClient();
+      const meRes = await api.get('/api/auth/me');
+      const userData = meRes.data?.data;
+      if (userData?.roles) {
+        roles = userData.roles.map((r: any) => r.name);
+        await saveRoles(roles);
+      }
+    } catch (e) {
+      console.warn('Failed to load roles after pairing:', e);
+    }
+
+    console.log('Pairing successful, tokens saved, roles:', roles);
+    return { token: access_token, refresh_token, user: { name: '测试用户', roles } };
   } catch (error: any) {
     console.error('Device pairing failed:', error);
     if (error.code === 'ECONNABORTED') {
@@ -182,6 +196,27 @@ export const pairDevice = async (
     }
     throw new Error(error.message || '配对失败，请检查配对码');
   }
+};
+
+/** 保存用户角色 */
+export const saveRoles = async (roles: string[]): Promise<void> => {
+  await secureSet('proclaw_roles', JSON.stringify(roles));
+};
+
+/** 加载用户角色 */
+export const loadRoles = async (): Promise<string[]> => {
+  const data = await secureGet('proclaw_roles');
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch {}
+  }
+  return [];
+};
+
+/** 清除用户角色 */
+export const clearRoles = async (): Promise<void> => {
+  await secureDelete('proclaw_roles');
 };
 
 /** 演示模式：保存虚拟 token 跳过真实配对 */

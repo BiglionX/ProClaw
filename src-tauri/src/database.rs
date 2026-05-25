@@ -43,6 +43,10 @@ impl Database {
         let spu_sku_schema = include_str!("../../database/spu_sku_schema_sqlite.sql");
         self.conn.execute_batch(spu_sku_schema)?;
         
+        // 运行迁移：员工邀请与角色权限自动分配（PRD v4.3）
+        let migration = include_str!("../../src/db/migrations/006_add_employee_invitation_fields.sql");
+        self.conn.execute_batch(migration).ok(); // 忽略错误（如果已经运行过）
+        
         Ok(())
     }
 

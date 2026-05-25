@@ -31,10 +31,36 @@ import CallScreen from './src/screens/CallScreen';
 import CallHistoryScreen from './src/screens/CallHistoryScreen';
 import IncomingCallModal from './src/components/IncomingCallModal';
 import { initDatabase } from './src/services/DatabaseService';
+import { loadToken, getApiClient } from './src/services/AuthService';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const SupplyChainStack = createStackNavigator();
+
+// 角色 -> 可见 Tab 映射 (PRD v4.3)
+const ROLE_TAB_ACCESS: Record<string, string[]> = {
+  boss: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  finance: ['HomeTab', 'SupplyChainTab', 'ProfileTab'],
+  purchase: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  warehouse: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  sales: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  customer: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  supplier: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+};
+
+/** 根据用户角色计算可见 Tab 列表 */
+function getVisibleTabs(roles: string[]): string[] {
+  if (roles.includes('boss')) {
+    return ROLE_TAB_ACCESS['boss'];
+  }
+  // 多个角色取并集
+  const visible = new Set<string>();
+  for (const role of roles) {
+    const tabs = ROLE_TAB_ACCESS[role] || [];
+    for (const t of tabs) visible.add(t);
+  }
+  return visible.size > 0 ? Array.from(visible) : ['HomeTab', 'ProfileTab'];
+}
 
 /** 供应链 Tab 内部 Stack：首页 + 客户 + 销售单 */
 function SupplyChainNavigator() {
@@ -70,8 +96,10 @@ function SupplyChainNavigator() {
   );
 }
 
-/** 主 Tab 导航 */
-function MainTabs() {
+/** 主 Tab 导航 (动态渲染) */
+function MainTabs({ userRoles }: { userRoles: string[] }) {
+  const visibleTabs = getVisibleTabs(userRoles);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -103,6 +131,8 @@ function MainTabs() {
             />
           );
         },
+        // 动态隐藏 Tab
+        tabBarItemStyle: visibleTabs.includes(route.name) ? undefined : { display: 'none' },
       })}
     >
       <Tab.Screen
@@ -132,6 +162,7 @@ function MainTabs() {
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<'Connection' | 'Main'>('Connection');
+  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
     checkAuth();
@@ -141,16 +172,48 @@ export default function App() {
     try {
       await initDatabase();
       console.log('Database initialized');
-      const { loadToken } = await import('./src/services/AuthService');
       const token = await loadToken();
       if (token) {
-        console.log('Found existing token, skipping pairing');
+        console.log('Found existing token, loading user info...');
+        // 加载保存的角色
+        const savedRoles = await loadRoles();
+        if (savedRoles.length > 0) {
+          setUserRoles(savedRoles);
+        }
+        // 尝试从服务器刷新最新角色
+        try {
+          const api = await getApiClient();
+          const res = await api.get('/api/auth/me');
+          const userData = res.data?.data;
+          if (userData?.roles) {
+            const roles = userData.roles.map((r: any) => r.name);
+            setUserRoles(roles);
+            await saveRoles(roles);
+          }
+        } catch (e) {
+          console.warn('Failed to refresh roles:', e);
+        }
         setInitialRoute('Main');
       }
     } catch (error: any) {
       console.warn('Init error:', error?.message);
     } finally {
       setDbReady(true);
+    }
+  };
+
+  // 登录成功后刷新角色
+  const handleLoginSuccess = async () => {
+    try {
+      const api = await getApiClient();
+      const res = await api.get('/api/auth/me');
+      const userData = res.data?.data;
+      if (userData?.roles) {
+        const roles = userData.roles.map((r: any) => r.name);
+        setUserRoles(roles);
+      }
+    } catch (e) {
+      console.warn('Failed to reload roles:', e);
     }
   };
 
@@ -166,7 +229,14 @@ export default function App() {
               screenOptions={{ headerShown: false }}
             >
               <Stack.Screen name="Connection" component={ConnectionScreen} />
-              <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen
+                name="Main"
+                options={{ headerShown: false }}
+              >
+                {(props) => (
+                  <MainTabs {...props} userRoles={userRoles} />
+                )}
+              </Stack.Screen>
               <Stack.Screen
                 name="Call"
                 component={CallScreen}

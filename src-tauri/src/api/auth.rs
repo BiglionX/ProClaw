@@ -337,6 +337,7 @@ pub fn verify_password(password: &str, hash: Option<&str>) -> bool {
 }
 
 /// 获取当前登录用户信息 (GET /api/auth/me)
+/// PRD v4.3: 返回完整角色列表和聚合权限
 pub async fn get_current_user(
     State(state): State<AppState>,
     request: axum::extract::Request,
@@ -352,53 +353,99 @@ pub async fn get_current_user(
     };
     let conn = db.connection();
 
-    let user_info = conn.query_row(
-        "SELECT id, name, email, phone FROM users WHERE id = ?1",
+    // 查询用户基本信息
+    let user_row = match conn.query_row(
+        "SELECT id, name, email, phone, user_type FROM users WHERE id = ?1",
         params![claims.sub],
         |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "email": row.get::<_, Option<String>>(2)?,
-                "phone": row.get::<_, Option<String>>(3)?,
-                "role": claims.role,
-                "permissions": claims.permissions,
-            }))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, String>(4)?,
+            ))
         },
-    ).unwrap_or(serde_json::json!({
-        "id": claims.sub,
-        "role": claims.role,
-        "permissions": claims.permissions,
-    }));
+    ) {
+        Ok(r) => r,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "User not found"}))),
+    };
+
+    let (user_id, name, email, phone, user_type) = user_row;
+
+    // 查询用户所有角色
+    let mut roles: Vec<serde_json::Value> = Vec::new();
+    let mut all_permissions: Vec<String> = Vec::new();
+
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT r.id, r.name, r.permissions \
+         FROM user_roles ur \
+         JOIN roles r ON ur.role_id = r.id \
+         WHERE ur.user_id = ?1"
+    ) {
+        let rows = stmt.query_map(params![&user_id], |row| {
+            let role_id: i32 = row.get(0)?;
+            let role_name: String = row.get(1)?;
+            let perms_json: Option<String> = row.get(2)?;
+
+            // 聚合权限
+            if let Some(ref pj) = perms_json {
+                if let Ok(perms) = serde_json::from_str::<Vec<String>>(pj) {
+                    for p in perms {
+                        if !all_permissions.contains(&p) {
+                            all_permissions.push(p);
+                        }
+                    }
+                }
+            }
+
+            Ok(serde_json::json!({
+                "id": role_id,
+                "name": role_name,
+            }))
+        });
+
+        if let Ok(iter) = rows {
+            for r in iter {
+                if let Ok(role_obj) = r {
+                    roles.push(role_obj);
+                }
+            }
+        }
+    }
+
+    // 如果没有角色记录，设置默认角色
+    let effective_roles = if roles.is_empty() {
+        vec![serde_json::json!({"id": 6, "name": "customer"})]
+    } else {
+        roles
+    };
+
+    let user_info = serde_json::json!({
+        "id": user_id,
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "user_type": user_type,
+        "roles": effective_roles,
+        "permissions": all_permissions,
+    });
 
     (StatusCode::OK, Json(serde_json::json!({ "data": user_info })))
 }
 
 // ========== 角色/权限查询 ==========
 
-/// 获取用户的角色名和权限列表
-fn get_user_role_and_permissions(conn: &rusqlite::Connection, user_id: &str) -> (String, Vec<String>) {
-    // 查询用户角色
-    let role = conn.query_row(
+/// 获取用户的主角色名和聚合权限列表（支持多角色）
+/// 返回 (primary_role_name, all_permissions)
+pub fn get_user_role_and_permissions(conn: &rusqlite::Connection, user_id: &str) -> (String, Vec<String>) {
+    // 查询用户所有角色，聚合权限
+    let mut stmt = match conn.prepare(
         "SELECT r.name, r.permissions FROM user_roles ur \
          JOIN roles r ON ur.role_id = r.id \
-         WHERE ur.user_id = ?1 LIMIT 1",
-        params![user_id],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, Option<String>>(1)?,
-            ))
-        },
-    );
-
-    match role {
-        Ok((role_name, perms_json)) => {
-            let perms: Vec<String> = perms_json
-                .and_then(|p| serde_json::from_str(&p).ok())
-                .unwrap_or_default();
-            (role_name, perms)
-        }
+         WHERE ur.user_id = ?1"
+    ) {
+        Ok(s) => s,
         Err(_) => {
             // 检查是否外部用户
             let user_type: String = conn.query_row(
@@ -408,10 +455,49 @@ fn get_user_role_and_permissions(conn: &rusqlite::Connection, user_id: &str) -> 
             ).unwrap_or_else(|_| "external".to_string());
 
             if user_type == "external" {
-                ("customer".to_string(), vec!["view_own_orders".to_string(), "view_own_products".to_string()])
+                return ("customer".to_string(), vec!["view_own_orders".to_string(), "view_own_products".to_string()]);
             } else {
-                ("customer".to_string(), vec![])
+                return ("customer".to_string(), vec![]);
+            }
+        }
+    };
+
+    let rows = stmt.query_map(params![user_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, Option<String>>(1)?,
+        ))
+    });
+
+    let mut primary_role = "customer".to_string();
+    let mut all_permissions: Vec<String> = Vec::new();
+    let mut found = false;
+
+    if let Ok(iter) = rows {
+        for row_result in iter {
+            if let Ok((role_name, perms_json)) = row_result {
+                if !found {
+                    primary_role = role_name.clone();
+                    found = true;
+                }
+                // 聚合权限
+                if let Some(ref pj) = perms_json {
+                    if let Ok(perms) = serde_json::from_str::<Vec<String>>(pj) {
+                        for p in perms {
+                            if !all_permissions.contains(&p) {
+                                all_permissions.push(p);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
+
+    // 如果是 boss 角色，添加通配符权限
+    if primary_role == "boss" && !all_permissions.contains(&"*".to_string()) {
+        all_permissions.push("*".to_string());
+    }
+
+    (primary_role, all_permissions)
 }

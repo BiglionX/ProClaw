@@ -10,13 +10,14 @@ import {
   ScrollView,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { acceptInvitation, parseInviteLink } from '../services/InvitationService';
+import { acceptInvitation, parseInviteLink, acceptEmployeeInvitation } from '../services/InvitationService';
 
 interface InvitationHandlerScreenProps {
   route: {
     params?: {
       code?: string;
       host?: string;
+      type?: string;
     };
   };
   navigation: any;
@@ -38,14 +39,17 @@ export const InvitationHandlerScreen: React.FC<InvitationHandlerScreenProps> = (
   const [invitationInfo, setInvitationInfo] = useState<any>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
   const [acceptStep, setAcceptStep] = useState<'info' | 'signup' | 'done'>('info');
+  const [inviteType, setInviteType] = useState<'order_share' | 'price_update' | 'employee' | null>(null);
 
   useEffect(() => {
     const code = route.params?.code;
     const hostParam = route.params?.host;
+    const typeParam = route.params?.type;
 
     if (code) {
       setInviteCode(code);
       if (hostParam) setHost(hostParam);
+      if (typeParam) setInviteType(typeParam as any);
       fetchInvitationInfo(code, hostParam || DEFAULT_HOST);
     }
   }, [route.params]);
@@ -98,31 +102,65 @@ export const InvitationHandlerScreen: React.FC<InvitationHandlerScreenProps> = (
       return;
     }
 
+    // 员工邀请：还需要手机号
+    if (inviteType === 'employee' && !phone) {
+      Alert.alert('错误', '员工邀请需要填写手机号');
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await acceptInvitation(host, {
-        invite_code: inviteCode,
-        new_user: {
-          phone: phone || undefined,
+      if (inviteType === 'employee') {
+        // 调用员工邀请 API
+        const response = await acceptEmployeeInvitation(host, {
+          invite_code: inviteCode,
+          phone,
           name,
           password: password || undefined,
-        },
-      });
+        });
 
-      if (response.success) {
-        setAcceptStep('done');
-        Alert.alert(
-          '邀请已接受',
-          '您已成功加入 ProClaw! 可以开始与伙伴协作了。',
-          [
-            {
-              text: '开始使用',
-              onPress: () => navigation.navigate('Main'),
-            },
-          ]
-        );
+        if (response.success) {
+          setAcceptStep('done');
+          const roleNames = response.roles?.join('、') || '';
+          Alert.alert(
+            '欢迎加入团队!',
+            `您已被授予 ${roleNames} 角色，现在可以开始工作了。`,
+            [
+              {
+                text: '开始使用',
+                onPress: () => navigation.navigate('Main'),
+              },
+            ]
+          );
+        } else {
+          Alert.alert('失败', (response as any).message || '接受邀请失败');
+        }
       } else {
-        Alert.alert('失败', (response as any).message || '接受邀请失败');
+        // 外部伙伴邀请（原有逻辑）
+        const response = await acceptInvitation(host, {
+          invite_code: inviteCode,
+          new_user: {
+            phone: phone || undefined,
+            name,
+            password: password || undefined,
+          },
+        });
+
+        if (response.success) {
+          setAcceptStep('done');
+          Alert.alert(
+            '邀请已接受',
+            '您已成功加入 ProClaw! 可以开始与伙伴协作了。',
+            [
+              {
+                text: '开始使用',
+                onPress: () => navigation.navigate('Main'),
+              },
+            ]
+          );
+        } else {
+          Alert.alert('失败', (response as any).message || '接受邀请失败');
+        }
       }
     } catch (error: any) {
       Alert.alert('错误', error.message || '接受邀请失败');
@@ -611,6 +649,34 @@ const styles = StyleSheet.create({
   expiredActions: {
     margin: 16,
     marginTop: 8,
+  },
+
+  // Employee invitation styles
+  roleContainer: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f0f0f0',
+  },
+  roleLabel: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 6,
+  },
+  roleChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  roleChip: {
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  roleChipText: {
+    fontSize: 13,
+    color: '#6366f1',
+    fontWeight: '500',
   },
 });
 

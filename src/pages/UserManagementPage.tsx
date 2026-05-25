@@ -23,13 +23,17 @@ import {
   MenuItem,
   Alert,
   Snackbar,
+  Chip,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   People as PeopleIcon,
+  QrCode as QrCodeIcon,
 } from '@mui/icons-material';
+import QrCode from 'qrcode.react';
 
 interface User {
   id: string;
@@ -82,6 +86,17 @@ const UserManagementPage: React.FC = () => {
     message: '',
     severity: 'success',
   });
+
+  // 邀请员工相关 state
+  const [inviteDialogOpen, setInviteDialogOpen] = useState<boolean>(false);
+  const [inviteRoles, setInviteRoles] = useState<number[]>([]);
+  const [invitePhone, setInvitePhone] = useState<string>('');
+  const [inviteLoading, setInviteLoading] = useState<boolean>(false);
+  const [inviteResult, setInviteResult] = useState<{
+    invite_code: string;
+    qr_data: string;
+    role_ids: number[];
+  } | null>(null);
 
   // 加载用户和角色数据
   const loadData = async () => {
@@ -223,19 +238,36 @@ const UserManagementPage: React.FC = () => {
           <PeopleIcon fontSize="large" />
           用户权限管理
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{
-            background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #4f46e5 0%, #9333ea 100%)',
-            },
-          }}
-        >
-          添加用户
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={handleOpenInviteDialog}
+            sx={{
+              borderColor: '#6366f1',
+              color: '#6366f1',
+              '&:hover': {
+                borderColor: '#4f46e5',
+                backgroundColor: '#eef2ff',
+              },
+            }}
+          >
+            邀请员工
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #4f46e5 0%, #9333ea 100%)',
+              },
+            }}
+          >
+            添加用户
+          </Button>
+        </Box>
       </Box>
 
       {/* 用户类型说明 */}
@@ -400,8 +432,180 @@ const UserManagementPage: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* 邀请员工对话框 */}
+      <Dialog
+        open={inviteDialogOpen}
+        onClose={handleCloseInviteDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <QrCodeIcon sx={{ color: '#6366f1' }} />
+            邀请员工
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            选择员工角色（可多选），生成邀请链接后发送给员工。员工扫码注册后将自动获得对应权限。
+          </DialogContentText>
+
+          {/* 角色选择 */}
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <FormLabel>分配角色 *</FormLabel>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+              {roles.map(role => (
+                <Chip
+                  key={role.id}
+                  label={role.description || role.name}
+                  clickable
+                  color={inviteRoles.includes(role.id) ? 'primary' : 'default'}
+                  variant={inviteRoles.includes(role.id) ? 'filled' : 'outlined'}
+                  onClick={() => {
+                    if (inviteRoles.includes(role.id)) {
+                      setInviteRoles(inviteRoles.filter(id => id !== role.id));
+                    } else {
+                      setInviteRoles([...inviteRoles, role.id]);
+                    }
+                  }}
+                  sx={{
+                    ...(inviteRoles.includes(role.id) && {
+                      backgroundColor: '#6366f1',
+                      color: '#fff',
+                      '&:hover': { backgroundColor: '#4f46e5' },
+                    }),
+                  }}
+                />
+              ))}
+            </Box>
+          </FormControl>
+
+          {/* 手机号输入（可选）*/}
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <FormLabel>员工手机号（选填）</FormLabel>
+            <TextField
+              fullWidth
+              value={invitePhone}
+              onChange={(e) => setInvitePhone(e.target.value)}
+              placeholder="填写后仅该手机号可接受邀请"
+              size="small"
+              sx={{ mt: 1 }}
+            />
+          </FormControl>
+
+          {/* 邀请结果展示 */}
+          {inviteResult && (
+            <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>邀请已生成</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                <QrCode
+                  value={inviteResult.qr_data}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                />
+              </Box>
+              <TextField
+                fullWidth
+                value={inviteResult.qr_data}
+                InputProps={{ readOnly: true }}
+                size="small"
+                sx={{ mb: 1 }}
+              />
+              <Button
+                fullWidth
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  navigator.clipboard.writeText(inviteResult.qr_data);
+                  showSnackbar('链接已复制', 'success');
+                }}
+              >
+                复制邀请链接
+              </Button>
+            </Box>
+          )}
+
+          {/* 加载状态 */}
+          {inviteLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseInviteDialog}>关闭</Button>
+          {!inviteResult && (
+            <Button
+              onClick={handleCreateInvite}
+              variant="contained"
+              disabled={inviteLoading || inviteRoles.length === 0}
+              sx={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #4f46e5 0%, #9333ea 100%)',
+                },
+              }}
+            >
+              {inviteLoading ? '生成中...' : '生成邀请'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
+};
+
+/* ========== 邀请员工相关函数 ========== */
+
+const handleOpenInviteDialog = () => {
+  setInviteRoles([]);
+  setInvitePhone('');
+  setInviteResult(null);
+  setInviteDialogOpen(true);
+};
+
+const handleCloseInviteDialog = () => {
+  setInviteDialogOpen(false);
+  setInviteResult(null);
+};
+
+const handleCreateInvite = async () => {
+  if (inviteRoles.length === 0) {
+    showSnackbar('请至少选择一个角色', 'error');
+    return;
+  }
+
+  setInviteLoading(true);
+  try {
+    // 调用后端 API 创建员工邀请
+    const response = await fetch('/api/invitations/create_employee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role_ids: inviteRoles,
+        target_phone: invitePhone || null,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || '创建邀请失败');
+    }
+
+    setInviteResult({
+      invite_code: data.invite_code,
+      qr_data: data.qr_data,
+      role_ids: data.role_ids,
+    });
+    showSnackbar('邀请已生成', 'success');
+  } catch (error: any) {
+    console.error('Failed to create invitation:', error);
+    showSnackbar(error.message || '创建邀请失败', 'error');
+  } finally {
+    setInviteLoading(false);
+  }
 };
 
 export default UserManagementPage;

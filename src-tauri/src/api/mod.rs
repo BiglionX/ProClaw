@@ -70,7 +70,9 @@ pub fn create_router(state: AppState) -> axum::Router {
         .route("/api/auth/token", axum::routing::post(auth::refresh_token))
         .route("/api/health", axum::routing::get(health_check))
         // 邀请接受（无需认证，IP 限流在 handler 内部实现）
-        .route("/api/invitations/accept", axum::routing::post(invitations::accept_invitation));
+        .route("/api/invitations/accept", axum::routing::post(invitations::accept_invitation))
+        // 员工邀请接受（无需认证，IP 限流在 handler 内部实现）
+        .route("/api/invitations/accept_employee", axum::routing::post(invitations::accept_employee_invitation));
 
     // 需要认证的端点
     let protected_routes = axum::Router::new()
@@ -157,8 +159,9 @@ pub fn create_router(state: AppState) -> axum::Router {
         // 权限检查
         .route("/api/auth/me", axum::routing::get(auth::get_current_user))
 
-        // 邀请管理 (PRD v4.2)
+        // 邀请管理 (PRD v4.2 + v4.3)
         .route("/api/invitations/create", axum::routing::post(invitations::create_invitation))
+        .route("/api/invitations/create_employee", axum::routing::post(invitations::create_employee_invitation))
         .route("/api/invitations", axum::routing::get(invitations::list_invitations))
         .route("/api/invitations/:code/revoke", axum::routing::post(invitations::revoke_invitation))
 
