@@ -750,3 +750,48 @@ CREATE TRIGGER IF NOT EXISTS update_order_drafts_updated_at
 BEGIN
     UPDATE order_drafts SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
+
+-- ============================================
+-- 邀请表 (PRD v4.2 外部伙伴邀请)
+-- ============================================
+CREATE TABLE IF NOT EXISTS invitations (
+    id TEXT PRIMARY KEY,
+    invite_code TEXT NOT NULL UNIQUE,
+    inviter_id TEXT NOT NULL,
+    target_phone TEXT,
+    type TEXT NOT NULL CHECK(type IN ('order_share', 'price_update')),
+    business_ref_id TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'used', 'expired', 'revoked')),
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER,
+    used_by TEXT,
+    FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (used_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_invitations_code ON invitations(invite_code);
+CREATE INDEX IF NOT EXISTS idx_invitations_status ON invitations(status);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter ON invitations(inviter_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_code_status ON invitations(invite_code, status);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter_status ON invitations(inviter_id, status);
+CREATE INDEX IF NOT EXISTS idx_invitations_expires ON invitations(expires_at);
+
+-- ============================================
+-- 用户联系人关系表 (PRD v4.2)
+-- ============================================
+CREATE TABLE IF NOT EXISTS user_contacts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    contact_id TEXT NOT NULL,
+    contact_type TEXT NOT NULL CHECK(contact_type IN ('supplier', 'customer', 'colleague')),
+    created_at INTEGER NOT NULL,
+    UNIQUE(user_id, contact_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (contact_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_contacts_user ON user_contacts(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_contacts_contact ON user_contacts(contact_id);
+CREATE INDEX IF NOT EXISTS idx_user_contacts_user_type ON user_contacts(user_id, contact_type);
+CREATE INDEX IF NOT EXISTS idx_user_contacts_contact_user ON user_contacts(contact_id, user_id);

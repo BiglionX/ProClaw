@@ -1,4 +1,4 @@
-import { Info as InfoIcon, Analytics as AnalyticsIcon, Help as HelpIcon } from '@mui/icons-material';
+import { Info as InfoIcon, Analytics as AnalyticsIcon, Help as HelpIcon, QrCode as QrCodeIcon } from '@mui/icons-material';
 import {
   Box,
   Button,
@@ -16,6 +16,7 @@ import { useState } from 'react';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
 import UserCenterPage from './UserCenterPage';
+import InvitationManagementPage from './InvitationManagementPage';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -75,6 +76,7 @@ export default function SettingsPage() {
           <Tab label="🗄️ 数据库设置" {...a11yProps(2)} />
           <Tab label="🔍 指令分析" {...a11yProps(3)} />
           <Tab label="ℹ️ 系统信息" {...a11yProps(4)} />
+          <Tab label="📧 邀请管理" {...a11yProps(5)} />
         </Tabs>
       </Paper>
 

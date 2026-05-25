@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { Text, Searchbar, Card, Avatar, useTheme, ActivityIndicator } from 'react-native-paper';
+import { Text, Searchbar, Card, Avatar, useTheme, ActivityIndicator, FAB } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
@@ -89,15 +89,15 @@ const ContactsScreen: React.FC = () => {
     loadContacts();
   };
 
-  // 各分类计数
+  // 各分类计数（基于实际数据）
   const typeCounts = useMemo(() => {
-    const data = contacts.length > 0 ? DEMO_CONTACTS : [];
+    const data = contacts;
     const all = data.length;
     const colleague = data.filter((c) => c.contact_type === 'colleague').length;
     const customer = data.filter((c) => c.contact_type === 'customer').length;
     const supplier = data.filter((c) => c.contact_type === 'supplier').length;
     return { all, colleague, customer, supplier };
-  }, []);
+  }, [contacts]);
 
   const FILTER_TABS: { key: FilterType; label: string; count: number }[] = [
     { key: 'all',        label: '全部',   count: typeCounts.all },
@@ -169,12 +169,20 @@ const ContactsScreen: React.FC = () => {
     navigation.navigate('Call' as never);
   };
 
+  /** 打开邀请页面 */
+  const handleInvite = () => {
+    navigation.navigate('InvitePartner' as never);
+  };
+
   const renderContact = ({ item }: { item: Customer }) => {
     const typeCfg = item.contact_type ? TYPE_CONFIG[item.contact_type] : null;
     const avatarColor = typeCfg?.color || colors.primary;
     const subtitle = item.company || item.department
       ? (item.company || item.department) + (item.position ? ` · ${item.position}` : '')
       : item.position || '';
+
+    // 联系人来源标识（是否为邀请添加）
+    const isInvited = (item as any).source === 'invitation';
 
     return (
       <Swipeable renderRightActions={() => renderRightActions(item)}>
@@ -189,6 +197,12 @@ const ContactsScreen: React.FC = () => {
               <View style={styles.nameRow}>
                 <Text variant="titleSmall" style={styles.name}>{item.name}</Text>
                 {renderTypeBadge(item.contact_type)}
+                {isInvited && (
+                  <View style={[styles.typeBadge, { backgroundColor: '#ede9fe' }]}>
+                    <MaterialCommunityIcons name="link-variant" size={10} color="#8b5cf6" />
+                    <Text style={[styles.typeBadgeText, { color: '#8b5cf6' }]}>邀请</Text>
+                  </View>
+                )}
               </View>
               {subtitle ? (
                 <Text variant="bodySmall" style={styles.subtitle} numberOfLines={1}>
@@ -305,6 +319,15 @@ const ContactsScreen: React.FC = () => {
           }
         />
       )}
+
+      {/* 邀请外部伙伴 FAB */}
+      <FAB
+        icon="account-plus"
+        label="邀请伙伴"
+        style={styles.fab}
+        onPress={handleInvite}
+        color="#fff"
+      />
     </View>
   );
 };
@@ -474,6 +497,14 @@ const styles = StyleSheet.create({
   },
   videoCallBtn: {
     backgroundColor: '#d1fae5',
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#6366f1',
+    borderRadius: 30,
   },
 });
 

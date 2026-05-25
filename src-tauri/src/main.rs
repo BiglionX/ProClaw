@@ -22,6 +22,7 @@ pub mod approval_commands;
 pub mod subscription_commands;
 pub mod message_commands;
 pub mod call_commands;
+pub mod invitation_commands;
 
 use database::{Database, get_database_path};
 use sync_engine::*;
@@ -48,6 +49,7 @@ use approval_commands::*;
 use subscription_commands::*;
 use message_commands::*;
 use call_commands::*;
+use invitation_commands::*;
 
 #[tokio::main]
 async fn main() {
@@ -242,6 +244,11 @@ async fn main() {
             create_call_record_cmd,
             update_call_record_cmd,
             check_user_online_cmd,
+            // 外部伙伴邀请 (PRD v4.2)
+            create_invitation_cmd,
+            accept_invitation_cmd,
+            revoke_invitation_cmd,
+            get_invitations_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

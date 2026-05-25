@@ -58,6 +58,9 @@ sha2 = "0.10.8"
 # 密码哈希 (argon2)
 argon2 = "0.5.3"
 
+# HMAC-SHA256 签名（邀请码防伪）
+hmac = "0.12"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

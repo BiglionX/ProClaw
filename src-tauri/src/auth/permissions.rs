@@ -39,6 +39,11 @@ pub mod perm {
     // 外部用户
     pub const VIEW_OWN_ORDERS: &str = "view_own_orders";
     pub const VIEW_OWN_PRODUCTS: &str = "view_own_products";
+
+    // 邀请管理 (PRD v4.2)
+    pub const CREATE_INVITATION: &str = "create_invitation";
+    pub const VIEW_INVITATIONS: &str = "view_invitations";
+    pub const REVOKE_INVITATION: &str = "revoke_invitation";
 }
 
 /// 角色定义
@@ -90,6 +95,9 @@ pub fn get_role_permissions(role_name: &str) -> Vec<String> {
             perm::MANAGE_PURCHASE.to_string(),
             perm::VIEW_PRODUCTS.to_string(),
             perm::VIEW_INVENTORY.to_string(),
+            perm::CREATE_INVITATION.to_string(),
+            perm::VIEW_INVITATIONS.to_string(),
+            perm::REVOKE_INVITATION.to_string(),
         ],
         "warehouse" => vec![
             perm::VIEW_INVENTORY.to_string(),
@@ -101,6 +109,9 @@ pub fn get_role_permissions(role_name: &str) -> Vec<String> {
             perm::CREATE_SALES_ORDER.to_string(),
             perm::VIEW_PRODUCTS.to_string(),
             perm::VIEW_INVENTORY.to_string(),
+            perm::CREATE_INVITATION.to_string(),
+            perm::VIEW_INVITATIONS.to_string(),
+            perm::REVOKE_INVITATION.to_string(),
         ],
         "customer" => vec![
             perm::VIEW_OWN_ORDERS.to_string(),
@@ -163,6 +174,11 @@ pub fn required_permission_for_route(method: &str, path: &str) -> Option<&'stati
 
         // 审批 (boss/finance)
         (_, p) if p.starts_with("/api/approvals") => Some(perm::APPROVE_ORDERS),
+
+        // 邀请管理 (PRD v4.2)
+        (_, p) if p == "/api/invitations/create" => Some(perm::CREATE_INVITATION),
+        (_, p) if p == "/api/invitations" && method == "GET" => Some(perm::VIEW_INVITATIONS),
+        (_, p) if p.contains("/api/invitations/") && p.contains("/revoke") => Some(perm::REVOKE_INVITATION),
 
         // AI / 文件 / 消息 / 设备 / 中继 — 内部用户均可
         _ => None,
