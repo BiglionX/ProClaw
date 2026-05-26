@@ -118,6 +118,12 @@ const AGENT_TEMPLATES: Record<string, TeamMember> = {
     responsibilities: '自动处理客户咨询、订单查询，维护客户信息，跟踪售后问题。',
     sort_order: 5,
   },
+  imageSearcher: {
+    agent_id: 'builtin-image-searcher',
+    role: 'AI智能找图',
+    responsibilities: '根据商品名称和描述自动搜索高质量产品图片，支持 Pexels/Pixabay 双源搜索，单商品精搜和批量匹配双模式，智能关键词优化以提升命中率。',
+    sort_order: 6,
+  },
 };
 
 // ============================================================
@@ -310,6 +316,14 @@ function ruleBasedRecommend(profile: BusinessProfile): TeamRecommendation {
     members.push({ ...AGENT_TEMPLATES.customerServiceAgent, sort_order: members.length });
     tags.push('客户服务');
     reasons.push('业务规模较大，建议配置客户服务助手提升响应效率');
+  }
+
+  // --- AI智能找图 Agent ---
+  // 有产品即可启用，帮商户快速获取产品图片
+  if (profile.totalProducts > 0) {
+    members.push({ ...AGENT_TEMPLATES.imageSearcher, sort_order: members.length });
+    tags.push('智能找图');
+    reasons.push(`${profile.totalProducts} 个产品需要配图，AI智能找图可自动搜索高质量商品图片`);
   }
 
   // 如果没有触发任何规则，至少给一个基础模板

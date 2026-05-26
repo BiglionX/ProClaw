@@ -16,6 +16,7 @@ import {
   PersonRemove as PersonRemoveIcon,
 } from '@mui/icons-material';
 import {
+  alpha,
   Box,
   Button,
   Card,
@@ -39,7 +40,7 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import { invoke } from '@tauri-apps/api/core';
+import { isTauri, safeInvoke } from '../lib/tauri';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AiTeam, CreateTeamPayload, TeamMember, UpdateTeamPayload } from '../lib/teamTypes';
 import { PUBLISH_STATUS_MAP, PUBLISH_STATUS_COLOR } from '../lib/teamTypes';
@@ -74,18 +75,137 @@ export default function TeamsPage() {
   const [recommendation, setRecommendation] = useState<TeamRecommendation | null>(null);
   const [recommendError, setRecommendError] = useState('');
 
+  // 内置默认团队的 ID 前缀（用于识别系统预置）
+  const BUILTIN_TEAM_PREFIX = 'builtin-ai-business-team';
+
+  /** 内置默认团队成员：AI 经营团队全量 7 个 Agent */
+  function getBuiltinTeamMembers(): TeamMember[] {
+    return [
+      {
+        agent_id: 'builtin-inventory-optimizer',
+        role: '库存优化师',
+        responsibilities: '监控库存水平，预警低库存商品，优化安全库存设置，识别滞销品并建议清仓策略。',
+        sort_order: 0,
+      },
+      {
+        agent_id: 'builtin-sales-forecaster',
+        role: '销售预测分析师',
+        responsibilities: '分析历史销售趋势，预测未来销量，识别季节性波动，辅助采购决策。',
+        sort_order: 1,
+      },
+      {
+        agent_id: 'builtin-business-analyst',
+        role: '业务分析师',
+        responsibilities: '多维度业务分析，KPI 监控与解读，生成经营报表和月度报告。',
+        sort_order: 2,
+      },
+      {
+        agent_id: 'builtin-purchase-advisor',
+        role: '采购顾问',
+        responsibilities: '根据库存和销售数据生成采购建议，优化采购批量和频率，管理供应商交付评估。',
+        sort_order: 3,
+      },
+      {
+        agent_id: 'builtin-financial-advisor',
+        role: '财务分析师',
+        responsibilities: '监控现金流健康度，分析应收应付结构，评估定价策略和利润率。',
+        sort_order: 4,
+      },
+      {
+        agent_id: 'builtin-cs-agent',
+        role: '客户服务助手',
+        responsibilities: '自动处理客户咨询、订单查询，维护客户信息，跟踪售后问题。',
+        sort_order: 5,
+      },
+      {
+        agent_id: 'builtin-image-searcher',
+        role: 'AI智能找图',
+        responsibilities: '根据商品名称和描述自动搜索高质量产品图片，支持 Pexels/Pixabay 双源搜索，单商品精搜和批量匹配双模式，智能关键词优化以提升命中率。',
+        sort_order: 6,
+      },
+    ];
+  }
+
+  /** 浏览器开发模式下的 mock 内置团队，无需 Tauri IPC */
+  function getMockBuiltinTeam(): AiTeam {
+    const now = new Date().toISOString();
+    return {
+      id: 'mock-builtin-team',
+      name: 'AI 经营团队',
+      description: 'ProClaw 内置的 AI 经营团队（浏览器开发模式），包含 7 个专业 Agent。实际运行请使用 Tauri 桌面端。',
+      category: '通用经营',
+      config_json: '{}',
+      source: 'builtin',
+      version: '1.0.0',
+      publish_status: 'draft',
+      tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图'],
+      members: getBuiltinTeamMembers(),
+      workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
+      triggers: {},
+      created_at: now,
+      updated_at: now,
+    };
+  }
+
+  /** 首次加载时若无任何团队，自动创建内置默认团队 */
+  async function ensureBuiltinTeam() {
+    try {
+      // 检查是否已存在内置团队
+      const existing = await safeInvoke<AiTeam[]>('get_teams');
+      if (existing && existing.length > 0) return;
+
+      // 创建默认的 "AI 经营团队"
+      const payload: CreateTeamPayload = {
+        name: 'AI 经营团队',
+        description: 'ProClaw 内置的 AI 经营团队，包含 7 个专业 Agent：库存优化师、销售预测分析师、业务分析师、采购顾问、财务分析师、客户服务助手、AI智能找图。可根据您的业务数据通过"AI 智能推荐"功能动态调整成员配置。',
+        category: '通用经营',
+        tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图'],
+        members: getBuiltinTeamMembers(),
+        workflow: {
+          mode: 'sequential',
+          steps: [
+            { order: 1, agent_role: '业务分析师', action: 'analyze', input_from: 'system_trigger' },
+            { order: 2, agent_role: '库存优化师', action: 'review_and_enhance', input_from: 'step_1' },
+            { order: 3, agent_role: '销售预测分析师', action: 'review_and_enhance', input_from: 'step_2' },
+          ],
+          fallback_strategy: 'skip_on_error',
+        },
+        triggers: {
+          inventory_check: { schedule: '0 8 * * *', description: '每天早上 8 点检查库存状态' },
+          sales_report: { schedule: '0 9 * * 1', description: '每周一早上 9 点生成销售周报' },
+          financial_review: { schedule: '0 10 1 * *', description: '每月 1 号上午 10 点生成月度财务报告' },
+        },
+      };
+
+      const team = await safeInvoke<AiTeam>('create_team', { payload });
+      if (team) setTeams([team]);
+    } catch (err) {
+      console.error('Failed to create builtin team:', err);
+      // 静默失败，不阻塞用户操作
+    }
+  }
+
   const loadTeams = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await invoke<AiTeam[]>('get_teams');
-      setTeams(result);
+      const result = await safeInvoke<AiTeam[]>('get_teams');
+      if (result) {
+        setTeams(result);
+        // 首次加载时若无任何团队，自动创建内置默认团队
+        if (result.length === 0) {
+          ensureBuiltinTeam();
+        }
+      } else if (!isTauri()) {
+        // 浏览器开发模式：展示模拟内置团队，方便 UI 调试
+        setTeams([getMockBuiltinTeam()]);
+      }
     } catch (err) {
       console.error('Failed to load teams:', err);
       setSnackbar('加载团队列表失败: ' + String(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadTeams();
@@ -96,9 +216,11 @@ export default function TeamsPage() {
     try {
       const text = await file.text();
       JSON.parse(text); // 验证
-      const team = await invoke<AiTeam>('import_team', { teamJson: text });
-      setTeams((prev) => [team, ...prev]);
-      setSnackbar(`成功导入"${team.name}"`);
+      const team = await safeInvoke<AiTeam>('import_team', { teamJson: text });
+      if (team) {
+        setTeams((prev) => [team, ...prev]);
+        setSnackbar(`成功导入"${team.name}"`);
+      }
     } catch (err) {
       const msg = String(err);
       setSnackbar(msg.includes('JSON') ? '文件格式错误' : '导入失败: ' + msg);
@@ -110,7 +232,7 @@ export default function TeamsPage() {
   // 删除团队
   const handleDelete = async (id: string) => {
     try {
-      await invoke('delete_team', { id });
+      await safeInvoke('delete_team', { id });
       setTeams((prev) => prev.filter((t) => t.id !== id));
       setSnackbar('已删除团队');
     } catch (err) {
@@ -124,12 +246,14 @@ export default function TeamsPage() {
   const handleTogglePublish = async (team: AiTeam) => {
     const newStatus = team.publish_status === 'published' ? 'private' : 'published';
     try {
-      const updated = await invoke<AiTeam>('update_team', {
+      const updated = await safeInvoke<AiTeam>('update_team', {
         id: team.id,
         payload: { publish_status: newStatus },
       });
-      setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      setSnackbar(newStatus === 'published' ? '已发布到市场' : '已取消发布');
+      if (updated) {
+        setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        setSnackbar(newStatus === 'published' ? '已发布到市场' : '已取消发布');
+      }
     } catch (err) {
       setSnackbar('操作失败: ' + String(err));
     }
@@ -234,7 +358,9 @@ export default function TeamsPage() {
             </Button>
           </Tooltip>
           <Tooltip title="刷新列表">
-            <IconButton onClick={loadTeams} disabled={loading}><RefreshIcon /></IconButton>
+            <span>
+              <IconButton onClick={loadTeams} disabled={loading}><RefreshIcon /></IconButton>
+            </span>
           </Tooltip>
           <Button
             variant="outlined"
@@ -308,8 +434,9 @@ export default function TeamsPage() {
       {/* 团队卡片列表 */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2 }}>
         {filteredTeams.map((team) => (
-          <Card key={team.id} sx={{ backgroundColor: '#1e1e1e', border: '1px solid #333', borderRadius: 2, transition: 'all 0.2s',
-            '&:hover': { borderColor: '#6366f1', boxShadow: '0 4px 20px rgba(99,102,241,0.15)' } }}>
+          <Card key={team.id} sx={{ backgroundColor: (theme) => theme.palette.background.paper, borderRadius: 2, transition: 'all 0.2s',
+            boxShadow: (theme) => `0 1px 3px ${alpha(theme.palette.common.black, 0.08)}`,
+            '&:hover': { borderColor: '#6366f1', boxShadow: (theme) => `0 6px 24px ${alpha('#6366f1', 0.18)}` } }}>
             <CardContent sx={{ pb: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1 }}>
                 <Box sx={{ width: 44, height: 44, borderRadius: 1.5, background: 'linear-gradient(135deg, #6366f1, #a855f7)',
@@ -328,7 +455,7 @@ export default function TeamsPage() {
                         color: PUBLISH_STATUS_COLOR[team.publish_status] }}
                     />
                     <Chip label={`v${team.version}`} size="small"
-                      sx={{ height: 20, fontSize: '0.65rem', backgroundColor: 'rgba(255,255,255,0.05)', color: '#999' }} />
+                      sx={{ height: 20, fontSize: '0.65rem', backgroundColor: (t) => alpha(t.palette.common.black, 0.04), color: (t) => t.palette.text.secondary }} />
                     {team.members?.length > 0 && (
                       <Chip label={`${team.members.length}成员`} size="small"
                         sx={{ height: 20, fontSize: '0.65rem', backgroundColor: 'rgba(168,85,247,0.1)', color: '#a78bfa' }} />
@@ -623,8 +750,8 @@ function CreateTeamDialog({ open, onClose, onCreated }: {
     setCreating(true);
     try {
       const payload: CreateTeamPayload = { name: name.trim(), description: description.trim() || undefined, category: category.trim() || undefined, tags };
-      const team = await invoke<AiTeam>('create_team', { payload });
-      onCreated(team);
+      const team = await safeInvoke<AiTeam>('create_team', { payload });
+      if (team) onCreated(team);
     } catch (err) {
       console.error('Create team failed:', err);
     } finally {
@@ -851,8 +978,8 @@ function EditTeamDialog({ team, onClose, onSaved }: {
         tags,
         members,
       };
-      const updated = await invoke<AiTeam>('update_team', { id: team.id, payload });
-      onSaved(updated);
+      const updated = await safeInvoke<AiTeam>('update_team', { id: team.id, payload });
+      if (updated) onSaved(updated);
     } catch (err) {
       console.error('Update team failed:', err);
     } finally {
