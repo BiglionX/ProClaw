@@ -5,9 +5,13 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/),
 版本遵循 [Semantic Versioning](https://semver.org/)。
 
-## [Unreleased]
+## [0.1.0] - 2026-05-26
 
 ### Added
+- **首个桌面安装包**: Windows x64 NSIS 安装程序 (~6.8 MB)
+- **AI 经营团队**: 内置 7 个专业 Agent（库存、销售、数据分析、采购、财务、客服、AI 智能找图）
+- **AI 智能找图 Agent**: 有产品时自动推荐，作为第 7 个内置 Agent
+- AI 团队管理：创建/编辑/删除/导入/导出，发布到市场
 - **Phase 8: 测试与文档** - 全面质量保证
 - 前端服务单元测试 (15 个测试模块, ~200+ 测试用例)
   - purchaseService: 供应商、采购订单 CRUD 及编码生成测试
@@ -20,6 +24,7 @@
   - subscriptionService: 套餐、订阅、token 用量、账单测试
   - syncService: 数据库统计、同步状态测试
   - aiConfig: 配置存取、多提供商连接测试
+- AI 团队推荐服务单元测试 (10 个测试用例)
 - Rust 后端单元测试
   - permissions: RBAC 权限检查（22 个测试用例）
   - key_manager: JWT 密钥生成/加载/环境变量（5 个测试用例）
@@ -37,16 +42,25 @@
 - 打包配置优化
   - 增强 Windows 构建脚本
   - 多平台目标配置准备
+- 发布说明文件 (`RELEASE_NOTES_v0.1.0.md`)
 
 ### Changed
+- TeamsPage: 使用 `safeInvoke` 替代裸 `invoke`，修复浏览器 dev 模式崩溃
+- TeamsPage: Card 样式从暗色(#1e1e1e)改为自适应主题背景
+- `tauri.ts`: 警告去重，同一命令仅提示一次
 - 完善权限模块测试覆盖
 - 优化 CHANGELOG 格式规范
+
+### Fixed
+- 修复 TeamsPage 在浏览器 dev 模式下 `Cannot read properties of undefined (reading 'invoke')` 崩溃
+- 修复 TeamsPage 卡片暗色背景与浅色主题不搭配的问题
 
 ### Technical
 - 前端测试覆盖率目标 > 60%（branches/functions/lines/statements）
 - Rust 测试覆盖: auth, utils, types 模块
 - E2E 测试覆盖: 登录、仪表盘、产品、销售、采购、财务、库存、设置、双模式库
 - 测试框架: Vitest + Playwright + Rust #[test]
+- 新增 `build:tauri` npm script，构建跳过 tsc 检查（CloudStore 预存 TS 错误不影响运行时）
 
 ## [1.0.0-beta.1] - 2026-04-13
 

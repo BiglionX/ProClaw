@@ -20,9 +20,7 @@ import {
   Launch,
   Timer,
   CheckCircle,
-  Cancel,
 } from '@mui/icons-material';
-import { isTauri } from '../../lib/tauri';
 import {
   createInvitation,
   formatTimeRemaining,
@@ -56,13 +54,7 @@ export const InvitationDialog: React.FC<InvitationDialogProps> = ({
     expires_at: number;
   } | null>(null);
 
-  // 倒计时刷新
-  const [now, setNow] = React.useState(Date.now());
-  React.useEffect(() => {
-    if (!result) return;
-    const timer = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(timer);
-  }, [result]);
+
 
   const handleCreate = async () => {
     setLoading(true);
