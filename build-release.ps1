@@ -6,7 +6,9 @@ param(
     [switch]$SkipTest,
     [switch]$SkipClean,
     [ValidateSet("msi", "nsis", "all")]
-    [string]$Target = "all"
+    [string]$Target = "all",
+    [ValidateSet("inventory", "virtual_company")]
+    [string]$Mode = "inventory"
 )
 
 # Configure local WiX installation (skip download)
@@ -22,6 +24,19 @@ if (Test-Path $wixPath) {
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Proclaw Desktop v0.1.0-beta.2 Builder" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# 设置构建模式
+$env:VITE_BUILD_MODE = $Mode
+Write-Host "Build Mode: $Mode" -ForegroundColor Yellow
+if ($Mode -eq "virtual_company") {
+    $env:CARGO_FEATURES = "virtual_company,custom-protocol"
+    $outputSuffix = "虚拟公司版"
+} else {
+    $env:CARGO_FEATURES = "inventory,custom-protocol"
+    $outputSuffix = "进销存版"
+}
+Write-Host "Output: ProClaw-$outputSuffix" -ForegroundColor Yellow
 Write-Host ""
 
 # Check if in correct directory

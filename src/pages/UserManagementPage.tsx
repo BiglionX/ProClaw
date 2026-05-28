@@ -33,7 +33,7 @@ import {
   People as PeopleIcon,
   QrCode as QrCodeIcon,
 } from '@mui/icons-material';
-import QrCode from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface User {
   id: string;
@@ -499,7 +499,7 @@ const UserManagementPage: React.FC = () => {
             <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>邀请已生成</Typography>
               <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-                <QrCode
+                <QRCodeCanvas
                   value={inviteResult.qr_data}
                   size={200}
                   level="H"

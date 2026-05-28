@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客户关系 Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+.header { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; }
+.stat-card { flex: 1; background: #fff; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-value { font-size: 24px; font-weight: 700; color: #11998e; }
+.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+.contacts { padding: 0 16px; }
+.contact-item { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.avatar { width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 16px; }
+.info { flex: 1; }
+.name { font-size: 14px; font-weight: 600; }
+.detail { font-size: 12px; color: #999; margin-top: 2px; }
+.tag { font-size: 11px; background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 10px; }
+.section-title { font-size: 15px; font-weight: 600; padding: 12px 16px 8px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>客户关系</h1>
+  <p>管理客户联系人、沟通记录、商机跟踪</p>
+</div>
+<div class="stats">
+  <div class="stat-card"><div class="stat-value">28</div><div class="stat-label">联系人</div></div>
+  <div class="stat-card"><div class="stat-value">6</div><div class="stat-label">商机</div></div>
+  <div class="stat-card"><div class="stat-value">12</div><div class="stat-label">跟进中</div></div>
+</div>
+<div class="section-title">最近联系人</div>
+<div class="contacts">
+  <div class="contact-item">
+    <div class="avatar" style="background:#e91e63">张</div>
+    <div class="info"><div class="name">张伟</div><div class="detail">云创科技 · CEO</div></div>
+    <div class="tag">高意向</div>
+  </div>
+  <div class="contact-item">
+    <div class="avatar" style="background:#2196f3">李</div>
+    <div class="info"><div class="name">李明</div><div class="detail">锐思软件 · 技术总监</div></div>
+    <div class="tag">跟进中</div>
+  </div>
+  <div class="contact-item">
+    <div class="avatar" style="background:#ff9800">王</div>
+    <div class="info"><div class="name">王芳</div><div class="detail">创新咨询 · 项目经理</div></div>
+    <div class="tag">新客户</div>
+  </div>
+  <div class="contact-item">
+    <div class="avatar" style="background:#9c27b0">陈</div>
+    <div class="info"><div class="name">陈强</div><div class="detail">未来科技 · 运营VP</div></div>
+    <div class="tag">已签约</div>
+  </div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[CRMAgent] Current user:', user);
+  } catch(e) {
+    console.log('[CRMAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

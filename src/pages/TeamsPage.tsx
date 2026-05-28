@@ -75,8 +75,6 @@ export default function TeamsPage() {
   const [recommendation, setRecommendation] = useState<TeamRecommendation | null>(null);
   const [recommendError, setRecommendError] = useState('');
 
-  // 内置默认团队的 ID 前缀（用于识别系统预置）
-  const BUILTIN_TEAM_PREFIX = 'builtin-ai-business-team';
 
   /** 内置默认团队成员：AI 经营团队全量 7 个 Agent */
   function getBuiltinTeamMembers(): TeamMember[] {
@@ -436,7 +434,7 @@ export default function TeamsPage() {
         {filteredTeams.map((team) => (
           <Card key={team.id} sx={{ backgroundColor: (theme) => theme.palette.background.paper, borderRadius: 2, transition: 'all 0.2s',
             boxShadow: (theme) => `0 1px 3px ${alpha(theme.palette.common.black, 0.08)}`,
-            '&:hover': { borderColor: '#6366f1', boxShadow: (theme) => `0 6px 24px ${alpha('#6366f1', 0.18)}` } }}>
+            '&:hover': { borderColor: '#6366f1', boxShadow: `0 6px 24px ${alpha('#6366f1', 0.18)}` } }}>
             <CardContent sx={{ pb: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1 }}>
                 <Box sx={{ width: 44, height: 44, borderRadius: 1.5, background: 'linear-gradient(135deg, #6366f1, #a855f7)',

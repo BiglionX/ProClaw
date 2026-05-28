@@ -60,6 +60,7 @@ pub mod approvals;
 pub mod subscriptions;
 pub mod call;
 pub mod invitations;
+pub mod store;
 
 /// 创建 Axum 路由器
 pub fn create_router(state: AppState) -> axum::Router {
@@ -164,6 +165,20 @@ pub fn create_router(state: AppState) -> axum::Router {
         .route("/api/invitations/create_employee", axum::routing::post(invitations::create_employee_invitation))
         .route("/api/invitations", axum::routing::get(invitations::list_invitations))
         .route("/api/invitations/:code/revoke", axum::routing::post(invitations::revoke_invitation))
+
+        // 云商城 API (PRD v5.0)
+        .route("/api/cloud-store", axum::routing::get(store::get_cloud_store).post(store::create_cloud_store))
+        .route("/api/cloud-store/:id", axum::routing::put(store::update_cloud_store))
+        .route("/api/cloud-store/:id/reset-key", axum::routing::post(store::reset_store_api_key))
+        .route("/api/cloud-store/:id/theme", axum::routing::get(store::get_store_theme).put(store::update_store_theme))
+        .route("/api/cloud-store/:id/sync-logs", axum::routing::get(store::get_cloud_sync_logs))
+        .route("/api/cloud-store/:id/orders", axum::routing::get(store::get_store_orders))
+        .route("/api/cloud-store/callback/order", axum::routing::post(store::order_callback))
+        // 云商城商品查询 API
+        .route("/api/cloud-store/products", axum::routing::get(store::get_cloud_products))
+        .route("/api/cloud-store/products/:id", axum::routing::get(store::get_cloud_product))
+        // 订单状态更新 API
+        .route("/api/cloud-store/orders/:id/status", axum::routing::put(store::update_order_status))
 
         // 通话记录 (v4.1 音视频通话)
         .route("/api/call-records", axum::routing::get(call::get_call_records).post(call::create_call_record))

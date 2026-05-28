@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任务管理 Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 16px; }
+.header { margin-bottom: 16px; }
+.header h1 { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+.header p { font-size: 12px; color: #888; margin-top: 4px; }
+.task-input { display: flex; gap: 8px; margin-bottom: 16px; }
+.task-input input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+.task-input input:focus { border-color: #ff3b30; }
+.task-input button { padding: 10px 16px; background: #ff3b30; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.task-input button:hover { background: #d32f2f; }
+.board { display: flex; gap: 12px; overflow-x: auto; }
+.column { min-width: 220px; background: #fff; border-radius: 10px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.column h3 { font-size: 13px; color: #666; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.task-card { background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+.task-card:hover { border-color: #ff3b30; box-shadow: 0 2px 8px rgba(255,59,48,0.1); }
+.task-card .title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.task-card .meta { display: flex; justify-content: space-between; font-size: 11px; color: #999; }
+.priority-high { border-left: 3px solid #ff3b30; }
+.priority-medium { border-left: 3px solid #ff9500; }
+.priority-low { border-left: 3px solid #34c759; }
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 1000; }
+.modal.show { display: flex; }
+.modal-content { background: #fff; border-radius: 12px; padding: 20px; width: 90%; max-width: 360px; }
+.modal-content h2 { font-size: 16px; margin-bottom: 12px; }
+.modal-content label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; margin-top: 10px; }
+.modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+.modal-content textarea { min-height: 60px; resize: vertical; }
+.modal-buttons { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+.modal-buttons button { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.btn-primary { background: #ff3b30; color: #fff; border: none; }
+.btn-secondary { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
+</style>
+</head>
+<body>
+<div class="header"><h1>任务管理</h1><p>看板式任务协作</p></div>
+<div class="task-input"><input id="taskInput" placeholder="添加新任务..." /><button onclick="showAddTask()">+</button></div>
+<div class="board" id="board"><div class="column"><h3>待处理</h3><div id="todo"></div></div><div class="column"><h3>进行中</h3><div id="inprogress"></div></div><div class="column"><h3>已完成</h3><div id="done"></div></div></div>
+
+<div class="modal" id="taskModal"><div class="modal-content">
+<h2 id="modalTitle">新建任务</h2>
+<label>标题</label><input id="editTitle" placeholder="任务标题" />
+<label>描述</label><textarea id="editDesc" placeholder="任务描述"></textarea>
+<label>优先级</label><select id="editPriority"><option value="low">低</option><option value="medium" selected>中</option><option value="high">高</option></select>
+<div class="modal-buttons"><button class="btn-secondary" onclick="closeModal()">取消</button><button class="btn-primary" onclick="saveTask()">保存</button></div>
+</div></div>
+
+<script>
+const STORAGE_KEY = 'proclaw_task_agent_tasks';
+let tasks = [];
+let editingId = null;
+
+function loadTasks() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  tasks = raw ? JSON.parse(raw) : [
+    { id: 't1', title: '欢迎使用任务管理 Agent', desc: '这是示例任务，可编辑或删除', priority: 'medium', status: 'todo', createdAt: Date.now() },
+  ];
+  render();
+}
+
+function saveTasks() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  render();
+}
+
+function render() {
+  const columns = { todo: document.getElementById('todo'), inprogress: document.getElementById('inprogress'), done: document.getElementById('done') };
+  for (const c of Object.values(columns)) c.innerHTML = '';
+  tasks.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'task-card priority-' + t.priority;
+    card.innerHTML = '<div class="title">' + t.title + '</div><div class="meta"><span>' + t.priority + '</span><span>' + new Date(t.createdAt).toLocaleDateString() + '</span></div>';
+    card.onclick = () => editTask(t.id);
+    const col = columns[t.status];
+    if (col) col.appendChild(card);
+  });
+}
+
+function showAddTask() { editingId = null; document.getElementById('modalTitle').textContent = '新建任务'; document.getElementById('editTitle').value = document.getElementById('taskInput').value || ''; document.getElementById('editDesc').value = ''; document.getElementById('editPriority').value = 'medium'; document.getElementById('taskModal').classList.add('show'); }
+
+function closeModal() { document.getElementById('taskModal').classList.remove('show'); }
+
+function editTask(id) {
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  editingId = id; document.getElementById('modalTitle').textContent = '编辑任务';
+  document.getElementById('editTitle').value = t.title;
+  document.getElementById('editDesc').value = t.desc || '';
+  document.getElementById('editPriority').value = t.priority;
+  document.getElementById('taskModal').classList.add('show');
+}
+
+function saveTask() {
+  const title = document.getElementById('editTitle').value.trim();
+  if (!title) return;
+  const desc = document.getElementById('editDesc').value.trim();
+  const priority = document.getElementById('editPriority').value;
+  if (editingId) {
+    const t = tasks.find(x => x.id === editingId);
+    if (t) { t.title = title; t.desc = desc; t.priority = priority; }
+  } else {
+    tasks.unshift({ id: 't' + Date.now(), title, desc, priority, status: 'todo', createdAt: Date.now() });
+  }
+  saveTasks();
+  closeModal();
+  try { if (window.proclaw && window.proclaw.showNotification) window.proclaw.showNotification('任务管理', '任务已保存'); } catch(e) {}
+}
+
+loadTasks();
+</script>
+</body>
+</html>

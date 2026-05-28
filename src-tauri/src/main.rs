@@ -10,11 +10,19 @@ mod auth;
 // 模块化命令文件
 pub mod types;
 mod types_tests;
+
+// 进销存版模块
+#[cfg(feature = "inventory")]
 pub mod product_commands;
+#[cfg(feature = "inventory")]
 pub mod inventory_commands;
+#[cfg(feature = "inventory")]
 pub mod purchase_commands;
+#[cfg(feature = "inventory")]
 pub mod sales_commands;
+#[cfg(feature = "inventory")]
 pub mod finance_commands;
+
 pub mod common_commands;
 pub mod team_commands;
 pub mod user_commands;
@@ -23,8 +31,22 @@ pub mod subscription_commands;
 pub mod message_commands;
 pub mod call_commands;
 pub mod invitation_commands;
+pub mod store_commands;
+
+// 虚拟公司版模块
+#[cfg(feature = "virtual_company")]
+pub mod agent_commands;
+#[cfg(feature = "virtual_company")]
+pub mod agent_sandbox;
+#[cfg(feature = "virtual_company")]
+pub mod agent_security;
+#[cfg(feature = "virtual_company")]
+pub mod finance_agent_commands;
+#[cfg(feature = "virtual_company")]
+pub mod market_commands;
 
 use database::{Database, get_database_path};
+use store_commands::*;
 use sync_engine::*;
 use sync_engine::SyncEngine;
 use services::cloud_backup_service::CloudBackupService;
@@ -37,10 +59,15 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 // 重新导出所有命令
+#[cfg(feature = "inventory")]
 use product_commands::*;
+#[cfg(feature = "inventory")]
 use inventory_commands::*;
+#[cfg(feature = "inventory")]
 use purchase_commands::*;
+#[cfg(feature = "inventory")]
 use sales_commands::*;
+#[cfg(feature = "inventory")]
 use finance_commands::*;
 use common_commands::*;
 use team_commands::*;
@@ -50,6 +77,12 @@ use subscription_commands::*;
 use message_commands::*;
 use call_commands::*;
 use invitation_commands::*;
+#[cfg(feature = "virtual_company")]
+use agent_commands::*;
+#[cfg(feature = "virtual_company")]
+use finance_agent_commands::*;
+#[cfg(feature = "virtual_company")]
+use market_commands::*;
 
 #[tokio::main]
 async fn main() {
@@ -249,7 +282,100 @@ async fn main() {
             accept_invitation_cmd,
             revoke_invitation_cmd,
             get_invitations_cmd,
+
+            // 云托管商城 (PRD v5.0)
+            get_cloud_store,
+            create_cloud_store,
+            upgrade_store_plan,
+            reset_store_api_key,
+            get_syncable_products,
+            sync_all_products_to_cloud,
+            sync_incremental_products,
+            toggle_product_cloud_visible,
+            batch_toggle_products_visible,
+            get_cloud_sync_logs,
+            get_store_theme,
+            update_store_theme,
+            generate_store_theme_ai,
+            get_store_orders,
+            get_store_order,
+            mark_store_order_shipped,
+            get_store_stats,
+            // 商品评价系统 (Phase 5)
+            create_product_review,
+            get_product_reviews,
+            reply_product_review,
+            delete_product_review,
+            // 优惠券系统 (Phase 5)
+            create_coupon,
+            get_coupons,
+            update_coupon_status,
+            delete_coupon,
+            use_coupon,
+            // Agent 管理 (PRD v6.0)
+            #[cfg(feature = "virtual_company")]
+            install_agent,
+            #[cfg(feature = "virtual_company")]
+            uninstall_agent,
+            #[cfg(feature = "virtual_company")]
+            enable_agent,
+            #[cfg(feature = "virtual_company")]
+            disable_agent,
+            #[cfg(feature = "virtual_company")]
+            get_installed_agents,
+            #[cfg(feature = "virtual_company")]
+            get_agent_detail,
+            #[cfg(feature = "virtual_company")]
+            update_agent,
+            #[cfg(feature = "virtual_company")]
+            get_agent_data_dir,
+            #[cfg(feature = "virtual_company")]
+            get_available_permissions,
+            #[cfg(feature = "virtual_company")]
+            agent_db_query,
+            #[cfg(feature = "virtual_company")]
+            agent_db_execute,
+            // 财务管理 Agent (PRD v6.0)
+            #[cfg(feature = "virtual_company")]
+            create_fa_account,
+            #[cfg(feature = "virtual_company")]
+            get_fa_accounts,
+            #[cfg(feature = "virtual_company")]
+            update_fa_account_balance,
+            #[cfg(feature = "virtual_company")]
+            create_fa_transaction,
+            #[cfg(feature = "virtual_company")]
+            get_fa_transactions,
+            #[cfg(feature = "virtual_company")]
+            delete_fa_transaction,
+            #[cfg(feature = "virtual_company")]
+            create_fa_budget,
+            #[cfg(feature = "virtual_company")]
+            get_fa_budgets,
+            #[cfg(feature = "virtual_company")]
+            check_fa_budget_alerts,
+            #[cfg(feature = "virtual_company")]
+            get_fa_category_summary,
+            #[cfg(feature = "virtual_company")]
+            get_fa_profit_loss,
+            #[cfg(feature = "virtual_company")]
+            get_fa_monthly_trend,
+            #[cfg(feature = "virtual_company")]
+            create_fa_invoice,
+            #[cfg(feature = "virtual_company")]
+            get_fa_invoices,
+            #[cfg(feature = "virtual_company")]
+            update_fa_invoice_status,
+            // Agent 市场 (PRD v6.0)
+            #[cfg(feature = "virtual_company")]
+            get_market_agents,
+            #[cfg(feature = "virtual_company")]
+            get_market_agent_detail,
+            #[cfg(feature = "virtual_company")]
+            get_market_categories,
+            #[cfg(feature = "virtual_company")]
+            download_market_agent_package,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application");
 }

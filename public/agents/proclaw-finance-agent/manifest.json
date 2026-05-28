@@ -1,0 +1,10 @@
+{
+  "id": "proclaw-finance-agent",
+  "name": "财务管理 Agent",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "description": "内置财务管理 Agent - 记账、预算、报表、发票管理",
+  "author": "ProClaw 官方",
+  "permissions": ["read_user", "read_finance", "write_finance", "show_notification"],
+  "icon": "account_balance"
+}

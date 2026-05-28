@@ -795,3 +795,36 @@ CREATE INDEX IF NOT EXISTS idx_user_contacts_user ON user_contacts(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_contacts_contact ON user_contacts(contact_id);
 CREATE INDEX IF NOT EXISTS idx_user_contacts_user_type ON user_contacts(user_id, contact_type);
 CREATE INDEX IF NOT EXISTS idx_user_contacts_contact_user ON user_contacts(contact_id, user_id);
+
+-- ============================================
+-- Agent 注册表 (PRD v6.0 Agent 化架构)
+-- ============================================
+CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    manifest TEXT NOT NULL,           -- JSON: 入口文件、权限声明、图标、描述、作者等
+    enabled BOOLEAN DEFAULT 1,
+    is_builtin BOOLEAN DEFAULT 0,     -- 是否内置（如财务管理 Agent，不可卸载）
+    installed_at INTEGER,
+    last_updated INTEGER,
+    data_dir TEXT                     -- Agent 专属数据目录
+);
+
+CREATE INDEX IF NOT EXISTS idx_agents_enabled ON agents(enabled);
+CREATE INDEX IF NOT EXISTS idx_agents_builtin ON agents(is_builtin);
+
+-- ============================================
+-- Agent 权限声明表 (PRD v6.0)
+-- ============================================
+CREATE TABLE IF NOT EXISTS agent_permissions (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    permission TEXT NOT NULL,          -- 权限名称
+    granted_by TEXT REFERENCES users(id),
+    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, permission)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_permissions_agent ON agent_permissions(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_permissions_name ON agent_permissions(permission);

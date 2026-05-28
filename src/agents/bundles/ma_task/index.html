@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任务管理 Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.board { display: flex; gap: 12px; padding: 16px; overflow-x: auto; min-height: 400px; }
+.column { background: #e8e8e8; border-radius: 10px; min-width: 260px; max-width: 280px; padding: 12px; }
+.column-header { font-size: 14px; font-weight: 600; margin-bottom: 10px; padding: 0 4px; }
+.card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
+.card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+.card-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.card-meta { font-size: 11px; color: #999; display: flex; justify-content: space-between; }
+.priority-high { border-left: 3px solid #ff3b30; }
+.priority-medium { border-left: 3px solid #ff9500; }
+.priority-low { border-left: 3px solid #34c759; }
+.status-bar { display: flex; justify-content: space-between; padding: 12px 16px; background: #fff; border-bottom: 1px solid #eee; font-size: 13px; color: #666; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>任务管理</h1>
+  <p>看板式任务管理，支持任务分配与进度跟踪</p>
+</div>
+<div class="status-bar">
+  <span>待处理: 3</span>
+  <span>进行中: 2</span>
+  <span>已完成: 5</span>
+</div>
+<div class="board">
+  <div class="column">
+    <div class="column-header">待处理</div>
+    <div class="card priority-high">
+      <div class="card-title">完成项目方案评审</div>
+      <div class="card-meta"><span>@张三</span><span>截止: 明天</span></div>
+    </div>
+    <div class="card priority-medium">
+      <div class="card-title">更新客户需求文档</div>
+      <div class="card-meta"><span>@李四</span><span>截止: 周三</span></div>
+    </div>
+    <div class="card priority-low">
+      <div class="card-title">整理会议记录</div>
+      <div class="card-meta"><span>@王五</span><span>截止: 周五</span></div>
+    </div>
+  </div>
+  <div class="column">
+    <div class="column-header">进行中</div>
+    <div class="card priority-high">
+      <div class="card-title">开发新功能模块</div>
+      <div class="card-meta"><span>@张三</span><span>进度: 60%</span></div>
+    </div>
+    <div class="card priority-medium">
+      <div class="card-title">编写单元测试</div>
+      <div class="card-meta"><span>@李四</span><span>进度: 30%</span></div>
+    </div>
+  </div>
+  <div class="column">
+    <div class="column-header">已完成</div>
+    <div class="card priority-high"><div class="card-title">需求分析报告</div><div class="card-meta"><span>@张三</span><span>已完成</span></div></div>
+    <div class="card priority-medium"><div class="card-title">UI 设计稿评审</div><div class="card-meta"><span>@王五</span><span>已完成</span></div></div>
+    <div class="card priority-medium"><div class="card-title">数据库设计</div><div class="card-meta"><span>@李四</span><span>已完成</span></div></div>
+    <div class="card priority-low"><div class="card-title">技术选型文档</div><div class="card-meta"><span>@张三</span><span>已完成</span></div></div>
+    <div class="card priority-low"><div class="card-title">部署环境配置</div><div class="card-meta"><span>@运维</span><span>已完成</span></div></div>
+  </div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[TaskAgent] Current user:', user);
+  } catch(e) {
+    console.log('[TaskAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

@@ -7,6 +7,9 @@ import {
   Groups as TeamsIcon,
   People as ContactsIcon,
   Chat as ChatIcon,
+  Storefront as StoreIcon,
+  Extension as ExtensionIcon,
+  AccountBalance as FinanceIcon,
 } from '@mui/icons-material';
 import {
   Divider,
@@ -18,6 +21,7 @@ import {
   ListItemText,
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { IS_VIRTUAL_COMPANY, IS_INVENTORY } from '../../config/appMode';
 
 const DRAWER_WIDTH = 240;
 const TOPBAR_HEIGHT = 64;
@@ -28,15 +32,35 @@ interface NavItem {
   path: string;
 }
 
-const navItems: NavItem[] = [
-  { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
-  { text: 'AI团队', icon: <TeamsIcon />, path: '/teams' },
-  { text: '联系人', icon: <ContactsIcon />, path: '/contacts' },
-  { text: '消息', icon: <ChatIcon />, path: '/messages' },
-  { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter' },
-  { text: '商品库', icon: <ProductsIcon />, path: '/products' },
-  { text: '供应链', icon: <SupplyChainIcon />, path: '/supplychain' },
-];
+const navItems: NavItem[] = (() => {
+  const items: NavItem[] = [
+    { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
+  ];
+
+  if (IS_VIRTUAL_COMPANY) {
+    items.push(
+      { text: 'Agent管理', icon: <ExtensionIcon />, path: '/agents' },
+      { text: '财务管理', icon: <FinanceIcon />, path: '/finance-agent' },
+    );
+  }
+
+  items.push(
+    { text: 'AI团队', icon: <TeamsIcon />, path: '/teams' },
+    { text: '联系人', icon: <ContactsIcon />, path: '/contacts' },
+    { text: '消息', icon: <ChatIcon />, path: '/messages' },
+    { text: '云商城', icon: <StoreIcon />, path: '/cloud-store' },
+  );
+
+  if (IS_INVENTORY) {
+    items.push(
+      { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter' },
+      { text: '商品库', icon: <ProductsIcon />, path: '/products' },
+      { text: '供应链', icon: <SupplyChainIcon />, path: '/supplychain' },
+    );
+  }
+
+  return items;
+})();
 
 export default function Sidebar() {
   const navigate = useNavigate();

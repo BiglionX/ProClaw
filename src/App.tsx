@@ -23,6 +23,10 @@ import ChatPage from './pages/ChatPage';
 import MessagesPage from './pages/MessagesPage';
 import CallPage from './pages/CallPage';
 import IncomingCallDialog from './components/Call/IncomingCallDialog';
+import CloudStorePage from './pages/CloudStorePage';
+import AgentManagerPage from './pages/AgentManagerPage';
+import FinanceAgentPage from './pages/FinanceAgentPage';
+import { IS_VIRTUAL_COMPANY } from './config/appMode';
 
 // 添加启动日志
 console.log('App component rendering...');
@@ -191,6 +195,40 @@ function App() {
           element={
             <ProtectedRoute>
               <CallPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Agent 管理 (PRD v6.0) - 仅虚拟公司版 */}
+        {IS_VIRTUAL_COMPANY && (
+          <Route
+            path="/agents"
+            element={
+              <ProtectedRoute>
+                <AgentManagerPage />
+              </ProtectedRoute>
+            }
+          />
+        )}
+
+        {/* 财务管理 (内置 Agent) - 仅虚拟公司版 */}
+        {IS_VIRTUAL_COMPANY && (
+          <Route
+            path="/finance-agent"
+            element={
+              <ProtectedRoute>
+                <FinanceAgentPage />
+              </ProtectedRoute>
+            }
+          />
+        )}
+
+        {/* 云商城路由 */}
+        <Route
+          path="/cloud-store/*"
+          element={
+            <ProtectedRoute>
+              <CloudStorePage />
             </ProtectedRoute>
           }
         />

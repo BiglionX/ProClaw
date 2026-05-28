@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客户关系 Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 16px; }
+.header { margin-bottom: 16px; }
+.header h1 { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+.header p { font-size: 12px; color: #888; margin-top: 4px; }
+.search-bar { margin-bottom: 12px; }
+.search-bar input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+.search-bar input:focus { border-color: #6366f1; }
+.contact-list { display: flex; flex-direction: column; gap: 8px; }
+.contact-card { background: #fff; border-radius: 10px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; }
+.contact-card:hover { box-shadow: 0 2px 8px rgba(99,102,241,0.15); }
+.contact-card .name { font-size: 14px; font-weight: 500; }
+.contact-card .company { font-size: 12px; color: #888; }
+.contact-card .tag { font-size: 11px; background: #eef2ff; color: #6366f1; padding: 2px 8px; border-radius: 10px; }
+.add-btn { position: fixed; bottom: 20px; right: 20px; width: 48px; height: 48px; border-radius: 50%; background: #6366f1; color: #fff; border: none; font-size: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 1000; }
+.modal.show { display: flex; }
+.modal-content { background: #fff; border-radius: 12px; padding: 20px; width: 90%; max-width: 360px; }
+.modal-content h2 { font-size: 16px; margin-bottom: 12px; }
+.modal-content label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; margin-top: 10px; }
+.modal-content input, .modal-content textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+.modal-buttons { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+.modal-buttons button { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.btn-primary { background: #6366f1; color: #fff; border: none; }
+.btn-secondary { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
+</style>
+</head>
+<body>
+<div class="header"><h1>客户关系</h1><p>管理客户与商机</p></div>
+<div class="search-bar"><input id="searchInput" placeholder="搜索客户..." oninput="filterContacts()" /></div>
+<div class="contact-list" id="contactList"></div>
+<button class="add-btn" onclick="showAdd()">+</button>
+<div class="modal" id="contactModal"><div class="modal-content">
+<h2 id="modalTitle">添加客户</h2>
+<label>姓名</label><input id="editName" placeholder="客户姓名" />
+<label>公司</label><input id="editCompany" placeholder="公司名称" />
+<label>电话</label><input id="editPhone" placeholder="联系电话" />
+<label>标签</label><input id="editTag" placeholder="如: 重要客户" />
+<div class="modal-buttons"><button class="btn-secondary" onclick="closeModal()">取消</button><button class="btn-primary" onclick="saveContact()">保存</button></div>
+</div></div>
+<script>
+const KEY = 'proclaw_crm_contacts'; let contacts = []; let editingId = null;
+function load() { const raw = localStorage.getItem(KEY); contacts = raw ? JSON.parse(raw) : [{ id: 'c1', name: '示例客户', company: '科技有限公司', phone: '13800000001', tag: '重要客户' }]; render(); }
+function save() { localStorage.setItem(KEY, JSON.stringify(contacts)); render(); }
+function render() { const q = (document.getElementById('searchInput').value || '').toLowerCase(); const list = document.getElementById('contactList'); list.innerHTML = ''; contacts.filter(c => !q || c.name.toLowerCase().includes(q) || c.company.toLowerCase().includes(q)).forEach(c => { const card = document.createElement('div'); card.className = 'contact-card'; card.innerHTML = '<div><div class="name">' + c.name + '</div><div class="company">' + c.company + '</div></div><span class="tag">' + c.tag + '</span>'; card.onclick = () => editContact(c.id); list.appendChild(card); }); }
+function filterContacts() { render(); }
+function showAdd() { editingId = null; document.getElementById('modalTitle').textContent = '添加客户'; document.getElementById('editName').value = ''; document.getElementById('editCompany').value = ''; document.getElementById('editPhone').value = ''; document.getElementById('editTag').value = ''; document.getElementById('contactModal').classList.add('show'); }
+function closeModal() { document.getElementById('contactModal').classList.remove('show'); }
+function editContact(id) { const c = contacts.find(x => x.id === id); if (!c) return; editingId = id; document.getElementById('modalTitle').textContent = '编辑客户'; document.getElementById('editName').value = c.name; document.getElementById('editCompany').value = c.company; document.getElementById('editPhone').value = c.phone; document.getElementById('editTag').value = c.tag; document.getElementById('contactModal').classList.add('show'); }
+function saveContact() { const name = document.getElementById('editName').value.trim(); if (!name) return; const company = document.getElementById('editCompany').value.trim(); const phone = document.getElementById('editPhone').value.trim(); const tag = document.getElementById('editTag').value.trim(); if (editingId) { const c = contacts.find(x => x.id === editingId); if (c) { c.name = name; c.company = company; c.phone = phone; c.tag = tag; } } else { contacts.unshift({ id: 'c' + Date.now(), name, company, phone, tag }); } save(); closeModal(); }
+load();
+</script>
+</body>
+</html>

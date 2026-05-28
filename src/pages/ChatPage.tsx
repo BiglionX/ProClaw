@@ -7,6 +7,7 @@ import {
   MoreVert as MoreIcon,
   Phone as PhoneIcon,
   Videocam as VideoIcon,
+  AutoAwesome as MagicIcon,
 } from '@mui/icons-material';
 import {
   Avatar,
@@ -14,6 +15,10 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   Paper,
   TextField,
   Tooltip,
@@ -22,6 +27,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Contact, Message, getContacts, getMessages, sendMessage } from '../lib/contactService';
+import { agentRuntime } from '../lib/agentRuntime';
 import desktopCallManager from '../services/CallManager';
 
 export default function ChatPage() {
@@ -32,7 +38,11 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [actionAnchor, setActionAnchor] = useState<HTMLElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // 获取所有聊天上下文的快捷操作
+  const quickActions = agentRuntime.getAllQuickActions('chat');
 
   useEffect(() => {
     loadData();
@@ -83,6 +93,20 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleActionClick = (event: React.MouseEvent<HTMLElement>) => {
+    setActionAnchor(event.currentTarget);
+  };
+
+  const handleActionSelect = async (agentId: string, actionId: string) => {
+    setActionAnchor(null);
+    const action = agentRuntime.getQuickActions(agentId).find(a => a.id === actionId);
+    if (action?.triggerMethod) {
+      await agentRuntime.triggerQuickAction(agentId, actionId);
+    } else if (action?.triggerMessage) {
+      setInput(`/agent ${agentId} ${action.triggerMessage}`);
     }
   };
 
@@ -308,6 +332,38 @@ export default function ChatPage() {
           <IconButton size="small" disabled>
             <FileIcon fontSize="small" />
           </IconButton>
+          {/* Agent 快捷操作按钮 */}
+          {quickActions.length > 0 && (
+            <>
+              <IconButton size="small" onClick={handleActionClick}>
+                <MagicIcon fontSize="small" sx={{ color: '#ff3b30' }} />
+              </IconButton>
+              <Menu
+                anchorEl={actionAnchor}
+                open={!!actionAnchor}
+                onClose={() => setActionAnchor(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              >
+                {quickActions.map(group =>
+                  group.actions.map(action => (
+                    <MenuItem
+                      key={action.id}
+                      onClick={() => handleActionSelect(group.agentId, action.id)}
+                    >
+                      <ListItemIcon>
+                        <MagicIcon fontSize="small" color="warning" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={action.label}
+                        secondary={action.description}
+                      />
+                    </MenuItem>
+                  ))
+                )}
+              </Menu>
+            </>
+          )}
           <TextField
             fullWidth
             multiline

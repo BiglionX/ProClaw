@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result};
+use rusqlite::{Connection, Result, params};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -33,6 +33,12 @@ impl Database {
         Ok(Self { conn })
     }
 
+    /// 创建内存数据库（用于测试）
+    pub fn new_in_memory() -> DbResult<Self> {
+        let conn = Connection::open_in_memory()?;
+        Ok(Self { conn })
+    }
+
     /// 初始化数据库 Schema
     pub fn initialize(&self) -> DbResult<()> {
         // 加载基础schema
@@ -46,6 +52,56 @@ impl Database {
         // 运行迁移：员工邀请与角色权限自动分配（PRD v4.3）
         let migration = include_str!("../../src/db/migrations/006_add_employee_invitation_fields.sql");
         self.conn.execute_batch(migration).ok(); // 忽略错误（如果已经运行过）
+
+        // 运行迁移：财务管理 Agent 数据表（PRD v6.0）
+        let finance_migration = include_str!("../../src/db/migrations/009_finance_agent_tables.sql");
+        self.conn.execute_batch(finance_migration).ok(); // 忽略错误（如果已经运行过）
+
+        // 运行迁移：Agent 市场数据表（PRD v6.0）
+        let market_migration = include_str!("../../database/migrations/010_market_agents.sql");
+        self.conn.execute_batch(market_migration).ok();
+
+        // 自动安装内置 Agent
+        let builtin_count: i64 = self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM agents WHERE is_builtin = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        if builtin_count == 0 {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64;
+
+            // 预定义所有内置 Agent
+            let builtins = vec![
+                ("proclaw-finance-agent", "财务管理 Agent", vec!["read_user", "read_finance", "write_finance", "show_notification"], "内置财务管理 Agent - 记账、预算、报表、发票管理"),
+                ("proclaw-task-agent", "任务管理 Agent", vec!["read_user", "send_message", "show_notification"], "看板式任务管理，支持任务分配、进度跟踪、优先级排序"),
+                ("proclaw-crm-agent", "客户关系 Agent", vec!["read_user", "read_contacts", "send_message"], "管理客户联系人、沟通记录、商机跟踪，支持标签分类"),
+                ("proclaw-docs-agent", "文档协作 Agent", vec!["read_user", "read_files", "write_files"], "Markdown 编辑器，支持版本历史、文档分类归档"),
+                ("proclaw-hr-agent", "人事管理 Agent", vec!["read_user", "send_message", "show_notification"], "员工信息管理、考勤记录、请假审批、工资单生成"),
+            ];
+
+            for (id, name, permissions, description) in &builtins {
+                let manifest = serde_json::json!({
+                    "id": id,
+                    "name": name,
+                    "version": "1.0.0",
+                    "entry": "index.html",
+                    "description": description,
+                    "author": "ProClaw 官方",
+                    "permissions": permissions,
+                }).to_string();
+                self.conn.execute(
+                    "INSERT INTO agents (id, name, version, manifest, enabled, is_builtin, installed_at)
+                     VALUES (?1, ?2, '1.0.0', ?3, 1, 1, ?4)",
+                    params![id, name, manifest, now],
+                ).ok();
+                println!("Installed built-in Agent: {}", name);
+            }
+        }
         
         Ok(())
     }

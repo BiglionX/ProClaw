@@ -29,9 +29,30 @@ import ContactsScreen from './src/screens/ContactsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import CallScreen from './src/screens/CallScreen';
 import CallHistoryScreen from './src/screens/CallHistoryScreen';
+import AgentsScreen from './src/screens/AgentsScreen';
 import IncomingCallModal from './src/components/IncomingCallModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initDatabase } from './src/services/DatabaseService';
 import { loadToken, getApiClient } from './src/services/AuthService';
+
+const ROLES_KEY = '@proclaw_user_roles';
+
+async function loadRoles(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(ROLES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveRoles(roles: string[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ROLES_KEY, JSON.stringify(roles));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,13 +60,13 @@ const SupplyChainStack = createStackNavigator();
 
 // 角色 -> 可见 Tab 映射 (PRD v4.3)
 const ROLE_TAB_ACCESS: Record<string, string[]> = {
-  boss: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  finance: ['HomeTab', 'SupplyChainTab', 'ProfileTab'],
-  purchase: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  warehouse: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  sales: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  customer: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  supplier: ['HomeTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  boss: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  finance: ['HomeTab', 'AgentsTab', 'SupplyChainTab', 'ProfileTab'],
+  purchase: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  warehouse: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  sales: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  customer: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
+  supplier: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
 };
 
 /** 根据用户角色计算可见 Tab 列表 */
@@ -119,6 +140,7 @@ function MainTabs({ userRoles }: { userRoles: string[] }) {
         tabBarIcon: ({ color, size }) => {
           const icons: Record<string, string> = {
             HomeTab: 'view-dashboard',
+            AgentsTab: 'puzzle',
             ProductsTab: 'package-variant-closed',
             SupplyChainTab: 'truck-delivery',
             ProfileTab: 'account',
@@ -139,6 +161,11 @@ function MainTabs({ userRoles }: { userRoles: string[] }) {
         name="HomeTab"
         component={HomeScreen}
         options={{ title: '首页', tabBarLabel: '首页' }}
+      />
+      <Tab.Screen
+        name="AgentsTab"
+        component={AgentsScreen}
+        options={{ title: 'Agent', tabBarLabel: 'Agent' }}
       />
       <Tab.Screen
         name="ProductsTab"

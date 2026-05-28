@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>React Render Test</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    // 测试 React 是否能正常渲染
+    console.log('Test page loading...');
+    
+    try {
+      const React = await import('react');
+      const ReactDOM = await import('react-dom/client');
+      console.log('React loaded successfully:', !!React, !!ReactDOM);
+      
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(React.createElement('h1', null, 'React 渲染成功！'));
+      console.log('Render complete');
+    } catch (err) {
+      console.error('Error:', err);
+      document.getElementById('root').innerHTML = `
+        <div style="color:red;padding:20px;">
+          <h2>Error</h2>
+          <pre>${err.message}</pre>
+          <pre>${err.stack}</pre>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

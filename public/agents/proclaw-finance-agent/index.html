@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>财务管理 Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 16px; }
+.header { margin-bottom: 16px; }
+.header h1 { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+.header p { font-size: 12px; color: #888; margin-top: 4px; }
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.summary-card { background: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.summary-card .label { font-size: 12px; color: #888; margin-bottom: 4px; }
+.summary-card .value { font-size: 20px; font-weight: 700; }
+.income { color: #34c759; }
+.expense { color: #ff3b30; }
+.asset { color: #007aff; }
+.section { margin-bottom: 16px; }
+.section h3 { font-size: 14px; font-weight: 600; color: #555; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.budget-list { display: flex; flex-direction: column; gap: 6px; }
+.budget-item { background: #fff; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; }
+.budget-item .cat { font-size: 13px; font-weight: 500; }
+.budget-item .amt { font-size: 12px; color: #888; }
+.budget-item .bar { height: 4px; border-radius: 2px; margin-top: 6px; background: #eee; }
+.budget-item .bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.bar-warning { background: #ff9500; }
+.bar-danger { background: #ff3b30; }
+.bar-ok { background: #34c759; }
+.quick-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.quick-actions button { flex: 1; min-width: 100px; padding: 10px 12px; background: #fff; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s; text-align: center; }
+.quick-actions button:hover { border-color: #007aff; background: #f0f7ff; }
+.quick-actions button .icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.loading { text-align: center; padding: 40px 0; color: #999; font-size: 14px; }
+.error { background: #fff0f0; border: 1px solid #ffcdd2; border-radius: 8px; padding: 12px; color: #d32f2f; font-size: 13px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="header"><h1>财务管理</h1><p>记账、预算、报表、发票管理</p></div>
+<div id="loading" class="loading">加载财务数据中...</div>
+<div id="error" class="error" style="display:none"></div>
+<div id="content" style="display:none">
+  <div class="summary-grid" id="summaryGrid"></div>
+  <div class="section">
+    <h3>预算告警</h3>
+    <div class="budget-list" id="budgetList"></div>
+  </div>
+  <div class="section">
+    <h3>快捷操作</h3>
+    <div class="quick-actions">
+      <button onclick="quickRecord('income')"><span class="icon">+</span>记一笔收入</button>
+      <button onclick="quickRecord('expense')"><span class="icon">-</span>记一笔支出</button>
+      <button onclick="openFullPage()"><span class="icon">&#x2197;</span>打开完整版</button>
+    </div>
+  </div>
+</div>
+<script>
+const API = window.proclaw;
+
+async function loadData() {
+  showLoading(true);
+  hideError();
+  try {
+    const accounts = await API.dbQuery('SELECT id, name, type, balance FROM agent_finance_accounts WHERE is_active = 1 ORDER BY created_at DESC');
+    const budgets = await API.dbQuery('SELECT b.id, c.name as category_name, b.limit_amount, b.actual_amount FROM agent_finance_budgets b LEFT JOIN agent_finance_categories c ON b.category_id = c.id WHERE b.month = strftime(\'%Y-%m\', \'now\')');
+    const transactions = await API.dbQuery('SELECT type, amount FROM agent_finance_transactions WHERE deleted_at IS NULL AND strftime(\'%Y-%m\', transaction_date) = strftime(\'%Y-%m\', \'now\')');
+    
+    renderSummary(accounts, transactions);
+    renderBudgets(budgets);
+    showLoading(false);
+    document.getElementById('content').style.display = 'block';
+  } catch (err) {
+    showLoading(false);
+    showError('加载财务数据失败: ' + (err.message || err));
+    // 回退：显示示例数据
+    renderDemoData();
+  }
+}
+
+function renderSummary(accounts, transactions) {
+  const totalAssets = (accounts || []).reduce((s, a) => s + (a.balance || 0), 0);
+  const txs = transactions || [];
+  const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
+  const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+  
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="summary-card"><div class="label">总资产</div><div class="value asset">&yen;${totalAssets.toFixed(2)}</div></div>
+    <div class="summary-card"><div class="label">本月收入</div><div class="value income">&yen;${income.toFixed(2)}</div></div>
+    <div class="summary-card"><div class="label">本月支出</div><div class="value expense">&yen;${expense.toFixed(2)}</div></div>
+    <div class="summary-card"><div class="label">本月结余</div><div class="value" style="color:${income - expense >= 0 ? '#34c759' : '#ff3b30'}">&yen;${(income - expense).toFixed(2)}</div></div>
+  `;
+}
+
+function renderBudgets(budgets) {
+  const list = document.getElementById('budgetList');
+  if (!budgets || budgets.length === 0) {
+    list.innerHTML = '<div class="budget-item"><span class="cat" style="color:#999">暂无预算数据</span></div>';
+    return;
+  }
+  list.innerHTML = budgets.map(b => {
+    const limit = b.limit_amount || 0;
+    const actual = b.actual_amount || 0;
+    const pct = limit > 0 ? Math.min(100, (actual / limit * 100)) : 0;
+    let barClass = 'bar-ok';
+    if (pct >= 100) barClass = 'bar-danger';
+    else if (pct >= 80) barClass = 'bar-warning';
+    return `<div class="budget-item">
+      <div><div class="cat">${b.category_name || '未分类'}</div><div class="amt">&yen;${actual.toFixed(0)} / &yen;${limit.toFixed(0)}</div></div>
+      <div class="bar" style="width:60%"><div class="bar-fill ${barClass}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderDemoData() {
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="summary-card"><div class="label">总资产</div><div class="value asset">&yen;128,500.00</div></div>
+    <div class="summary-card"><div class="label">本月收入</div><div class="value income">&yen;45,200.00</div></div>
+    <div class="summary-card"><div class="label">本月支出</div><div class="value expense">&yen;32,800.00</div></div>
+    <div class="summary-card"><div class="label">本月结余</div><div class="value" style="color:#34c759">&yen;12,400.00</div></div>
+  `;
+  document.getElementById('budgetList').innerHTML = `
+    <div class="budget-item"><div><div class="cat">餐饮</div><div class="amt">&yen;3,200 / &yen;5,000</div></div><div class="bar" style="width:60%"><div class="bar-fill bar-ok" style="width:64%"></div></div></div>
+    <div class="budget-item"><div><div class="cat">办公</div><div class="amt">&yen;4,500 / &yen;4,000</div></div><div class="bar" style="width:60%"><div class="bar-fill bar-danger" style="width:113%"></div></div></div>
+    <div class="budget-item"><div><div class="cat">交通</div><div class="amt">&yen;1,200 / &yen;2,000</div></div><div class="bar" style="width:60%"><div class="bar-fill bar-ok" style="width:60%"></div></div></div>
+  `;
+  document.getElementById('content').style.display = 'block';
+}
+
+function quickRecord(type) {
+  const label = type === 'income' ? '收入' : '支出';
+  try {
+    if (API.showNotification) {
+      API.showNotification('财务管理', '请在完整版中记账');
+    }
+  } catch(e) {}
+  openFullPage();
+}
+
+function openFullPage() {
+  try {
+    window.parent.dispatchEvent(new CustomEvent('proclaw:open-page', { detail: { page: '/finance-agent' } }));
+  } catch(e) {
+    window.open('/#/finance-agent', '_blank');
+  }
+}
+
+function showLoading(show) {
+  document.getElementById('loading').style.display = show ? 'block' : 'none';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error').style.display = 'none';
+}
+
+loadData();
+</script>
+</body>
+</html>

@@ -23,6 +23,16 @@ Thumbs.db
 *.log
 npm-debug.log*
 cargo_check*.log
+check_output*.txt
+final_check*.txt
+check_err*.txt
+check_err.txt
+
+# IDE artifacts
+.codebuddy/
+
+# Mobile build output
+mobile/dist-web/
 
 # Database
 *.db

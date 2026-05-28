@@ -27,7 +27,7 @@ pub struct RecognizeOrderRequest {
     pub provider: Option<String>,
     /// 云端 API Key
     pub api_key: Option<String>,
-    /// 云端 API 基础 URL（默认 OpenAI）
+    /// 云端 API 基础 URL（默认 DeepSeek）
     pub api_base: Option<String>,
     /// 模型名称（默认 gpt-4o）
     pub model: Option<String>,
@@ -102,25 +102,25 @@ pub struct ValidationWarning {
     pub suggestion: Option<String>,
 }
 
-/// 云端 AI 原始响应的内部结构
+/// 云端 AI 原始响应的内部结构 (DeepSeek API 与 OpenAI 兼容)
 #[derive(Debug, Deserialize)]
-struct OpenAIResponse {
-    choices: Vec<OpenAIChoice>,
-    usage: Option<OpenAIUsage>,
+struct DeepSeekResponse {
+    choices: Vec<DeepSeekChoice>,
+    usage: Option<DeepSeekUsage>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAIChoice {
-    message: OpenAIMessage,
+struct DeepSeekChoice {
+    message: DeepSeekMessage,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAIMessage {
+struct DeepSeekMessage {
     content: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAIUsage {
+struct DeepSeekUsage {
     total_tokens: Option<i32>,
 }
 
@@ -173,23 +173,23 @@ pub async fn recognize_order(
             .unwrap_or("http://localhost:8866/predict/ocr_system");
         call_local_ocr(&image_bytes, endpoint).await
     } else {
-        // cloud (default)
+        // cloud (default) - DeepSeek
         let api_key = payload
             .api_key
             .clone()
             .filter(|k| !k.is_empty())
-            .or_else(|| std::env::var("OPENAI_API_KEY").ok())
+            .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
             .unwrap_or_default();
         let api_base = payload
             .api_base
             .as_deref()
-            .unwrap_or("https://api.openai.com/v1");
-        let model = payload.model.as_deref().unwrap_or("gpt-4o");
+            .unwrap_or("https://api.deepseek.com");
+        let model = payload.model.as_deref().unwrap_or("deepseek-chat");
 
         if api_key.is_empty() {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(json!({"error": "API key is required for cloud provider. Set OPENAI_API_KEY env var or provide api_key in request."})),
+                Json(json!({"error": "API key is required for cloud provider. Set DEEPSEEK_API_KEY env var or provide api_key in request."})),
             );
         }
 
@@ -778,7 +778,7 @@ pub async fn submit_order_draft(
 // AI 引擎调用
 // ============================================================
 
-/// 调用云端 AI 模型（GPT-4V / GPT-4o 等 OpenAI 兼容 API）
+/// 调用云端 AI 模型（DeepSeek API，OpenAI 兼容格式）
 async fn call_cloud_ai(
     image_data: &[u8],
     api_key: &str,
@@ -798,7 +798,7 @@ async fn call_cloud_ai(
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    // 构建 OpenAI Vision API 请求
+    // 构建 DeepSeek Vision API 请求
     let request_body = json!({
         "model": model,
         "messages": [
@@ -856,13 +856,13 @@ async fn call_cloud_ai(
         return Err(format!("API returned {}: {}", status.as_u16(), response_text));
     }
 
-    // 解析 OpenAI 响应
-    let openai_resp: OpenAIResponse = serde_json::from_str(&response_text)
+    // 解析 DeepSeek 响应 (OpenAI 兼容格式)
+    let deepseek_resp: DeepSeekResponse = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse AI response: {} - raw: {}", e,
             if response_text.len() > 500 { format!("{}...", &response_text[..500]) } else { response_text.clone() }
         ))?;
 
-    let content = openai_resp
+    let content = deepseek_resp
         .choices
         .first()
         .ok_or_else(|| "AI response has no choices".to_string())?
@@ -874,7 +874,7 @@ async fn call_cloud_ai(
     let items = extract_items_from_ai_response(&content)?;
 
     let total_amount: f64 = items.iter().map(|i| i.total_price).sum();
-    let tokens_used = openai_resp
+    let tokens_used = deepseek_resp
         .usage
         .as_ref()
         .and_then(|u| u.total_tokens);
@@ -1188,16 +1188,16 @@ fn detect_image_format(data: &[u8]) -> &'static str {
     }
 }
 
-/// 计算 AI 调用费用（人民币，参考 OpenAI 定价）
+/// 计算 AI 调用费用（人民币，参考 DeepSeek 定价）
 fn calculate_cost(tokens: i32, model: &str) -> f64 {
     let tokens = tokens as f64;
     match model {
-        "gpt-4o" => tokens * 0.000015,              // $2.50/1M input + $10/1M output, approx average
-        "gpt-4-turbo" => tokens * 0.00003,           // more expensive
-        "gpt-3.5-turbo" => tokens * 0.000002,        // much cheaper
-        "claude-3-opus" => tokens * 0.00003,
-        "claude-3-sonnet" => tokens * 0.000015,
-        _ => tokens * 0.000015,                      // default
+        "deepseek-chat" => tokens * 0.00000021,        // ¥0.14/1M input + ¥0.28/1M output, approx average
+        "deepseek-reasoner" => tokens * 0.00000042,    // ¥0.14/1M input + ¥0.28/1M output, approx average
+        "gpt-4o" => tokens * 0.000015,              // OpenAI 兼容模式（如果仍使用）
+        "gpt-4-turbo" => tokens * 0.00003,
+        "gpt-3.5-turbo" => tokens * 0.000002,
+        _ => tokens * 0.00000021,                    // default: DeepSeek Chat
     }
 }
 

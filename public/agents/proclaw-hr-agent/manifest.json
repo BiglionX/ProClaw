@@ -1,0 +1,10 @@
+{
+  "id": "proclaw-hr-agent",
+  "name": "人事管理 Agent",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "description": "员工信息管理、考勤记录、请假审批、工资单生成",
+  "author": "ProClaw 官方",
+  "permissions": ["read_user", "send_message", "show_notification"],
+  "icon": "badge"
+}

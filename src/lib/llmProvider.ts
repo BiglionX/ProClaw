@@ -13,7 +13,7 @@ export interface TestResult {
 export interface LLMProviderInfo {
   id: string;
   name: string;
-  type: 'openai' | 'anthropic' | 'ollama' | 'custom';
+  type: 'openai' | 'deepseek' | 'anthropic' | 'ollama' | 'custom';
   model: string;
   isActive: boolean;
 }
@@ -35,7 +35,35 @@ export class LLMProviderManager {
     this.providers.clear();
     this.providerInfo.clear();
 
-    // 初始化OpenAI
+    // 初始化 DeepSeek (使用 OpenAI 兼容 API)
+    if (config.providers.some(p => p.type === 'deepseek' && p.isActive)) {
+      const deepseekProvider = config.providers.find(p => p.type === 'deepseek');
+      if (deepseekProvider && deepseekProvider.apiKey) {
+        try {
+          const chatModel = new ChatOpenAI({
+            modelName: deepseekProvider.model || 'deepseek-chat',
+            apiKey: deepseekProvider.apiKey,
+            temperature: config.temperatureByTask?.business_insight ?? config.temperature,
+            maxTokens: config.maxTokens,
+            configuration: {
+              baseURL: deepseekProvider.endpoint || 'https://api.deepseek.com',
+            },
+          });
+          this.providers.set('deepseek', chatModel);
+          this.providerInfo.set('deepseek', {
+            id: 'deepseek',
+            name: 'DeepSeek',
+            type: 'deepseek',
+            model: deepseekProvider.model,
+            isActive: true,
+          });
+        } catch (error) {
+          console.error('Failed to initialize DeepSeek:', error);
+        }
+      }
+    }
+
+    // 初始化 OpenAI
     if (config.providers.some(p => p.type === 'openai' && p.isActive)) {
       const openaiProvider = config.providers.find(p => p.type === 'openai');
       if (openaiProvider && openaiProvider.apiKey) {
@@ -136,8 +164,8 @@ export class LLMProviderManager {
       if (provider) return provider;
     }
 
-    // 默认优先级：OpenAI > Anthropic > Ollama
-    const priority = ['openai', 'anthropic', 'ollama'];
+    // 默认优先级：DeepSeek > OpenAI > Anthropic > Ollama
+    const priority = ['deepseek', 'openai', 'anthropic', 'ollama'];
     for (const providerId of priority) {
       const provider = this.providers.get(providerId);
       if (provider) return provider;

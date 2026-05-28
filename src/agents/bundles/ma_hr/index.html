@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人事管理 Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+.header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; }
+.stat-card { flex: 1; background: #fff; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-value { font-size: 24px; font-weight: 700; color: #4facfe; }
+.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+.tabs { display: flex; gap: 0; padding: 0 16px; border-bottom: 2px solid #eee; }
+.tab { padding: 10px 18px; font-size: 13px; font-weight: 500; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.tab.active { color: #4facfe; border-bottom-color: #4facfe; }
+.employee-list { padding: 16px; }
+.emp-item { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.emp-avatar { width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 16px; }
+.emp-info { flex: 1; }
+.emp-name { font-size: 14px; font-weight: 600; }
+.emp-role { font-size: 12px; color: #999; margin-top: 2px; }
+.emp-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.emp-status.active { background: #e8f5e9; color: #2e7d32; }
+.emp-status.leave { background: #fff3e0; color: #e65100; }
+.emp-status.offline { background: #f5f5f5; color: #999; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>人事管理</h1>
+  <p>员工信息管理、考勤记录、请假审批、工资单生成</p>
+</div>
+<div class="stats">
+  <div class="stat-card"><div class="stat-value">16</div><div class="stat-label">在职员工</div></div>
+  <div class="stat-card"><div class="stat-value">2</div><div class="stat-label">请假中</div></div>
+  <div class="stat-card"><div class="stat-value">3</div><div class="stat-label">待审批</div></div>
+</div>
+<div class="tabs">
+  <div class="tab active">员工列表</div>
+  <div class="tab">考勤</div>
+  <div class="tab">审批</div>
+  <div class="tab">工资</div>
+</div>
+<div class="employee-list">
+  <div class="emp-item">
+    <div class="emp-avatar" style="background:#e91e63">张</div>
+    <div class="emp-info"><div class="emp-name">张三</div><div class="emp-role">技术总监 · 技术部</div></div>
+    <span class="emp-status active">在线</span>
+  </div>
+  <div class="emp-item">
+    <div class="emp-avatar" style="background:#2196f3">李</div>
+    <div class="emp-info"><div class="emp-name">李四</div><div class="emp-role">高级工程师 · 技术部</div></div>
+    <span class="emp-status active">在线</span>
+  </div>
+  <div class="emp-item">
+    <div class="emp-avatar" style="background:#ff9800">王</div>
+    <div class="emp-info"><div class="emp-name">王五</div><div class="emp-role">产品经理 · 产品部</div></div>
+    <span class="emp-status leave">请假</span>
+  </div>
+  <div class="emp-item">
+    <div class="emp-avatar" style="background:#9c27b0">赵</div>
+    <div class="emp-info"><div class="emp-name">赵六</div><div class="emp-role">UI 设计师 · 设计部</div></div>
+    <span class="emp-status active">在线</span>
+  </div>
+  <div class="emp-item">
+    <div class="emp-avatar" style="background:#009688">钱</div>
+    <div class="emp-info"><div class="emp-name">钱七</div><div class="emp-role">市场专员 · 市场部</div></div>
+    <span class="emp-status offline">离线</span>
+  </div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[HRAgent] Current user:', user);
+  } catch(e) {
+    console.log('[HRAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

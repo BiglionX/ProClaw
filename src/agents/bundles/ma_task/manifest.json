@@ -1,0 +1,11 @@
+{
+  "id": "ma_task",
+  "name": "任务管理 Agent",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "send_message", "show_notification"],
+  "icon": "icon.svg",
+  "description": "看板式任务管理，支持任务分配、进度跟踪、优先级排序",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_task"
+}

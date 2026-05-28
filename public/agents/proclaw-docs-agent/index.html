@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文档协作 Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 16px; }
+.header { margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+.header button { padding: 6px 12px; background: #0288d1; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.doc-list { display: flex; flex-direction: column; gap: 8px; }
+.doc-item { background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.doc-item:hover { box-shadow: 0 2px 8px rgba(2,136,209,0.15); }
+.doc-item .title { font-size: 14px; font-weight: 500; }
+.doc-item .date { font-size: 11px; color: #999; }
+.editor-area { display: none; }
+.editor-area.active { display: block; }
+.editor-area textarea { width: 100%; min-height: 300px; border: 1px solid #ddd; border-radius: 8px; padding: 12px; font-size: 14px; font-family: monospace; outline: none; resize: vertical; }
+.editor-area textarea:focus { border-color: #0288d1; }
+.editor-actions { display: flex; gap: 8px; margin-top: 8px; }
+.editor-actions button { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.btn-primary { background: #0288d1; color: #fff; border: none; }
+.btn-secondary { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
+.back-btn { background: none; border: none; color: #0288d1; cursor: pointer; font-size: 13px; padding: 4px 0; margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+<div class="header" id="listHeader"><h1>文档</h1><button onclick="showNewDoc()">+ 新建</button></div>
+<div class="header" id="editorHeader" style="display:none"><button class="back-btn" onclick="showList()">&larr; 返回</button><h1 id="editorTitle">编辑文档</h1></div>
+<div class="doc-list" id="docList"></div>
+<div class="editor-area" id="editorArea"><textarea id="editorContent" placeholder="在此编写 Markdown..."></textarea><div class="editor-actions"><button class="btn-secondary" onclick="showList()">取消</button><button class="btn-primary" onclick="saveDoc()">保存</button></div></div>
+<script>
+const KEY = 'proclaw_docs_list'; let docs = []; let editingId = null;
+function load() { const raw = localStorage.getItem(KEY); docs = raw ? JSON.parse(raw) : [{ id: 'd1', title: '欢迎使用文档协作 Agent', content: '# 欢迎\n\n这是您的第一篇文档。\n\n- 支持 Markdown 格式\n- 自动保存到本地\n- 点击即可编辑', updatedAt: Date.now() }]; renderList(); }
+function save() { if (editingId) { const d = docs.find(x => x.id === editingId); if (d) { d.content = document.getElementById('editorContent').value; d.updatedAt = Date.now(); } } localStorage.setItem(KEY, JSON.stringify(docs)); }
+function renderList() { document.getElementById('listHeader').style.display = 'flex'; document.getElementById('editorHeader').style.display = 'none'; document.getElementById('editorArea').classList.remove('active'); const list = document.getElementById('docList'); list.innerHTML = ''; docs.forEach(d => { const item = document.createElement('div'); item.className = 'doc-item'; item.innerHTML = '<div class="title">' + d.title + '</div><div class="date">' + new Date(d.updatedAt).toLocaleDateString() + '</div>'; item.onclick = () => editDoc(d.id); list.appendChild(item); }); }
+function showNewDoc() { editingId = 'd' + Date.now(); docs.unshift({ id: editingId, title: '未命名文档', content: '', updatedAt: Date.now() }); showEditor('新建文档'); document.getElementById('editorContent').value = ''; }
+function editDoc(id) { editingId = id; const d = docs.find(x => x.id === id); if (!d) return; document.getElementById('editorTitle').textContent = d.title; showEditor(d.title); document.getElementById('editorContent').value = d.content; }
+function showEditor(title) { document.getElementById('listHeader').style.display = 'none'; document.getElementById('editorHeader').style.display = 'block'; document.getElementById('editorTitle').textContent = title; document.getElementById('editorArea').classList.add('active'); }
+function showList() { save(); editingId = null; renderList(); }
+function saveDoc() { if (editingId) { const d = docs.find(x => x.id === editingId); if (d) { d.content = document.getElementById('editorContent').value; d.updatedAt = Date.now(); const firstLine = d.content.split('\n')[0].replace(/^#\s*/, '').trim(); if (firstLine && d.title === '未命名文档') d.title = firstLine; } } localStorage.setItem(KEY, JSON.stringify(docs)); showList(); }
+load();
+</script>
+</body>
+</html>

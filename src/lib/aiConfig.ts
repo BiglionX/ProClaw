@@ -1,7 +1,7 @@
 export interface AIProvider {
   id: string;
   name: string;
-  type: 'default' | 'openai' | 'azure' | 'aliyun' | 'zhipu' | 'anthropic' | 'ollama' | 'custom';
+  type: 'default' | 'deepseek' | 'openai' | 'azure' | 'aliyun' | 'zhipu' | 'anthropic' | 'ollama' | 'custom';
   endpoint: string;
   apiKey: string;
   model: string;
@@ -42,6 +42,15 @@ const DEFAULT_CONFIG: AIConfig = {
       apiKey: '',
       model: 'proclaw-gpt-4',
       isActive: true,
+    },
+    {
+      id: 'deepseek',
+      name: 'DeepSeek',
+      type: 'deepseek',
+      endpoint: 'https://api.deepseek.com',
+      apiKey: '',
+      model: 'deepseek-chat',
+      isActive: false,
     },
     {
       id: 'openai',

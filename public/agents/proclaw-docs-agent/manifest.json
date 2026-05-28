@@ -1,0 +1,10 @@
+{
+  "id": "proclaw-docs-agent",
+  "name": "文档协作 Agent",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "description": "Markdown 编辑器，支持版本历史、文档分类归档",
+  "author": "ProClaw 官方",
+  "permissions": ["read_user", "read_files", "write_files"],
+  "icon": "description"
+}

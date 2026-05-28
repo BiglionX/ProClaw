@@ -1,0 +1,11 @@
+{
+  "id": "ma_hr",
+  "name": "人事管理 Agent",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "send_message"],
+  "icon": "icon.svg",
+  "description": "员工信息管理、考勤记录、请假审批、工资单生成",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_hr"
+}
