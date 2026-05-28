@@ -12,6 +12,20 @@
   "app": {
     "windows": [
       {
+        "label": "setup-wizard",
+        "title": "ProClaw 安装向导",
+        "url": "/#/setup",
+        "width": 720,
+        "height": 620,
+        "resizable": false,
+        "fullscreen": false,
+        "center": true,
+        "visible": false,
+        "focus": false,
+        "decorations": false
+      },
+      {
+        "label": "main",
         "title": "ProClaw Desktop",
         "width": 1200,
         "height": 800,
@@ -20,8 +34,8 @@
         "resizable": true,
         "fullscreen": false,
         "center": true,
-        "visible": true,
-        "focus": true,
+        "visible": false,
+        "focus": false,
         "decorations": true
       }
     ],

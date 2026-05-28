@@ -12,6 +12,7 @@ import ProductsPage from './pages/ProductsPage';
 import RegisterPage from './pages/RegisterPage';
 import SettingsPage from './pages/SettingsPage';
 import SetupPage from './pages/SetupPage';
+import { SetupWizard } from './components/SetupWizard';
 import TeamsPage from './pages/TeamsPage';
 import TestPage from './pages/TestPage';
 import UnrecognizedCommandsPage from './pages/UnrecognizedCommandsPage';
@@ -57,7 +58,9 @@ function App() {
       <IncomingCallDialog />
       <Routes>
         {/* 公开路由 */}
-        <Route path="/setup" element={<SetupPage />} />
+        {/* 安装向导 - 独立无边框窗口使用 */}
+        <Route path="/setup" element={<SetupWizard />} />
+        <Route path="/setup-page" element={<SetupPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 

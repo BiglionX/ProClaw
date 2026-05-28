@@ -61,6 +61,14 @@ impl Database {
         let market_migration = include_str!("../../database/migrations/010_market_agents.sql");
         self.conn.execute_batch(market_migration).ok();
 
+        // 运行迁移：安装向导系统配置表（PRD v6.1）
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS system_config (\
+             key TEXT PRIMARY KEY,\
+             value TEXT NOT NULL\
+             );"
+        ).ok();
+
         // 自动安装内置 Agent
         let builtin_count: i64 = self.conn
             .query_row(
@@ -115,6 +123,50 @@ impl Database {
     #[allow(dead_code)]
     pub fn connection_mut(&mut self) -> &mut Connection {
         &mut self.conn
+    }
+
+    /// 查询 system_config 表
+    pub fn get_config(&self, key: &str) -> Option<String> {
+        self.conn
+            .query_row(
+                "SELECT value FROM system_config WHERE key = ?1",
+                params![key],
+                |row| row.get(0),
+            )
+            .ok()
+    }
+
+    /// 写入 system_config 表
+    pub fn set_config(&self, key: &str, value: &str) -> Result<(), rusqlite::Error> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO system_config (key, value) VALUES (?1, ?2)",
+            params![key, value],
+        )?;
+        Ok(())
+    }
+
+    /// 获取所有 system_config 键值对
+    pub fn get_all_config(&self) -> std::collections::HashMap<String, String> {
+        let mut stmt = self.conn
+            .prepare("SELECT key, value FROM system_config")
+            .unwrap();
+        let mut map = std::collections::HashMap::new();
+        let rows = stmt.query_map([], |row| {
+            let key: String = row.get(0)?;
+            let value: String = row.get(1)?;
+            Ok((key, value))
+        }).ok();
+        if let Some(rows) = rows {
+            for row in rows.flatten() {
+                map.insert(row.0, row.1);
+            }
+        }
+        map
+    }
+
+    /// 检查安装是否已经完成
+    pub fn is_installation_complete(&self) -> bool {
+        self.get_config("install_path").is_some()
     }
 
     /// 关闭数据库连接

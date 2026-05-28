@@ -1,9 +1,14 @@
-import { Info as InfoIcon, Analytics as AnalyticsIcon, Help as HelpIcon, QrCode as QrCodeIcon } from '@mui/icons-material';
+import { Info as InfoIcon, Analytics as AnalyticsIcon, Help as HelpIcon } from '@mui/icons-material';
 import {
   Box,
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   Grid,
   Paper,
@@ -12,11 +17,10 @@ import {
   Typography,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
 import UserCenterPage from './UserCenterPage';
-import InvitationManagementPage from './InvitationManagementPage';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -49,7 +53,37 @@ function a11yProps(index: number) {
 
 export default function SettingsPage() {
   const [tabValue, setTabValue] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const navigate = useNavigate();
+
+  const handleReconfigureClick = useCallback(() => {
+    setConfirmOpen(true);
+  }, []);
+
+  const handleReconfigureConfirm = useCallback(async () => {
+    setConfirmOpen(false);
+    // 打开安装向导（Tauri 环境）或导航到 setup 页面
+    try {
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const setupWindow = new WebviewWindow('setup-wizard', {
+        url: '/#/setup',
+        width: 720,
+        height: 620,
+        decorations: false,
+        center: true,
+        resizable: false,
+      });
+      setupWindow.once('tauri://created', () => {
+        console.log('Setup wizard window created');
+      });
+      setupWindow.once('tauri://error', (e) => {
+        console.error('Failed to create setup wizard window', e);
+      });
+    } catch {
+      // 非 Tauri 环境，直接导航
+      window.location.hash = '#/setup';
+    }
+  }, []);
 
   return (
     <Box>
@@ -225,6 +259,44 @@ export default function SettingsPage() {
                 </Paper>
               </Grid>
             </Grid>
+
+            <Divider sx={{ my: 3 }} />
+            
+            {/* 重新配置公司 */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                重新运行安装向导
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                您可以重新运行 CEO Agent 安装向导来修改公司名称和模型配置。
+                注意：修改公司名不会影响已有数据。
+              </Typography>
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={handleReconfigureClick}
+              >
+                重新配置公司
+              </Button>
+            </Box>
+
+            {/* 重新配置确认对话框 */}
+            <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+              <DialogTitle>确认重新配置？</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  重新运行安装向导不会影响您现有的业务数据。
+                  公司名称和模型配置将被更新。
+                  是否继续？
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setConfirmOpen(false)}>取消</Button>
+                <Button onClick={handleReconfigureConfirm} color="warning" variant="contained">
+                  确认重新配置
+                </Button>
+              </DialogActions>
+            </Dialog>
           </CardContent>
         </Card>
       </TabPanel>

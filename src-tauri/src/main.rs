@@ -23,6 +23,7 @@ pub mod sales_commands;
 #[cfg(feature = "inventory")]
 pub mod finance_commands;
 
+pub mod setup_commands;
 pub mod common_commands;
 pub mod team_commands;
 pub mod user_commands;
@@ -69,6 +70,7 @@ use purchase_commands::*;
 use sales_commands::*;
 #[cfg(feature = "inventory")]
 use finance_commands::*;
+use setup_commands::*;
 use common_commands::*;
 use team_commands::*;
 use user_commands::*;
@@ -165,10 +167,42 @@ async fn main() {
 
     // 启动 Tauri 应用
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(db)
         .manage(sync_engine)
         .manage(cloud_backup_service)
         .manage(ws_manager)
+        .setup(|app| {
+            use tauri::Manager;
+            
+            // 检查安装状态，决定显示哪个窗口
+            let is_installed = match app.state::<Mutex<Database>>().lock() {
+                Ok(db) => db.is_installation_complete(),
+                Err(e) => {
+                    eprintln!("Warning: Could not lock database for setup check: {}", e);
+                    false
+                }
+            };
+
+            if is_installed {
+                // 已安装：显示主窗口
+                if let Some(main_window) = app.get_webview_window("main") {
+                    let _ = main_window.show();
+                    let _ = main_window.set_focus();
+                }
+                println!("Installation detected, showing main window");
+            } else {
+                // 未安装：显示向导窗口
+                if let Some(setup_window) = app.get_webview_window("setup-wizard") {
+                    let _ = setup_window.show();
+                    let _ = setup_window.set_focus();
+                }
+                println!("No installation detected, showing setup wizard");
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // 产品管理
             create_product,
@@ -375,6 +409,15 @@ async fn main() {
             get_market_categories,
             #[cfg(feature = "virtual_company")]
             download_market_agent_package,
+
+            // 安装向导 (PRD v6.1)
+            check_installation_status,
+            check_disk_space,
+            save_setup_config,
+            test_ollama_connection,
+            test_llamacpp_connection,
+            get_default_data_path,
+            complete_setup_and_switch,
         ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
