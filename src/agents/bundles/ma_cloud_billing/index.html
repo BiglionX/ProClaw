@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token 计费助手</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fc; color: #333; }
+.header { background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.balance-card { margin: 16px; background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); border-radius: 16px; padding: 24px; color: #fff; }
+.balance-card .label { font-size: 13px; opacity: 0.8; }
+.balance-card .amount { font-size: 36px; font-weight: 700; margin: 8px 0 4px; }
+.balance-card .est-days { font-size: 13px; opacity: 0.7; }
+.stats { display: flex; gap: 12px; padding: 0 16px 16px; flex-wrap: wrap; }
+.stat-card { background: #fff; border-radius: 10px; padding: 16px; flex: 1; min-width: 100px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.stat-card .num { font-size: 24px; font-weight: 700; color: #3498db; }
+.stat-card .label { font-size: 12px; color: #999; margin-top: 4px; }
+.usage-section { padding: 0 16px 16px; }
+.usage-section h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; color: #555; }
+.usage-bar { display: flex; align-items: center; margin-bottom: 8px; }
+.usage-label { width: 80px; font-size: 13px; color: #555; }
+.usage-track { flex: 1; height: 24px; background: #eef0f5; border-radius: 12px; overflow: hidden; }
+.usage-fill { height: 100%; border-radius: 12px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 11px; color: #fff; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; padding: 0 16px 16px; }
+.plan-card { background: #fff; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.plan-card .plan-name { font-weight: 700; font-size: 16px; }
+.plan-card .plan-price { font-size: 22px; font-weight: 700; color: #3498db; margin: 8px 0; }
+.plan-card .plan-tokens { font-size: 13px; color: #666; }
+.plan-card .plan-recommend { border: 2px solid #3498db; position: relative; }
+.plan-card .rec-badge { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #3498db; color: #fff; font-size: 11px; padding: 2px 12px; border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ Token 计费助手</h1>
+  <p>余额查询 · 套餐推荐 · 消耗分析 · 预算预警</p>
+</div>
+<div class="balance-card">
+  <div class="label">当前余额</div>
+  <div class="amount">128,450</div>
+  <div class="est-days">预计可用 23 天 · 月消耗约 168,000 Token</div>
+</div>
+<div class="stats">
+  <div class="stat-card"><div class="num">6,850</div><div class="label">今日消耗</div></div>
+  <div class="stat-card"><div class="num">-12%</div><div class="label">较昨日</div></div>
+  <div class="stat-card"><div class="num">15</div><div class="label">剩余天数</div></div>
+  <div class="stat-card"><div class="num">¥199</div><div class="label">本月账单</div></div>
+</div>
+<div class="usage-section">
+  <h2>📊 资源消耗分布 (本月)</h2>
+  <div class="usage-bar"><span class="usage-label">GPT-4o</span><div class="usage-track"><div style="width:45%;background:#3498db;" class="usage-fill">45%</div></div></div>
+  <div class="usage-bar"><span class="usage-label">GPT-4o-mini</span><div class="usage-track"><div style="width:30%;background:#2ecc71;" class="usage-fill">30%</div></div></div>
+  <div class="usage-bar"><span class="usage-label">图像生成</span><div class="usage-track"><div style="width:15%;background:#e67e22;" class="usage-fill">15%</div></div></div>
+  <div class="usage-bar"><span class="usage-label">其他</span><div class="usage-track"><div style="width:10%;background:#9b59b6;" class="usage-fill">10%</div></div></div>
+</div>
+<div class="plan-grid">
+  <div class="plan-card"><div class="plan-name">基础版</div><div class="plan-price">¥99</div><div class="plan-tokens">100,000 Token/月</div></div>
+  <div class="plan-card plan-recommend"><span class="rec-badge">推荐</span><div class="plan-name">标准版</div><div class="plan-price">¥199</div><div class="plan-tokens">250,000 Token/月</div></div>
+  <div class="plan-card"><div class="plan-name">专业版</div><div class="plan-price">¥399</div><div class="plan-tokens">600,000 Token/月</div></div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[CloudBilling] Current user:', user);
+  } catch(e) {
+    console.log('[CloudBilling] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

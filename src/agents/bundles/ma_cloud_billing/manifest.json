@@ -1,0 +1,12 @@
+{
+  "id": "ma_cloud_billing",
+  "name": "Token 计费助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_finance", "send_message", "show_notification"],
+  "capabilities": ["token_balance_query", "plan_recommendation", "usage_analytics", "budget_alert", "invoice_query"],
+  "icon": "icon.svg",
+  "description": "Token 计费助手 - 余额查询、套餐推荐、消耗分析、预算预警、账单查询",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_cloud_billing"
+}

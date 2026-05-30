@@ -1,0 +1,12 @@
+{
+  "id": "ma_catering_kds",
+  "name": "后厨调度助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_orders", "show_notification", "send_message"],
+  "capabilities": ["kds_order_monitor", "overdue_alert", "prep_time_estimate", "printer_integration"],
+  "icon": "icon.svg",
+  "description": "后厨调度助手 - 订单监控、超时预警、备餐预估、打印联动",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_catering_kds"
+}

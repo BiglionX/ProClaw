@@ -8,9 +8,21 @@ import {
   People as ContactsIcon,
   Chat as ChatIcon,
   Storefront as StoreIcon,
-  Extension as ExtensionIcon,
   AccountBalance as FinanceIcon,
   AccountCircle as UserIcon,
+  ShoppingCart as ShoppingCartIcon,
+  BarChart as BarChartIcon,
+  MenuBook as KnowledgeIcon,
+  Extension as ExtensionIcon,
+  // ========== Phase 4 行业插件图标 ==========
+  Restaurant as RestaurantIcon,
+  DesktopWindows as DesktopWindowsIcon,
+  Inventory2 as Inventory2Icon,
+  CalendarMonth as CalendarMonthIcon,
+  Campaign as CampaignIcon,
+  Pets as PetsIcon,
+  Home as HomeIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import {
   Divider,
@@ -22,7 +34,7 @@ import {
   ListItemText,
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { IS_VIRTUAL_COMPANY, IS_INVENTORY } from '../../config/appMode';
+import { useAppModeStore, PluginNavItem } from '../../config/appMode';
 
 const DRAWER_WIDTH = 240;
 const TOPBAR_HEIGHT = 64;
@@ -33,40 +45,77 @@ interface NavItem {
   path: string;
 }
 
-const navItems: NavItem[] = (() => {
-  const items: NavItem[] = [
-    { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
-    { text: '用户中心', icon: <UserIcon />, path: '/ucenter' },
-  ];
+/** 图标名称到 React 组件的映射（与 manifest 中 icon 字段对齐） */
+const ICON_MAP: Record<string, React.ReactNode> = {
+  'agent': <AgentIcon sx={{ color: '#ff3b30' }} />,
+  'user': <UserIcon />,
+  'database': <DataCenterIcon />,
+  'package': <ProductsIcon />,
+  'truck': <SupplyChainIcon />,
+  'users': <TeamsIcon />,
+  'book-open': <KnowledgeIcon />,
+  'phone': <ContactsIcon />,
+  'message-square': <ChatIcon />,
+  'shopping-bag': <StoreIcon />,
+  'finance': <FinanceIcon />,
+  'shopping-cart': <ShoppingCartIcon />,
+  'bar-chart': <BarChartIcon />,
+  // ========== Phase 4 行业插件图标 ==========
+  'table-restaurant': <RestaurantIcon />,
+  'monitor': <DesktopWindowsIcon />,
+  'inventory': <Inventory2Icon />,
+  'calendar': <CalendarMonthIcon />,
+  'megaphone': <CampaignIcon />,
+  'paw': <PetsIcon />,
+  'home': <HomeIcon />,
+  'sparkles': <AutoAwesomeIcon />,
+};
 
-  if (IS_VIRTUAL_COMPANY) {
-    items.push(
-      { text: 'Agent管理', icon: <ExtensionIcon />, path: '/agents' },
-      { text: '财务管理', icon: <FinanceIcon />, path: '/finance-agent' },
-    );
+/** 基础默认导航项（无插件时回退） */
+const DEFAULT_NAV_ITEMS: NavItem[] = [
+  { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
+  { text: '用户中心', icon: <UserIcon />, path: '/ucenter' },
+  { text: 'AI团队', icon: <TeamsIcon />, path: '/teams' },
+  { text: 'AI 知识库', icon: <KnowledgeIcon />, path: '/ai-knowledge' },
+  { text: '联系人', icon: <ContactsIcon />, path: '/contacts' },
+  { text: '消息', icon: <ChatIcon />, path: '/messages' },
+  { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter' },
+  { text: '商品库', icon: <ProductsIcon />, path: '/products' },
+  { text: '供应链', icon: <SupplyChainIcon />, path: '/supplychain' },
+  { text: '云商城', icon: <StoreIcon />, path: '/cloud-store' },
+];
+
+/** 将 PluginNavItem[] 转换为 NavItem[]（解析 icon 字符串为组件） */
+function resolvePluginNavItems(pluginItems: PluginNavItem[]): NavItem[] {
+  return pluginItems.map(item => ({
+    text: item.text,
+    icon: ICON_MAP[item.icon] || <ExtensionIcon />,
+    path: item.path,
+  }));
+}
+
+function useNavItems(): NavItem[] {
+  const pluginNavItems = useAppModeStore(state => state.getNavAddItems());
+  const pluginRemovePaths = useAppModeStore(state => state.getNavRemovePaths());
+
+  // 优先使用插件 manifest 定义的导航项
+  if (pluginNavItems.length > 0) {
+    let items = resolvePluginNavItems(pluginNavItems);
+    // 应用插件声明的隐藏路径
+    if (pluginRemovePaths.length > 0) {
+      items = items.filter(item => !pluginRemovePaths.includes(item.path));
+    }
+    return items;
   }
 
-  items.push(
-    { text: 'AI团队', icon: <TeamsIcon />, path: '/teams' },
-    { text: '联系人', icon: <ContactsIcon />, path: '/contacts' },
-    { text: '消息', icon: <ChatIcon />, path: '/messages' },
-    { text: '云商城', icon: <StoreIcon />, path: '/cloud-store' },
-  );
-
-  if (IS_INVENTORY) {
-    items.push(
-      { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter' },
-      { text: '商品库', icon: <ProductsIcon />, path: '/products' },
-      { text: '供应链', icon: <SupplyChainIcon />, path: '/supplychain' },
-    );
-  }
-
-  return items;
-})();
+  // 无插件时使用默认导航（回退行为）
+  return DEFAULT_NAV_ITEMS;
+}
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const navItems = useNavItems();
 
   return (
     <Drawer

@@ -196,3 +196,154 @@ export interface UserTokenConfig {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================
+// 行业插件系统类型 (PRD v6.0 - 插件化行业版)
+// ============================================================
+
+/** 行业插件状态 */
+export type PluginStatus = 'draft' | 'review' | 'published' | 'deprecated';
+
+/** 插件功能配置 */
+export interface PluginFeatureConfig {
+  modules: string[];
+  dashboards: string[];
+  reports: string[];
+}
+
+/** 插件导航项 */
+export interface PluginNavItem {
+  text: string;
+  icon: string;
+  path: string;
+  group?: string;
+}
+
+/** 第三方插件开发者信息 */
+export interface PluginDeveloper {
+  name: string;
+  website?: string;
+  email?: string;
+  publicKey?: string;
+}
+
+/** 工业插件 Manifest */
+export interface IndustryPluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  icon: string;
+  compatibleAppVersion: string;
+  features: PluginFeatureConfig;
+  navigation: {
+    add: PluginNavItem[];
+    remove: string[];
+    reorder?: string[];
+  };
+  dataModels?: {
+    tables: string[];
+    migrations: string[];
+  };
+  ui: {
+    theme?: Record<string, string>;
+    onboarding?: string;
+    quickActions?: Array<{
+      label: string;
+      icon: string;
+      action: string;
+      color: string;
+    }>;
+  };
+  assets: {
+    path: string;
+    files: string[];
+  };
+  /** 开发者信息（第三方插件用） */
+  developer?: PluginDeveloper;
+  /** 插件分类标签：内置 / 官方 / 第三方 */
+  category?: 'builtin' | 'official' | 'third-party';
+  /** 标签列表 */
+  tags?: string[];
+}
+
+/** 行业插件记录（对应 industry_plugins 表） */
+export interface IndustryPlugin {
+  id: string;
+  name: string;
+  version: string;
+  status: PluginStatus;
+  manifest_json: string;
+  package_url: string | null;
+  package_hash: string | null;
+  package_size: number | null;
+  min_app_version: string | null;
+  icon: string | null;
+  description: string | null;
+  downloads: number;
+  active_installs: number;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+}
+
+/** 插件版本记录（对应 plugin_versions 表） */
+export interface PluginVersion {
+  id: string;
+  plugin_id: string;
+  version: string;
+  changelog: string | null;
+  package_url: string;
+  package_hash: string;
+  package_size: number;
+  min_app_version: string | null;
+  is_force_update: boolean;
+  rollout_percentage: number;
+  created_at: string;
+}
+
+/** 插件安装记录（对应 plugin_installs 表） */
+export interface PluginInstall {
+  id: string;
+  plugin_id: string;
+  version: string | null;
+  app_version: string | null;
+  os: string | null;
+  install_id: string | null;
+  action: 'install' | 'update' | 'uninstall';
+  created_at: string;
+}
+
+/** 插件评分/评价 */
+export interface PluginReview {
+  id: string;
+  plugin_id: string;
+  user_id: string;
+  rating: number; // 1-5
+  title: string | null;
+  content: string | null;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+  /** 联表查询用 */
+  user_name?: string;
+  user_avatar?: string;
+}
+
+/** 插件评分汇总 */
+export interface PluginRatingSummary {
+  plugin_id: string;
+  average: number;
+  count: number;
+  distribution: { [star: number]: number }; // 1-5 ok
+}
+
+/** 插件统计数据 */
+export interface PluginStats {
+  plugin_id: string;
+  total_downloads: number;
+  active_installs: number;
+  total_reviews: number;
+  average_rating: number;
+  recent_downloads_30d: number;
+}

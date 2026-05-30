@@ -36,8 +36,10 @@ import {
   getCustomers,
   getSalesOrders,
 } from '../lib/salesService';
+import { useAppModeStore } from '../config/appMode';
 
 export default function SalesPage() {
+  const mode = useAppModeStore(state => state.mode);
   const [tabValue, setTabValue] = useState(0);
 
   // 客户状态
@@ -47,6 +49,7 @@ export default function SalesPage() {
   // 销售订单状态
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [orderSearch, setOrderSearch] = useState('');
+  const [platformFilter, setPlatformFilter] = useState<string>('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +86,10 @@ export default function SalesPage() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const data = await getSalesOrders({ search: orderSearch || undefined });
+      const data = await getSalesOrders({
+        search: orderSearch || undefined,
+        platform_source: platformFilter || undefined,
+      });
       setOrders(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败');
@@ -307,6 +313,21 @@ export default function SalesPage() {
               flexWrap: 'wrap',
             }}
           >
+            {mode === 'light' && (
+              <TextField
+                select
+                size="small"
+                value={platformFilter}
+                onChange={(e) => { setPlatformFilter(e.target.value); }}
+                sx={{ minWidth: 140 }}
+                SelectProps={{ native: true }}
+              >
+                <option value="">全部平台</option>
+                <option value="local">本地销售</option>
+                <option value="groupbuy">团购订单</option>
+                <option value="miniapp">小程序订单</option>
+              </TextField>
+            )}
             <TextField
               placeholder="搜索销售订单 (SO号/客户)"
               value={orderSearch}
@@ -361,6 +382,7 @@ export default function SalesPage() {
                     <TableCell>客户</TableCell>
                     <TableCell>订单日期</TableCell>
                     <TableCell>状态</TableCell>
+                    {mode === 'light' && <TableCell>平台来源</TableCell>}
                     <TableCell align="right">总金额</TableCell>
                     <TableCell>付款状态</TableCell>
                   </TableRow>
@@ -368,7 +390,7 @@ export default function SalesPage() {
                 <TableBody>
                   {orders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={mode === 'light' ? 7 : 6} align="center" sx={{ py: 4 }}>
                         <Typography color="text.secondary">
                           {loading ? '加载中...' : '暂无销售订单'}
                         </Typography>
@@ -401,6 +423,24 @@ export default function SalesPage() {
                             }
                           />
                         </TableCell>
+                        {mode === 'light' && (
+                          <TableCell>
+                            <Chip
+                              label={
+                                order.platform_source === 'local' ? '本地' :
+                                order.platform_source === 'groupbuy' ? '团购' :
+                                order.platform_source === 'miniapp' ? '小程序' : '未知'
+                              }
+                              size="small"
+                              variant="outlined"
+                              color={
+                                order.platform_source === 'local' ? 'default' :
+                                order.platform_source === 'groupbuy' ? 'warning' :
+                                order.platform_source === 'miniapp' ? 'info' : 'default'
+                              }
+                            />
+                          </TableCell>
+                        )}
                         <TableCell align="right">
                           <Typography sx={{ fontWeight: 'bold' }}>
                             ¥{order.total_amount.toFixed(2)}

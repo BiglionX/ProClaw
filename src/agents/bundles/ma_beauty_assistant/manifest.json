@@ -1,0 +1,12 @@
+{
+  "id": "ma_beauty_assistant",
+  "name": "美业服务顾问",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_crm", "send_message", "show_notification"],
+  "capabilities": ["appointment_management", "service_recommendation", "employee_schedule_query", "member_insight", "crm_engagement"],
+  "icon": "icon.svg",
+  "description": "美业服务顾问 - 预约管理、服务推荐、技师排班、客户洞察、沉睡唤醒",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_beauty_assistant"
+}

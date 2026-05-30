@@ -19,7 +19,6 @@ import {
   Paper,
   TextField,
   Typography,
-  Snackbar,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { getCloudStore, updateCloudStore, upgradePlan, resetApiKey, CloudStore, PlanType, PLAN_INFO } from '../../lib/cloudStoreService';

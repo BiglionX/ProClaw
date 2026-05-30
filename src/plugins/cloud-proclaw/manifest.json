@@ -1,0 +1,74 @@
+{
+  "id": "cloud-proclaw",
+  "name": "ProClaw Cloud 云服务版",
+  "version": "1.0.0",
+  "description": "ProClaw 自身运营使用的云端管理版本。含 Token 计费仪表盘、云商城管理、云端备份同步、Admin 运营后台。面向 SaaS 运营团队，非商户端。",
+  "icon": "☁️",
+  "compatibleAppVersion": ">=0.1.0",
+  "features": {
+    "modules": [
+      "cloud-store",
+      "token-billing",
+      "cloud-backup",
+      "admin-panel",
+      "analytics",
+      "user-management",
+      "subscription",
+      "ai-teams"
+    ],
+    "dashboards": [
+      "token-balance",
+      "cloud-store-overview",
+      "revenue-trend",
+      "active-users",
+      "plugin-insights"
+    ],
+    "reports": [
+      "token-usage-report",
+      "revenue-report",
+      "cloud-store-report",
+      "user-activity-report"
+    ]
+  },
+  "navigation": {
+    "add": [
+      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
+      { "text": "云商城管理", "icon": "shopping-bag", "path": "/cloud-store", "group": "云服务" },
+      { "text": "Token 计费", "icon": "finance", "path": "/token-billing", "group": "云服务" },
+      { "text": "云备份", "icon": "database", "path": "/cloud-backup", "group": "云服务" },
+      { "text": "用户管理", "icon": "user", "path": "/ucenter", "group": "运营" },
+      { "text": "数据分析", "icon": "bar-chart", "path": "/analytics", "group": "运营" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "运营后台", "icon": "settings", "path": "/settings", "group": "系统" }
+    ],
+    "remove": ["/products", "/supplychain", "/purchase", "/sales", "/inventory", "/contacts", "/messages"],
+    "reorder": ["/", "/cloud-store", "/token-billing", "/cloud-backup", "/ucenter", "/analytics", "/teams", "/settings"]
+  },
+  "dataModels": {
+    "tables": [
+      "CREATE TABLE IF NOT EXISTS cloud_token_packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL NOT NULL, tokens INTEGER NOT NULL, bonus_percent INTEGER DEFAULT 0, is_active BOOLEAN DEFAULT 1)",
+      "CREATE TABLE IF NOT EXISTS cloud_store_sites (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, domain TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT (datetime('now')))",
+      "CREATE TABLE IF NOT EXISTS cloud_backup_jobs (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, status TEXT DEFAULT 'pending', started_at TEXT, completed_at TEXT, size_bytes INTEGER)"
+    ],
+    "migrations": [
+      "ALTER TABLE cloud_store_sites ADD COLUMN last_sync_at TEXT;"
+    ]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#0ea5e9",
+      "secondary": "#6366f1"
+    },
+    "onboarding": "cloud-onboarding",
+    "quickActions": [
+      { "label": "查看 Token 余额", "icon": "wallet", "action": "openTokenBalance", "color": "#0ea5e9" },
+      { "label": "云备份", "icon": "cloud-arrow-up", "action": "startCloudBackup", "color": "#6366f1" },
+      { "label": "商城管理", "icon": "store", "action": "openCloudStore", "color": "#10b981" },
+      { "label": "Token 充值", "icon": "credit-card", "action": "openTokenRecharge", "color": "#f59e0b" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  }
+}

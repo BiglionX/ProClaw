@@ -1,0 +1,47 @@
+{
+  "id": "pet",
+  "name": "宠物行业版",
+  "version": "1.0.0",
+  "description": "面向宠物店、宠物医院、宠物寄养中心，覆盖商品（食品/用品/活体）有效期管理、寄养服务流程、会员充值、疫苗提醒等场景。AI 活体库存追踪 + 会员智能营销。",
+  "icon": "🐾",
+  "compatibleAppVersion": ">=0.1.0",
+  "features": {
+    "modules": ["pet-board", "boarding", "grooming", "member-card", "inventory", "purchase", "sales", "reports", "ai-teams", "ai-knowledge"],
+    "dashboards": ["boarding-status", "pet-checkin", "service-today", "expiry-alert"],
+    "reports": ["product-expiry-report", "boarding-revenue", "service-analysis", "member-loyalty"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
+      { "text": "宠物档案", "icon": "paw", "path": "/pets", "group": "业务" },
+      { "text": "寄养管理", "icon": "home", "path": "/boarding", "group": "业务" },
+      { "text": "洗护服务", "icon": "sparkles", "path": "/grooming", "group": "业务" },
+      { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "供应链", "icon": "truck", "path": "/supplychain", "group": "业务" },
+      { "text": "销售管理", "icon": "finance", "path": "/sales", "group": "业务" },
+      { "text": "库存管理", "icon": "inventory", "path": "/inventory", "group": "业务" },
+      { "text": "会员管理", "icon": "users", "path": "/members", "group": "客户" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" }
+    ],
+    "remove": ["/datacenter", "/contacts", "/messages", "/cloud-store", "/ucenter"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#f59e0b",
+      "secondary": "#10b981"
+    },
+    "onboarding": "pet-onboarding",
+    "quickActions": [
+      { "label": "宠物入住", "icon": "dog", "action": "openPetCheckin", "color": "#f59e0b" },
+      { "label": "疫苗提醒", "icon": "syringe", "action": "openVaccineReminder", "color": "#10b981" },
+      { "label": "有效期预警", "icon": "clock", "action": "openExpiryAlert", "color": "#ef4444" },
+      { "label": "今日服务", "icon": "clipboard-list", "action": "openTodayService", "color": "#6366f1" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  }
+}

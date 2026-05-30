@@ -103,6 +103,7 @@ export interface SalesOrder {
   total_amount: number;
   paid_amount: number;
   payment_status: 'unpaid' | 'partial' | 'paid';
+  platform_source?: 'local' | 'groupbuy' | 'miniapp';
   shipping_address?: string;
   notes?: string;
   created_at: string;
@@ -139,6 +140,7 @@ export async function createSalesOrder(
 export async function getSalesOrders(options?: {
   status?: string;
   search?: string;
+  platform_source?: string;
 }): Promise<SalesOrder[]> {
   if (!isTauri()) {
     return [];

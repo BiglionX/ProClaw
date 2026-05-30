@@ -1,0 +1,12 @@
+{
+  "id": "ma_catering_assistant",
+  "name": "餐饮服务助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "send_message", "show_notification"],
+  "capabilities": ["pos_order_management", "menu_recommendation", "table_status_query", "daily_summary", "member_lookup"],
+  "icon": "icon.svg",
+  "description": "智能餐饮助手 - POS 点餐、桌台管理、菜单推荐、营收统计",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_catering_assistant"
+}

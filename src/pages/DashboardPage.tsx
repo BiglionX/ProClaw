@@ -48,6 +48,36 @@ import {
   type FinancialSummary,
 } from '../lib/financeService';
 import { getDatabaseStats } from '../lib/productService';
+import { useAppModeStore } from '../config/appMode';
+import FloatingAgentChat from '../components/Agent/FloatingAgentChat';
+import type { TeamChatContext } from '../components/Agent/FloatingAgentChat';
+import TeamConfigDialog from '../components/Agent/TeamConfigDialog';
+
+interface AITeamCardData {
+  id: string;
+  name: string;
+  status: 'running' | 'configuring';
+  desc: string;
+  color: string;
+  icon: string;
+}
+
+function getDefaultAITeams(): AITeamCardData[] {
+  let stored: AITeamCardData[] = [];
+  try {
+    const data = localStorage.getItem('proclaw-dashboard-ai-teams');
+    if (data) stored = JSON.parse(data);
+  } catch { /* ignore */ }
+
+  if (stored.length > 0) return stored;
+
+  const defaults: AITeamCardData[] = [
+    { id: 'team-newmedia', name: '新媒体运营', status: 'running', desc: '支持短视频、小红书内容生成与发布', color: '#e74c3c', icon: '📱' },
+    { id: 'team-localdeal', name: '本地团购', status: 'configuring', desc: '管理美团/抖音团购订单与活动', color: '#f39c12', icon: '🏷️' },
+    { id: 'team-miniapp', name: '小程序商城', status: 'running', desc: '一键同步商品、订单处理、客户管理', color: '#3498db', icon: '🛍️' },
+  ];
+  return defaults;
+}
 
 interface StatCardProps {
   title: string;
@@ -123,6 +153,10 @@ function StatCard({ title, value, icon, color, change, subtitle }: StatCardProps
 }
 
 export default function DashboardPage() {
+  // 从插件 manifest 读取快速操作按钮
+  const plugin = useAppModeStore(state => state.activePlugin);
+  const quickActions = plugin?.ui.quickActions ?? [];
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -132,6 +166,11 @@ export default function DashboardPage() {
   const [productAnalytics, setProductAnalytics] = useState<ProductAnalytics | null>(null);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [dbStats, setDbStats] = useState<any>(null);
+
+  // AI 团队交互状态
+  const [chatContext, setChatContext] = useState<TeamChatContext | undefined>(undefined);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [configTeam, setConfigTeam] = useState<{ id: string; name: string } | null>(null);
 
   // 加载所有数据
   const loadDashboardData = async () => {
@@ -519,6 +558,96 @@ export default function DashboardPage() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* AI 团队运行状态卡片（全版本） */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+          {'🤖 AI 团队运行状态'}
+        </Typography>
+        <Grid container spacing={2}>
+          {getDefaultAITeams().map(team => (
+            <Grid item xs={12} sm={6} md={4} key={team.id}>
+              <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%', '&:hover': { boxShadow: 2 } }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Typography variant="h5" sx={{ fontSize: '1.8rem' }}>{team.icon}</Typography>
+                    <Chip
+                      label={team.status === 'running' ? '运行中' : '待配置'}
+                      size="small"
+                      color={team.status === 'running' ? 'success' : 'warning'}
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {team.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {team.desc}
+                  </Typography>
+                  <Box sx={{ mt: 1.5, display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      variant="text"
+                      sx={{ color: team.color }}
+                      onClick={() => setConfigTeam({ id: team.id, name: team.name })}
+                    >
+                      配置
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="text"
+                      sx={{ color: team.color }}
+                      onClick={() => {
+                        setChatContext({ teamId: team.id, teamName: team.name });
+                        setChatOpen(true);
+                      }}
+                    >
+                      查看详情
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* 一键操作按钮 - 从插件 manifest 动态渲染 */}
+        {quickActions.length > 0 && (
+          <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            {quickActions.map((action, idx) => (
+              <Button
+                key={idx}
+                variant="contained"
+                startIcon={action.icon === 'shopping-cart' ? <ShoppingCartIcon /> : <TrendingUpIcon />}
+                sx={{ bgcolor: action.color || '#3498db', '&:hover': { bgcolor: action.color || '#2980b9' } }}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </Box>
+        )}
+      </Box>
+
+      {/* FloatingAgentChat 团队对话 */}
+      {chatOpen && chatContext && (
+        <FloatingAgentChat
+          teamContext={chatContext}
+          onClose={() => {
+            setChatOpen(false);
+            setChatContext(undefined);
+          }}
+        />
+      )}
+
+      {/* TeamConfigDialog 团队配置对话框 */}
+      {configTeam && (
+        <TeamConfigDialog
+          open={!!configTeam}
+          teamId={configTeam.id}
+          teamName={configTeam.name}
+          onClose={() => setConfigTeam(null)}
+        />
+      )}
     </Box>
   );
 }

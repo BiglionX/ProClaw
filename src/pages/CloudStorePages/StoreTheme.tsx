@@ -15,7 +15,6 @@ import {
   Paper,
   TextField,
   Typography,
-  Snackbar,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { getCloudStore, getStoreTheme, updateStoreTheme, generateThemeWithAI, StoreTheme as StoreThemeType, CloudStore, getSyncableProducts } from '../../lib/cloudStoreService';
@@ -38,7 +37,7 @@ export default function StoreTheme({
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [industry, setIndustry] = useState('零售');
+  const [industry, _setIndustry] = useState('零售');
   const [generatingLogo, setGeneratingLogo] = useState(false);
   const [generatingBanner, setGeneratingBanner] = useState(false);
 
@@ -198,8 +197,8 @@ export default function StoreTheme({
       if (!selected || Array.isArray(selected)) return;
 
       // 读取文件
-      const fileData = await readFile(selected.path!);
-      const fileName = `logo_${Date.now()}.${selected.path!.split('.').pop()}`;
+      const fileData = await readFile(selected);
+      const fileName = `logo_${Date.now()}.${selected.split('.').pop()}`;
       
       // 保存到应用数据目录
       await writeFile(fileName, fileData, { baseDir: BaseDirectory.AppData });
@@ -235,8 +234,8 @@ export default function StoreTheme({
       if (!selected || Array.isArray(selected)) return;
 
       // 读取文件
-      const fileData = await readFile(selected.path!);
-      const fileName = `banner_${Date.now()}.${selected.path!.split('.').pop()}`;
+      const fileData = await readFile(selected);
+      const fileName = `banner_${Date.now()}.${selected.split('.').pop()}`;
       
       // 保存到应用数据目录
       await writeFile(fileName, fileData, { baseDir: BaseDirectory.AppData });
@@ -489,13 +488,9 @@ export default function StoreTheme({
               {/* Banner 上传 */}
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>首页轮播图</Typography>
-                {theme?.banner_images?.length > 0 ? (
-                  <Box sx={{ mb: 1, display: 'flex', gap: 1, overflow: 'auto' }}>
-                    {theme.banner_images.map((url, i) => (
-                      <img key={i} src={url} alt={`Banner ${i + 1}`} style={{ height: 50, borderRadius: 4 }} />
-                    ))}
-                  </Box>
-                ) : null}
+                {(theme?.banner_images?.length ?? 0) > 0 && theme!.banner_images!.map((url, i) => (
+                    <img key={i} src={url} alt={`Banner ${i + 1}`} style={{ height: 50, borderRadius: 4 }} />
+                  ))}
                 <Paper
                   variant="outlined"
                   sx={{
@@ -573,7 +568,7 @@ export default function StoreTheme({
 
       {/* 保存按钮 */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadTheme} disabled={saving}>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => loadTheme()} disabled={saving}>
           重置
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={saving || !theme}>

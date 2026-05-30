@@ -2,7 +2,7 @@ import { Box, Typography } from '@mui/material';
 import { STEP_LABELS } from './ceoAgentStyles';
 
 interface StepIndicatorProps {
-  steps: string[];
+  steps: readonly string[];
   currentStep: string;
 }
 

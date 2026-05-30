@@ -1,0 +1,12 @@
+{
+  "id": "ma_cloud_ops",
+  "name": "云平台运营助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_finance", "read_orders", "send_message"],
+  "capabilities": ["store_analytics", "product_sync_status", "order_monitoring", "performance_report"],
+  "icon": "icon.svg",
+  "description": "云平台运营助手 - 商城分析、商品同步、订单监控、性能报告",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_cloud_ops"
+}

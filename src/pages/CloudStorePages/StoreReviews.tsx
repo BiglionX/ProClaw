@@ -1,7 +1,6 @@
 import {
-  Star as StarIcon,
-  Reply as ReplyIcon,
   Delete as DeleteIcon,
+  Reply as ReplyIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -9,7 +8,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -22,7 +20,6 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 
 interface ProductReview {
   id: string;
@@ -53,7 +50,7 @@ export default function StoreReviews({
   const [replyContent, setReplyContent] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const loadReviews = async (productId?: string) => {
+  const loadReviews = async (_productId?: string) => {
     try {
       setLoading(true);
       // 暂时使用模拟数据

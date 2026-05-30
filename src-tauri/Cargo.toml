@@ -55,6 +55,10 @@ hex = "0.4.3"
 # ZIP 解压（Agent 包）
 zip = "0.6"
 
+# 插件包解压 (tar.gz)
+flate2 = "1.0"
+tar = "0.4"
+
 # 加密库 (端到端加密)
 aes-gcm = "0.10.3"
 pbkdf2 = { version = "0.12.2", features = ["simple"] }
@@ -65,6 +69,10 @@ argon2 = "0.5.3"
 
 # HMAC-SHA256 签名（邀请码防伪）
 hmac = "0.12"
+
+# Ed25519 签名（插件包签名校验）
+ed25519-dalek = { version = "2.1", features = ["batch", "digest"] }
+signature = "2"
 
 [features]
 default = ["custom-protocol", "inventory"]

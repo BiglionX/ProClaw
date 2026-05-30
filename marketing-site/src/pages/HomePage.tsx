@@ -20,8 +20,8 @@ const featureCards = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
       </svg>
     ),
-    title: '双模式架构',
-    desc: '开店管库存用 ProClaw Plus，创业带队用虚拟公司版。一套软件，两种模式，总有一款适合你。',
+    title: '插件化行业版',
+    desc: '一个基础桌面端统一构建，安装后按需下载行业插件。餐饮、零售、美业、宠物...覆盖更多商家场景。',
     link: '/features',
   },
   {
@@ -79,7 +79,7 @@ const HomePage: React.FC = () => {
             <div className="text-center md:text-left">
               <div className="inline-flex flex-wrap gap-2 mb-6">
                 <span className="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-sm font-semibold">零技术门槛</span>
-                <span className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold">AI 开箱即用</span>
+                <span className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold">一个软件，所有行业</span>
                 <span className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold">数据本地安全</span>
               </div>
               <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
@@ -248,10 +248,10 @@ const HomePage: React.FC = () => {
       <div className="py-20 bg-gray-900">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            先下载用用看，两个版本都免费
+            先下载用用看，免费且开源
           </h2>
           <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">
-            3 分钟完成安装，CEO Agent 对话引导配置。不满意？卸载就是了，没有任何损失。
+            3 分钟完成安装，CEO Agent 对话引导选择行业。不满意？卸载就是了，没有任何损失。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useCallback, useState } from 'react';
+import { useAppModeStore } from '../config/appMode';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
 import PreferenceSettings from '../components/CEO/PreferenceSettings';
@@ -53,6 +54,7 @@ function a11yProps(index: number) {
 }
 
 export default function SettingsPage() {
+  const mode = useAppModeStore(state => state.mode);
   const [tabValue, setTabValue] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const navigate = useNavigate();
@@ -107,11 +109,11 @@ export default function SettingsPage() {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab label="🤖 AI 模型设置" {...a11yProps(0)} />
-          <Tab label="🗄️ 数据库设置" {...a11yProps(1)} />
-          <Tab label="🔍 指令分析" {...a11yProps(2)} />
+          {mode !== 'light' && <Tab label="🗄️ 数据库设置" {...a11yProps(1)} />}
+          {mode !== 'light' && <Tab label="🔍 指令分析" {...a11yProps(2)} />}
           <Tab label="ℹ️ 系统信息" {...a11yProps(3)} />
-          <Tab label="📧 邀请管理" {...a11yProps(4)} />
-          <Tab label="🧠 CEO Agent" {...a11yProps(5)} />
+          {mode !== 'light' && <Tab label="📧 邀请管理" {...a11yProps(4)} />}
+          {mode !== 'light' && <Tab label="🧠 CEO Agent" {...a11yProps(5)} />}
         </Tabs>
       </Paper>
 

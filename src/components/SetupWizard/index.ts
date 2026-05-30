@@ -5,4 +5,7 @@ export { PathSelector } from './PathSelector';
 export { CompanyNameInput } from './CompanyNameInput';
 export { ModelConfigStep } from './ModelConfigStep';
 export { CompletionScreen } from './CompletionScreen';
-export type { SetupStep, SetupContext, DialogueNode } from './dialogueScript';
+export { StoreTypeSelector } from './StoreTypeSelector';
+export { DataImportStep } from './DataImportStep';
+export { PlatformBindStep } from './PlatformBindStep';
+export type { SetupStep, LightSetupStep, SetupContext, DialogueNode } from './dialogueScript';

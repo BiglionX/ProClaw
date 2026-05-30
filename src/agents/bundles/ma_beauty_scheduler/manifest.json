@@ -1,0 +1,12 @@
+{
+  "id": "ma_beauty_scheduler",
+  "name": "智能排班助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_finance", "send_message"],
+  "capabilities": ["schedule_optimization", "peak_hour_prediction", "leave_management", "commission_calc"],
+  "icon": "icon.svg",
+  "description": "智能排班助手 - 排班优化、高峰预测、请假管理、提成计算",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_beauty_scheduler"
+}

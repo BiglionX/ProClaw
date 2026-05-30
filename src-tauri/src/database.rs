@@ -118,6 +118,81 @@ impl Database {
                 ).ok();
                 println!("Installed built-in Agent: {}", name);
             }
+
+            // 预定义行业插件 Agent（餐饮/美业/宠物/Cloud）
+            let industry_builtins = vec![
+                // === 餐饮行业 (Catering) ===
+                ("proclaw-catering-assistant", "餐饮服务助手",
+                 vec!["read_user", "read_orders", "send_message", "show_notification"],
+                 vec!["pos_order_management", "menu_recommendation", "table_status_query", "daily_summary", "member_lookup"],
+                 "智能餐饮助手 - POS 点餐、桌台管理、菜单推荐、营收统计"),
+                ("proclaw-catering-menu", "智能菜单顾问",
+                 vec!["read_user", "send_message"],
+                 vec!["dish_recommendation", "popular_dishes", "dietary_pairing", "special_diet"],
+                 "智能菜单顾问 - 菜品推荐、热销榜单、营养搭配、特殊饮食需求"),
+                ("proclaw-catering-kds", "后厨调度助手",
+                 vec!["read_orders", "show_notification", "send_message"],
+                 vec!["kds_order_monitor", "overdue_alert", "prep_time_estimate", "printer_integration"],
+                 "后厨调度助手 - 订单监控、超时预警、备餐预估、打印联动"),
+                // === 美业行业 (Beauty) ===
+                ("proclaw-beauty-assistant", "美业服务顾问",
+                 vec!["read_user", "read_crm", "send_message", "show_notification"],
+                 vec!["appointment_management", "service_recommendation", "employee_schedule_query", "member_insight", "crm_engagement"],
+                 "美业服务顾问 - 预约管理、服务推荐、技师排班、客户洞察、沉睡唤醒"),
+                ("proclaw-beauty-scheduler", "智能排班助手",
+                 vec!["read_user", "read_finance", "send_message"],
+                 vec!["schedule_optimization", "peak_hour_prediction", "leave_management", "commission_calc"],
+                 "智能排班助手 - 排班优化、高峰预测、请假管理、提成计算"),
+                ("proclaw-beauty-marketing", "营销活动助手",
+                 vec!["read_crm", "send_message", "show_notification"],
+                 vec!["campaign_templates", "campaign_analytics", "wechat_template_push", "coupon_distribution"],
+                 "营销活动助手 - 沉睡唤醒、生日礼、充值满赠、优惠券发放"),
+                // === 宠物行业 (Pet) ===
+                ("proclaw-pet-assistant", "宠物养护顾问",
+                 vec!["read_user", "send_message", "show_notification"],
+                 vec!["pet_care_advice", "breed_query", "grooming_recommendation", "product_recommendation", "emergency_guide"],
+                 "宠物养护顾问 - 日常养护、品种查询、洗护推荐、商品推荐、紧急指南"),
+                ("proclaw-pet-boarding", "寄养管理助手",
+                 vec!["read_user", "send_message", "show_notification"],
+                 vec!["boarding_status_query", "daily_log_management", "checkout_calculation", "owner_communication", "availability_forecast"],
+                 "寄养管理助手 - 房间状态、每日日志、费用计算、主人沟通、需求预测"),
+                ("proclaw-pet-health", "健康管理助手",
+                 vec!["read_user", "send_message", "show_notification"],
+                 vec!["vaccine_reminder", "vaccine_schedule", "weight_tracking", "health_log", "medical_alert"],
+                 "健康管理助手 - 疫苗提醒、疫苗计划、体重跟踪、健康记录、异常预警"),
+                // === Cloud 平台 (Cloud) ===
+                ("proclaw-cloud-billing", "Token 计费助手",
+                 vec!["read_finance", "send_message", "show_notification"],
+                 vec!["token_balance_query", "plan_recommendation", "usage_analytics", "budget_alert", "invoice_query"],
+                 "Token 计费助手 - 余额查询、套餐推荐、消耗分析、预算预警、账单查询"),
+                ("proclaw-cloud-ops", "云平台运营助手",
+                 vec!["read_finance", "read_orders", "send_message"],
+                 vec!["store_analytics", "product_sync_status", "order_monitoring", "performance_report"],
+                 "云平台运营助手 - 商城分析、商品同步、订单监控、性能报告"),
+                ("proclaw-cloud-backup", "备份恢复助手",
+                 vec!["read_user", "send_message", "show_notification"],
+                 vec!["backup_status_query", "auto_backup_config", "restore_assistant", "backup_integrity_check", "disaster_recovery"],
+                 "备份恢复助手 - 备份查询、自动备份、恢复引导、完整性检查、灾难恢复"),
+            ];
+
+            for (id, name, permissions, capabilities, description) in &industry_builtins {
+                let manifest = serde_json::json!({
+                    "id": id,
+                    "name": name,
+                    "version": "1.0.0",
+                    "entry": "index.html",
+                    "description": description,
+                    "author": "ProClaw 官方",
+                    "permissions": permissions,
+                    "capabilities": capabilities,
+                }).to_string();
+                self.conn.execute(
+                    "INSERT INTO agents (id, name, version, manifest, enabled, is_builtin, installed_at)
+                     VALUES (?1, ?2, '1.0.0', ?3, 1, 1, ?4)",
+                    params![id, name, manifest, now],
+                ).ok();
+                println!("Installed industry Agent: {}", name);
+            }
         }
         
         Ok(())

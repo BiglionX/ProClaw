@@ -29,6 +29,8 @@ import AdminTasksPage from './pages/admin/AdminTasksPage';
 import AdminRateLimitingPage from './pages/admin/AdminRateLimitingPage';
 import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
 import AdminTokenMonitorPage from './pages/admin/AdminTokenMonitorPage';
+import AdminPluginsPage from './pages/admin/AdminPluginsPage';
+import PluginStorePage from './pages/PluginStorePage';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: 'user' | 'admin' }> = ({ 
@@ -81,6 +83,7 @@ function App() {
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />
           <Route path="/use-cases" element={<UseCasesPage />} />
+          <Route path="/plugins" element={<PluginStorePage />} />
           <Route path="/faq" element={<FAQPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -205,6 +208,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminTokenMonitorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/plugins"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminPluginsPage />
               </ProtectedRoute>
             }
           />

@@ -230,6 +230,55 @@ const UserManagementPage: React.FC = () => {
       .join(', ');
   };
 
+  // ========== 邀请员工相关函数 ==========
+  const handleOpenInviteDialog = () => {
+    setInviteRoles([]);
+    setInvitePhone('');
+    setInviteResult(null);
+    setInviteDialogOpen(true);
+  };
+
+  const handleCloseInviteDialog = () => {
+    setInviteDialogOpen(false);
+    setInviteResult(null);
+  };
+
+  const handleCreateInvite = async () => {
+    if (inviteRoles.length === 0) {
+      showSnackbar('请至少选择一个角色', 'error');
+      return;
+    }
+
+    setInviteLoading(true);
+    try {
+      const response = await fetch('/api/invitations/create_employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role_ids: inviteRoles,
+          target_phone: invitePhone || null,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || '创建邀请失败');
+      }
+
+      setInviteResult({
+        invite_code: data.invite_code,
+        qr_data: data.qr_data,
+        role_ids: data.role_ids,
+      });
+      showSnackbar('邀请已生成', 'success');
+    } catch (error: any) {
+      console.error('Failed to create invitation:', error);
+      showSnackbar(error.message || '创建邀请失败', 'error');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* 页面标题 */}
@@ -555,57 +604,6 @@ const UserManagementPage: React.FC = () => {
       </Dialog>
     </Box>
   );
-};
-
-/* ========== 邀请员工相关函数 ========== */
-
-const handleOpenInviteDialog = () => {
-  setInviteRoles([]);
-  setInvitePhone('');
-  setInviteResult(null);
-  setInviteDialogOpen(true);
-};
-
-const handleCloseInviteDialog = () => {
-  setInviteDialogOpen(false);
-  setInviteResult(null);
-};
-
-const handleCreateInvite = async () => {
-  if (inviteRoles.length === 0) {
-    showSnackbar('请至少选择一个角色', 'error');
-    return;
-  }
-
-  setInviteLoading(true);
-  try {
-    // 调用后端 API 创建员工邀请
-    const response = await fetch('/api/invitations/create_employee', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        role_ids: inviteRoles,
-        target_phone: invitePhone || null,
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || '创建邀请失败');
-    }
-
-    setInviteResult({
-      invite_code: data.invite_code,
-      qr_data: data.qr_data,
-      role_ids: data.role_ids,
-    });
-    showSnackbar('邀请已生成', 'success');
-  } catch (error: any) {
-    console.error('Failed to create invitation:', error);
-    showSnackbar(error.message || '创建邀请失败', 'error');
-  } finally {
-    setInviteLoading(false);
-  }
 };
 
 export default UserManagementPage;

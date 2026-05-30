@@ -1,0 +1,40 @@
+{
+  "id": "inventory",
+  "name": "进销存通用版",
+  "version": "1.0.0",
+  "description": "适用于大多数实体商户，含完整进销存管理、报表分析、AI经营团队",
+  "icon": "📦",
+  "compatibleAppVersion": ">=0.1.0",
+  "features": {
+    "modules": ["pos", "inventory", "purchase", "sales", "reports", "contacts", "teams", "ai-knowledge", "cloud-store"],
+    "dashboards": ["sales-trend", "inventory-distribution", "financial-overview"],
+    "reports": ["sales-report", "inventory-report", "financial-report"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "用户中心", "icon": "user", "path": "/ucenter", "group": "系统" },
+      { "text": "数据中心", "icon": "database", "path": "/datacenter", "group": "业务" },
+      { "text": "商品库", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "供应链", "icon": "truck", "path": "/supplychain", "group": "业务" },
+      { "text": "AI团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "联系人", "icon": "phone", "path": "/contacts", "group": "通讯" },
+      { "text": "消息", "icon": "message-square", "path": "/messages", "group": "通讯" },
+      { "text": "云商城", "icon": "shopping-bag", "path": "/cloud-store", "group": "扩展" }
+    ],
+    "remove": [],
+    "reorder": ["/ucenter", "/datacenter", "/products", "/supplychain", "/teams", "/ai-knowledge", "/contacts", "/messages", "/cloud-store"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#111827",
+      "secondary": "#6b7280"
+    },
+    "onboarding": "default-onboarding",
+    "quickActions": []
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  }
+}

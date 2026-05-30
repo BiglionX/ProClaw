@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>后厨调度助手</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; }
+.header { background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); color: #fff; padding: 20px; border-bottom: 2px solid #e94560; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats-bar { display: flex; gap: 8px; padding: 12px 16px; }
+.stat-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+.badge-new { background: #e94560; color: #fff; }
+.badge-cooking { background: #f39c12; color: #fff; }
+.badge-done { background: #27ae60; color: #fff; }
+.badge-overdue { background: #c0392b; color: #fff; animation: pulse 1s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; padding: 0 16px 16px; }
+.order-card { background: #16213e; border-radius: 12px; padding: 16px; border-left: 4px solid #e94560; }
+.order-card .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.order-card .table-no { font-size: 16px; font-weight: 700; }
+.order-card .time { font-size: 12px; color: #888; }
+.order-card .items { border-top: 1px solid #1a1a3e; padding-top: 10px; }
+.order-card .item { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; }
+.order-card .item .qty { color: #e94560; font-weight: 700; }
+.order-card .item .status-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.order-card .item .tag-pending { background: #e94560; color: #fff; }
+.order-card .item .tag-done { background: #27ae60; color: #fff; }
+.order-card .overdue-badge { font-size: 12px; color: #e94560; font-weight: 600; margin-top: 8px; }
+.order-card.overdue { border-left-color: #e94560; animation: flash-border 2s infinite; }
+@keyframes flash-border { 0%, 100% { border-left-color: #e94560; } 50% { border-left-color: #ff7979; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>👨‍🍳 后厨调度助手</h1>
+  <p>订单监控 · 超时预警 · 备餐预估 · 打印联动</p>
+</div>
+<div class="stats-bar">
+  <span class="stat-badge badge-new">新订单 3</span>
+  <span class="stat-badge badge-cooking">制作中 4</span>
+  <span class="stat-badge badge-overdue">超时 2</span>
+  <span class="stat-badge badge-done">已完成 12</span>
+</div>
+<div class="order-grid">
+  <div class="order-card overdue">
+    <div class="order-header"><span class="table-no">A2 桌</span><span class="time">15分钟前</span></div>
+    <div class="items">
+      <div class="item"><span>招牌水煮鱼 <span class="qty">×1</span></span><span class="status-tag tag-pending">等待</span></div>
+      <div class="item"><span>干锅牛蛙 <span class="qty">×1</span></span><span class="status-tag tag-pending">等待</span></div>
+    </div>
+    <div class="overdue-badge">⚠️ 超时 5 分钟</div>
+  </div>
+  <div class="order-card">
+    <div class="order-header"><span class="table-no">A5 桌</span><span class="time">8分钟前</span></div>
+    <div class="items">
+      <div class="item"><span>蒜蓉粉丝蒸虾 <span class="qty">×1</span></span><span class="status-tag tag-pending">等待</span></div>
+      <div class="item"><span>松仁玉米 <span class="qty">×1</span></span><span class="status-tag tag-done">已完成</span></div>
+    </div>
+  </div>
+  <div class="order-card">
+    <div class="order-header"><span class="table-no">B2 桌</span><span class="time">12分钟前</span></div>
+    <div class="items">
+      <div class="item"><span>地三鲜 <span class="qty">×2</span></span><span class="status-tag tag-pending">等待</span></div>
+      <div class="item"><span>麻辣香锅 <span class="qty">×1</span></span><span class="status-tag tag-done">已完成</span></div>
+    </div>
+  </div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[KitchenAgent] Current user:', user);
+  } catch(e) {
+    console.log('[KitchenAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

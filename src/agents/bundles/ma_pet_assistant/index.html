@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宠物养护顾问</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f8f0; color: #333; }
+.header { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.stat-card { background: #fff; border-radius: 10px; padding: 16px; flex: 1; min-width: 100px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.stat-card .num { font-size: 26px; font-weight: 700; color: #f39c12; }
+.stat-card .label { font-size: 12px; color: #999; margin-top: 4px; }
+.pet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; padding: 0 16px 16px; }
+.pet-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.pet-card .pet-avatar { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.pet-card .pet-name { font-weight: 700; font-size: 15px; text-align: center; }
+.pet-card .pet-breed { font-size: 12px; color: #999; text-align: center; margin-top: 2px; }
+.pet-card .pet-meta { display: flex; justify-content: space-around; margin-top: 10px; font-size: 12px; color: #666; }
+.tips { padding: 0 16px 16px; }
+.tips h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; color: #555; }
+.tip-list { background: #fff; border-radius: 10px; padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.tip-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.tip-item:last-child { border-bottom: none; }
+.tip-item .tip-tag { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-right: 6px; }
+.tag-care { background: #e8f5e9; color: #27ae60; }
+.tag-emergency { background: #ffe0e0; color: #e74c3c; }
+.tag-food { background: #fff3e0; color: #f57c00; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🐾 宠物养护顾问</h1>
+  <p>日常养护 · 品种查询 · 洗护推荐 · 紧急指南</p>
+</div>
+<div class="stats">
+  <div class="stat-card"><div class="num">16</div><div class="label">经常顾客</div></div>
+  <div class="stat-card"><div class="num">8</div><div class="label">今日预约</div></div>
+  <div class="stat-card"><div class="num">3</div><div class="label">寄养中</div></div>
+  <div class="stat-card"><div class="num">5</div><div class="label">待疫苗</div></div>
+</div>
+<div class="pet-grid">
+  <div class="pet-card"><div class="pet-avatar" style="background:#fef3e2;">🐕</div><div class="pet-name">豆豆</div><div class="pet-breed">金毛 · 3岁</div><div class="pet-meta"><span>❤️ 健康</span><span>⚡ 疫苗✓</span></div></div>
+  <div class="pet-card"><div class="pet-avatar" style="background:#e8f5e9;">🐱</div><div class="pet-name">咪咪</div><div class="pet-breed">英短 · 1岁</div><div class="pet-meta"><span>❤️ 健康</span><span>⚡ 待疫苗</span></div></div>
+  <div class="pet-card"><div class="pet-avatar" style="background:#e3f2fd;">🐕</div><div class="pet-name">小黑</div><div class="pet-breed">泰迪 · 5岁</div><div class="pet-meta"><span>❤️ 皮肤病</span><span>⚡ 治疗中</span></div></div>
+  <div class="pet-card"><div class="pet-avatar" style="background:#fce4ec;">🐱</div><div class="pet-name">花花</div><div class="pet-breed">布偶 · 2岁</div><div class="pet-meta"><span>❤️ 健康</span><span>⚡ 疫苗✓</span></div></div>
+</div>
+<div class="tips">
+  <h2>💡 养护小贴士</h2>
+  <div class="tip-list">
+    <div class="tip-item"><span class="tip-tag tag-care">养护</span>🐕 金毛夏季掉毛严重，建议每周梳理2-3次</div>
+    <div class="tip-item"><span class="tip-tag tag-food">饮食</span>🐱 猫咪3个月大应选择幼猫粮，每日3-4餐</div>
+    <div class="tip-item"><span class="tip-tag tag-emergency">紧急</span>⚠️ 狗狗皮肤发红可能是过敏，建议暂停洗护并就医</div>
+    <div class="tip-item"><span class="tip-tag tag-care">养护</span>🐕 泰迪需每4-6周修剪一次毛发</div>
+  </div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[PetAssistant] Current user:', user);
+  } catch(e) {
+    console.log('[PetAssistant] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

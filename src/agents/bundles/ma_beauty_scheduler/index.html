@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能排班助手</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+.header { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.stat-card { background: #fff; border-radius: 10px; padding: 16px; flex: 1; min-width: 100px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.stat-card .num { font-size: 26px; font-weight: 700; color: #3498db; }
+.stat-card .label { font-size: 12px; color: #999; margin-top: 4px; }
+.section { padding: 0 16px 16px; }
+.section h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; color: #555; }
+.schedule-grid { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+.schedule-header { display: flex; background: #f0f4f8; padding: 10px 12px; font-weight: 600; font-size: 13px; color: #555; }
+.schedule-row { display: flex; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; align-items: center; }
+.schedule-row:last-child { border-bottom: none; }
+.col-name { width: 80px; }
+.col-time { width: 100px; font-size: 13px; }
+.col-shift { flex: 1; display: flex; gap: 4px; }
+.shift-block { padding: 4px 10px; border-radius: 6px; font-size: 12px; text-align: center; flex: 1; }
+.shift-work { background: #e3f2fd; color: #1976d2; }
+.shift-rest { background: #f5f5f5; color: #999; }
+.shift-leave { background: #ffe0e0; color: #e74c3c; }
+.staff-avatar { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 700; margin-right: 8px; }
+.peak-chart { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.peak-bar { display: flex; align-items: center; margin-bottom: 8px; }
+.peak-label { width: 60px; font-size: 12px; color: #666; }
+.peak-fill { height: 20px; border-radius: 4px; transition: width 0.3s; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📊 智能排班助手</h1>
+  <p>排班优化 · 高峰预测 · 请假管理 · 提成计算</p>
+</div>
+<div class="stats">
+  <div class="stat-card"><div class="num">6</div><div class="label">在岗技师</div></div>
+  <div class="stat-card"><div class="num">1</div><div class="label">请假</div></div>
+  <div class="stat-card"><div class="num">14:00</div><div class="label">今日高峰</div></div>
+  <div class="stat-card"><div class="num">92%</div><div class="label">人效比</div></div>
+</div>
+<div class="section">
+  <h2>📅 今日排班</h2>
+  <div class="schedule-grid">
+    <div class="schedule-header"><span class="col-name">技师</span><span class="col-time">时段</span><span class="col-shift">早班 09-12</span><span class="col-shift">中班 12-17</span><span class="col-shift">晚班 17-22</span></div>
+    <div class="schedule-row"><span class="col-name"><span class="staff-avatar" style="background:#9b59b6;">王</span>王小明</span><span class="col-time">09:00-18:00</span><span class="col-shift"><span class="shift-block shift-work">✓</span><span class="shift-block shift-work">✓</span><span class="shift-block shift-rest">-</span></span></div>
+    <div class="schedule-row"><span class="col-name"><span class="staff-avatar" style="background:#e74c3c;">李</span>李婷</span><span class="col-time">12:00-22:00</span><span class="col-shift"><span class="shift-block shift-rest">-</span><span class="shift-block shift-work">✓</span><span class="shift-block shift-work">✓</span></span></div>
+    <div class="schedule-row"><span class="col-name"><span class="staff-avatar" style="background:#27ae60;">张</span>张丽</span><span class="col-time">09:00-17:00</span><span class="col-shift"><span class="shift-block shift-work">✓</span><span class="shift-block shift-work">✓</span><span class="shift-block shift-rest">-</span></span></div>
+    <div class="schedule-row"><span class="col-name"><span class="staff-avatar" style="background:#e67e22;">陈</span>陈芳</span><span class="col-time">-</span><span class="col-shift"><span class="shift-block shift-leave">请假</span><span class="shift-block shift-leave">请假</span><span class="shift-block shift-leave">请假</span></span></div>
+  </div>
+</div>
+<div class="section">
+  <h2>📈 高峰时段预测</h2>
+  <div class="peak-chart">
+    <div class="peak-bar"><span class="peak-label">09:00</span><div style="width:80%;" class="peak-fill" style="background:#e3f2fd;">&nbsp;</div></div>
+    <div class="peak-bar"><span class="peak-label">10:00</span><div style="width:50%;" class="peak-fill" style="background:#e3f2fd;">&nbsp;</div></div>
+    <div class="peak-bar"><span class="peak-label">11:00</span><div style="width:40%;" class="peak-fill" style="background:#e3f2fd;">&nbsp;</div></div>
+    <div class="peak-bar"><span class="peak-label">14:00</span><div style="width:100%;" class="peak-fill" style="background:#3498db;">&nbsp;</div></div>
+    <div class="peak-bar"><span class="peak-label">15:00</span><div style="width:90%;" class="peak-fill" style="background:#3498db;">&nbsp;</div></div>
+    <div class="peak-bar"><span class="peak-label">19:00</span><div style="width:70%;" class="peak-fill" style="background:#e3f2fd;">&nbsp;</div></div>
+    <div class="peak-bar"><span class="peak-label">20:00</span><div style="width:60%;" class="peak-fill" style="background:#e3f2fd;">&nbsp;</div></div>
+  </div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[BeautyScheduler] Current user:', user);
+  } catch(e) {
+    console.log('[BeautyScheduler] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

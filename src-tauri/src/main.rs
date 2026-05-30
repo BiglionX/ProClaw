@@ -23,6 +23,7 @@ pub mod sales_commands;
 #[cfg(feature = "inventory")]
 pub mod finance_commands;
 
+pub mod plugin_manager;
 pub mod setup_commands;
 pub mod common_commands;
 pub mod team_commands;
@@ -34,6 +35,14 @@ pub mod call_commands;
 pub mod invitation_commands;
 pub mod store_commands;
 pub mod ceo_commands;
+
+// 云备份模块（Cloud 版）
+pub mod cloud_backup_commands;
+
+// 行业插件命令（Phase 4）
+pub mod catering_commands;
+pub mod beauty_commands;
+pub mod pet_commands;
 
 // 虚拟公司版模块
 #[cfg(feature = "virtual_company")]
@@ -72,6 +81,7 @@ use purchase_commands::*;
 use sales_commands::*;
 #[cfg(feature = "inventory")]
 use finance_commands::*;
+use plugin_manager::*;
 use setup_commands::*;
 use common_commands::*;
 use team_commands::*;
@@ -81,6 +91,10 @@ use subscription_commands::*;
 use message_commands::*;
 use call_commands::*;
 use invitation_commands::*;
+use cloud_backup_commands::*;
+use catering_commands::*;
+use beauty_commands::*;
+use pet_commands::*;
 #[cfg(feature = "virtual_company")]
 use agent_commands::*;
 #[cfg(feature = "virtual_company")]
@@ -444,6 +458,46 @@ async fn main() {
             test_llamacpp_connection,
             get_default_data_path,
             complete_setup_and_switch,
+
+            // 行业插件管理
+            list_installed_plugins,
+            get_plugin_manifest,
+            download_plugin,
+            verify_plugin_package,
+            verify_plugin_compatibility,
+            install_plugin,
+            uninstall_plugin,
+            get_plugin_assets_path,
+
+            // 云备份命令（Cloud 版）
+            get_backup_history_cmd,
+            get_backup_status_cmd,
+            get_backup_config_cmd,
+            trigger_cloud_backup_cmd,
+            set_auto_backup_schedule_cmd,
+            restore_from_backup_cmd,
+
+            // 餐饮行业插件命令
+            catering_create_pos_order,
+            catering_get_pos_orders,
+            catering_settle_pos_order,
+            catering_get_daily_summary,
+            catering_get_kds_orders,
+            catering_mark_kds_item_done,
+
+            // 美业行业插件命令
+            beauty_create_appointment,
+            beauty_get_appointments,
+            beauty_update_appointment_status,
+            beauty_get_employees,
+            beauty_create_employee,
+
+            // 宠物行业插件命令
+            pet_create_profile,
+            pet_get_profiles,
+            pet_create_boarding,
+            pet_get_boarding_records,
+            pet_check_out_boarding,
         ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

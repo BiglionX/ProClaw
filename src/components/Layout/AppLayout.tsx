@@ -5,10 +5,12 @@ import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import RecruitButton from '../AgentMarket/RecruitButton';
 import MarketDialog from '../AgentMarket/MarketDialog';
+import { useAppModeStore } from '../../config/appMode';
 
 const TOPBAR_HEIGHT = 64;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const mode = useAppModeStore(state => state.mode);
   const [marketOpen, setMarketOpen] = useState(false);
 
   // 监听全局事件打开市场
@@ -35,19 +37,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         {children}
       </Box>
-      {/* 浮动市场招募按钮 */}
-      <RecruitButton onClick={() => setMarketOpen(true)} />
+      {/* Light 版隐藏市场招募按钮和弹窗 */}
+      {mode !== 'light' && (
+        <RecruitButton onClick={() => setMarketOpen(true)} />
+      )}
       {/* 浮动 AI 智能体对话 */}
       <FloatingAgentChat />
       {/* 市场弹窗 */}
-      <MarketDialog
-        open={marketOpen}
-        onClose={() => setMarketOpen(false)}
-        onAgentInstalled={() => {
-          // 安装后刷新 Agent 管理页面
-          window.dispatchEvent(new CustomEvent('proclaw:agents-changed'));
-        }}
-      />
+      {mode !== 'light' && (
+        <MarketDialog
+          open={marketOpen}
+          onClose={() => setMarketOpen(false)}
+          onAgentInstalled={() => {
+            // 安装后刷新 Agent 管理页面
+            window.dispatchEvent(new CustomEvent('proclaw:agents-changed'));
+          }}
+        />
+      )}
     </Box>
   );
 }

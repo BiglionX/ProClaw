@@ -1,0 +1,12 @@
+{
+  "id": "ma_beauty_marketing",
+  "name": "营销活动助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_crm", "send_message", "show_notification"],
+  "capabilities": ["campaign_templates", "campaign_analytics", "wechat_template_push", "coupon_distribution"],
+  "icon": "icon.svg",
+  "description": "营销活动助手 - 沉睡唤醒、生日礼、充值满赠、优惠券发放",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_beauty_marketing"
+}

@@ -1,6 +1,7 @@
 import {
   Add as AddIcon,
   AutoAwesome as AutoAwesomeIcon,
+  Chat as ChatIcon,
   Delete as DeleteIcon,
   Download as DownloadIcon,
   Edit as EditIcon,
@@ -44,6 +45,7 @@ import { isTauri, safeInvoke } from '../lib/tauri';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AiTeam, CreateTeamPayload, TeamMember, UpdateTeamPayload } from '../lib/teamTypes';
 import { PUBLISH_STATUS_MAP, PUBLISH_STATUS_COLOR } from '../lib/teamTypes';
+import { getWorkLogsGroupedByDate } from '../lib/teamWorkLogService';
 import { useAuthStore } from '../lib/authStore';
 import {
   generateTeamRecommendation,
@@ -52,6 +54,8 @@ import {
   generateCrossAuthToken,
   type TeamRecommendation,
 } from '../lib/aiTeamRecommendationService';
+import FloatingAgentChat from '../components/Agent/FloatingAgentChat';
+import type { TeamChatContext } from '../components/Agent/FloatingAgentChat';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<AiTeam[]>([]);
@@ -65,6 +69,9 @@ export default function TeamsPage() {
   const [editTeam, setEditTeam] = useState<AiTeam | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState(0);
+
+  // AI 团队对话状态
+  const [chatContext, setChatContext] = useState<TeamChatContext | undefined>(undefined);
 
   // 导入方式选择对话框
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -483,6 +490,7 @@ export default function TeamsPage() {
               </Box>
             </CardContent>
             <CardActions sx={{ pt: 0, justifyContent: 'flex-end', gap: 0.5 }}>
+              <Tooltip title="对话"><IconButton size="small" onClick={() => setChatContext({ teamId: team.id, teamName: team.name })}><ChatIcon fontSize="small" /></IconButton></Tooltip>
               <Tooltip title="查看详情"><IconButton size="small" onClick={() => setDetailTeam(team)}><ViewIcon fontSize="small" /></IconButton></Tooltip>
               <Tooltip title="编辑"><IconButton size="small" onClick={() => setEditTeam(team)}><EditIcon fontSize="small" /></IconButton></Tooltip>
               <Tooltip title="导出"><IconButton size="small" onClick={() => handleExport(team)}><DownloadIcon fontSize="small" /></IconButton></Tooltip>
@@ -508,7 +516,11 @@ export default function TeamsPage() {
           onEdit={(t) => { setDetailTeam(null); setEditTeam(t); }}
           onDelete={(id) => { setDetailTeam(null); setDeleteTarget(id); }}
           onExport={handleExport}
-          onTogglePublish={handleTogglePublish} />
+          onTogglePublish={handleTogglePublish}
+          onChat={(memberRole) => {
+            setDetailTeam(null);
+            setChatContext({ teamId: detailTeam.id, teamName: detailTeam.name, memberRole });
+          }} />
       )}
 
       {/* ============ 编辑对话框 ============ */}
@@ -718,6 +730,14 @@ export default function TeamsPage() {
       </Dialog>
 
       <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar('')} message={snackbar} />
+
+      {/* FloatingAgentChat 团队对话 */}
+      {chatContext && (
+        <FloatingAgentChat
+          teamContext={chatContext}
+          onClose={() => setChatContext(undefined)}
+        />
+      )}
     </Box>
   );
 }
@@ -800,15 +820,26 @@ function CreateTeamDialog({ open, onClose, onCreated }: {
 // ============================================================
 // 团队详情对话框
 // ============================================================
-function TeamDetailDialog({ team, onClose, onEdit, onDelete, onExport, onTogglePublish }: {
+function TeamDetailDialog({ team, onClose, onEdit, onDelete, onExport, onTogglePublish, onChat }: {
   team: AiTeam; onClose: () => void;
   onEdit: (t: AiTeam) => void;
   onDelete: (id: string) => void;
   onExport: (t: AiTeam) => void;
   onTogglePublish: (t: AiTeam) => void;
+  onChat?: (memberRole?: string) => void;
 }) {
+  const [detailTab, setDetailTab] = useState(0);
   const formatDate = (d: string) => {
     try { return new Date(d).toLocaleString('zh-CN'); } catch { return d; }
+  };
+
+  const workLogs = team ? getWorkLogsGroupedByDate(team.id) : {};
+  const workLogDates = Object.keys(workLogs).sort((a, b) => b.localeCompare(a));
+
+  const STATUS_LABELS: Record<string, string> = {
+    completed: '已完成',
+    in_progress: '进行中',
+    failed: '失败',
   };
 
   return (
@@ -819,95 +850,163 @@ function TeamDetailDialog({ team, onClose, onEdit, onDelete, onExport, onToggleP
         </Box>
         <IconButton onClick={onClose}><CloseIcon /></IconButton>
       </DialogTitle>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
+        <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={{ '& .MuiTab-root': { textTransform: 'none' } }}>
+          <Tab label="信息" />
+          <Tab label={`工作日志 (${Object.keys(workLogs).reduce((s, k) => s + workLogs[k].length, 0)})`} />
+        </Tabs>
+      </Box>
       <DialogContent dividers>
-        {/* 基本信息 */}
-        <Typography variant="subtitle2" color="primary" gutterBottom>基本信息</Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2 }}>
-          <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-            <Typography variant="caption" color="text.secondary">名称</Typography>
-            <Typography variant="body2">{team.name}</Typography>
-          </Paper>
-          <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-            <Typography variant="caption" color="text.secondary">版本</Typography>
-            <Typography variant="body2">v{team.version}</Typography>
-          </Paper>
-          <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-            <Typography variant="caption" color="text.secondary">状态</Typography>
-            <Chip label={PUBLISH_STATUS_MAP[team.publish_status]} size="small"
-              sx={{ backgroundColor: PUBLISH_STATUS_COLOR[team.publish_status] + '22', color: PUBLISH_STATUS_COLOR[team.publish_status], height: 22 }} />
-          </Paper>
-          <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-            <Typography variant="caption" color="text.secondary">分类</Typography>
-            <Typography variant="body2">{team.category || '未分类'}</Typography>
-          </Paper>
-        </Box>
-
-        {team.description && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" color="primary" gutterBottom>描述</Typography>
-            <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-              <Typography variant="body2" color="text.secondary">{team.description}</Typography>
-            </Paper>
-          </Box>
-        )}
-
-        {/* 标签 */}
-        {team.tags?.length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" color="primary" gutterBottom>标签</Typography>
-            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-              {team.tags.map((t) => (
-                <Chip key={t} label={t} size="small" sx={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#a5b4fc' }} />
-              ))}
-            </Box>
-          </Box>
-        )}
-
-        {/* 成员 */}
-        {team.members?.length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" color="primary" gutterBottom>团队成员 ({team.members.length})</Typography>
-            {team.members.map((m, i) => (
-              <Paper key={i} sx={{ p: 1.5, mb: 1, bgcolor: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{ width: 36, height: 36, borderRadius: 1, background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Typography variant="caption" color="white" fontWeight={600}>{m.role.charAt(0)}</Typography>
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" fontWeight={600}>{m.role}</Typography>
-                  {m.responsibilities && (
-                    <Typography variant="caption" color="text.secondary">{m.responsibilities}</Typography>
-                  )}
-                </Box>
-                <Chip label={`排序: ${m.sort_order ?? i}`} size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
+        {detailTab === 0 ? (
+          <>
+            {/* 基本信息 */}
+            <Typography variant="subtitle2" color="primary" gutterBottom>基本信息</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2 }}>
+              <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                <Typography variant="caption" color="text.secondary">名称</Typography>
+                <Typography variant="body2">{team.name}</Typography>
               </Paper>
-            ))}
+              <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                <Typography variant="caption" color="text.secondary">版本</Typography>
+                <Typography variant="body2">v{team.version}</Typography>
+              </Paper>
+              <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                <Typography variant="caption" color="text.secondary">状态</Typography>
+                <Chip label={PUBLISH_STATUS_MAP[team.publish_status]} size="small"
+                  sx={{ backgroundColor: PUBLISH_STATUS_COLOR[team.publish_status] + '22', color: PUBLISH_STATUS_COLOR[team.publish_status], height: 22 }} />
+              </Paper>
+              <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                <Typography variant="caption" color="text.secondary">分类</Typography>
+                <Typography variant="body2">{team.category || '未分类'}</Typography>
+              </Paper>
+            </Box>
+
+            {team.description && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="primary" gutterBottom>描述</Typography>
+                <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                  <Typography variant="body2" color="text.secondary">{team.description}</Typography>
+                </Paper>
+              </Box>
+            )}
+
+            {/* 标签 */}
+            {team.tags?.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="primary" gutterBottom>标签</Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  {team.tags.map((t) => (
+                    <Chip key={t} label={t} size="small" sx={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#a5b4fc' }} />
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* 成员 - 可点击发起对话 */}
+            {team.members?.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="primary" gutterBottom>团队成员 ({team.members.length})</Typography>
+                {team.members.map((m, i) => (
+                  <Paper
+                    key={i}
+                    sx={{
+                      p: 1.5, mb: 1, bgcolor: 'rgba(255,255,255,0.03)',
+                      display: 'flex', alignItems: 'center', gap: 1.5,
+                      cursor: onChat ? 'pointer' : 'default',
+                      '&:hover': onChat ? { bgcolor: 'rgba(99,102,241,0.08)' } : {},
+                    }}
+                    onClick={() => onChat?.(m.role)}
+                  >
+                    <Box sx={{ width: 36, height: 36, borderRadius: 1, background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Typography variant="caption" color="white" fontWeight={600}>{m.role.charAt(0)}</Typography>
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" fontWeight={600}>{m.role}</Typography>
+                      {m.responsibilities && (
+                        <Typography variant="caption" color="text.secondary">{m.responsibilities}</Typography>
+                      )}
+                    </Box>
+                    <Chip label={`排序: ${m.sort_order ?? i}`} size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
+                  </Paper>
+                ))}
+              </Box>
+            )}
+
+            {/* 工作流预览 */}
+            {team.workflow && Object.keys(team.workflow).length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="primary" gutterBottom>工作流配置</Typography>
+                <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', maxHeight: 150, overflow: 'auto' }}>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+                    {JSON.stringify(team.workflow, null, 2)}
+                  </Typography>
+                </Paper>
+              </Box>
+            )}
+
+            {/* 时间 */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+              <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                <Typography variant="caption" color="text.secondary">创建时间</Typography>
+                <Typography variant="body2">{formatDate(team.created_at)}</Typography>
+              </Paper>
+              <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
+                <Typography variant="caption" color="text.secondary">更新时间</Typography>
+                <Typography variant="body2">{formatDate(team.updated_at)}</Typography>
+              </Paper>
+            </Box>
+          </>
+        ) : (
+          /* 工作日志 Tab */
+          <Box>
+            {workLogDates.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <Typography color="text.secondary">暂无工作日志</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  AI 团队开始工作后，日志将自动记录在这里
+                </Typography>
+              </Box>
+            ) : (
+              workLogDates.map((date) => (
+                <Box key={date} sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>
+                    📅 {date}
+                  </Typography>
+                  {workLogs[date].map((log) => (
+                    <Paper key={log.id} sx={{ p: 1.5, mb: 1, bgcolor: 'rgba(255,255,255,0.03)', borderLeft: '3px solid',
+                      borderLeftColor: log.status === 'completed' ? '#10b981' : log.status === 'in_progress' ? '#f59e0b' : '#ef4444' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(log.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                        <Chip
+                          label={STATUS_LABELS[log.status] || log.status}
+                          size="small"
+                          sx={{
+                            height: 20, fontSize: '0.6rem',
+                            backgroundColor: log.status === 'completed' ? 'rgba(16,185,129,0.15)' :
+                              log.status === 'in_progress' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                            color: log.status === 'completed' ? '#10b981' :
+                              log.status === 'in_progress' ? '#f59e0b' : '#ef4444',
+                          }}
+                        />
+                      </Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        {log.agent_role} - {log.action}
+                      </Typography>
+                      {log.result && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.3, display: 'block' }}>
+                          {log.result}
+                        </Typography>
+                      )}
+                    </Paper>
+                  ))}
+                </Box>
+              ))
+            )}
           </Box>
         )}
-
-        {/* 工作流预览 */}
-        {team.workflow && Object.keys(team.workflow).length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" color="primary" gutterBottom>工作流配置</Typography>
-            <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', maxHeight: 150, overflow: 'auto' }}>
-              <Typography variant="caption" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(team.workflow, null, 2)}
-              </Typography>
-            </Paper>
-          </Box>
-        )}
-
-        {/* 时间 */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-          <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-            <Typography variant="caption" color="text.secondary">创建时间</Typography>
-            <Typography variant="body2">{formatDate(team.created_at)}</Typography>
-          </Paper>
-          <Paper sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)' }}>
-            <Typography variant="caption" color="text.secondary">更新时间</Typography>
-            <Typography variant="body2">{formatDate(team.updated_at)}</Typography>
-          </Paper>
-        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={() => onDelete(team.id)} color="error" startIcon={<DeleteIcon />}>删除</Button>

@@ -29,6 +29,10 @@ export const STEP_LABELS: Record<string, string> = {
   company: '公司命名',
   model: '大模型配置',
   completion: '安装完成',
+  store_type: '店铺类型',
+  data_import: '导入数据',
+  platform_bind: '绑定平台',
+  content_init: '内容初始化',
 };
 
 export const WIZARD_CONTAINER_SX = {

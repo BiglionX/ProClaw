@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../lib/authStore';
 import { useNavigate, Link } from 'react-router-dom';
 import { NotificationBell, NotificationPanel } from '../lib/notificationContext';
+import { getRecentPluginReleases, getActiveIndustryDistribution, getPluginDownloadTrend } from '../lib/pluginService';
+import type { IndustryPlugin } from '../types';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface PlatformStats {
   totalUsers: number;
@@ -29,6 +32,10 @@ const AdminDashboard: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [recentPlugins, setRecentPlugins] = useState<IndustryPlugin[]>([]);
+  const [industryDistribution, setIndustryDistribution] = useState<{ plugin_id: string; name: string; installs: number }[]>([]);
+  const [pluginStatsLoading, setPluginStatsLoading] = useState(true);
+  const [downloadTrend, setDownloadTrend] = useState<{ date: string; total: number }[]>([]);
 
   useEffect(() => {
     // 模拟加载数据（演示模式）
@@ -47,6 +54,22 @@ const AdminDashboard: React.FC = () => {
         });
         setIsLoading(false);
       }, 500);
+
+      // 加载插件统计
+      getRecentPluginReleases(5).then(setRecentPlugins).finally(() => setPluginStatsLoading(false));
+      getActiveIndustryDistribution().then(setIndustryDistribution);
+      getPluginDownloadTrend(30).then((data) => {
+        // 按日期聚合所有插件的下载量
+        const agg: Record<string, number> = {};
+        for (const row of data) {
+          const date = row.date;
+          agg[date] = (agg[date] || 0) + row.count;
+        }
+        const trend = Object.entries(agg)
+          .map(([date, total]) => ({ date, total }))
+          .sort((a, b) => a.date.localeCompare(b.date));
+        setDownloadTrend(trend);
+      });
     };
 
     loadStats();
@@ -128,6 +151,17 @@ const AdminDashboard: React.FC = () => {
       ),
       color: 'bg-gray-50 text-gray-600',
       href: '/admin/settings',
+    },
+    {
+      title: '行业插件管理',
+      description: '上架、编辑和管理行业插件',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" />
+        </svg>
+      ),
+      color: 'bg-teal-50 text-teal-600',
+      href: '/admin/plugins',
     },
   ];
 
@@ -294,6 +328,103 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* 插件统计 */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">行业插件统计</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* 插件下载趋势图 */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">插件下载趋势（近30天）</h3>
+              {pluginStatsLoading ? (
+                <div className="text-sm text-gray-400">加载中...</div>
+              ) : downloadTrend.length === 0 ? (
+                <div className="text-sm text-gray-400">暂无数据</div>
+              ) : (
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={downloadTrend} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(val) => val.slice(5)} />
+                      <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                      <Tooltip
+                        formatter={(value: number) => [value, '下载量']}
+                        labelFormatter={(label) => `日期: ${label}`}
+                      />
+                      <Bar dataKey="total" fill="#14b8a6" radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* 最新插件发布动态 */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">最新插件发布动态</h3>
+              {pluginStatsLoading ? (
+                <div className="text-sm text-gray-400">加载中...</div>
+              ) : recentPlugins.length === 0 ? (
+                <div className="text-sm text-gray-400">暂无数据</div>
+              ) : (
+                <div className="space-y-3">
+                  {recentPlugins.map((plugin) => (
+                    <div key={plugin.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{plugin.icon || '🧩'}</span>
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{plugin.name}</span>
+                          <span className="text-xs text-gray-400 ml-2">v{plugin.version}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {plugin.published_at ? new Date(plugin.published_at).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Link
+                to="/admin/plugins"
+                className="mt-3 inline-block text-sm text-blue-600 hover:text-blue-800"
+              >
+                查看全部插件 &rarr;
+              </Link>
+            </div>
+
+            {/* 活跃行业分布 */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">活跃行业分布</h3>
+              {pluginStatsLoading ? (
+                <div className="text-sm text-gray-400">加载中...</div>
+              ) : industryDistribution.length === 0 ? (
+                <div className="text-sm text-gray-400">暂无数据</div>
+              ) : (
+                <div className="space-y-3">
+                  {industryDistribution
+                    .sort((a, b) => b.installs - a.installs)
+                    .map((dist) => {
+                      const total = industryDistribution.reduce((s, d) => s + d.installs, 0);
+                      const pct = total > 0 ? ((dist.installs / total) * 100).toFixed(1) : '0';
+                      return (
+                        <div key={dist.plugin_id} className="flex items-center gap-3">
+                          <span className="text-sm text-gray-700 w-24 truncate">{dist.name}</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-2">
+                            <div
+                              className="bg-teal-500 h-2 rounded-full transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-500 w-16 text-right">
+                            {dist.installs} 安装
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Admin Menu Grid */}
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">管理功能</h2>
@@ -368,6 +499,18 @@ const AdminDashboard: React.FC = () => {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">审计日志</h3>
               <p className="text-sm text-gray-600">完整的操作记录和追溯</p>
+            </Link>
+            <Link
+              to="/admin/plugins"
+              className="block p-6 bg-gradient-to-br from-teal-50 to-green-50 border border-teal-200 rounded-xl hover:shadow-lg transition-all group"
+            >
+              <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">行业插件管理</h3>
+              <p className="text-sm text-gray-600">上架和管理行业插件</p>
             </Link>
           </div>
         </div>

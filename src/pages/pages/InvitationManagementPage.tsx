@@ -23,18 +23,12 @@ import {
   InputLabel,
   FormControl,
   Alert,
-  CircularProgress,
   Snackbar,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
-  Delete as DeleteIcon,
-  CheckCircle as ActiveIcon,
   Cancel as RevokedIcon,
-  Schedule as PendingIcon,
-  Error as ExpiredIcon,
 } from '@mui/icons-material';
-import { isTauri } from '../../lib/tauri';
 import {
   getInvitations,
   revokeInvitation,

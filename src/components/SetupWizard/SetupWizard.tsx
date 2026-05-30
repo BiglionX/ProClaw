@@ -1,23 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { safeInvoke } from '../../lib/tauri';
-import { APP_MODE } from '../../config/appMode';
+import { useAppModeStore, PluginManager } from '../../config/appMode';
 import { CEOBubble } from './CEOBubble';
 import { StepIndicator } from './StepIndicator';
 import { PathSelector } from './PathSelector';
 import { CompanyNameInput } from './CompanyNameInput';
 import { ModelConfigStep } from './ModelConfigStep';
 import { CompletionScreen } from './CompletionScreen';
+import { StoreTypeSelector } from './StoreTypeSelector';
+import { DataImportStep } from './DataImportStep';
+import { IndustrySelector } from './IndustrySelector';
+import { PlatformBindStep } from './PlatformBindStep';
+import { pluginLoader } from '../../lib/pluginLoader';
+import { isTauri } from '../../lib/tauri';
 import {
   CHAT_AREA_SX,
   INPUT_AREA_SX,
   WIZARD_CONTAINER_SX,
 } from './ceoAgentStyles';
-import type { DialogueNode, SetupContext, SetupStep } from './dialogueScript';
+import type { DialogueNode, SetupContext, SetupStep, LightSetupStep } from './dialogueScript';
 import {
   getCompletionDialogue,
   getCompanyNameDialogue,
   getGreetingDialogue,
+  getLightStoreTypeDialogue,
+  getLightDataImportDialogue,
+  getLightPlatformBindDialogue,
+  getLightContentInitDialogue,
+  getLightCompletionDialogue,
   getPathSelectionDialogue,
   getProCloudConfirmDialogue,
 } from './dialogueScript';
@@ -25,7 +36,13 @@ import { generatePersonalizedText } from './llmEnhancer';
 
 // ==================== 状态常量 ====================
 
-const STEPS: SetupStep[] = ['greeting', 'path', 'company', 'model', 'completion'];
+const STANDARD_STEPS = ['industry', 'greeting', 'path', 'company', 'model', 'completion'] as const;
+const LIGHT_STEPS = ['industry', 'greeting', 'store_type', 'data_import', 'platform_bind', 'content_init', 'completion'] as const;
+
+/** 从当前模式获取步骤列表 */
+function getSteps(isLight: boolean): readonly string[] {
+  return isLight ? LIGHT_STEPS : STANDARD_STEPS;
+}
 
 interface SetupData {
   installPath: string;
@@ -33,6 +50,10 @@ interface SetupData {
   modelProvider: string;
   modelPath?: string;
   spaceInfo?: { total_gb: number; free_gb: number; enough: boolean };
+  // Light 版专有
+  storeType?: string;
+  hasData?: boolean;
+  boundPlatforms?: string[];
 }
 
 // ==================== 安装状态类型 ====================
@@ -55,13 +76,65 @@ interface SetupConfigPayload {
 // ==================== 主组件 ====================
 
 export function SetupWizard() {
-  const [currentStep, setCurrentStep] = useState<SetupStep>('greeting');
+  const mode = useAppModeStore(state => state.mode);
+  const isLight = mode === 'light';
+  const STEPS = getSteps(isLight);
+
+  const [currentStep, setCurrentStep] = useState<SetupStep | LightSetupStep | 'industry'>('industry');
   const [dialogueNodes, setDialogueNodes] = useState<DialogueNode[]>([]);
   const [setupData, setSetupData] = useState<SetupData>({
     installPath: '',
     companyName: '',
     modelProvider: '',
   });
+  // 行业选择回调
+  const handleIndustrySelected = useCallback(async (industryId: string) => {
+    const pm = PluginManager.getInstance();
+
+    // 在 Tauri 环境中自动下载并安装对应行业插件
+    if (isTauri()) {
+      // 显示加载状态（通过 IndustrySelector 的 loading prop）
+      try {
+        // 注册进度回调，显示下载进度
+        pluginLoader.onProgress((progress) => {
+          console.log(`[PluginLoader] ${progress.phase}: ${progress.message}`);
+        });
+        await pluginLoader.downloadAndInstall(industryId, '1.0.0', '');
+        await pluginLoader.switchIndustry(industryId);
+      } catch (err) {
+        console.error('[SetupWizard] Plugin download failed, using default mode:', err);
+        // 插件下载失败不阻塞安装流程，使用默认模式继续
+      }
+    }
+
+    await pm.setIndustry(industryId as any);
+    setCurrentStep('greeting');
+
+    const newMode = useAppModeStore.getState().mode;
+    const newIsLight = newMode === 'light';
+
+    const ctx: SetupContext = {
+      appMode: newMode,
+    };
+
+    if (newIsLight) {
+      const personalGreeting = await generatePersonalizedText('greeting', ctx);
+      const greetingNodes = getGreetingDialogue(ctx);
+      if (personalGreeting) {
+        greetingNodes[0].text = personalGreeting;
+      }
+      const storeNodes = getLightStoreTypeDialogue(ctx);
+      setDialogueNodes([...greetingNodes, ...storeNodes]);
+    } else {
+      const personalGreeting = await generatePersonalizedText('greeting', ctx);
+      const greetingNodes = getGreetingDialogue(ctx);
+      if (personalGreeting) {
+        greetingNodes[0].text = personalGreeting;
+      }
+      setDialogueNodes(greetingNodes);
+    }
+  }, []);
+
   const [installationComplete, setInstallationComplete] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -75,9 +148,36 @@ export function SetupWizard() {
         return;
       }
 
+      // 开始时显示行业选择步骤，不再自动显示欢迎语
+      // 如果当前模式已经确定（非初始状态），才自动进入欢迎语
+      // 否则让用户先选择行业
+    };
+    init();
+  }, []);
+
+  // 当行业选择完成后，实际欢迎语由 handleIndustrySelected 触发
+  useEffect(() => {
+    if (currentStep !== 'greeting') return;
+    // 如果对话节点已有内容（从行业选择设置），不再重复添加
+    if (dialogueNodes.length > 0) return;
+
+    const init = async () => {
       const ctx: SetupContext = {
-        appMode: APP_MODE,
+        appMode: mode,
       };
+
+      if (isLight) {
+        const personalGreeting = await generatePersonalizedText('greeting', ctx);
+        const greetingNodes = getGreetingDialogue(ctx);
+        if (personalGreeting) {
+          greetingNodes[0].text = personalGreeting;
+        }
+        // Light 版欢迎后直接进入店铺类型选择
+        const storeNodes = getLightStoreTypeDialogue(ctx);
+        setDialogueNodes([...greetingNodes, ...storeNodes]);
+        setCurrentStep('store_type');
+        return;
+      }
 
       // 尝试 LLM 个性化欢迎语
       const personalGreeting = await generatePersonalizedText('greeting', ctx);
@@ -96,7 +196,99 @@ export function SetupWizard() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [dialogueNodes]);
 
-  // ==================== 步骤推进逻辑 ====================
+  // ==================== Light 版步骤推进逻辑 ====================
+
+  const handleStoreTypeSelected = useCallback(
+    async (type: string) => {
+      setSetupData((prev) => ({ ...prev, storeType: type }));
+
+      const ctx: SetupContext = {
+        appMode: mode,
+        storeType: type as SetupContext['storeType'],
+      };
+
+      const storeNodes = getLightStoreTypeDialogue(ctx);
+      // 更新已显示的店铺选择对话
+      setDialogueNodes((prev) => {
+        const withoutStoreItems = prev.filter(n => !n.id.startsWith('store-'));
+        return [...withoutStoreItems, ...storeNodes];
+      });
+    },
+    []
+  );
+
+  const handleStoreNext = useCallback(() => {
+    const ctx: SetupContext = {
+      storeType: setupData.storeType as SetupContext['storeType'],
+      appMode: mode,
+    };
+    const importNodes = getLightDataImportDialogue(ctx);
+    setCurrentStep('data_import');
+    setDialogueNodes((prev) => [...prev, ...importNodes]);
+  }, [setupData.storeType]);
+
+  const handleImportSelected = useCallback(
+    (hasData: boolean) => {
+      setSetupData((prev) => ({ ...prev, hasData }));
+
+      const ctx: SetupContext = {
+        appMode: mode,
+        storeType: setupData.storeType as SetupContext['storeType'],
+        hasData,
+      };
+
+      const importNodes = getLightDataImportDialogue(ctx);
+      setDialogueNodes((prev) => {
+        const withoutImportItems = prev.filter(n => !n.id.startsWith('import-'));
+        return [...withoutImportItems, ...importNodes];
+      });
+    },
+    [setupData.storeType]
+  );
+
+  const handleImportNext = useCallback(() => {
+    const ctx: SetupContext = {
+      appMode: mode,
+      storeType: setupData.storeType as SetupContext['storeType'],
+      hasData: setupData.hasData,
+    };
+    const platformNodes = getLightPlatformBindDialogue(ctx);
+    setCurrentStep('platform_bind');
+    setDialogueNodes((prev) => [...prev, ...platformNodes]);
+  }, [setupData.storeType, setupData.hasData]);
+
+  const handlePlatformsConfirmed = useCallback(
+    (platforms: string[]) => {
+      setSetupData((prev) => ({ ...prev, boundPlatforms: platforms }));
+
+      const ctx: SetupContext = {
+        appMode: mode,
+        storeType: setupData.storeType as SetupContext['storeType'],
+        boundPlatforms: platforms,
+      };
+
+      const platformNodes = getLightPlatformBindDialogue(ctx);
+      setDialogueNodes((prev) => {
+        const withoutPlatformItems = prev.filter(n => !n.id.startsWith('platform-'));
+        return [...withoutPlatformItems, ...platformNodes];
+      });
+    },
+    [setupData.storeType]
+  );
+
+  const handlePlatformNext = useCallback(() => {
+    const contentNodes = getLightContentInitDialogue();
+    setCurrentStep('content_init');
+    setDialogueNodes((prev) => [...prev, ...contentNodes]);
+  }, []);
+
+  const handleContentNext = useCallback(() => {
+    const completeNodes = getLightCompletionDialogue();
+    setCurrentStep('completion');
+    setDialogueNodes((prev) => [...prev, ...completeNodes]);
+  }, []);
+
+  // ==================== 步骤推进逻辑（标准版） ====================
 
   const handlePathSelected = useCallback(
     async (path: string, spaceInfo: { total_gb: number; free_gb: number; enough: boolean }) => {
@@ -110,7 +302,7 @@ export function SetupWizard() {
         installPath: path,
         freeSpaceGb: spaceInfo.free_gb,
         totalSpaceGb: spaceInfo.total_gb,
-        appMode: APP_MODE,
+        appMode: mode,
       };
 
       if (!spaceInfo.enough) {
@@ -135,7 +327,7 @@ export function SetupWizard() {
       const ctx: SetupContext = {
         installPath: setupData.installPath,
         companyName: name,
-        appMode: APP_MODE,
+        appMode: mode,
       };
 
       // 尝试 LLM 个性化公司名回应
@@ -179,7 +371,7 @@ export function SetupWizard() {
           companyName: setupData.companyName,
           modelProvider: provider,
           modelPath,
-          appMode: APP_MODE,
+          appMode: mode,
         };
         const completionNodes = getCompletionDialogue(ctx);
         setCurrentStep('completion');
@@ -215,7 +407,7 @@ export function SetupWizard() {
       installPath: setupData.installPath,
       companyName: setupData.companyName,
       modelProvider: setupData.modelProvider,
-      appMode: APP_MODE,
+      appMode: mode,
     };
     await generatePersonalizedText('completion_summary', ctx);
 
@@ -274,35 +466,107 @@ export function SetupWizard() {
               installPath: setupData.installPath,
               companyName: setupData.companyName,
               modelProvider: setupData.modelProvider,
-              appMode: APP_MODE,
+              appMode: mode,
             }) : node.text}
             isTyping={node.isTyping}
             showAvatar={node.avatar}
           />
         ))}
 
-        {/* 当前步骤的交互组件 */}
-        {currentStep === 'path' && (
-          <PathSelector onPathSelected={handlePathSelected} />
+        {/* 当前步骤的交互组件 - 行业选择 */}
+        {currentStep === 'industry' && (
+          <IndustrySelector onIndustrySelected={handleIndustrySelected} />
         )}
 
-        {currentStep === 'company' && (
-          <CompanyNameInput onNameConfirmed={handleNameConfirmed} />
+        {/* 当前步骤的交互组件 - Light 版 */}
+        {isLight && currentStep === 'store_type' && (
+          <StoreTypeSelector onStoreTypeSelected={handleStoreTypeSelected} />
         )}
 
-        {currentStep === 'model' && (
-          <ModelConfigStep
-            onModelConfigured={handleModelConfigured}
-            appMode={APP_MODE}
+        {isLight && currentStep === 'data_import' && (
+          <DataImportStep onImportSelected={handleImportSelected} />
+        )}
+
+        {isLight && currentStep === 'platform_bind' && (
+          <PlatformBindStep onPlatformsConfirmed={handlePlatformsConfirmed} />
+        )}
+
+        {isLight && currentStep === 'completion' && (
+          <CompletionScreen
+            companyName={setupData.storeType ? ({
+              catering: '餐饮店', retail: '零售店', service: '服务店', fresh: '生鲜店', other: '店铺',
+            } as Record<string, string>)[setupData.storeType] || '店铺' : '店铺'}
+            onEnterWorkspace={handleEnterWorkspace}
           />
         )}
 
-        {currentStep === 'completion' && setupData.companyName && (
+        {/* 当前步骤的交互组件 - 标准版 */}
+        {!isLight && currentStep === 'path' && (
+          <PathSelector onPathSelected={handlePathSelected} />
+        )}
+
+        {!isLight && currentStep === 'company' && (
+          <CompanyNameInput onNameConfirmed={handleNameConfirmed} />
+        )}
+
+        {!isLight && currentStep === 'model' && (
+          <ModelConfigStep
+            onModelConfigured={handleModelConfigured}
+            appMode={mode === 'virtual_company' ? 'virtual_company' : 'inventory'}
+          />
+        )}
+
+        {!isLight && currentStep === 'completion' && setupData.companyName && (
           <CompletionScreen
             companyName={setupData.companyName}
             onEnterWorkspace={handleEnterWorkspace}
           />
         )}
+
+        {/* 选项按钮处理 */}
+        {dialogueNodes.length > 0 && (() => {
+          const lastNode = dialogueNodes[dialogueNodes.length - 1];
+          if (!lastNode.options) return null;
+          return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1 }}>
+              {lastNode.options.map(opt => {
+                let handleClick: (() => void) | undefined;
+
+                // 根据选项 ID 判断对应的 Light 步骤推进
+                if (opt.action === 'confirm') {
+                  handleClick = handleEnterWorkspace;
+                } else if (opt.id === 'store-next' || opt.id === 'start-setup') {
+                  handleClick = isLight ? handleStoreNext : undefined;
+                } else if (opt.id === 'import-next') {
+                  handleClick = handleImportNext;
+                } else if (opt.id === 'platform-next') {
+                  handleClick = handlePlatformNext;
+                } else if (opt.id === 'content-next') {
+                  handleClick = handleContentNext;
+                }
+
+                return handleClick ? (
+                  <button
+                    key={opt.id}
+                    onClick={handleClick}
+                    className="MuiButtonBase-root MuiButton-root MuiButton-contained"
+                    style={{
+                      padding: '8px 24px',
+                      background: '#ff3b30',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ) : null;
+              })}
+            </Box>
+          );
+        })()}
 
         <div ref={chatEndRef} />
       </Box>

@@ -1,0 +1,47 @@
+{
+  "id": "catering",
+  "name": "餐饮行业版",
+  "version": "1.0.0",
+  "description": "面向中小型餐馆、快餐店、饮品店，覆盖扫码点餐、后厨打印、桌台管理、团购对接、会员营销等场景。AI 菜单优化师 + 库存预测师辅助经营。",
+  "icon": "🍽️",
+  "compatibleAppVersion": ">=0.1.0",
+  "features": {
+    "modules": ["pos", "kitchen-display", "reservation", "scan-order", "delivery", "membership", "inventory", "purchase", "sales", "reports", "ai-teams", "ai-knowledge"],
+    "dashboards": ["daily-sales", "popular-dishes", "table-occupancy", "delivery-stats"],
+    "reports": ["dish-sales-report", "daily-revenue", "ingredient-cost", "member-analysis"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
+      { "text": "收银台", "icon": "shopping-cart", "path": "/pos", "group": "前台" },
+      { "text": "桌台管理", "icon": "table-restaurant", "path": "/tables", "group": "前台" },
+      { "text": "后厨显示", "icon": "monitor", "path": "/kitchen", "group": "前台" },
+      { "text": "菜品管理", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "供应链", "icon": "truck", "path": "/supplychain", "group": "业务" },
+      { "text": "销售管理", "icon": "finance", "path": "/sales", "group": "业务" },
+      { "text": "库存管理", "icon": "inventory", "path": "/inventory", "group": "业务" },
+      { "text": "会员管理", "icon": "users", "path": "/members", "group": "营销" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" }
+    ],
+    "remove": ["/datacenter", "/contacts", "/messages", "/cloud-store", "/ucenter"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#e74c3c",
+      "secondary": "#f39c12"
+    },
+    "onboarding": "catering-onboarding",
+    "quickActions": [
+      { "label": "开桌点餐", "icon": "utensils", "action": "openNewTable", "color": "#e74c3c" },
+      { "label": "今日营收", "icon": "dollar-sign", "action": "openDailyRevenue", "color": "#f39c12" },
+      { "label": "食材预警", "icon": "alert-triangle", "action": "openIngredientAlert", "color": "#ef4444" },
+      { "label": "团购核销", "icon": "ticket", "action": "openGroupBuy", "color": "#10b981" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  }
+}

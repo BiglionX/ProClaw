@@ -24,6 +24,69 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { executeCommand, parseCommand } from '../../lib/commandParser';
 import { handleUserInput, checkLLMConnectionStatus, getConnectionGuideMessage, getPersonalizedRecommendations, recordUserBehavior } from '../../lib/aiGuide';
+import { useAppModeStore } from '../../config/appMode';
+import { getLightInitialMessage, getLightQuickCommands, queryLightAI } from '../../lib/lightAIAssistant';
+
+// ===== 团队上下文类型 =====
+export interface TeamChatContext {
+  teamId: string;
+  teamName: string;
+  memberRole?: string;
+}
+
+// ===== 组件 Props =====
+export interface FloatingAgentChatProps {
+  teamContext?: TeamChatContext;
+  onClose?: () => void;
+}
+
+/**
+ * 根据团队上下文获取快捷指令
+ */
+export function getTeamQuickCommands(teamContext?: TeamChatContext, isLight?: boolean): Array<{ label: string; command: string }> {
+  if (!teamContext) {
+    return isLight ? getLightQuickCommands() : [
+      { label: '所有产品', command: '查询产品' },
+      { label: '库存统计', command: '查询库存' },
+      { label: '库存预警', command: '库存预警' },
+      { label: '入库', command: '入库' },
+    ];
+  }
+
+  // 根据团队名称特征返回不同的快捷指令
+  const name = teamContext.teamName || '';
+  if (name.includes('新媒体') || name.includes('运营')) {
+    return [
+      { label: '生成文案', command: '帮我写一篇小红书种草文案' },
+      { label: '生图', command: '帮我生成一张商品海报图' },
+      { label: '数据分析', command: '分析最近一周的运营数据' },
+      { label: '发布日程', command: '查看本周发布计划' },
+    ];
+  }
+  if (name.includes('团购') || name.includes('本地')) {
+    return [
+      { label: '订单查询', command: '查询今日团购订单' },
+      { label: '活动管理', command: '查看当前团购活动' },
+      { label: '数据统计', command: '团购数据统计' },
+      { label: '打印订单', command: '打印团购订单' },
+    ];
+  }
+  if (name.includes('商城') || name.includes('电商')) {
+    return [
+      { label: '商品同步', command: '同步商品到商城' },
+      { label: '订单处理', command: '查看待处理订单' },
+      { label: '客服消息', command: '查看未回复消息' },
+      { label: '数据看板', command: '商城经营数据' },
+    ];
+  }
+  // 通用团队指令
+  return [
+    { label: '任务分派', command: '给团队分派新任务' },
+    { label: '工作进度', command: '查看团队工作进度' },
+    { label: '生成报告', command: '生成工作报告' },
+    { label: '成员管理', command: '查看团队成员信息' },
+  ];
+}
 
 interface Message {
   id: string;
@@ -32,21 +95,25 @@ interface Message {
   timestamp: Date;
 }
 
-const initialMessages: Message[] = [
-  {
-    id: '1',
-    role: 'assistant',
-    content:
-      '你好!我是 ProClaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?',
-    timestamp: new Date(),
-  },
-];
-
-export default function FloatingAgentChat() {
+export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgentChatProps = {}) {
+  const mode = useAppModeStore(state => state.mode);
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  // 初始化消息 - 根据团队上下文动态生成
+  const getInitialMessages = (): Message[] => {
+    let content: string;
+    if (teamContext) {
+      content = `你好！我是 **${teamContext.teamName}** 的 AI 助手，可以帮你管理团队任务、查看工作进度、分派工作。有什么可以帮你的吗？`;
+    } else if (mode === 'light') {
+      content = getLightInitialMessage();
+    } else {
+      content = '你好!我是 ProClaw 经营智能体,可以帮您管理产品、库存和销售。请问有什么可以帮助您的?';
+    }
+    return [{ id: '1', role: 'assistant' as const, content, timestamp: new Date() }];
+  };
+
+  const [messages, setMessages] = useState<Message[]>(getInitialMessages);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -186,6 +253,22 @@ export default function FloatingAgentChat() {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: guideResult.response,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      } else if (mode === 'light') {
+        // Light 版使用四库联动 AI 助手
+        const result = queryLightAI(userInput);
+        let responseText = result.text;
+        if (result.sources.length > 0) {
+          responseText += '\n\n---\n📎 参考来源：\n' + result.sources.map(s =>
+            `- [${s.type}] ${s.title}`
+          ).join('\n');
+        }
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: responseText,
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, assistantMessage]);
@@ -344,17 +427,30 @@ export default function FloatingAgentChat() {
                 <BotIcon />
               </Avatar>
               <Typography variant="subtitle2" fontWeight={600}>
-                AI
-                <Typography
-                  component="span"
-                  sx={{
-                    color: '#ff3b30',
-                    fontWeight: 700,
-                  }}
-                >
-                  claw
-                </Typography>
+                {teamContext ? (
+                  teamContext.teamName
+                ) : (
+                  <>
+                    AI
+                    <Typography
+                      component="span"
+                      sx={{
+                        color: '#ff3b30',
+                        fontWeight: 700,
+                      }}
+                    >
+                      claw
+                    </Typography>
+                  </>
+                )}
               </Typography>
+              {teamContext?.memberRole && (
+                <Chip
+                  label={teamContext.memberRole}
+                  size="small"
+                  sx={{ height: 20, fontSize: '0.65rem', backgroundColor: 'rgba(255,59,48,0.2)', color: '#ff3b30' }}
+                />
+              )}
             </Box>
             <Box sx={{ display: 'flex', gap: 0.5 }}>
               {!isMinimized && (
@@ -389,7 +485,13 @@ export default function FloatingAgentChat() {
               )}
               <IconButton
                 size="small"
-                onClick={toggleChat}
+                onClick={() => {
+                  if (onClose) {
+                    onClose();
+                  } else {
+                    toggleChat();
+                  }
+                }}
                 title="关闭"
                 sx={{
                   color: 'white',
@@ -544,12 +646,7 @@ export default function FloatingAgentChat() {
                   💡 快捷指令：
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {[
-                    { label: '📦 所有产品', command: '查询产品' },
-                    { label: '📊 库存统计', command: '查询库存' },
-                    { label: '⚠️ 库存预警', command: '库存预警' },
-                    { label: '📥 入库', command: '入库' },
-                  ].map(item => (
+                  {getTeamQuickCommands(teamContext, mode === 'light').map(item => (
                     <Chip
                       key={item.command}
                       label={item.label}

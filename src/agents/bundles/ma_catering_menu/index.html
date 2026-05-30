@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能菜单顾问</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+.header { background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.category { padding: 16px; }
+.category h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; color: #555; }
+.dish-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.dish-card { background: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.dish-card .dish-name { font-weight: 600; font-size: 14px; }
+.dish-card .dish-price { font-size: 14px; font-weight: 700; color: #e67e22; margin-top: 4px; }
+.dish-card .dish-tag { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 6px; background: #fef3e2; color: #e67e22; }
+.dish-card .dish-desc { font-size: 12px; color: #999; margin-top: 4px; }
+.tag-spicy { background: #ffe0e0; color: #e74c3c; }
+.tag-veg { background: #e8f5e9; color: #27ae60; }
+.tag-popular { background: #fff3e0; color: #f57c00; }
+.tag-recommend { border-left: 3px solid #e67e22; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📋 智能菜单顾问</h1>
+  <p>菜品推荐 · 热销榜单 · 营养搭配 · 特殊饮食</p>
+</div>
+<div class="category">
+  <h2>🔥 今日热销</h2>
+  <div class="dish-grid">
+    <div class="dish-card tag-recommend"><div class="dish-name">招牌水煮鱼</div><div class="dish-price">¥88</div><span class="dish-tag tag-popular">热销第1</span><div class="dish-desc">今日售出 26 份</div></div>
+    <div class="dish-card"><div class="dish-name">干锅牛蛙</div><div class="dish-price">¥78</div><span class="dish-tag tag-popular">热销第2</span><div class="dish-desc">今日售出 18 份</div></div>
+    <div class="dish-card"><div class="dish-name">蒜蓉粉丝蒸虾</div><div class="dish-price">¥68</div><span class="dish-tag tag-popular">热销第3</span><div class="dish-desc">今日售出 15 份</div></div>
+  </div>
+</div>
+<div class="category">
+  <h2>🌿 素食推荐</h2>
+  <div class="dish-grid">
+    <div class="dish-card"><div class="dish-name">松仁玉米</div><div class="dish-price">¥32</div><span class="dish-tag tag-veg">素食</span><div class="dish-desc">甜香可口，老少皆宜</div></div>
+    <div class="dish-card"><div class="dish-name">荷塘小炒</div><div class="dish-price">¥28</div><span class="dish-tag tag-veg">素食</span><div class="dish-desc">清爽时蔬，低脂健康</div></div>
+    <div class="dish-card"><div class="dish-name">地三鲜</div><div class="dish-price">¥26</div><span class="dish-tag tag-veg">素食</span><div class="dish-desc">经典素菜，下饭首选</div></div>
+  </div>
+</div>
+<div class="category">
+  <h2>🌶️ 辣味推荐</h2>
+  <div class="dish-grid">
+    <div class="dish-card"><div class="dish-name">麻辣香锅</div><div class="dish-price">¥68</div><span class="dish-tag tag-spicy">中辣</span><div class="dish-desc">自选食材，麻辣鲜香</div></div>
+    <div class="dish-card"><div class="dish-name">剁椒鱼头</div><div class="dish-price">¥58</div><span class="dish-tag tag-spicy">辣</span><div class="dish-desc">鲜嫩入味，湘菜经典</div></div>
+  </div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[MenuAdvisor] Current user:', user);
+  } catch(e) {
+    console.log('[MenuAdvisor] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

@@ -2,7 +2,6 @@
 // 测试邀请全流程、过期/撤销场景、手机号匹配校验
 
 import { describe, test, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import * as tauriModule from '../lib/tauri';
 
 // 在所有测试之前 mock tauri 模块
 vi.mock('../lib/tauri', () => ({

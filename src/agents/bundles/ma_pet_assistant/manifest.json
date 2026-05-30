@@ -1,0 +1,12 @@
+{
+  "id": "ma_pet_assistant",
+  "name": "宠物养护顾问",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "send_message", "show_notification"],
+  "capabilities": ["pet_care_advice", "breed_query", "grooming_recommendation", "product_recommendation", "emergency_guide"],
+  "icon": "icon.svg",
+  "description": "宠物养护顾问 - 日常养护、品种查询、洗护推荐、商品推荐、紧急指南",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_pet_assistant"
+}

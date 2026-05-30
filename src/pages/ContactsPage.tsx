@@ -29,8 +29,10 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Contact, addContact, getContacts, AddContactInput } from '../lib/contactService';
+import { useAppModeStore } from '../config/appMode';
 
 export default function ContactsPage() {
+  const mode = useAppModeStore(state => state.mode);
   const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
@@ -241,9 +243,16 @@ export default function ContactsPage() {
                     <Typography variant="caption" color="text.secondary" display="block">
                       {formatTime(contact.last_message_time)}
                     </Typography>
-                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/chat/${contact.id}`); }}>
-                      <ChatIcon fontSize="small" color="action" />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                      {mode === 'light' && contact.external_type === 'customer' && (
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); alert('发送短信功能即将上线'); }}>
+                          <ChatIcon fontSize="small" color="action" />
+                        </IconButton>
+                      )}
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/chat/${contact.id}`); }}>
+                        <ChatIcon fontSize="small" color="action" />
+                      </IconButton>
+                    </Box>
                   </Box>
                 </ListItemButton>
               </Box>

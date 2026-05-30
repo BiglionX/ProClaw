@@ -1,0 +1,12 @@
+{
+  "id": "ma_catering_menu",
+  "name": "智能菜单顾问",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "send_message"],
+  "capabilities": ["dish_recommendation", "popular_dishes", "dietary_pairing", "special_diet"],
+  "icon": "icon.svg",
+  "description": "智能菜单顾问 - 菜品推荐、热销榜单、营养搭配、特殊饮食需求",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_catering_menu"
+}

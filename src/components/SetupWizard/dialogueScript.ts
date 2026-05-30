@@ -12,6 +12,14 @@ export type SetupStep =
   | 'model'
   | 'completion';
 
+export type LightSetupStep =
+  | 'greeting'
+  | 'store_type'
+  | 'data_import'
+  | 'platform_bind'
+  | 'content_init'
+  | 'completion';
+
 // ==================== 对话引擎类型 ====================
 
 export interface SetupContext {
@@ -21,7 +29,13 @@ export interface SetupContext {
   modelPath?: string;
   totalSpaceGb?: number;
   freeSpaceGb?: number;
-  appMode: 'inventory' | 'virtual_company';
+  appMode: 'inventory' | 'virtual_company' | 'light';
+  /** Light 版：店铺类型 */
+  storeType?: 'catering' | 'retail' | 'service' | 'fresh' | 'other';
+  /** Light 版：已有商品数据 */
+  hasData?: boolean;
+  /** Light 版：已绑定平台列表 */
+  boundPlatforms?: string[];
 }
 
 export interface DialogueOption {
@@ -44,13 +58,16 @@ export interface DialogueNode {
 
 export function getGreetingDialogue(ctx: SetupContext): DialogueNode[] {
   const isVirtual = ctx.appMode === 'virtual_company';
+  const isLight = ctx.appMode === 'light';
   return [
     {
       id: 'greeting-1',
       speaker: 'ceo',
       text: isVirtual
         ? '您好，老板！我是您的虚拟公司 CEO Agent。很高兴为您效劳。让我们一起把公司建立起来吧。'
-        : '您好！我是 ProClaw 的智能助手。很高兴为您效劳。让我们一起完成初始配置吧。',
+        : isLight
+          ? '老板您好！我是您的 ProClaw-Light 智能经营助手。很高兴为您效劳！让我们快速配置您的店铺吧。'
+          : '您好！我是 ProClaw 的智能助手。很高兴为您效劳。让我们一起完成初始配置吧。',
       avatar: true,
       isTyping: true,
     },
@@ -59,7 +76,9 @@ export function getGreetingDialogue(ctx: SetupContext): DialogueNode[] {
       speaker: 'ceo',
       text: isVirtual
         ? '在开始之前，我需要了解一些基本信息，帮助我们为您打造最合适的虚拟公司。不会占用您太多时间。'
-        : '首先，我们需要选择一个位置来存放您的业务数据。不用担心，整个过程非常简单。',
+        : isLight
+          ? '首先，我想了解一下您的店铺类型，这样我可以为您提供最合适的经营工具。整个过程只需几分钟。'
+          : '首先，我们需要选择一个位置来存放您的业务数据。不用担心，整个过程非常简单。',
       avatar: false,
       isTyping: true,
       options: [
@@ -264,6 +283,149 @@ export function getModelTestResultDialogue(success: boolean, message: string): D
               payload: { provider: 'procloud' },
             },
           ],
+    },
+  ];
+}
+
+// ==================== Light 版对话脚本 ====================
+
+/**
+ * Light 版：店铺类型选择对话
+ */
+export function getLightStoreTypeDialogue(ctx: SetupContext): DialogueNode[] {
+  const storeTypeLabels: Record<string, string> = {
+    catering: '餐饮',
+    retail: '零售',
+    service: '服务',
+    fresh: '生鲜',
+    other: '其他',
+  };
+  const type = ctx.storeType;
+  if (type) {
+    return [
+      {
+        id: 'store-confirmed',
+        speaker: 'ceo',
+        text: `${storeTypeLabels[type]}店，明白了！我会为您提供最适合 ${storeTypeLabels[type]} 行业的经营工具和 AI 助手。`,
+        avatar: true,
+        isTyping: true,
+        options: [
+          { id: 'store-next', label: '继续，导入商品数据', action: 'next' },
+        ],
+      },
+    ];
+  }
+  return [
+    {
+      id: 'store-ask',
+      speaker: 'ceo',
+      text: '请问您经营的是什么类型的店铺？了解店铺类型后，我可以为您推荐最合适的经营方案。',
+      avatar: true,
+      isTyping: true,
+    },
+  ];
+}
+
+/**
+ * Light 版：商品数据导入对话
+ */
+export function getLightDataImportDialogue(ctx: SetupContext): DialogueNode[] {
+  if (ctx.hasData === true) {
+    return [
+      {
+        id: 'import-yes',
+        speaker: 'ceo',
+        text: '太好了！已有商品数据的话，我可以帮您快速导入。支持从 Excel 文件批量导入，也可以逐条添加。完成后即可在"商品管理"中查看和管理。',
+        avatar: true,
+        isTyping: true,
+        options: [
+          { id: 'import-next', label: '下一步，绑定平台账号', action: 'next' },
+        ],
+      },
+    ];
+  }
+  return [
+    {
+      id: 'import-no',
+      speaker: 'ceo',
+      text: '没问题！我们先从空白开始，您可以随时在"商品管理"中添加商品。支持扫码枪快速录入和手动添加。',
+      avatar: true,
+      isTyping: true,
+      options: [
+        { id: 'import-next', label: '下一步，绑定平台账号', action: 'next' },
+      ],
+    },
+  ];
+}
+
+/**
+ * Light 版：平台账号绑定对话
+ */
+export function getLightPlatformBindDialogue(ctx: SetupContext): DialogueNode[] {
+  const platforms = ctx.boundPlatforms || [];
+  if (platforms.length > 0) {
+    const platformLabels: Record<string, string> = {
+      douyin: '抖音',
+      meituan: '美团',
+      weapp: '小程序',
+    };
+    const list = platforms.map(p => `  - ${platformLabels[p] || p}`).join('\n');
+    return [
+      {
+        id: 'platform-confirmed',
+        speaker: 'ceo',
+        text: `已绑定以下平台：\n${list}\n\n后续您可以在这些平台上同步商品、管理订单和开展营销活动。`,
+        avatar: true,
+        isTyping: true,
+        options: [
+          { id: 'platform-next', label: '下一步，初始化内容库', action: 'next' },
+        ],
+      },
+    ];
+  }
+  return [
+    {
+      id: 'platform-ask',
+      speaker: 'ceo',
+      text: '您是否已有抖音、美团或小程序账号？绑定后可以实现商品同步、订单管理和一键发布。如果没有，也可以先跳过，后续在设置中绑定。',
+      avatar: true,
+      isTyping: true,
+    },
+  ];
+}
+
+/**
+ * Light 版：内容库初始化对话
+ */
+export function getLightContentInitDialogue(): DialogueNode[] {
+  return [
+    {
+      id: 'content-init',
+      speaker: 'ceo',
+      text: '最后一步！建议您初始化内容库，这样 AI 助手可以更好地帮您回答客户问题和管理素材：\n\n1. 📷 上传常用商品图片到媒体库\n2. 💬 设置几条高频客服问答（如退换货政策）\n3. 📄 上传配送政策到资料库\n\n您可以在主界面随时补充这些内容。',
+      avatar: true,
+      isTyping: true,
+      options: [
+        { id: 'content-next', label: '完成配置，进入主界面', action: 'next' },
+      ],
+    },
+  ];
+}
+
+/**
+ * Light 版：完成对话
+ */
+export function getLightCompletionDialogue(): DialogueNode[] {
+  return [
+    {
+      id: 'light-complete',
+      speaker: 'ceo',
+      text: '配置完成！欢迎使用 ProClaw-Light 🎉\n\n这里有几个新手任务可以帮助您快速上手：\n\n📦 同步第一个商品\n📷 上传第一组素材到媒体库\n📢 发布第一条抖音/团购活动\n📋 处理第一个订单\n\n点击下方"进入工作区"，即可开始您的智能经营之旅！',
+      avatar: true,
+      isTyping: true,
+      options: [
+        { id: 'enter-workspace', label: '进入工作区', action: 'confirm' },
+      ],
     },
   ];
 }

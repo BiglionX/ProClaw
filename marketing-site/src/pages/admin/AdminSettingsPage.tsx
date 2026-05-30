@@ -12,6 +12,10 @@ interface SystemSettings {
   tokenExpiryDays: number;
   enableNotifications: boolean;
   supportEmail: string;
+  // 插件仓库配置
+  pluginCdnUrl: string;
+  pluginPublicKey: string;
+  pluginAutoUpdate: 'auto' | 'manual';
 }
 
 const AdminSettingsPage: React.FC = () => {
@@ -27,6 +31,9 @@ const AdminSettingsPage: React.FC = () => {
     tokenExpiryDays: 365,
     enableNotifications: true,
     supportEmail: 'support@proclaw.cc',
+    pluginCdnUrl: 'https://cdn.proclaw.cc/plugins',
+    pluginPublicKey: '',
+    pluginAutoUpdate: 'auto',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -256,6 +263,69 @@ const AdminSettingsPage: React.FC = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
               />
               <p className="text-xs text-gray-500 mt-1">显示给用户的支持联系邮箱</p>
+            </div>
+          </div>
+        </SettingSection>
+
+        {/* 插件仓库配置 */}
+        <SettingSection 
+          title="插件仓库配置" 
+          description="配置行业插件的 CDN 分发和签名验证"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                CDN 地址
+              </label>
+              <input
+                type="text"
+                value={settings.pluginCdnUrl}
+                onChange={(e) => handleSettingChange('pluginCdnUrl', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
+                placeholder="https://cdn.proclaw.cc/plugins"
+              />
+              <p className="text-xs text-gray-500 mt-1">插件包的 CDN 分发地址，桌面端从此域名下载插件</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                插件签名公钥 (Ed25519)
+              </label>
+              <textarea
+                value={settings.pluginPublicKey}
+                onChange={(e) => handleSettingChange('pluginPublicKey', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none font-mono text-sm"
+                rows={3}
+                placeholder="粘贴 Ed25519 公钥，用于验证插件包签名"
+              />
+              <p className="text-xs text-gray-500 mt-1">插件包的数字签名公钥，防止篡改。如不设置则跳过签名验证</p>
+            </div>
+            <div className="py-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                自动更新策略
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="pluginAutoUpdate"
+                    checked={settings.pluginAutoUpdate === 'auto'}
+                    onChange={() => handleSettingChange('pluginAutoUpdate', 'auto')}
+                    className="text-gray-900"
+                  />
+                  自动更新
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="pluginAutoUpdate"
+                    checked={settings.pluginAutoUpdate === 'manual'}
+                    onChange={() => handleSettingChange('pluginAutoUpdate', 'manual')}
+                    className="text-gray-900"
+                  />
+                  手动更新
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">自动更新：桌面端启动时自动检查并安装插件更新。手动更新：仅提示用户有可用更新</p>
             </div>
           </div>
         </SettingSection>

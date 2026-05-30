@@ -13,11 +13,9 @@ import {
   PhoneAndroid as MobileIcon,
 } from '@mui/icons-material';
 import {
-  Alert,
   Box,
   Button,
   Card,
-  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -29,7 +27,6 @@ import {
   IconButton,
   InputLabel,
   LinearProgress,
-  Menu,
   MenuItem,
   Paper,
   Select,
@@ -44,7 +41,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ProductSPU } from '../../lib/productService';
 import { isTauri } from '../../lib/tauri';
 import { getCloudStore, getSyncableProducts, syncAllProducts, syncIncremental, toggleProductVisible, SyncStatus, CloudStore } from '../../lib/cloudStoreService';
@@ -85,7 +82,6 @@ export default function StoreProducts({
   const [search, setSearch] = useState('');
   const [syncFilter, setSyncFilter] = useState<SyncFilter>('all');
   const [syncing, setSyncing] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [uploadingSpuId, setUploadingSpuId] = useState<string | null>(null);
@@ -173,8 +169,8 @@ export default function StoreProducts({
         filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }]
       });
       if (!selected || Array.isArray(selected)) { setUploadingSpuId(null); return; }
-      const fileData = await readFile(selected.path!);
-      const ext = selected.path!.split('.').pop() || 'jpg';
+      const fileData = await readFile(selected);
+      const ext = selected.split('.').pop() || 'jpg';
       const blob = new Blob([fileData], { type: `image/${ext}` });
       const dataUrl = await blobToDataUrl(blob);
       applyProductImage(spuId, dataUrl);
@@ -659,7 +655,7 @@ export default function StoreProducts({
           </Typography>
 
           <Grid container spacing={2}>
-            <Grid size={{ xs: 6 }}>
+            <Grid xs={6}>
               <Card
                 variant="outlined"
                 sx={{
@@ -677,7 +673,7 @@ export default function StoreProducts({
                 </Typography>
               </Card>
             </Grid>
-            <Grid size={{ xs: 6 }}>
+            <Grid xs={6}>
               <Card
                 variant="outlined"
                 sx={{
@@ -735,7 +731,7 @@ export default function StoreProducts({
                   </Typography>
                   <Grid container spacing={1}>
                     {aiSearchResults.map((result) => (
-                      <Grid size={{ xs: 4 }} key={result.id}>
+                      <Grid xs={4} key={result.id}>
                         {result.source === 'fallback' ? (
                           <Card
                             variant="outlined"
@@ -828,7 +824,7 @@ export default function StoreProducts({
           {aiSearchResults.length > 0 && (
             <Grid container spacing={1.5}>
               {aiSearchResults.map((result) => (
-                <Grid size={{ xs: 4 }} key={result.id}>
+                <Grid xs={4} key={result.id}>
                   {result.source === 'fallback' ? (
                     <Card
                       variant="outlined"

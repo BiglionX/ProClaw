@@ -1,0 +1,12 @@
+{
+  "id": "ma_pet_boarding",
+  "name": "寄养管理助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "send_message", "show_notification"],
+  "capabilities": ["boarding_status_query", "daily_log_management", "checkout_calculation", "owner_communication", "availability_forecast"],
+  "icon": "icon.svg",
+  "description": "寄养管理助手 - 房间状态、每日日志、费用计算、主人沟通、需求预测",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_pet_boarding"
+}

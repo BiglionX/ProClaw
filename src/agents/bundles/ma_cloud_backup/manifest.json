@@ -1,0 +1,12 @@
+{
+  "id": "ma_cloud_backup",
+  "name": "备份恢复助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "send_message", "show_notification"],
+  "capabilities": ["backup_status_query", "auto_backup_config", "restore_assistant", "backup_integrity_check", "disaster_recovery"],
+  "icon": "icon.svg",
+  "description": "备份恢复助手 - 备份查询、自动备份、恢复引导、完整性检查、灾难恢复",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_cloud_backup"
+}

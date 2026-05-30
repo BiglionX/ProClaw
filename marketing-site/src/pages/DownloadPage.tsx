@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { getPublishedPlugins } from '../lib/pluginService';
+import type { IndustryPlugin } from '../types';
 
 const platforms = [
   {
@@ -53,6 +55,18 @@ const systemRequirements = [
 ];
 
 const DownloadPage: React.FC = () => {
+  const [plugins, setPlugins] = useState<IndustryPlugin[]>([]);
+  const [pluginsLoading, setPluginsLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const data = await getPublishedPlugins();
+      setPlugins(data);
+      setPluginsLoading(false);
+    };
+    load();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
@@ -62,14 +76,23 @@ const DownloadPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">下载 ProClaw</h1>
           <p className="text-xl text-gray-500">
+            基础桌面端统一构建 · 按需下载行业插件
+          </p>
+          <p className="text-sm text-gray-400 mt-2">
             当前版本：v0.1.0 | 发布日期：2026-05-26
           </p>
         </div>
       </div>
 
-      {/* Platform Cards */}
+      {/* Platform Cards - 基础桌面端 */}
       <div className="flex-grow py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+            ProClaw 基础桌面端
+          </h2>
+          <p className="text-sm text-gray-500 text-center mb-8">
+            适用所有行业，插件按需下载
+          </p>
           <div className="grid md:grid-cols-3 gap-6 mb-16">
             {platforms.map((platform) => (
               <div
@@ -103,6 +126,56 @@ const DownloadPage: React.FC = () => {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* 行业插件 */}
+          <div className="mb-16">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+              行业插件
+            </h2>
+            <p className="text-sm text-gray-500 text-center mb-8">
+              安装桌面端后选择行业，即可自动下载对应插件
+            </p>
+            {pluginsLoading ? (
+              <div className="text-center py-8 text-gray-400">加载中...</div>
+            ) : (
+              <div className="grid md:grid-cols-4 gap-4">
+                {plugins.map((plugin) => (
+                  <div
+                    key={plugin.id}
+                    className="bg-white rounded-xl border border-gray-200 p-6 text-center hover:border-gray-300 hover:shadow-md transition-all"
+                  >
+                    <div className="text-4xl mb-3">{plugin.icon || '🧩'}</div>
+                    <h3 className="font-semibold text-gray-900 mb-1">{plugin.name}</h3>
+                    <p className="text-xs text-gray-400 mb-2">v{plugin.version}</p>
+                    <span className="inline-block px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                      已发布
+                    </span>
+                  </div>
+                ))}
+                {/* 预留位 */}
+                {[{ id: 'beauty', name: '美业版', icon: '💇' }, { id: 'pet', name: '宠物版', icon: '🐾' }].map(
+                  (placeholder) => {
+                    if (plugins.find((p) => p.id === placeholder.id)) return null;
+                    return (
+                      <div
+                        key={placeholder.id}
+                        className="bg-white rounded-xl border border-gray-200 p-6 text-center opacity-60"
+                      >
+                        <div className="text-4xl mb-3">{placeholder.icon}</div>
+                        <h3 className="font-semibold text-gray-900 mb-1">{placeholder.name}</h3>
+                        <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 text-xs font-medium rounded-full">
+                          即将推出
+                        </span>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            )}
+            <p className="text-center text-gray-400 text-sm mt-6">
+              💡 安装后选择行业即可自动下载对应插件
+            </p>
           </div>
 
           {/* System Requirements */}
@@ -191,7 +264,7 @@ const DownloadPage: React.FC = () => {
           </div>
 
           <p className="text-center text-gray-400 text-sm mt-8">
-            更多版本请查看{' '}
+            源码与历史版本请查看{' '}
             <a href="https://github.com/BigLionX/ProClaw/releases" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
               GitHub Releases
             </a>

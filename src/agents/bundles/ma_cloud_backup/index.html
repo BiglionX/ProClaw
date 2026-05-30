@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>备份恢复助手</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+.header { background: linear-gradient(135deg, #2c3e50 0%, #1a1a2e 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.stat-card { background: #fff; border-radius: 10px; padding: 16px; flex: 1; min-width: 100px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.stat-card .num { font-size: 24px; font-weight: 700; color: #2c3e50; }
+.stat-card .label { font-size: 12px; color: #999; margin-top: 4px; }
+.config-card { margin: 0 16px 16px; background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.config-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+.config-row:last-child { border-bottom: none; }
+.config-row .config-label { font-size: 14px; font-weight: 500; }
+.config-row .config-value { font-size: 13px; color: #666; }
+.toggle-on { color: #27ae60; font-weight: 600; }
+.toggle-off { color: #999; }
+.backup-list { margin: 0 16px 16px; background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.backup-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+.backup-item:last-child { border-bottom: none; }
+.backup-item .backup-info { flex: 1; }
+.backup-item .backup-name { font-weight: 600; font-size: 14px; }
+.backup-item .backup-meta { font-size: 12px; color: #999; margin-top: 2px; }
+.backup-item .backup-status { font-size: 12px; padding: 3px 10px; border-radius: 12px; }
+.bstatus-success { background: #e8f5e9; color: #27ae60; }
+.bstatus-failed { background: #ffe0e0; color: #e74c3c; }
+.bstatus-in-progress { background: #e3f2fd; color: #1976d2; }
+.actions { margin: 0 16px 16px; display: flex; gap: 8px; }
+.action-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; }
+.btn-backup { background: #2c3e50; color: #fff; }
+.btn-restore { background: #e74c3c; color: #fff; }
+.btn-check { background: #f5f5f5; color: #333; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>💾 备份恢复助手</h1>
+  <p>备份查询 · 自动备份 · 恢复引导 · 完整性检查</p>
+</div>
+<div class="stats">
+  <div class="stat-card"><div class="num">12</div><div class="label">备份总数</div></div>
+  <div class="stat-card"><div class="num">2026-06-28</div><div class="label">最近备份</div></div>
+  <div class="stat-card"><div class="num">2.3GB</div><div class="label">总备份大小</div></div>
+  <div class="stat-card"><div class="num">100%</div><div class="label">成功率</div></div>
+</div>
+<div class="actions">
+  <div class="action-btn btn-backup">立即备份</div>
+  <div class="action-btn btn-restore">恢复数据</div>
+  <div class="action-btn btn-check">完整性检查</div>
+</div>
+<div class="config-card">
+  <h2 style="font-size:15px; font-weight:600; margin-bottom:4px;">⚙️ 自动备份配置</h2>
+  <div class="config-row"><span class="config-label">自动备份</span><span class="config-value toggle-on">已开启</span></div>
+  <div class="config-row"><span class="config-label">备份频率</span><span class="config-value">每日 03:00 (UTC+8)</span></div>
+  <div class="config-row"><span class="config-label">保留策略</span><span class="config-value">保留最近 30 天</span></div>
+  <div class="config-row"><span class="config-label">备份范围</span><span class="config-value">数据库 + 文件存储</span></div>
+</div>
+<div class="backup-list">
+  <h2 style="font-size:15px; font-weight:600; margin-bottom:10px;">📋 备份记录</h2>
+  <div class="backup-item"><div class="backup-info"><div class="backup-name">每日自动备份</div><div class="backup-meta">2026-06-28 03:00 · 245MB</div></div><span class="backup-status bstatus-success">成功</span></div>
+  <div class="backup-item"><div class="backup-info"><div class="backup-name">每日自动备份</div><div class="backup-meta">2026-06-27 03:00 · 242MB</div></div><span class="backup-status bstatus-success">成功</span></div>
+  <div class="backup-item"><div class="backup-info"><div class="backup-name">手动备份</div><div class="backup-meta">2026-06-26 14:30 · 238MB</div></div><span class="backup-status bstatus-success">成功</span></div>
+  <div class="backup-item"><div class="backup-info"><div class="backup-name">每日自动备份</div><div class="backup-meta">2026-06-26 03:00 · 240MB</div></div><span class="backup-status bstatus-success">成功</span></div>
+</div>
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[CloudBackup] Current user:', user);
+  } catch(e) {
+    console.log('[CloudBackup] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

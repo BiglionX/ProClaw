@@ -1,0 +1,42 @@
+{
+  "id": "virtual_company",
+  "name": "虚拟公司版",
+  "version": "1.0.0",
+  "description": "虚拟团队与 Agent 协作平台，CEO Agent 主控官系统驱动多 Agent 协作。",
+  "icon": "🏢",
+  "compatibleAppVersion": ">=0.1.0",
+  "features": {
+    "modules": ["agents", "projects", "finance-agent", "teams", "ai-knowledge", "contacts", "messages", "ucenter"],
+    "dashboards": ["project-progress", "agent-performance", "financial-overview"],
+    "reports": ["agent-report", "project-report"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
+      { "text": "用户中心", "icon": "user", "path": "/ucenter", "group": "系统" },
+      { "text": "Agent管理", "icon": "shopping-bag", "path": "/agents", "group": "协作" },
+      { "text": "项目概览", "icon": "database", "path": "/project-overview", "group": "协作" },
+      { "text": "财务 Agent", "icon": "finance", "path": "/finance-agent", "group": "协作" },
+      { "text": "AI团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "联系人", "icon": "phone", "path": "/contacts", "group": "通讯" },
+      { "text": "消息", "icon": "message-square", "path": "/messages", "group": "通讯" }
+    ],
+    "remove": ["/datacenter", "/supplychain", "/products", "/cloud-store"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#7c3aed",
+      "secondary": "#8b5cf6"
+    },
+    "quickActions": [
+      { "label": "新建项目", "icon": "folder-plus", "action": "openNewProject", "color": "#7c3aed" },
+      { "label": "分派任务", "icon": "check-circle", "action": "openTaskAssignment", "color": "#8b5cf6" },
+      { "label": "财务报告", "icon": "bar-chart", "action": "openFinanceReport", "color": "#6366f1" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  }
+}

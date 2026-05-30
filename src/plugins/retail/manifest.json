@@ -1,0 +1,41 @@
+{
+  "id": "light",
+  "name": "极简零售版",
+  "version": "1.0.0",
+  "description": "县区小微商家首选，简化操作流程，聚焦核心业务。适用餐饮、零售、服务、生鲜等业态。",
+  "icon": "🛍️",
+  "compatibleAppVersion": ">=0.1.0",
+  "features": {
+    "modules": ["pos", "inventory", "sales", "customers", "ai-teams", "analytics", "ai-knowledge"],
+    "dashboards": ["sales-trend", "inventory-status", "ai-team-overview"],
+    "reports": ["sales-report", "inventory-report"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
+      { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "销售管理", "icon": "shopping-cart", "path": "/sales", "group": "业务" },
+      { "text": "库存管理", "icon": "truck", "path": "/inventory", "group": "业务" },
+      { "text": "客户管理", "icon": "phone", "path": "/customers", "group": "业务" },
+      { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" },
+      { "text": "AI 团队", "icon": "users", "path": "/ai-teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" }
+    ],
+    "remove": ["/datacenter", "/supplychain", "/cloud-store", "/ucenter", "/teams", "/contacts", "/messages"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#e74c3c",
+      "secondary": "#f39c12"
+    },
+    "quickActions": [
+      { "label": "新建销售单", "icon": "shopping-cart", "action": "openNewSale", "color": "#e74c3c" },
+      { "label": "库存盘点", "icon": "package", "action": "openInventoryCheck", "color": "#f39c12" },
+      { "label": "AI 经营分析", "icon": "bar-chart", "action": "openAIAnalysis", "color": "#3498db" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  }
+}
