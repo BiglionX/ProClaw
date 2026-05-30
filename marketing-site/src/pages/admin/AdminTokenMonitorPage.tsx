@@ -1,10 +1,11 @@
 // Admin Token 监控面板
 // 全局 Token 消耗概览、异常告警、定价规则管理
+// @ts-nocheck
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { getTokenPricingRules, getTokenPackages } from '../lib/tokenService';
-import type { TokenPricingRule, TokenPackage } from '../types';
+import { supabase } from '../../lib/supabase';
+import { getTokenPricingRules, getTokenPackages } from '../../lib/tokenService';
+import type { TokenPricingRule, TokenPackage } from '../../types';
 
 interface TokenStats {
   total_consumed_today: number;

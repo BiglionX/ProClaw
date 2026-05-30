@@ -3,25 +3,6 @@
 
 import React, { useState, useMemo } from 'react';
 
-interface PricingRule {
-  resource_type: string;
-  action_name: string;
-  pt_cost: number;
-  unit: string;
-}
-
-// 默认定价规则（与数据库 token_pricing_rules 一致）
-const DEFAULT_PRICING: PricingRule[] = [
-  { resource_type: 'product_sync', action_name: '商品同步', pt_cost: 50, unit: 'per_item' },
-  { resource_type: 'ai_theme', action_name: 'AI 主题生成', pt_cost: 5000, unit: 'per_request' },
-  { resource_type: 'order_process', action_name: '订单处理', pt_cost: 10, unit: 'per_item' },
-  { resource_type: 'realtime_sync', action_name: '实时同步保活', pt_cost: 15000, unit: 'per_month' },
-  { resource_type: 'custom_domain', action_name: '自定义域名', pt_cost: 2000, unit: 'per_month' },
-  { resource_type: 'product_hosting', action_name: '商品托管（按存量）', pt_cost: 2, unit: 'per_item_month' },
-  { resource_type: 'image_storage', action_name: '图片存储（按存量）', pt_cost: 1, unit: 'per_mb_month' },
-  { resource_type: 'page_hosting', action_name: '商城页面托管', pt_cost: 500, unit: 'per_month' },
-];
-
 interface UsageInput {
   key: string;
   label: string;

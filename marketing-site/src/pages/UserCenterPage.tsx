@@ -105,7 +105,7 @@ const UserCenterPage: React.FC = () => {
   const [tokenBalanceData, setTokenBalanceData] = useState<TokenBalanceSummary | null>(null);
   const [tokenPackages, setTokenPackages] = useState<TokenPackage[]>([]);
   const [purchaseHistory, setPurchaseHistory] = useState<TokenSale[]>([]);
-  const [tokenConfig, setTokenConfig] = useState<UserTokenConfig | null>(null);
+  const [, setTokenConfig] = useState<UserTokenConfig | null>(null);
   const [consumptionPage, setConsumptionPage] = useState(1);
   const [consumptionData, setConsumptionData] = useState<TokenConsumptionResult | null>(null);
   const [tokenLoading, setTokenLoading] = useState(false);

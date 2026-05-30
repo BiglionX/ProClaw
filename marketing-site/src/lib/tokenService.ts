@@ -3,7 +3,7 @@
 
 import { supabase } from './supabase';
 import type {
-  TokenBalance, TokenSale, TokenPackage, ApiUsageLog,
+  TokenSale, TokenPackage, ApiUsageLog,
   UserTokenConfig, TokenPricingRule, TokenBalanceSummary,
   TokenConsumptionResult,
 } from '../types';
@@ -293,7 +293,6 @@ export async function getFreeAllowance(userId: string): Promise<{
 
     // 免费额度 = 注册赠送 50000 PT
     const freeTokenUsed = Math.min(balance.total_used, 50000);
-    const freeTokenRemaining = Math.max(0, 50000 - freeTokenUsed);
 
     return {
       free_token_used: freeTokenUsed,
