@@ -68,3 +68,25 @@ pub fn record_token_cmd(db: State<Mutex<Database>>, user_id: String, action_type
     subscription_service::record_token_usage(&db, &user_id, &action_type, resource_path.as_deref(), None)?;
     Ok(serde_json::json!({ "message": "Token recorded" }))
 }
+
+/// 获取 Token 定价规则 (PRD v8.0)
+#[tauri::command]
+pub fn get_token_pricing_cmd() -> Result<serde_json::Value, String> {
+    let pricing = subscription_service::get_token_pricing();
+    Ok(serde_json::json!({ "data": pricing }))
+}
+
+/// 获取 Token 余额摘要 (PRD v8.0)
+#[tauri::command]
+pub fn get_token_balance_cmd(db: State<Mutex<Database>>, user_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let info = subscription_service::get_token_balance(&db, &user_id)?;
+    Ok(serde_json::json!({ "data": info }))
+}
+
+/// 估算 Token 消耗 (PRD v8.0)
+#[tauri::command]
+pub fn estimate_token_cost_cmd(resource_type: String, quantity: i64) -> Result<serde_json::Value, String> {
+    let cost = subscription_service::estimate_token_cost(&resource_type, quantity);
+    Ok(serde_json::json!({ "cost": cost, "resource_type": resource_type, "quantity": quantity }))
+}

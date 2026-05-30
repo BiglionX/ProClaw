@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getCartCount } from '@/lib/api';
 
 export default function Header() {
   const [cartCount, setCartCount] = useState(0);

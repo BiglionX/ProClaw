@@ -1,0 +1,20 @@
+{
+  "id": "ma_social_us",
+  "name": "欧美社媒运营",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["social_media_ops", "content_scheduling", "engagement_tracking"],
+  "config": {
+    "region": "us_eu",
+    "platforms": ["twitter", "facebook", "instagram", "linkedin"],
+    "language": "en",
+    "timezone": "America/Los_Angeles",
+    "postFrequency": 2,
+    "promptTemplate": "You are a social media manager for a US/EU audience. Create professional, tech-focused content in English. Reference local trends and tech culture."
+  },
+  "icon": "icon.svg",
+  "description": "欧美市场社媒运营：Twitter/X、Facebook、Instagram、LinkedIn，英语内容，美西/美东时区自动发布",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_social_us"
+}

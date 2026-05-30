@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内容生成专家</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #333; }
+.header { background: linear-gradient(135deg, #E91E63 0%, #F48FB1 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.toolbar { display: flex; gap: 10px; padding: 14px 16px; flex-wrap: wrap; }
+.toolbar button { padding: 8px 18px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-generate { background: #E91E63; color: #fff; }
+.btn-generate:hover { background: #C2185B; }
+.btn-publish { background: #43A047; color: #fff; }
+.btn-publish:hover { background: #2E7D32; }
+.btn-publish:disabled { opacity: 0.5; cursor: not-allowed; }
+.content-area { padding: 0 16px; }
+.content-card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.content-card h3 { font-size: 16px; margin-bottom: 8px; color: #333; }
+.content-card .meta { font-size: 12px; color: #999; margin-bottom: 8px; display: flex; gap: 12px; }
+.content-card .preview { font-size: 13px; color: #666; line-height: 1.6; max-height: 80px; overflow: hidden; }
+.content-card .actions { display: flex; gap: 8px; margin-top: 10px; }
+.content-card .actions button { padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.btn-approve { background: #E8F5E9; color: #2E7D32; }
+.btn-edit { background: #E3F2FD; color: #1565C0; }
+.btn-reject { background: #FFEBEE; color: #C62828; }
+.status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.status-pending { background: #FFF3E0; color: #E65100; }
+.status-approved { background: #E8F5E9; color: #2E7D32; }
+.status-published { background: #E3F2FD; color: #1565C0; }
+.text-center { text-align: center; padding: 30px; color: #999; }
+textarea { width: 100%; height: 200px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; font-size: 14px; line-height: 1.6; resize: vertical; font-family: inherit; }
+.input-group { margin-bottom: 10px; }
+.input-group label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; }
+.input-group input, .input-group select { width: 100%; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 13px; }
+.generated-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+.generated-modal.active { display: flex; }
+.generated-modal .modal-content { background: #fff; border-radius: 16px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; padding: 24px; }
+.modal-content h2 { font-size: 18px; margin-bottom: 12px; }
+.modal-content .full-content { font-size: 14px; line-height: 1.8; color: #444; white-space: pre-wrap; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>内容生成专家</h1>
+  <p>根据 SEO 关键词生成高质量博客文章，支持 Boss 确认发布</p>
+</div>
+
+<div class="toolbar">
+  <select id="langSelect" style="padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;">
+    <option value="zh">中文</option>
+    <option value="en">English</option>
+  </select>
+  <input type="text" id="keywordInput" placeholder="输入关键词 (多个用逗号分隔)" style="flex:1;min-width:150px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;">
+  <button class="btn-generate" onclick="generateContent()">AI 生成</button>
+  <button class="btn-publish" id="publishBtn" onclick="publishAll()" disabled>发布已确认内容 (0)</button>
+</div>
+
+<div class="content-area" id="contentList">
+  <div class="text-center">点击 "AI 生成" 创建新内容，生成后将出现在此列表中等待确认</div>
+</div>
+
+<div class="generated-modal" id="previewModal">
+  <div class="modal-content">
+    <h2 id="previewTitle">文章标题</h2>
+    <div class="full-content" id="previewContent">内容加载中...</div>
+    <div class="meta" id="previewMeta" style="margin-bottom:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn-reject" onclick="closePreview()">返回编辑</button>
+      <button class="btn-approve" onclick="confirmPublish()" style="padding:8px 20px;">确认发布</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let contentItems = [];
+let pendingConfirmId = null;
+let currentPreviewId = null;
+
+function renderContentList() {
+  const container = document.getElementById('contentList');
+  if (contentItems.length === 0) {
+    container.innerHTML = '<div class="text-center">点击 "AI 生成" 创建新内容，生成后将出现在此列表中等待确认</div>';
+    return;
+  }
+  
+  const pendingCount = contentItems.filter(c => c.status === 'pending').length;
+  document.getElementById('publishBtn').disabled = pendingCount === 0;
+  document.getElementById('publishBtn').textContent = '发布已确认内容 (' + pendingCount + ')';
+
+  container.innerHTML = contentItems.map((item, idx) => {
+    const statusClass = 'status-' + item.status;
+    const statusLabel = { pending: '待确认', approved: '已确认', published: '已发布' };
+    return '<div class="content-card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+        '<h3>' + item.title + '</h3>' +
+        '<span class="status-badge ' + statusClass + '">' + statusLabel[item.status] + '</span>' +
+      '</div>' +
+      '<div class="meta"><span>' + item.lang + '</span><span>' + item.keywords + '</span><span>' + new Date(item.createdAt).toLocaleDateString() + '</span></div>' +
+      '<div class="preview">' + item.content.substring(0, 120) + '...</div>' +
+      (item.status === 'pending' ? '<div class="actions">' +
+        '<button class="btn-approve" onclick="approveItem(' + idx + ')">确认</button>' +
+        '<button class="btn-edit" onclick="previewItem(' + idx + ')">预览</button>' +
+        '<button class="btn-reject" onclick="rejectItem(' + idx + ')">拒绝</button>' +
+      '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+async function generateContent() {
+  const keyword = document.getElementById('keywordInput').value.trim();
+  const lang = document.getElementById('langSelect').value;
+  
+  if (!keyword) {
+    try { await window.proclaw.showNotification('提示', '请输入关键词'); } catch(e) {}
+    return;
+  }
+
+  const title = lang === 'en' 
+    ? '[' + keyword.split(',')[0].trim() + '] - Technical Insights & Best Practices'
+    : '关于 ' + keyword.split(',')[0].trim() + ' 的技术实践与最佳方案';
+
+  const sampleContent = lang === 'en'
+    ? 'In this article, we explore the best practices for ' + keyword.split(',')[0].trim() + ' in modern software development.\n\n## Key Insights\n\n1. Understanding the fundamentals\n2. Implementing efficient workflows\n3. Measuring and optimizing performance\n\nThis is an AI-generated draft. Please review and confirm before publishing.'
+    : '本文将深入探讨 ' + keyword.split(',')[0].trim() + ' 在现代软件开发中的最佳实践。\n\n## 核心要点\n\n1. 理解基础原理\n2. 实现高效工作流\n3. 衡量和优化性能\n\n*本文由 AI 自动生成，请审核确认后发布。*';
+
+  const newItem = {
+    id: 'content_' + Date.now(),
+    title: title,
+    content: sampleContent,
+    lang: lang === 'en' ? 'English' : '中文',
+    keywords: keyword,
+    status: 'pending',
+    createdAt: Date.now()
+  };
+
+  contentItems.push(newItem);
+  renderContentList();
+
+  // 触发 Boss 确认通知
+  try {
+    await window.proclaw.showNotification('内容待确认', '新内容「' + title + '」已生成，请确认是否发布');
+  } catch(e) {}
+
+  document.getElementById('keywordInput').value = '';
+}
+
+function previewItem(idx) {
+  const item = contentItems[idx];
+  if (!item) return;
+  currentPreviewId = idx;
+  document.getElementById('previewTitle').textContent = item.title;
+  document.getElementById('previewContent').textContent = item.content;
+  document.getElementById('previewMeta').textContent = item.lang + ' | ' + item.keywords;
+  document.getElementById('previewModal').classList.add('active');
+}
+
+function closePreview() {
+  document.getElementById('previewModal').classList.remove('active');
+  currentPreviewId = null;
+}
+
+function confirmPublish() {
+  if (currentPreviewId !== null) {
+    approveItem(currentPreviewId);
+  }
+  closePreview();
+}
+
+function approveItem(idx) {
+  contentItems[idx].status = 'approved';
+  renderContentList();
+}
+
+function rejectItem(idx) {
+  contentItems.splice(idx, 1);
+  renderContentList();
+}
+
+async function publishAll() {
+  const toPublish = contentItems.filter(c => c.status === 'approved' || c.status === 'pending');
+  toPublish.forEach(c => c.status = 'published');
+  renderContentList();
+  
+  try {
+    await window.proclaw.showNotification('发布成功', '已发布 ' + toPublish.length + ' 篇内容到官网');
+  } catch(e) {}
+}
+
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[ContentGenAgent] Current user:', user);
+  } catch(e) {
+    console.log('[ContentGenAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+// 云商城 Token 中间件 API Route 封装
+// 在商品同步、订单创建、主题生成等关键操作前检查并扣除 Token
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getTokenBalance, getDebtStatus, checkDailyLimit } from '@/lib/tokenApi';
+
+const PT_COST = {
+  product_sync: 50,
+  ai_theme: 5000,
+  order_process: 10,
+  api_write: 5,
+  api_read: 1,
+};
+
+// ========== 欠费保护状态码 ==========
+
+const DEBT_STATUS_RESPONSES: Record<string, { status: number; error: string; code: string }> = {
+  readonly: {
+    status: 403,
+    error: '您的账户处于只读模式（余额耗尽第4~7天），请充值后恢复写操作',
+    code: 'DEBT_READONLY',
+  },
+  suspended: {
+    status: 403,
+    error: '您的账户已暂停服务（余额耗尽超过7天），请立即充值恢复',
+    code: 'DEBT_SUSPENDED',
+  },
+  archived: {
+    status: 403,
+    error: '您的账户数据已归档（余额耗尽超过30天），请联系管理员恢复',
+    code: 'DEBT_ARCHIVED',
+  },
+};
+
+// ========== Token 保护装饰器 ==========
+
+interface TokenGuardOptions {
+  resourceType: string;
+  quantity?: number;
+  costPerUnit?: number;
+}
+
+interface TokenGuardResult {
+  allowed: boolean;
+  error?: string;
+  cost?: number;
+  debtStatus?: string;
+  dailyRemaining?: number;
+}
+
+/**
+ * Token 保护：在执行操作前检查余额并扣费
+ * 增强版：增加欠费保护检查和日消耗上限检查
+ */
+export async function tokenGuard(
+  userId: string,
+  options: TokenGuardOptions
+): Promise<TokenGuardResult> {
+  const quantity = options.quantity || 1;
+  const ptPerUnit = options.costPerUnit || PT_COST[options.resourceType as keyof typeof PT_COST] || 0;
+  const totalCost = ptPerUnit * quantity;
+
+  if (totalCost <= 0) {
+    return { allowed: true, cost: 0 };
+  }
+
+  // Step 1: 检查欠费状态
+  const debtStatus = await getDebtStatus(userId);
+  if (debtStatus) {
+    if (debtStatus.status === 'suspended' || debtStatus.status === 'archived') {
+      const resp = DEBT_STATUS_RESPONSES[debtStatus.status];
+      return {
+        allowed: false,
+        error: resp.error,
+        cost: totalCost,
+        debtStatus: debtStatus.status,
+      };
+    }
+    if (debtStatus.status === 'readonly') {
+      // 只读模式：检查是否为读操作
+      // resourceType 以 'api_read' 或查询操作为读
+      if (options.resourceType !== 'api_read') {
+        const resp = DEBT_STATUS_RESPONSES['readonly'];
+        return {
+          allowed: false,
+          error: resp.error,
+          cost: totalCost,
+          debtStatus: 'readonly',
+        };
+      }
+    }
+  }
+
+  // Step 2: 检查日消耗上限
+  const dailyCheck = await checkDailyLimit(userId, totalCost);
+  if (dailyCheck && !dailyCheck.allowed) {
+    return {
+      allowed: false,
+      error: `今日 Token 消耗已达上限（${dailyCheck.daily_limit.toLocaleString()} PT）。如需调整，请前往用户中心设置。`,
+      cost: totalCost,
+      dailyRemaining: dailyCheck.remaining,
+    };
+  }
+
+  // Step 3: 检查余额
+  const balance = await getTokenBalance(userId);
+  if (balance < totalCost) {
+    return {
+      allowed: false,
+      error: `Token 余额不足。需要 ${totalCost.toLocaleString()} PT，当前余额 ${balance.toLocaleString()} PT。请前往用户中心充值。`,
+      cost: totalCost,
+    };
+  }
+
+  return { allowed: true, cost: totalCost, debtStatus: debtStatus?.status, dailyRemaining: dailyCheck?.remaining };
+}
+
+// ========== 中间件辅助函数 ==========
+
+/**
+ * 从请求中提取用户 ID（从 header 或 cookie）
+ */
+export function getUserIdFromRequest(request: NextRequest): string | null {
+  // 优先从 header 获取（由边缘中间件设置）
+  const headerUserId = request.headers.get('x-token-user-id');
+  if (headerUserId) return headerUserId;
+
+  // 其次从 cookie 获取
+  const cookieUserId = request.cookies.get('user_id')?.value;
+  if (cookieUserId) return cookieUserId;
+
+  return null;
+}
+
+/**
+ * 处理 Token 检查失败响应
+ */
+export function tokenInsufficientResponse(error: string): NextResponse {
+  return NextResponse.json(
+    {
+      error,
+      code: 'INSUFFICIENT_TOKENS',
+      message: 'Token 余额不足，请充值后重试',
+      payment_url: '/user-center?tab=4', // 跳转到充值页面
+    },
+    { status: 402 }
+  );
+}
+
+/**
+ * 处理未授权响应
+ */
+export function unauthorizedResponse(): NextResponse {
+  return NextResponse.json(
+    { error: '未登录，无法执行计费操作', code: 'UNAUTHORIZED' },
+    { status: 401 }
+  );
+}

@@ -33,8 +33,8 @@ const LoginPage: React.FC = () => {
           console.log('Redirecting to admin dashboard');
           navigate('/admin');
         } else {
-          console.log('Redirecting to user dashboard');
-          navigate('/dashboard');
+          console.log('Redirecting to user center');
+          navigate('/user');
         }
       }, 200); // 增加等待时间到 200ms
     } catch (err) {

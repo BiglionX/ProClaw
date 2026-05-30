@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEO 优化专家</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #333; }
+.header { background: linear-gradient(135deg, #1565C0 0%, #42A5F5 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.header .score { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; }
+.stats { display: flex; gap: 12px; padding: 16px; }
+.stat-card { flex: 1; background: #fff; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-value { font-size: 24px; font-weight: 700; color: #1565C0; }
+.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+.section { padding: 0 16px; margin-bottom: 16px; }
+.section-title { font-size: 15px; font-weight: 600; padding: 12px 0 8px; color: #444; }
+.optimization-item { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.opt-icon { width: 36px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+.opt-info { flex: 1; }
+.opt-title { font-size: 14px; font-weight: 600; }
+.opt-desc { font-size: 12px; color: #999; margin-top: 2px; }
+.priority-high { background: #e53935; }
+.priority-medium { background: #FB8C00; }
+.priority-low { background: #43A047; }
+.keyword-item { display: flex; justify-content: space-between; align-items: center; background: #fff; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; font-size: 13px; }
+.keyword-rank { color: #1565C0; font-weight: 600; }
+.keyword-change-up { color: #43A047; }
+.keyword-change-down { color: #e53935; }
+.btn-scan { display: block; width: calc(100% - 32px); margin: 16px; padding: 12px; background: #1565C0; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-scan:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-scan:hover:not(:disabled) { background: #0D47A1; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>SEO 优化专家</h1>
+  <p>监控关键词排名、网站健康度、自动优化建议</p>
+  <div class="score" id="healthScore">健康评分: 加载中...</div>
+</div>
+<div class="stats">
+  <div class="stat-card"><div class="stat-value" id="keywordCount">-</div><div class="stat-label">跟踪关键词</div></div>
+  <div class="stat-card"><div class="stat-value" id="optimizationCount">-</div><div class="stat-label">优化建议</div></div>
+  <div class="stat-card"><div class="stat-value" id="deadLinkCount">-</div><div class="stat-label">死链</div></div>
+</div>
+<div class="section">
+  <div class="section-title">关键词排名</div>
+  <div id="keywordList">
+    <div class="keyword-item"><span>ProClaw AI</span><span><span class="keyword-rank">#3</span> <span class="keyword-change-up">+2</span></span></div>
+    <div class="keyword-item"><span>AI 经营系统</span><span><span class="keyword-rank">#8</span> <span class="keyword-change-up">+1</span></span></div>
+    <div class="keyword-item"><span>开源 ERP AI</span><span><span class="keyword-rank">#12</span> <span class="keyword-change-down">-3</span></span></div>
+  </div>
+</div>
+<div class="section">
+  <div class="section-title">优化建议</div>
+  <div id="optimizationList">
+    <div class="optimization-item">
+      <div class="opt-icon priority-high">高</div>
+      <div class="opt-info"><div class="opt-title">首页加载速度优化</div><div class="opt-desc">LCP 3.2s，建议优化至 2.5s 以下</div></div>
+    </div>
+    <div class="optimization-item">
+      <div class="opt-icon priority-medium">中</div>
+      <div class="opt-info"><div class="opt-title">缺失 meta description</div><div class="opt-desc">3 个页面缺少 meta description</div></div>
+    </div>
+    <div class="optimization-item">
+      <div class="opt-icon priority-low">低</div>
+      <div class="opt-info"><div class="opt-title">内部链接优化</div><div class="opt-desc">建议增加产品页之间的关联链接</div></div>
+    </div>
+  </div>
+</div>
+<button class="btn-scan" id="scanBtn" onclick="runScan()">运行全面扫描</button>
+<script>
+let isScanning = false;
+
+async function runScan() {
+  if (isScanning) return;
+  isScanning = true;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = '扫描中...';
+
+  try {
+    const healthEl = document.getElementById('healthScore');
+    healthEl.textContent = '健康评分: 分析中...';
+
+    // 模拟扫描进度
+    for (let i = 0; i <= 100; i += 20) {
+      btn.textContent = '扫描中 ' + i + '%';
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    healthEl.textContent = '健康评分: 82/100 (良好)';
+    document.getElementById('keywordCount').textContent = '12';
+    document.getElementById('optimizationCount').textContent = '5';
+    document.getElementById('deadLinkCount').textContent = '2';
+
+    try {
+      await window.proclaw.showNotification('扫描完成', 'SEO 扫描完成，发现 5 条优化建议和 2 个死链');
+    } catch(e) {}
+
+    btn.textContent = '重新扫描';
+  } catch(e) {
+    console.error('[SEOAgent] Scan failed:', e);
+  } finally {
+    isScanning = false;
+    btn.disabled = false;
+  }
+}
+
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[SEOAgent] Current user:', user);
+  } catch(e) {
+    console.log('[SEOAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

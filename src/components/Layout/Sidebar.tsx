@@ -10,6 +10,7 @@ import {
   Storefront as StoreIcon,
   Extension as ExtensionIcon,
   AccountBalance as FinanceIcon,
+  AccountCircle as UserIcon,
 } from '@mui/icons-material';
 import {
   Divider,
@@ -35,6 +36,7 @@ interface NavItem {
 const navItems: NavItem[] = (() => {
   const items: NavItem[] = [
     { text: 'AI claw', icon: <AgentIcon sx={{ color: '#ff3b30' }} />, path: '/' },
+    { text: '用户中心', icon: <UserIcon />, path: '/ucenter' },
   ];
 
   if (IS_VIRTUAL_COMPANY) {

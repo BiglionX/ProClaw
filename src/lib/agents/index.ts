@@ -16,3 +16,6 @@ export type { SalesForecastResult } from './SalesForecasterAgent';
 
 export { DecisionAdvisorAgent } from './DecisionAdvisorAgent';
 export type { DecisionRecommendation } from './DecisionAdvisorAgent';
+
+export { CEOAgent } from './CEOAgent';
+export type { CEOAnalysisResult, CEODecision } from './CEOAgent';

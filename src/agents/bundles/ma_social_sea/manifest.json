@@ -1,0 +1,19 @@
+{
+  "id": "ma_social_sea",
+  "name": "东南亚社媒运营",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["social_media_ops", "content_scheduling", "engagement_tracking"],
+  "config": {
+    "region": "sea",
+    "platforms": ["tiktok", "instagram", "facebook"],
+    "languages": ["th", "id", "vi"],
+    "postFrequency": 3,
+    "promptTemplate": "You are a social media manager for Southeast Asia. Create short, engaging content in local languages (Thai, Indonesian, Vietnamese). Use local trends, hot topics, and influencer culture."
+  },
+  "icon": "icon.svg",
+  "description": "东南亚市场社媒运营：TikTok、Instagram、Facebook，支持泰语/印尼语/越南语",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_social_sea"
+}

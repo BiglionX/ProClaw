@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "entry": "index.html",
   "permissions": ["read_user", "read_files", "write_files"],
+  "capabilities": ["document_management", "file_collaboration"],
   "icon": "icon.svg",
   "description": "Markdown 编辑器，支持版本历史、实时协作",
   "author": "ProClaw 官方",

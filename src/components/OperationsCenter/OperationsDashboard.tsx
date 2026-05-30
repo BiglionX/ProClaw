@@ -1,0 +1,318 @@
+import React, { useState } from 'react';
+
+// ==================== 运营中心主仪表板 ====================
+
+const OperationsDashboard: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'seo' | 'social' | 'approvals' | 'alerts'>('overview');
+
+  const tabs = [
+    { key: 'overview', label: '总览' },
+    { key: 'seo', label: 'SEO 健康' },
+    { key: 'social', label: '社媒数据' },
+    { key: 'approvals', label: '待审核内容' },
+    { key: 'alerts', label: '异常预警' },
+  ];
+
+  return (
+    <div className="p-4 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">运营中心</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          网站运营 AI Team 与多区域社媒运营数据总览
+        </p>
+      </div>
+
+      {/* 标签页导航 */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as typeof activeTab)}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === tab.key
+                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && <OverviewTab />}
+      {activeTab === 'seo' && <SEOHealthCard />}
+      {activeTab === 'social' && <SocialMediaStats />}
+      {activeTab === 'approvals' && <PendingContentList />}
+      {activeTab === 'alerts' && <AlertList />}
+    </div>
+  );
+};
+
+// ==================== 总览标签 ====================
+
+const OverviewTab: React.FC = () => {
+  const summaryCards = [
+    { label: 'SEO 健康评分', value: '82/100', color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20' },
+    { label: '社媒账号', value: '5 个', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+    { label: '待发布内容', value: '3 条', color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20' },
+    { label: '进行中 Agent', value: '4 个', color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+    { label: '异常预警', value: '2 条', color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
+    { label: '本周发帖', value: '12 条', color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-900/20' },
+  ];
+
+  const teamStatus = [
+    { name: '网站运营 AI Team', agents: ['SEO 优化', '内容生成', '数据分析', '转化优化'], status: 'running' as const },
+    { name: '欧美社媒 Team', agents: ['Twitter', 'Facebook', 'Instagram', 'LinkedIn'], status: 'running' as const },
+    { name: '东南亚社媒 Team', agents: ['TikTok', 'Instagram', 'Facebook'], status: 'paused' as const },
+    { name: '国内社媒 Team', agents: ['微信公众号', '小红书', '知乎', '微博'], status: 'running' as const },
+  ];
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        {summaryCards.map((card, idx) => (
+          <div key={idx} className={`${card.bg} rounded-xl p-4 text-center`}>
+            <div className={`text-2xl font-bold ${card.color}`}>{card.value}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{card.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">AI Team 运行状态</h3>
+      <div className="grid md:grid-cols-2 gap-4">
+        {teamStatus.map((team, idx) => (
+          <div key={idx} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-sm text-gray-900 dark:text-white">{team.name}</h4>
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                team.status === 'running'
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+              }`}>
+                {team.status === 'running' ? '运行中' : '已暂停'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {team.agents.map((agent, aidx) => (
+                <span key={aidx} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
+                  {agent}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ==================== SEO 健康卡片 ====================
+
+const SEOHealthCard: React.FC = () => {
+  const metrics = [
+    { label: '关键词排名', value: '12 个跟踪', detail: '前10: 3个', trend: 'up' },
+    { label: '页面加载时间', value: '2.8s', detail: '目标: 2.5s', trend: 'down' },
+    { label: '死链数量', value: '2 个', detail: '需修复', trend: 'warning' },
+    { label: '索引页面', value: '47 页', detail: '上周: 45', trend: 'up' },
+  ];
+
+  const recommendations = [
+    { priority: '高' as const, title: '首页加载速度优化', desc: 'LCP 3.2s，建议优化至 2.5s 以下' },
+    { priority: '中' as const, title: '缺失 meta description', desc: '3 个页面缺少 meta description' },
+    { priority: '低' as const, title: '内部链接优化', desc: '建议增加产品页之间的关联链接' },
+  ];
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {metrics.map((m, idx) => (
+          <div key={idx} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{m.label}</div>
+            <div className="text-xl font-bold text-gray-900 dark:text-white">{m.value}</div>
+            <div className={`text-xs mt-1 ${
+              m.trend === 'up' ? 'text-green-600' : m.trend === 'down' ? 'text-red-600' : 'text-orange-600'
+            }`}>{m.detail}</div>
+          </div>
+        ))}
+      </div>
+
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">优化建议</h3>
+      <div className="space-y-3">
+        {recommendations.map((r, idx) => (
+          <div key={idx} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="flex items-start gap-3">
+              <span className={`text-xs font-bold px-2 py-1 rounded ${
+                r.priority === '高' ? 'bg-red-100 text-red-700' :
+                r.priority === '中' ? 'bg-orange-100 text-orange-700' :
+                'bg-green-100 text-green-700'
+              }`}>{r.priority}</span>
+              <div>
+                <div className="font-medium text-sm text-gray-900 dark:text-white">{r.title}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{r.desc}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ==================== 社媒数据统计 ====================
+
+const SocialMediaStats: React.FC = () => {
+  const accounts = [
+    { platform: 'Twitter/X', region: '欧美', followers: '1,247', engagement: '3.4%', status: 'active' as const },
+    { platform: 'Facebook', region: '欧美', followers: '892', engagement: '2.1%', status: 'active' as const },
+    { platform: 'Instagram', region: '欧美', followers: '1,568', engagement: '4.2%', status: 'active' as const },
+    { platform: 'LinkedIn', region: '欧美', followers: '634', engagement: '2.8%', status: 'active' as const },
+    { platform: 'TikTok', region: '东南亚', followers: '4,200', engagement: '6.5%', status: 'paused' as const },
+    { platform: '微信公众号', region: '国内', followers: '2,100', engagement: '2.3%', status: 'active' as const },
+    { platform: '小红书', region: '国内', followers: '1,468', engagement: '3.1%', status: 'active' as const },
+  ];
+
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              <th className="text-left py-3 px-2 font-medium text-gray-500 dark:text-gray-400">平台</th>
+              <th className="text-left py-3 px-2 font-medium text-gray-500 dark:text-gray-400">区域</th>
+              <th className="text-right py-3 px-2 font-medium text-gray-500 dark:text-gray-400">粉丝</th>
+              <th className="text-right py-3 px-2 font-medium text-gray-500 dark:text-gray-400">互动率</th>
+              <th className="text-center py-3 px-2 font-medium text-gray-500 dark:text-gray-400">状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.map((a, idx) => (
+              <tr key={idx} className="border-b border-gray-100 dark:border-gray-700/50">
+                <td className="py-3 px-2 font-medium text-gray-900 dark:text-white">{a.platform}</td>
+                <td className="py-3 px-2 text-gray-500 dark:text-gray-400">{a.region}</td>
+                <td className="py-3 px-2 text-right font-medium text-gray-900 dark:text-white">{a.followers}</td>
+                <td className="py-3 px-2 text-right text-gray-700 dark:text-gray-300">{a.engagement}</td>
+                <td className="py-3 px-2 text-center">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    a.status === 'active'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                  }`}>
+                    {a.status === 'active' ? '活跃' : '暂停'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ==================== 待审核内容列表 ====================
+
+const PendingContentList: React.FC = () => {
+  const [items, setItems] = useState([
+    { id: '1', title: 'ProClaw AI 最佳实践', source: '内容生成 Agent', status: 'pending' as const, time: '10 分钟前' },
+    { id: '2', title: 'Announcing v2.0 Release', source: '内容生成 Agent', status: 'pending' as const, time: '1 小时前' },
+    { id: '3', title: 'SEO 优化建议报告', source: 'SEO Agent', status: 'approved' as const, time: '2 小时前' },
+    { id: '4', title: '产品功能介绍推文', source: '欧美社媒运营', status: 'pending' as const, time: '3 小时前' },
+  ]);
+
+  const handleAction = (id: string, action: 'approve' | 'reject') => {
+    setItems(prev => {
+      if (action === 'reject') return prev.filter(i => i.id !== id);
+      return prev.map(i => i.id === id ? { ...i, status: 'approved' as const } : i);
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          待处理: {items.filter(i => i.status === 'pending').length} 条
+        </span>
+      </div>
+      <div className="space-y-3">
+        {items.map(item => (
+          <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="font-medium text-sm text-gray-900 dark:text-white">{item.title}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.source} - {item.time}</div>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                item.status === 'pending'
+                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                  : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              }`}>
+                {item.status === 'pending' ? '待审核' : '已通过'}
+              </span>
+            </div>
+            {item.status === 'pending' && (
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => handleAction(item.id, 'approve')}
+                  className="px-3 py-1.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
+                >
+                  确认发布
+                </button>
+                <button
+                  onClick={() => handleAction(item.id, 'reject')}
+                  className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+                >
+                  拒绝
+                </button>
+                <button className="px-3 py-1.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors">
+                  编辑
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ==================== 异常预警列表 ====================
+
+const AlertList: React.FC = () => {
+  const alerts = [
+    { level: 'warning' as const, title: '首页跳出率异常升高', desc: '首页跳出率从 35% 升至 52%', time: '30 分钟前' },
+    { level: 'warning' as const, title: '博客分类流量下降', desc: '技术博客分类流量下降 28%', time: '1 小时前' },
+    { level: 'info' as const, title: '东南亚社媒 Team 已暂停', desc: 'TikTok 账号需重新授权', time: '3 小时前' },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {alerts.map((alert, idx) => (
+        <div
+          key={idx}
+          className={`rounded-xl p-4 border ${
+            alert.level === 'warning'
+              ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800'
+              : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <span className={`text-lg ${alert.level === 'warning' ? 'text-orange-500' : 'text-blue-500'}`}>
+              {alert.level === 'warning' ? '\u26A0' : '\u2139'}
+            </span>
+            <div className="flex-1">
+              <div className={`font-medium text-sm ${
+                alert.level === 'warning' ? 'text-orange-800 dark:text-orange-300' : 'text-blue-800 dark:text-blue-300'
+              }`}>{alert.title}</div>
+              <div className={`text-xs mt-1 ${
+                alert.level === 'warning' ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'
+              }`}>{alert.desc}</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">{alert.time}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default OperationsDashboard;

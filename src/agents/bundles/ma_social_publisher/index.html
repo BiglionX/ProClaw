@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社媒内容发布</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #333; }
+.header { background: linear-gradient(135deg, #E91E63 0%, #F48FB1 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.stat-card { flex: 1; min-width: 80px; background: #fff; border-radius: 10px; padding: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-value { font-size: 20px; font-weight: 700; color: #E91E63; }
+.stat-label { font-size: 11px; color: #999; margin-top: 2px; }
+.tabs { display: flex; gap: 0; padding: 0 16px; border-bottom: 2px solid #e0e0e0; }
+.tab { padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; color: #999; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+.tab.active { color: #E91E63; border-bottom-color: #E91E63; }
+.tab:hover { color: #666; }
+.section { padding: 16px; }
+.post-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.post-card .post-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.post-card .post-platform { font-size: 12px; color: #999; }
+.post-card .post-status { font-size: 11px; padding: 2px 8px; border-radius: 8px; }
+.status-scheduled { background: #FFF3E0; color: #E65100; }
+.status-published { background: #E8F5E9; color: #2E7D32; }
+.status-draft { background: #E3F2FD; color: #1565C0; }
+.post-card .post-content { font-size: 13px; color: #444; line-height: 1.5; margin-bottom: 8px; }
+.post-card .post-meta { font-size: 11px; color: #999; display: flex; gap: 12px; }
+.post-card .post-actions { display: flex; gap: 8px; margin-top: 8px; }
+.post-card .post-actions button { padding: 4px 12px; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
+.btn-edit { background: #E3F2FD; color: #1565C0; }
+.btn-publish-now { background: #E8F5E9; color: #2E7D32; }
+.btn-cancel { background: #FFEBEE; color: #C62828; }
+.create-area { padding: 16px; }
+.create-area textarea { width: 100%; height: 100px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; font-size: 13px; resize: vertical; font-family: inherit; }
+.create-area .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.create-area select, .create-area input { padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px; }
+.btn-create { padding: 8px 20px; background: #E91E63; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>社媒内容发布</h1>
+  <p>统一内容发布队列管理 - 通用发布内核</p>
+</div>
+
+<div class="stats">
+  <div class="stat-card"><div class="stat-value" id="postCount">0</div><div class="stat-label">总内容</div></div>
+  <div class="stat-card"><div class="stat-value" id="scheduledCount">0</div><div class="stat-label">待发布</div></div>
+  <div class="stat-card"><div class="stat-value" id="publishedCount">0</div><div class="stat-label">已发布</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('queue')">发布队列</div>
+  <div class="tab" onclick="switchTab('create')">创建内容</div>
+  <div class="tab" onclick="switchTab('stats')">互动统计</div>
+</div>
+
+<div id="tabQueue" class="section"></div>
+
+<div id="tabCreate" class="section hidden">
+  <div class="create-area">
+    <textarea id="createContent" placeholder="输入要发布的内容..."></textarea>
+    <div class="row">
+      <select id="createPlatform"><option value="twitter">Twitter/X</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="linkedin">LinkedIn</option><option value="tiktok">TikTok</option><option value="wechat">微信公众号</option><option value="xiaohongshu">小红书</option><option value="zhihu">知乎</option></select>
+      <select id="createRegion"><option value="us_eu">欧美</option><option value="sea">东南亚</option><option value="cn">国内</option></select>
+      <input type="datetime-local" id="createSchedule">
+      <button class="btn-create" onclick="createPost()">添加到队列</button>
+    </div>
+  </div>
+</div>
+
+<div id="tabStats" class="section hidden">
+  <div class="post-card">
+    <div style="text-align:center;padding:20px;color:#999;">
+      <div style="font-size:36px;margin-bottom:10px;">&#128202;</div>
+      <p>数据同步中...</p>
+      <p style="font-size:12px;margin-top:4px;">正在获取各平台互动数据，请稍后查看完整统计报告</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let posts = JSON.parse(localStorage.getItem('social_posts') || '[]');
+let currentTab = 'queue';
+
+function save() {
+  localStorage.setItem('social_posts', JSON.stringify(posts));
+  updateCounts();
+}
+
+function updateCounts() {
+  document.getElementById('postCount').textContent = posts.length;
+  document.getElementById('scheduledCount').textContent = posts.filter(p => p.status === 'scheduled').length;
+  document.getElementById('publishedCount').textContent = posts.filter(p => p.status === 'published').length;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab')[['queue','create','stats'].indexOf(tab)].classList.add('active');
+  document.getElementById('tabQueue').classList.toggle('hidden', tab !== 'queue');
+  document.getElementById('tabCreate').classList.toggle('hidden', tab !== 'create');
+  document.getElementById('tabStats').classList.toggle('hidden', tab !== 'stats');
+  if (tab === 'queue') renderQueue();
+}
+
+function createPost() {
+  const content = document.getElementById('createContent').value.trim();
+  if (!content) return;
+  
+  posts.unshift({
+    id: 'post_' + Date.now(),
+    content,
+    platform: document.getElementById('createPlatform').value,
+    region: document.getElementById('createRegion').value,
+    scheduledTime: document.getElementById('createSchedule').value || null,
+    status: 'scheduled',
+    createdAt: Date.now()
+  });
+  
+  save();
+  document.getElementById('createContent').value = '';
+  switchTab('queue');
+}
+
+function publishNow(id) {
+  const post = posts.find(p => p.id === id);
+  if (post) {
+    post.status = 'published';
+    post.publishedAt = Date.now();
+    save();
+    renderQueue();
+  }
+}
+
+function cancelPost(id) {
+  posts = posts.filter(p => p.id !== id);
+  save();
+  renderQueue();
+}
+
+function renderQueue() {
+  const container = document.getElementById('tabQueue');
+  if (posts.length === 0) {
+    container.innerHTML = '<div class="post-card"><div style="text-align:center;padding:20px;color:#999;">暂无内容，切换到"创建内容"标签添加</div></div>';
+    return;
+  }
+  container.innerHTML = posts.map(p => {
+    const statusLabel = { scheduled: '待发布', published: '已发布', draft: '草稿' };
+    const statusClass = 'status-' + p.status;
+    return '<div class="post-card">' +
+      '<div class="post-header">' +
+        '<span class="post-platform">' + p.platform + ' - ' + (p.region === 'us_eu' ? '欧美' : p.region === 'sea' ? '东南亚' : '国内') + '</span>' +
+        '<span class="post-status ' + statusClass + '">' + statusLabel[p.status] + '</span>' +
+      '</div>' +
+      '<div class="post-content">' + p.content.substring(0, 100) + (p.content.length > 100 ? '...' : '') + '</div>' +
+      '<div class="post-meta">' +
+        (p.scheduledTime ? '<span>定时: ' + p.scheduledTime + '</span>' : '<span>即时发布</span>') +
+        '<span>创建: ' + new Date(p.createdAt).toLocaleString() + '</span>' +
+      '</div>' +
+      (p.status === 'scheduled' ? '<div class="post-actions">' +
+        '<button class="btn-publish-now" onclick="publishNow(\'' + p.id + '\')">立即发布</button>' +
+        '<button class="btn-cancel" onclick="cancelPost(\'' + p.id + '\')">取消</button>' +
+      '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+renderQueue();
+updateCounts();
+
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[SocialPublisher] Current user:', user);
+  } catch(e) {
+    console.log('[SocialPublisher] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

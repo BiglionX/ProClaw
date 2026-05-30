@@ -1,0 +1,12 @@
+{
+  "id": "ma_social_publisher",
+  "name": "社媒内容发布",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["content_publishing", "scheduled_posting", "engagement_tracking"],
+  "icon": "icon.svg",
+  "description": "内容发布队列管理、定时发布、互动回复、数据追踪（通用内核，所有社媒 Agent 共享）",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_social_publisher"
+}

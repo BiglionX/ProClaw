@@ -1,66 +1,100 @@
 [![Latest Release](https://img.shields.io/github/v/release/BiglionX/ProClaw?include_prereleases)](https://github.com/BiglionX/ProClaw/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/BiglionX/ProClaw/total)](https://github.com/BiglionX/ProClaw/releases)
-# 🦞 ProClaw Desktop
+# 🦞 ProClaw
 
 > 开源AI驱动的商户经营操作系统 | Open-Source AI-Powered Business OS
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0--beta.1-green.svg)](https://github.com/BiglionX/ProClaw/releases)
-[![Tauri](https://img.shields.io/badge/Tauri-2.0-blue.svg)](https://tauri.app/)
+[![Version](https://img.shields.io/badge/version-1.0.0--beta.2-green.svg)](https://github.com/BiglionX/ProClaw/releases)
+[![Tauri](https://img.shields.io/badge/Tauri-2.11-blue.svg)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
 [![Stars](https://img.shields.io/github/stars/BiglionX/ProClaw?style=social)](https://github.com/BiglionX/ProClaw)
 
 ## 🎯 项目定位
 
-ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应用架构（Tauri），为中小商户提供智能化的业务管理解决方案。
+ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应用架构（Tauri + React），为中小商户提供智能化的业务管理解决方案。支持双模式运行（进销存版 / 虚拟公司版），并配备移动端 App、云托管商城、AI 经营团队等完整生态。
 
 **核心特点**：
-- 🤖 **AI智能体** - 自然语言交互，智能分析经营数据
+- 🤖 **AI 经营团队** - 7+ 专业 Agent 协同工作，自然语言交互
+- 🏢 **双模式架构** - 进销存版 / 虚拟公司版（含 CEO Agent 主控官）
+- 💾 **本地优先** - 数据本地存储（SQLCipher 加密），完全自主可控
+- ☁️ **云托管可选** - 支持 Supabase 云端同步和协作
+- 🔌 **全栈生态** - 桌面端 + 移动端 App + 云托管商城 + 营销站点
 - 🔑 **Token管理** - API密钥管理、用量统计、成本控制
-- 🔌 **资源桥接** - 连接各种API、Webhook、第三方服务
-- 💾 **本地优先** - 数据本地存储，完全自主可控
-- ☁️ **云托管可选** - 支持云端同步和协作
 
 ## ✨ 核心功能
 
-### 1. 用户管理系统
-- 注册/登录/权限控制
-- 多租户支持
-- 角色权限管理（店主/仓管/财务）
-
-### 2. AI经营智能体
+### 1. AI 经营智能体
+- **AI 经营团队**：内置 7 个专业 Agent（库存管理、销售预测、数据分析、采购管理、财务管理、客户服务、AI 智能找图）
+- **CEO Agent 主控官系统 (PRD v6.2/v6.3)**：
+  - 项目上下文协议 (PCP)：愿景/目标/约束/里程碑/决策管理
+  - 任务分派与跟踪：自动分配任务给子 Agent，实时追踪状态
+  - 决策确认机制：审批/驳回/编辑决策日志，个性化偏好学习
+  - 快捷命令：/task list、/context show、/report
 - 自然语言查询："帮我看看上周哪些商品卖得最好"
-- 智能数据分析：销量预测、库存预警、利润分析
-- Dify工作流引擎集成
-- Token用量监控和成本控制
+- 财务 Agent：账户管理、预算控制、发票管理、交易记录、报表生成
+- Dify 工作流引擎集成 / LangChain 多提供商支持
+- Token 用量监控和成本控制
 
-### 3. 进销存管理
-- 产品库管理（CRUD、品牌分类）
-- 实时库存跟踪
-- 智能补货建议
-- 多维度报表分析
+### 2. 进销存管理
+- **产品库管理**：简单模式 + SPU-SKU 电商模式，分类与品牌管理
+- **供应商管理**：供应商 CRUD、自动编码生成
+- **采购订单管理**：采购单创建/审核/收货全流程
+- **销售订单管理**：销售单创建/出库，客户管理
+- **实时库存跟踪**：库存变动记录，安全库存预警
+- **智能补货建议**：基于销售数据和库存水平的自动补货推荐
+- **多维度报表分析**：销售趋势、利润分析、库存周转
 
-### 4. 技能商店生态
+### 3. 用户与权限系统
+- 注册/登录/权限控制（支持演示模式）
+- 多租户支持
+- 角色权限管理（店主/仓管/财务/采购/销售/客服）
+- **员工邀请与角色分配 (PRD v4.3)**
+- **外部伙伴邀请与自动关联 (PRD v4.2)**
+
+### 4. 安装向导 (CEO Agent 对话式配置)
+- CEO Agent 对话引导安装流程
+- 安装路径选择（含磁盘空间检测）
+- 公司名称注册
+- AI 模型配置（ProCloud / 本地模型）
+- 安装完成自动进入工作区
+
+### 5. 设备配对与通信
+- **桌面-移动端设备配对**：二维码扫码配对
+- **语音/视频通话**：基于 WebRTC 的实时通话
+- **消息系统**：联系人管理、实时消息、通话记录
+
+### 6. 云托管商城 (CloudStore)
+- AI 生成的独立电商站点（Next.js 16）
+- 商城主题自定义（颜色/布局/字体/Logo/Banner）
+- 商品同步管理（从本地产品库同步）
+- 订单管理、优惠券管理、商品评价管理
+- 多套餐订阅（免费/基础/专业）
+- 独立子域名 + 自定义域名
+
+### 7. Agent 生态（虚拟公司版）
+- **Agent 管理**：创建/编辑/删除/导入/导出 Agent
+- **Agent 市场**：浏览/安装/发布 Agent 到市场
+- **Agent 沙箱**：安全隔离运行环境
+- **Agent 安全**：权限控制和安全策略
+- **Agent 包**：ZIP 打包分发机制
+
+### 8. 技能商店生态
 - 可扩展的插件系统
 - 财务管理、会员管理、电商对接等技能
 - 开发者可创建自定义技能
 - 收益分成机制
 
-### 5. 外部资源桥接
-- RESTful API集成
-- Webhook支持
-- 第三方服务连接（支付、物流、ERP等）
-- 自定义连接器开发
-
-## �� 快速开始
+## 🚀 快速开始
 
 ### 前置要求
 
-- Node.js 18+ 
-- Rust 1.75+
+- Node.js 18+
+- Rust 1.77+（Tauri 2.x 要求）
 - Git
+- Windows：WebView2（Win10+ 已内置）
 
-### 安装
+### 桌面端安装
 
 ```bash
 # 克隆仓库
@@ -98,14 +132,45 @@ VITE_DEMO_MODE=true
 ### 开发模式
 
 ```bash
+# 桌面端开发（默认进销存版）
 npm run tauri dev
+
+# 虚拟公司版构建
+$env:VITE_BUILD_MODE='virtual_company'; npm run tauri dev
 ```
+
+桌面端内置 HTTP API 服务（端口 8888），为移动端 App 提供后端接口。
 
 ### 构建生产版本
 
 ```bash
+# 进销存版
 npm run tauri build
+
+# 虚拟公司版
+$env:VITE_BUILD_MODE='virtual_company'; npm run tauri build
 ```
+
+### 子项目开发
+
+```bash
+# 移动端 App（Expo）
+cd mobile
+npm install
+npx expo start
+
+# 云托管商城（Next.js）
+cd cloud-store
+npm install
+npm run dev
+
+# 营销站点
+cd marketing-site
+npm install
+npm run dev
+```
+
+安装包位置：`src-tauri/target/release/bundle/nsis/`
 
 ## 🚀 部署模式
 
@@ -158,75 +223,126 @@ npm run tauri build
 
 | 层级 | 技术 |
 |------|------|
-| **桌面框架** | Tauri 2.0 (Rust) |
-| **前端** | React 18 + TypeScript + Vite |
-| **UI** | MUI 5 + Tailwind CSS |
+| **桌面框架** | Tauri 2.11 (Rust) |
+| **前端** | React 18 + TypeScript + Vite 5 |
+| **UI** | MUI 5 + Tailwind CSS 3 |
 | **状态管理** | Zustand + TanStack Query |
-| **数据库** | SQLite (本地) + Supabase (云端) |
-| **AI** | Dify + Pinecone Vector DB |
-| **图表** | Recharts |
+| **数据库** | SQLite + SQLCipher (本地) + Supabase (云端) |
+| **HTTP 服务** | Axum 0.7 + WebSocket |
+| **AI 框架** | LangChain + Dify + Ollama |
+| **加密** | AES-256-GCM + Argon2 + HMAC-SHA256 |
+| **图表** | Recharts + simple-statistics |
+| **移动端** | Expo + React Native (iOS/Android/Web) |
+| **云商城** | Next.js 16 + Tailwind CSS 4 |
+| **测试** | Vitest + Playwright + Rust #[test] |
 
 ## 🏗️ 架构设计
 
 ```
-
-   经营智能体 (Operating Agent)       
-
-   内置模块                           
-   - 产品库                          
-   - 进销存 AI                       
-   - 技能商店                        
-
-   Tauri Core (Rust)                 
-   - SQLite + SQLCipher              
-   - 文件系统访问                     
-   - 系统托盘/通知                    
-
-         ↕ WebSocket / HTTPS
-
-   Supabase Backend                  
-   - PostgreSQL + Realtime           
-   - Auth + RLS                      
-   - Edge Functions (Dify)           
-
+┌─────────────────────────────────────────────────────────┐
+│                  ProClaw 全栈生态                         │
+├─────────────────────────────────────────────────────────┤
+│  Desktop App (Tauri 2.11)                               │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  React 18 + TypeScript + MUI + Tailwind          │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌────────────────┐   │   │
+│  │  │ AI经营团队│ │ CEO Agent │ │ 进销存管理      │   │   │
+│  │  │ 7 Agents  │ │ 主控官   │ │ 产品/采购/销售  │   │   │
+│  │  └──────────┘ └──────────┘ └────────────────┘   │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌────────────────┐   │   │
+│  │  │ 设备配对  │ │ 通话/消息 │ │ 安装向导        │   │   │
+│  │  └──────────┘ └──────────┘ └────────────────┘   │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│  Tauri Core (Rust)                                      │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  SQLite + SQLCipher │ 文件系统 │ 系统托盘/通知   │   │
+│  │  Axum HTTP Server  │ WebSocket │ API 路由       │   │
+│  │  Agent 沙箱/安全    │ 同步引擎 │ 云端备份        │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│         ↕ WebSocket / HTTPS                             │
+│                                                         │
+│  Supabase Backend (可选)                                │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  PostgreSQL + Realtime │ Auth + RLS             │   │
+│  │  Edge Functions         │ 云端备份               │   │
+│  └─────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────┤
+│  Mobile App (Expo)       │  CloudStore (Next.js 16)     │
+│  iOS/Android/Web         │  AI 生成电商独立站           │
+├─────────────────────────────────────────────────────────┤
+│  Marketing Site (Vite + React)                          │
+│  营销落地页 / 用户引导 / 管理后台                       │
+└─────────────────────────────────────────────────────────┘
 ```
+
+## 📊 项目规模
+
+| 维度 | 数据 |
+|------|------|
+| **前端页面** | 35+ 个路由页面 |
+| **前端组件** | 60+ 个 UI 组件 |
+| **前端服务模块** | 56 个 lib 模块 |
+| **Rust 后端** | 30+ 个命令模块，22 个 API 端点 |
+| **单元测试** | 15 个测试模块，~200+ 测试用例 |
+| **E2E 测试** | 9 个 spec 文件 |
+| **Rust 测试** | ~40 个测试用例 |
+| **安装包大小** | ~6.8 MB (Windows x64) |
 
 ## 📖 文档
 
 ### 用户指南
 - [安装指南](docs/guides/INSTALLATION_GUIDE.md)
 - [快速开始](docs/guides/QUICKSTART.md)
+- [部署指南](docs/guides/DEPLOYMENT_USER_GUIDE.md)
+- [Pro 版开通指南](docs/guides/PRO_SETUP_GUIDE.md)
 - [Supabase 设置](docs/guides/SUPABASE_SETUP.md)
 - [测试指南](docs/guides/TESTING_GUIDE.md)
-- [测试快速开始](docs/guides/TESTING_QUICKSTART.md)
+- [新数据库配置指南](docs/guides/NEW_DATABASE_SETUP.md)
+- [数据库快速开始](docs/guides/DATABASE_QUICKSTART.md)
+- [认证设置指南](docs/guides/AUTH_SETUP.md)
 
 ### 技术文档
 - [技术方案](docs/TECHNICAL_OVERVIEW.md)
+- [API 文档](docs/API_DOCUMENTATION.md)
+- [数据库 Schema](docs/DATABASE_SCHEMA.md)
 - [已知问题](docs/KNOWN_ISSUES.md)
-
-### 项目报告
-- [环境检查报告](docs/reports/ENVIRONMENT_CHECK_REPORT.md)
-- [初始化完成报告](docs/reports/INITIALIZATION_COMPLETE.md)
-- [阶段0完成报告](docs/reports/PHASE0_COMPLETE.md)
-- [最终实现报告](docs/reports/FINAL_IMPLEMENTATION_REPORT.md)
-- [产品增强完成报告](docs/reports/PRODUCT_ENHANCEMENT_COMPLETE.md)
-- [库存模块报告](docs/reports/INVENTORY_MODULE_REPORT.md)
-- [测试完成报告](docs/reports/TEST_COMPLETION_REPORT.md)
+- [PRD v4.0 产品需求](docs/ProClaw_PRD_v4.0.md)
+- [PRD v5.0 云商城](docs/需求文档：ProClaw 云托管商城（AI 生成独立站）PRD v5.0.md)
+- [PRD v6.0 虚拟公司版](docs/需求文档：ProClaw 虚拟公司版（Agent 化架构）PRD v6.0.md)
+- [PRD v6.1 安装向导](docs/需求文档：ProClaw 安装向导（CEO Agent 对话式配置）PRD v6.1.md)
+- [PRD v6.2 CEO Agent 主控官](docs/需求文档：CEO Agent 作为主控官 - 项目上下文协议与任务分派（PRD v6.2）.md)
+- [PRD v6.3 决策确认机制](docs/需求文档：CEO Agent 决策确认机制与个性化学习（PRD v6.3）.md)
+- [PRD v4.2 外部伙伴邀请](docs/需求文档：ProClaw 外部伙伴邀请与自动关联机制（PRD v4.2）.md)
+- [PRD v4.3 员工邀请与角色分配](docs/需求文档：ProClaw 员工邀请与角色权限自动分配（PRD v4.3）.md)
 
 ### 发布文档
 - [Beta 发布就绪](docs/releases/BETA_RELEASE_READY.md)
-- [GitHub 发布说明](docs/releases/GITHUB_RELEASE_NOTES.md)
+- [v0.1.0 发布说明](RELEASE_NOTES_v0.1.0.md)
 - [发布检查清单](docs/releases/RELEASE_CHECKLIST.md)
-- [发布说明](docs/releases/RELEASE_NOTES.md)
+- [GitHub 发布说明](docs/releases/GITHUB_RELEASE_NOTES.md)
 - [测试交付检查清单](docs/releases/TEST_DELIVERY_CHECKLIST.md)
 
+### 功能文档
+- [AI 聊天窗口增强](docs/AI_CHAT_WINDOW_ENHANCEMENTS.md)
+- [AI 决策系统](docs/AI_DECISION_SYSTEM.md)
+- [AI 引导系统优化](docs/AI_GUIDE_SYSTEM_OPTIMIZATION.md)
+- [FAQ 自动采集系统](docs/FAQ_AUTO_COLLECTION_SYSTEM.md)
+- [电商产品库](docs/ECOMMERCE_PRODUCT_LIBRARY_README.md)
+- [仪表盘改进](docs/DASHBOARD_IMPROVEMENTS.md)
+- [多图片上传](docs/MULTI_IMAGE_UPLOAD_FEATURE.md)
+- [自动编码生成](docs/AUTO_GENERATE_CODE_IMPLEMENTATION.md)
+- [采购销售订单自动编码](docs/PURCHASE_SALES_ORDER_AUTO_CODE_FEATURE.md)
+- [供应商客户自动编码](docs/SUPPLIER_CUSTOMER_AUTO_CODE_FEATURE.md)
+
 ### 营销网站
-- [营销网站文档](marketing-site/README_MARKETING.md) - Next.js 营销落地页
-- [营销系统完成报告](docs/reports/MARKETING_IMPLEMENTATION_COMPLETE.md)
-- [营销系统就绪报告](docs/reports/MARKETING_SYSTEM_READY.md)
+- [营销网站](marketing-site/README.md) - Vite + React 营销落地页
+- [管理后台](marketing-site/src/pages/admin/) - 10+ 管理页面
 
 ### 贡献
 - [贡献指南](CONTRIBUTING.md)
+- [Agent 开发指南](docs/guides/AGENT_DEVELOPMENT.md)
 
 ## 🤝 贡献
 
@@ -249,6 +365,11 @@ npm run tauri build
 - [Tauri](https://tauri.app/) - 轻量级桌面应用框架
 - [Supabase](https://supabase.com/) - 开源 Firebase 替代品
 - [Dify](https://dify.ai/) - LLM 应用开发平台
+- [LangChain](https://langchain.com/) - LLM 应用开发框架
+- [Expo](https://expo.dev/) - React Native 跨平台开发框架
+- [Next.js](https://nextjs.org/) - React 全栈框架
+- [Axum](https://github.com/tokio-rs/axum) - Rust Web 框架
+- [React Native WebRTC](https://github.com/react-native-webrtc) - WebRTC 移动端实现
 
 ---
 

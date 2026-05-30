@@ -1,0 +1,12 @@
+{
+  "id": "ma_site_analytics",
+  "name": "数据分析专家",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["data_analysis", "traffic_analytics", "anomaly_detection"],
+  "icon": "icon.svg",
+  "description": "整合网站分析数据，生成日报/周报，发现异常趋势并预警",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_site_analytics"
+}

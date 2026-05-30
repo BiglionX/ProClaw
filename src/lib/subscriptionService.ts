@@ -124,6 +124,61 @@ export async function recordToken(userId: string, actionType: string, resourcePa
   });
 }
 
+// ========== Token 新定价系统 (PRD v8.0) ==========
+
+export interface TokenPricingRule {
+  resource_type: string;
+  action_name: string;
+  description: string | null;
+  pt_cost: number;
+  unit: string;
+  sort_order: number;
+}
+
+export interface TokenBalanceInfo {
+  user_id: string;
+  balance: number;
+  today_used: number;
+  daily_avg_30d: number;
+  estimated_days: number;
+  total_purchased: number;
+  total_used: number;
+}
+
+export interface EstimateCostResult {
+  cost: number;
+  resource_type: string;
+  quantity: number;
+}
+
+/**
+ * 获取 Token 定价规则
+ */
+export async function getTokenPricing(): Promise<TokenPricingRule[]> {
+  const result = await invoke<{ data: TokenPricingRule[] }>('get_token_pricing_cmd');
+  return result.data;
+}
+
+/**
+ * 获取 Token 余额摘要
+ */
+export async function getTokenBalance(userId: string): Promise<TokenBalanceInfo> {
+  const result = await invoke<{ data: TokenBalanceInfo }>('get_token_balance_cmd', {
+    user_id: userId,
+  });
+  return result.data;
+}
+
+/**
+ * 估算 Token 消耗
+ */
+export async function estimateTokenCost(resourceType: string, quantity: number): Promise<EstimateCostResult> {
+  return invoke('estimate_token_cost_cmd', {
+    resource_type: resourceType,
+    quantity,
+  });
+}
+
 // ========== 账单 ==========
 
 export async function getInvoices(userId: string): Promise<Invoice[]> {

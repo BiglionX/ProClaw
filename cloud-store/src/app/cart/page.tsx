@@ -1,17 +1,19 @@
 // 购物车页面
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, startTransition } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getCart, removeFromCart, updateCartItemQuantity, getCartTotal, CartItem } from '@/lib/api';
 
 export default function CartPage() {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(getCart);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
-    setCart(getCart());
+    startTransition(() => {
+      setIsClient(true);
+    });
   }, []);
 
   const handleRemove = (productId: string) => {
@@ -65,12 +67,14 @@ export default function CartPage() {
               >
                 <div className="flex items-center space-x-4">
                   {/* 商品图片 */}
-                  <div className="relative w-24 h-24 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
+                  <div className="relative w-24 h-24 bg-gray-200 rounded-md overflow-hidden shrink-0">
                     {item.product.image ? (
-                      <img
+                      <Image
                         src={item.product.image}
                         alt={item.product.name}
                         className="w-full h-full object-cover"
+                        width={96}
+                        height={96}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

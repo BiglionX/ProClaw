@@ -1,0 +1,12 @@
+{
+  "id": "ma_conversion",
+  "name": "转化优化专家",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "show_notification"],
+  "capabilities": ["conversion_optimization", "ab_testing", "funnel_analysis"],
+  "icon": "icon.svg",
+  "description": "分析用户行为漏斗，建议 A/B 测试方案，优化转化率",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_conversion"
+}

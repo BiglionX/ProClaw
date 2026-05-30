@@ -143,3 +143,56 @@ export interface Session {
   token_type?: string;
   user: User;
 }
+
+// ============================================================
+// Token 计费系统类型 (PRD v8.0)
+// ============================================================
+
+/** Token 定价规则 */
+export interface TokenPricingRule {
+  id: string;
+  resource_type: string;
+  action_name: string;
+  description: string | null;
+  pt_cost: number;
+  unit: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Token 余额摘要 */
+export interface TokenBalanceSummary {
+  balance: number;
+  today_used: number;
+  daily_avg_30d: number;
+  estimated_days: number;
+}
+
+/** Token 消费明细结果 */
+export interface TokenConsumptionResult {
+  items: {
+    id: string;
+    resource_type: string;
+    tokens_used: number;
+    endpoint: string | null;
+    created_at: string;
+  }[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** 用户 Token 配置 */
+export interface UserTokenConfig {
+  user_id: string;
+  low_balance_threshold: number;
+  daily_limit: number;
+  auto_recharge_package_id: string | null;
+  auto_recharge_enabled: boolean;
+  notification_email: boolean;
+  notification_wechat: boolean;
+  created_at: string;
+  updated_at: string;
+}

@@ -1,0 +1,19 @@
+{
+  "id": "ma_social_cn",
+  "name": "国内社媒运营",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["social_media_ops", "content_scheduling", "engagement_tracking"],
+  "config": {
+    "region": "cn",
+    "platforms": ["wechat", "xiaohongshu", "zhihu", "weibo"],
+    "language": "zh-CN",
+    "postFrequency": 2,
+    "promptTemplate": "你是国内社媒运营专家，需要为微信公众号、小红书、知乎、微博生成内容。内容需符合国内平台规范，使用网络热词，注意合规审查。语言风格生动有趣，适合中国用户阅读习惯。"
+  },
+  "icon": "icon.svg",
+  "description": "国内市场社媒运营：微信公众号、小红书、知乎、微博，简体中文内容",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_social_cn"
+}

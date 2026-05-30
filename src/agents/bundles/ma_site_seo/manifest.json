@@ -1,0 +1,12 @@
+{
+  "id": "ma_site_seo",
+  "name": "SEO 优化专家",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["seo_analysis", "keyword_tracking", "site_audit"],
+  "icon": "icon.svg",
+  "description": "监控官网关键词排名，自动建议优化标题、元描述、内部链接，检测死链和加载速度问题",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_site_seo"
+}

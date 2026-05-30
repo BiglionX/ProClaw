@@ -33,6 +33,7 @@ pub mod message_commands;
 pub mod call_commands;
 pub mod invitation_commands;
 pub mod store_commands;
+pub mod ceo_commands;
 
 // 虚拟公司版模块
 #[cfg(feature = "virtual_company")]
@@ -48,6 +49,7 @@ pub mod market_commands;
 
 use database::{Database, get_database_path};
 use store_commands::*;
+use ceo_commands::*;
 use sync_engine::*;
 use sync_engine::SyncEngine;
 use services::cloud_backup_service::CloudBackupService;
@@ -297,6 +299,10 @@ async fn main() {
             get_token_usage_cmd,
             get_invoices_cmd,
             record_token_cmd,
+            // Token 定价系统 (PRD v8.0)
+            get_token_pricing_cmd,
+            get_token_balance_cmd,
+            estimate_token_cost_cmd,
             // 联系人与消息
             get_contacts,
             get_messages,
@@ -409,6 +415,26 @@ async fn main() {
             get_market_categories,
             #[cfg(feature = "virtual_company")]
             download_market_agent_package,
+
+            // CEO Agent 主控官 (PRD v6.2)
+            pcp_add_entry,
+            pcp_update_entry,
+            pcp_query_entries,
+            pcp_delete_entry,
+            ceo_create_task,
+            ceo_get_tasks,
+            ceo_update_task_status,
+            ceo_get_task_stats,
+
+            // CEO Agent 决策确认与个性化学习 (PRD v6.3)
+            ceo_add_decision_log,
+            ceo_query_decision_logs,
+            ceo_get_decision_stats,
+            ceo_update_decision_log,
+            ceo_get_learning_preferences,
+            ceo_update_preference,
+            ceo_export_company_config,
+            ceo_import_company_config,
 
             // 安装向导 (PRD v6.1)
             check_installation_status,

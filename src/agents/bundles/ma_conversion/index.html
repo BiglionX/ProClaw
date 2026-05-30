@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>转化优化专家</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #333; }
+.header { background: linear-gradient(135deg, #00695C 0%, #26A69A 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.stat-card { flex: 1; min-width: 100px; background: #fff; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-value { font-size: 24px; font-weight: 700; color: #00695C; }
+.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+.section { padding: 0 16px; margin-bottom: 16px; }
+.section-title { font-size: 15px; font-weight: 600; padding: 12px 0 8px; }
+.funnel-card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.funnel-step { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.funnel-step:last-child { margin-bottom: 0; }
+.funnel-bar { height: 32px; background: linear-gradient(90deg, #26A69A, #80CBC4); border-radius: 6px; display: flex; align-items: center; padding: 0 10px; color: #fff; font-size: 12px; font-weight: 600; transition: width 0.5s; white-space: nowrap; overflow: hidden; }
+.funnel-label { font-size: 13px; min-width: 80px; color: #555; }
+.funnel-pct { font-size: 12px; color: #999; min-width: 40px; text-align: right; }
+.suggestion-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 3px solid #26A69A; }
+.suggestion-card h4 { font-size: 14px; color: #00695C; margin-bottom: 4px; }
+.suggestion-card p { font-size: 13px; color: #666; line-height: 1.5; }
+.suggestion-card .impact { display: inline-block; background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 8px; font-size: 11px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>转化优化专家</h1>
+  <p>分析用户行为漏斗，建议 A/B 测试方案，提升转化率</p>
+</div>
+
+<div class="stats">
+  <div class="stat-card"><div class="stat-value">3.2%</div><div class="stat-label">整体转化率</div></div>
+  <div class="stat-card"><div class="stat-value">62%</div><div class="stat-label">漏斗流失率</div></div>
+  <div class="stat-card"><div class="stat-value">4.7%</div><div class="stat-label">预估提升空间</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">用户转化漏斗</div>
+  <div class="funnel-card">
+    <div class="funnel-step">
+      <div class="funnel-label">访问网站</div>
+      <div class="funnel-bar" style="width:100%">8,932</div>
+      <div class="funnel-pct">100%</div>
+    </div>
+    <div class="funnel-step">
+      <div class="funnel-label">浏览产品</div>
+      <div class="funnel-bar" style="width:65%">5,806</div>
+      <div class="funnel-pct">65%</div>
+    </div>
+    <div class="funnel-step">
+      <div class="funnel-label">注册/登录</div>
+      <div class="funnel-bar" style="width:28%">2,501</div>
+      <div class="funnel-pct">28%</div>
+    </div>
+    <div class="funnel-step">
+      <div class="funnel-label">创建项目</div>
+      <div class="funnel-bar" style="width:12%">1,072</div>
+      <div class="funnel-pct">12%</div>
+    </div>
+    <div class="funnel-step">
+      <div class="funnel-label">付费转化</div>
+      <div class="funnel-bar" style="width:3.2%">286</div>
+      <div class="funnel-pct">3.2%</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">优化建议</div>
+  <div class="suggestion-card">
+    <h4>A/B 测试: CTA 按钮颜色和位置</h4>
+    <p>将注册按钮从页面底部移至首屏位置，并改为高对比度颜色，有望提升注册转化率 15-25%。建议设置 7 天 A/B 测试。</p>
+    <span class="impact">预估影响: +15% ~ +25%</span>
+  </div>
+  <div class="suggestion-card">
+    <h4>简化注册流程</h4>
+    <p>当前注册需要填写 6 个字段，建议减少到 3 个（邮箱、密码、公司名称），支持社交账号一键登录。有望减少 40% 的表单放弃率。</p>
+    <span class="impact">预估影响: +20% ~ +35%</span>
+  </div>
+  <div class="suggestion-card">
+    <h4>定价页添加对比表格</h4>
+    <p>建议在定价页添加功能对比表格和客户案例，帮助用户快速了解各套餐差异，降低决策成本。</p>
+    <span class="impact">预估影响: +10% ~ +18%</span>
+  </div>
+</div>
+
+<script>
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[ConversionAgent] Current user:', user);
+  } catch(e) {
+    console.log('[ConversionAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据分析专家</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; color: #333; }
+.header { background: linear-gradient(135deg, #7B1FA2 0%, #CE93D8 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.stat-card { flex: 1; min-width: 100px; background: #fff; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-value { font-size: 24px; font-weight: 700; color: #7B1FA2; }
+.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+.stat-trend-up { color: #43A047; font-size: 11px; }
+.stat-trend-down { color: #e53935; font-size: 11px; }
+.section { padding: 0 16px; margin-bottom: 16px; }
+.section-title { font-size: 15px; font-weight: 600; padding: 12px 0 8px; display: flex; justify-content: space-between; }
+.report-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.report-card h4 { font-size: 14px; margin-bottom: 4px; }
+.report-card .report-meta { font-size: 11px; color: #999; margin-bottom: 6px; }
+.report-card p { font-size: 13px; color: #666; line-height: 1.5; }
+.alert-item { display: flex; align-items: flex-start; gap: 10px; background: #FFF3E0; border-radius: 10px; padding: 12px; margin-bottom: 6px; border-left: 3px solid #FB8C00; }
+.alert-icon { font-size: 18px; }
+.alert-info { flex: 1; }
+.alert-title { font-size: 13px; font-weight: 600; color: #E65100; }
+.alert-desc { font-size: 12px; color: #BF360C; margin-top: 2px; }
+.btn-refresh { display: block; width: calc(100% - 32px); margin: 16px; padding: 12px; background: #7B1FA2; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+.chart-bar { display: flex; align-items: flex-end; gap: 4px; height: 80px; padding: 8px 0; }
+.bar { flex: 1; background: linear-gradient(to top, #7B1FA2, #CE93D8); border-radius: 3px 3px 0 0; min-height: 4px; transition: height 0.3s; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>数据分析专家</h1>
+  <p>网站流量分析、用户行为洞察、异常预警</p>
+</div>
+
+<div class="stats">
+  <div class="stat-card"><div class="stat-value" id="dailyVisitors">2,847</div><div class="stat-label">日访问量 <span class="stat-trend-up">+12%</span></div></div>
+  <div class="stat-card"><div class="stat-value" id="pageViews">8,932</div><div class="stat-label">页面浏览 <span class="stat-trend-up">+8%</span></div></div>
+  <div class="stat-card"><div class="stat-value" id="bounceRate">42.3%</div><div class="stat-label">跳出率 <span class="stat-trend-down">-3%</span></div></div>
+  <div class="stat-card"><div class="stat-value" id="avgDuration">3m 12s</div><div class="stat-label">平均停留</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">本周流量趋势</div>
+  <div class="report-card">
+    <div class="chart-bar" id="trafficChart">
+      <div class="bar" style="height:40px" title="周一"></div>
+      <div class="bar" style="height:65px" title="周二"></div>
+      <div class="bar" style="height:50px" title="周三"></div>
+      <div class="bar" style="height:75px" title="周四"></div>
+      <div class="bar" style="height:60px" title="周五"></div>
+      <div class="bar" style="height:45px" title="周六"></div>
+      <div class="bar" style="height:30px" title="周日"></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">异常预警</div>
+  <div id="alertList">
+    <div class="alert-item">
+      <div class="alert-icon">&#9888;</div>
+      <div class="alert-info">
+        <div class="alert-title">首页跳出率异常升高</div>
+        <div class="alert-desc">首页跳出率从 35% 升至 52%，建议检查页面加载速度和内容质量</div>
+      </div>
+    </div>
+    <div class="alert-item">
+      <div class="alert-icon">&#9888;</div>
+      <div class="alert-info">
+        <div class="alert-title">博客页流量下降</div>
+        <div class="alert-desc">技术博客分类流量下降 28%，可能与近期未更新内容有关</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">最近报告</div>
+  <div id="reportList">
+    <div class="report-card">
+      <h4>周报 - 第22周</h4>
+      <div class="report-meta">2026-05-25 生成 | 数据来源: GA4</div>
+      <p>本周总访问量 19,847 次，较上周增长 8.3%。主要流量来源：搜索引擎 42%、直接访问 28%、社交媒体 18%、外部链接 12%。建议加强 SEO 内容输出以持续提升搜索引擎流量占比。</p>
+    </div>
+    <div class="report-card">
+      <h4>日报 - 2026-05-28</h4>
+      <div class="report-meta">昨日数据 | 数据来源: GA4</div>
+      <p>昨日访问量 2,847 次，最受欢迎的页面：首页(892)、定价页(445)、博客列表(312)。用户主要来自美国(35%)、中国(28%)、东南亚(18%)。</p>
+    </div>
+  </div>
+</div>
+
+<button class="btn-refresh" onclick="refreshData()">刷新数据</button>
+
+<script>
+async function refreshData() {
+  const btn = document.querySelector('.btn-refresh');
+  btn.disabled = true;
+  btn.textContent = '刷新中...';
+  await new Promise(r => setTimeout(r, 1500));
+  btn.textContent = '数据已刷新';
+  setTimeout(() => { btn.disabled = false; btn.textContent = '刷新数据'; }, 2000);
+}
+
+(async function() {
+  try {
+    const user = await window.proclaw.getCurrentUser();
+    console.log('[AnalyticsAgent] Current user:', user);
+  } catch(e) {
+    console.log('[AnalyticsAgent] Running in standalone mode');
+  }
+})();
+</script>
+</body>
+</html>

@@ -5,14 +5,18 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { useAuthStore } from './lib/authStore';
 import { NotificationProvider } from './lib/notificationContext';
 
-// Pages (will be created in next steps)
+// Pages
 import HomePage from './pages/HomePage';
-import QuickStartPage from './pages/QuickStartPage';
+import FeaturesPage from './pages/FeaturesPage';
+import PricingPage from './pages/PricingPage';
+import DownloadPage from './pages/DownloadPage';
+import ChangelogPage from './pages/ChangelogPage';
 import UseCasesPage from './pages/UseCasesPage';
 import FAQPage from './pages/FAQPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import UserDashboard from './pages/UserDashboard';
+import UserCenterPage from './pages/UserCenterPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminPackagesPage from './pages/admin/AdminPackagesPage';
@@ -24,6 +28,7 @@ import AdminReportsPage from './pages/admin/AdminReportsPage';
 import AdminTasksPage from './pages/admin/AdminTasksPage';
 import AdminRateLimitingPage from './pages/admin/AdminRateLimitingPage';
 import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
+import AdminTokenMonitorPage from './pages/admin/AdminTokenMonitorPage';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: 'user' | 'admin' }> = ({ 
@@ -71,13 +76,24 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
-          <Route path="/quick-start" element={<QuickStartPage />} />
+          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/download" element={<DownloadPage />} />
+          <Route path="/changelog" element={<ChangelogPage />} />
           <Route path="/use-cases" element={<UseCasesPage />} />
           <Route path="/faq" element={<FAQPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* User Routes - 允许 user 和 admin 访问 */}
+          {/* User Routes - 用户中心 */}
+          <Route
+            path="/user"
+            element={
+              <ProtectedRoute>
+                <UserCenterPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={
@@ -90,7 +106,7 @@ function App() {
             path="/user/*"
             element={
               <ProtectedRoute>
-                <UserDashboard />
+                <UserCenterPage />
               </ProtectedRoute>
             }
           />
@@ -181,6 +197,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminAuditLogsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/tokens"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminTokenMonitorPage />
               </ProtectedRoute>
             }
           />

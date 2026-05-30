@@ -1,228 +1,202 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 interface FAQItem {
   question: string;
   answer: string;
-  tags?: string[];
-  is_featured?: boolean;
+  featured?: boolean;
 }
 
 interface FAQCategory {
-  category: {
-    name: string;
-    slug: string;
-    description?: string;
-  };
+  name: string;
   questions: FAQItem[];
 }
 
-interface FAQData {
-  generated_at: string;
-  total_categories: number;
-  total_questions: number;
-  faqs: FAQCategory[];
-}
+const faqData: FAQCategory[] = [
+  {
+    name: '入门指南',
+    questions: [
+      {
+        question: 'ProClaw 是什么？',
+        answer: 'ProClaw 是一个开源的 AI 驱动商户经营操作系统。它不仅仅是进销存软件，更集成了 AI 经营团队（7 个专业 Agent）、CEO 主控官、云托管商城、Agent 生态、移动端 App 等完整能力，帮助中小商户实现智能化经营。',
+        featured: true,
+      },
+      {
+        question: '进销存版和虚拟公司版怎么选？',
+        answer: '进销存版面向实体商户，提供完整的产品库管理、采购销售、库存跟踪功能。虚拟公司版面向创业团队、自由职业者、虚拟组织，剥离进销存模块，以 Agent 化架构为基础，内置财务管理 Agent，支持从 Agent 市场安装其他能力（任务管理、CRM、文档协作等）。如果两者都需要，可以分别安装使用。',
+      },
+      {
+        question: '支持哪些操作系统？',
+        answer: '基于 Tauri 2.0 构建，目前完美支持 Windows 10/11 (x64)、macOS (Intel & Apple Silicon) 以及主流 Linux 发行版。Windows 安装包已发布，macOS 和 Linux 即将推出。移动端 App (Expo) 支持 iOS 和 Android。',
+      },
+    ],
+  },
+  {
+    name: 'AI 与 Agent',
+    questions: [
+      {
+        question: 'CEO Agent 和普通 AI 聊天有什么区别？',
+        answer: 'CEO Agent 是 ProClaw 的核心创新。普通 AI 聊天只是一问一答，而 CEO Agent 作为"主控官"，具备项目上下文协议 (PCP) 能力。它会自动捕获你的宏观决策，维护公司愿景、目标、约束、里程碑等结构化知识。更重要的是，CEO Agent 可以主动分派任务给合适的子 Agent（如财务 Agent、营销 Agent），审查执行结果，并向你汇报进展。你可以使用 /task list、/context show、/report daily 等快捷命令进行管理。',
+        featured: true,
+      },
+      {
+        question: '支持哪些 AI 模型？如何配置 API Key？',
+        answer: 'ProClaw 不绑定任何模型提供商。支持 OpenAI (GPT 系列)、Anthropic (Claude)、DeepSeek、以及通过 Ollama 运行的本地模型。在桌面端"设置 > Token 管理"中添加 API Key 即可。内置 Token 用量监控和成本控制功能，帮你管理开销。',
+      },
+      {
+        question: '可以自己开发 Agent 吗？怎么发布？',
+        answer: '可以。ProClaw 提供完整的 Agent 开发 SDK，使用 TypeScript/JavaScript 即可编写。Agent 以 ZIP 包形式分发，包含 manifest.json 声明权限和能力，前端资源独立运行在沙箱 (WebWorker/iframe) 中。开发完成后上传到 Agent 市场 (nvwa.proclaw.cc) 供其他用户安装。详见贡献指南。',
+      },
+    ],
+  },
+  {
+    name: '数据与安全',
+    questions: [
+      {
+        question: '我的数据安全吗？会上传到云端吗？',
+        answer: '非常安全。ProClaw 采用"本地优先"架构，所有业务数据默认使用 SQLCipher AES-256 加密存储在你本地的 SQLite 数据库中。除非你主动开启 Supabase 云同步功能，否则数据永远不会离开你的设备。云同步也是加密传输，你可以随时关闭。',
+        featured: true,
+      },
+    ],
+  },
+  {
+    name: '定价与费用',
+    questions: [
+      {
+        question: '使用 ProClaw 需要付费吗？',
+        answer: 'ProClaw 桌面端应用（进销存版和虚拟公司版）均永久免费开源 (GPL-3.0)。如果你使用 AI 功能，需要自行配置 LLM API Key，费用由模型提供商按用量收取。云托管商城是可选增值服务，提供免费版（20 商品/10 单月）和付费套餐（29元起）。详见定价页。',
+        featured: true,
+      },
+      {
+        question: 'AI 调用费用需要我自己承担吗？',
+        answer: '是的。ProClaw 软件本身免费。AI 对话、分析等功能依赖的大模型 API 调用费用，由你选择的模型提供商（如 OpenAI、Anthropic、DeepSeek）按用量收取。你也可以使用 Ollama 等本地部署的模型，完全免费。ProClaw 内置了 Token 用量监控，方便你控制成本。',
+      },
+    ],
+  },
+  {
+    name: '云商城',
+    questions: [
+      {
+        question: '云商城和桌面端数据如何同步？',
+        answer: '桌面端作为数据源，通过 HTTPS API 将商品数据（名称、价格、图片、库存）加密推送到云端。支持初始全量同步和后续增量同步（仅变更字段）。商城生成的订单会自动回调桌面端，生成销售单并扣减本地库存。如果库存不足，订单会标记为"待确认"并通知你。',
+      },
+    ],
+  },
+  {
+    name: '移动端',
+    questions: [
+      {
+        question: '移动端 App 什么时候能用？',
+        answer: '移动端 App 基于 Expo (React Native) 开发，支持 iOS 和 Android。目前 Android APK 即将推出，iOS 版本在后续计划中。移动端可与桌面端通过 WebSocket 实时同步数据，支持扫码配对设备和 WebRTC 语音/视频通话。',
+      },
+    ],
+  },
+  {
+    name: '反馈与支持',
+    questions: [
+      {
+        question: '如何反馈 Bug 或提交建议？',
+        answer: '欢迎前往 GitHub Issues 提交反馈，我们非常重视社区的每一条建议。也可以在 GitHub 上 Star 项目，参与讨论和贡献代码。',
+      },
+    ],
+  },
+];
 
 const FAQPage: React.FC = () => {
-  const [faqData, setFaqData] = useState<FAQData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [openIndex, setOpenIndex] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadFAQs();
-  }, []);
-
-  const loadFAQs = async () => {
-    try {
-      // 尝试从主应用API加载
-      const response = await fetch('http://localhost:3000/api/faqs/export');
-      if (response.ok) {
-        const data = await response.json();
-        setFaqData(data);
-      } else {
-        // 如果API不可用，使用静态数据
-        loadStaticFAQs();
-      }
-    } catch (error) {
-      console.error('Failed to load FAQs from API, using static data:', error);
-      loadStaticFAQs();
-    } finally {
-      setLoading(false);
-    }
+  const toggleQuestion = (catIdx: number, qIdx: number) => {
+    const key = `${catIdx}-${qIdx}`;
+    setOpenIndex(openIndex === key ? null : key);
   };
 
-  const loadStaticFAQs = () => {
-    // 默认的静态FAQ数据
-    setFaqData({
-      generated_at: new Date().toISOString(),
-      total_categories: 3,
-      total_questions: 4,
-      faqs: [
-        {
-          category: {
-            name: '入门指南',
-            slug: 'getting-started',
-            description: '安装、配置和基本使用',
-          },
-          questions: [
-            {
-              question: 'ProClaw 是什么？',
-              answer: 'ProClaw 是一个开源的进销存管理系统，采用本地优先架构，支持AI智能决策。所有数据默认存储在本地，确保数据安全性和隐私保护。',
-              is_featured: true,
-            },
-          ],
-        },
-        {
-          category: {
-            name: '数据管理',
-            slug: 'data-management',
-            description: '产品、库存、销售数据管理',
-          },
-          questions: [
-            {
-              question: '我的数据安全吗？会上传到云端吗？',
-              answer: '非常安全。ProClaw 采用“本地优先”架构，所有业务数据默认加密存储在你本地的 SQLite 数据库中。除非你主动开启云同步功能，否则数据永远不会离开你的设备。',
-              is_featured: true,
-            },
-          ],
-        },
-        {
-          category: {
-            name: '账户与订阅',
-            slug: 'account-subscription',
-            description: '账户管理和Token订阅',
-          },
-          questions: [
-            {
-              question: '使用 ProClaw 需要付费吗？',
-              answer: 'ProClaw 桌面端应用本身是开源且免费的（GPL-3.0 协议）。但你如果使用 AI 智能体功能，需要自行配置 LLM API Key，这部分费用由模型提供商收取。',
-              is_featured: true,
-            },
-            {
-              question: '支持哪些操作系统？',
-              answer: '基于 Tauri 2.0 构建，目前完美支持 Windows 10/11、macOS (Intel & Apple Silicon) 以及主流 Linux 发行版。',
-            },
-          ],
-        },
-      ],
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
-  }
+  const totalQuestions = faqData.reduce((sum, cat) => sum + cat.questions.length, 0);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <Link to="/" className="flex items-center gap-2">
-              <img src="/proclaw-logo.png" alt="ProClaw Logo" className="h-8 w-auto" />
-              <span className="text-xl font-bold tracking-tight hover:text-gray-600">ProClaw</span>
-            </Link>
-            <div className="space-x-4">
-              <Link to="/" className="text-gray-600 hover:text-black">首页</Link>
-              <Link to="/quick-start" className="text-gray-600 hover:text-black">快速开始</Link>
-              <Link to="/use-cases" className="text-gray-600 hover:text-black">应用场景</Link>
-              <Link to="/faq" className="text-gray-600 hover:text-black">常见问题</Link>
-              <Link to="/login" className="text-gray-600 hover:text-black">登录</Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
-      <main className="max-w-4xl mx-auto px-4 py-16 flex-grow">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">常见问题 (FAQ)</h1>
-          <p className="text-gray-600">
-            {faqData && `共 ${faqData.total_questions} 个问题，更新于 ${new Date(faqData.generated_at).toLocaleDateString('zh-CN')}`}
-          </p>
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">常见问题</h1>
+          <p className="text-xl text-gray-500">共 {totalQuestions} 个问题，帮你快速了解 ProClaw</p>
         </div>
-        
-        {faqData?.faqs.map((categoryData, catIndex) => (
-          <section key={catIndex} className="mb-12">
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold mb-2">{categoryData.category.name}</h2>
-              {categoryData.category.description && (
-                <p className="text-gray-600">{categoryData.category.description}</p>
-              )}
-            </div>
-            
-            <div className="space-y-6">
-              {categoryData.questions.map((faq, qIndex) => (
-                <div
-                  key={qIndex}
-                  className={`bg-white p-6 rounded-lg shadow-sm border-l-4 ${
-                    faq.is_featured ? 'border-blue-500' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    {faq.is_featured && (
-                      <span className="text-blue-500 text-xl">⭐</span>
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold mb-3">{faq.question}</h3>
-                      <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                        {faq.answer}
-                      </p>
-                      {faq.tags && faq.tags.length > 0 && (
-                        <div className="mt-3 flex gap-2 flex-wrap">
-                          {faq.tags.map((tag, tagIndex) => (
-                            <span
-                              key={tagIndex}
-                              className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+      </div>
+
+      {/* FAQ Content */}
+      <div className="flex-grow py-12">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          {faqData.map((category, catIdx) => (
+            <section key={catIdx} className="mb-12">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-200">
+                {category.name}
+              </h2>
+              <div className="space-y-3">
+                {category.questions.map((faq, qIdx) => {
+                  const key = `${catIdx}-${qIdx}`;
+                  const isOpen = openIndex === key;
+                  return (
+                    <div
+                      key={qIdx}
+                      className={`bg-white rounded-xl border transition-all cursor-pointer ${
+                        isOpen ? 'border-black shadow-md' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => toggleQuestion(catIdx, qIdx)}
+                    >
+                      <div className="p-5 flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                          {faq.featured && (
+                            <svg className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                          )}
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 pr-8">{faq.question}</h3>
+                            {isOpen && (
+                              <p className="mt-3 text-gray-600 leading-relaxed whitespace-pre-line">{faq.answer}</p>
+                            )}
+                          </div>
                         </div>
-                      )}
+                        <svg
+                          className={`w-5 h-5 text-gray-400 shrink-0 mt-1 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                        </svg>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
-
-        {/* 反馈区域 */}
-        <div className="mt-12 bg-blue-50 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">没有找到您需要的答案？</h3>
-          <p className="text-gray-700 mb-4">
-            欢迎通过以下方式联系我们：
-          </p>
-          <ul className="list-disc list-inside text-gray-700 space-y-2">
-            <li>
-              前往{' '}
-              <a
-                href="https://github.com/BigLionX/ProClaw/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                GitHub Issues
-              </a>{' '}
-              提交问题
-            </li>
-            <li>发送邮件至 support@proclaw.cc</li>
-            <li>加入我们的社区讨论组</li>
-          </ul>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
-      </main>
+      </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 text-center mt-auto">
-        <p className="text-gray-400">&copy; 2026 ProClaw Team.</p>
-      </footer>
+      {/* Feedback */}
+      <div className="bg-gray-100 py-12">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">没有找到你需要的答案？</h3>
+          <p className="text-gray-600 mb-4">
+            前往{' '}
+            <a
+              href="https://github.com/BigLionX/ProClaw/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              GitHub Issues
+            </a>{' '}
+            提交问题，或发送邮件至 support@proclaw.cc
+          </p>
+        </div>
+      </div>
+
+      <Footer />
     </div>
   );
 };

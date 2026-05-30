@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国内社媒运营</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #333; }
+.header { background: linear-gradient(135deg, #D32F2F 0%, #EF5350 100%); color: #fff; padding: 20px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 10px; font-size: 11px; margin-top: 6px; margin-right: 4px; }
+.stats { display: flex; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.stat-card { flex: 1; min-width: 80px; background: #fff; border-radius: 10px; padding: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-value { font-size: 20px; font-weight: 700; color: #D32F2F; }
+.stat-label { font-size: 11px; color: #999; margin-top: 2px; }
+.section { padding: 0 16px; margin-bottom: 16px; }
+.section-title { font-size: 15px; font-weight: 600; padding: 12px 0 8px; }
+.post-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.post-card .card-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.post-card .platform-tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #FFEBEE; color: #C62828; }
+.post-card .content { font-size: 13px; color: #444; line-height: 1.5; }
+.post-card .time { font-size: 11px; color: #999; margin-top: 4px; }
+.schedule-row { display: flex; gap: 8px; padding: 12px 0; align-items: flex-start; flex-wrap: wrap; }
+.schedule-row select, .schedule-row input { padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 12px; }
+.schedule-row textarea { width: 100%; height: 80px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; font-size: 13px; resize: vertical; font-family: inherit; }
+.btn-primary { padding: 8px 18px; background: #D32F2F; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.compliance-note { font-size: 11px; color: #999; padding: 4px 0; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>国内社媒运营</h1>
+  <p>微信公众号 / 小红书 / 知乎 / 微博 - 合规内容管理</p>
+  <div><span class="badge">微信公众号</span><span class="badge">小红书</span><span class="badge">知乎</span><span class="badge">微博</span></div>
+</div>
+
+<div class="stats">
+  <div class="stat-card"><div class="stat-value">3,568</div><div class="stat-label">全平台粉丝</div></div>
+  <div class="stat-card"><div class="stat-value">2.8%</div><div class="stat-label">互动率</div></div>
+  <div class="stat-card"><div class="stat-value">2</div><div class="stat-label">日发布数</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">新建内容</div>
+  <div class="schedule-row">
+    <select id="platformSelect"><option>微信公众号</option><option>小红书</option><option>知乎</option><option>微博</option></select>
+    <input type="text" id="titleInput" placeholder="标题..." style="flex:1;padding:8px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;min-width:200px;">
+  </div>
+  <div class="schedule-row">
+    <textarea id="contentInput" placeholder="输入内容...请注意内容合规性审核"></textarea>
+  </div>
+  <div class="schedule-row">
+    <input type="datetime-local" id="scheduleTime">
+    <label class="compliance-note"><input type="checkbox" id="complianceCheck"> 已通过合规审查</label>
+    <button class="btn-primary" onclick="schedulePost()">添加排程</button>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">内容队列</div>
+  <div id="postList"></div>
+</div>
+
+<script>
+const posts = JSON.parse(localStorage.getItem('social_cn_posts') || '[]');
+
+function render() {
+  const list = document.getElementById('postList');
+  if (posts.length === 0) { list.innerHTML = '<div class="post-card"><div class="content" style="text-align:center;color:#999;">暂无内容</div></div>'; return; }
+  list.innerHTML = posts.slice().reverse().map(p => 
+    '<div class="post-card">' +
+      '<div class="card-row"><span class="platform-tag">' + p.platform + '</span><span style="font-size:11px;color:' + (p.compliant ? '#43A047' : '#999') + '">' + (p.compliant ? '已过审' : '待审核') + '</span></div>' +
+      '<div class="content">' + (p.title ? '【' + p.title + '】' : '') + p.content.substring(0, 80) + (p.content.length > 80 ? '...' : '') + '</div>' +
+      '<div class="time">' + (p.scheduledTime || '待定') + '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function schedulePost() {
+  const content = document.getElementById('contentInput').value.trim();
+  if (!content) return;
+  posts.push({
+    platform: document.getElementById('platformSelect').value,
+    title: document.getElementById('titleInput').value.trim(),
+    content,
+    scheduledTime: document.getElementById('scheduleTime').value || null,
+    compliant: document.getElementById('complianceCheck').checked,
+    createdAt: Date.now()
+  });
+  localStorage.setItem('social_cn_posts', JSON.stringify(posts));
+  document.getElementById('contentInput').value = '';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('complianceCheck').checked = false;
+  render();
+}
+render();
+
+(async function() {
+  try { const user = await window.proclaw.getCurrentUser(); console.log('[SocialCNAgent] User:', user); } catch(e) { console.log('[SocialCNAgent] Standalone mode'); }
+})();
+</script>
+</body>
+</html>

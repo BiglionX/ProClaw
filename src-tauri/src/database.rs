@@ -69,6 +69,14 @@ impl Database {
              );"
         ).ok();
 
+        // 运行迁移：CEO Agent 项目上下文协议表（PRD v6.2）
+        let ceo_migration = include_str!("../../src/db/migrations/011_pcp_tables.sql");
+        self.conn.execute_batch(ceo_migration).ok();
+
+        // 运行迁移：CEO Agent 决策确认与个性化学习表（PRD v6.3）
+        let decision_migration = include_str!("../../src/db/migrations/012_ceo_decision_logs.sql");
+        self.conn.execute_batch(decision_migration).ok();
+
         // 自动安装内置 Agent
         let builtin_count: i64 = self.conn
             .query_row(
@@ -83,16 +91,16 @@ impl Database {
                 .unwrap_or_default()
                 .as_secs() as i64;
 
-            // 预定义所有内置 Agent
+            // 预定义所有内置 Agent（含 capabilities 用于 CEO Agent 任务分派）
             let builtins = vec![
-                ("proclaw-finance-agent", "财务管理 Agent", vec!["read_user", "read_finance", "write_finance", "show_notification"], "内置财务管理 Agent - 记账、预算、报表、发票管理"),
-                ("proclaw-task-agent", "任务管理 Agent", vec!["read_user", "send_message", "show_notification"], "看板式任务管理，支持任务分配、进度跟踪、优先级排序"),
-                ("proclaw-crm-agent", "客户关系 Agent", vec!["read_user", "read_contacts", "send_message"], "管理客户联系人、沟通记录、商机跟踪，支持标签分类"),
-                ("proclaw-docs-agent", "文档协作 Agent", vec!["read_user", "read_files", "write_files"], "Markdown 编辑器，支持版本历史、文档分类归档"),
-                ("proclaw-hr-agent", "人事管理 Agent", vec!["read_user", "send_message", "show_notification"], "员工信息管理、考勤记录、请假审批、工资单生成"),
+                ("proclaw-finance-agent", "财务管理 Agent", vec!["read_user", "read_finance", "write_finance", "show_notification"], vec!["financial_report", "expense_analysis", "budget_management"], "内置财务管理 Agent - 记账、预算、报表、发票管理"),
+                ("proclaw-task-agent", "任务管理 Agent", vec!["read_user", "send_message", "show_notification"], vec!["task_management", "progress_tracking"], "看板式任务管理，支持任务分配、进度跟踪、优先级排序"),
+                ("proclaw-crm-agent", "客户关系 Agent", vec!["read_user", "read_contacts", "send_message"], vec!["contact_management", "communication_tracking"], "管理客户联系人、沟通记录、商机跟踪，支持标签分类"),
+                ("proclaw-docs-agent", "文档协作 Agent", vec!["read_user", "read_files", "write_files"], vec!["document_management", "file_collaboration"], "Markdown 编辑器，支持版本历史、文档分类归档"),
+                ("proclaw-hr-agent", "人事管理 Agent", vec!["read_user", "send_message", "show_notification"], vec!["hr_management", "attendance_tracking"], "员工信息管理、考勤记录、请假审批、工资单生成"),
             ];
 
-            for (id, name, permissions, description) in &builtins {
+            for (id, name, permissions, capabilities, description) in &builtins {
                 let manifest = serde_json::json!({
                     "id": id,
                     "name": name,
@@ -101,6 +109,7 @@ impl Database {
                     "description": description,
                     "author": "ProClaw 官方",
                     "permissions": permissions,
+                    "capabilities": capabilities,
                 }).to_string();
                 self.conn.execute(
                     "INSERT INTO agents (id, name, version, manifest, enabled, is_builtin, installed_at)

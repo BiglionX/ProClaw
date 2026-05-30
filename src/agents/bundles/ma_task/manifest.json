@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "entry": "index.html",
   "permissions": ["read_user", "send_message", "show_notification"],
+  "capabilities": ["task_management", "progress_tracking"],
   "icon": "icon.svg",
   "description": "看板式任务管理，支持任务分配、进度跟踪、优先级排序",
   "author": "ProClaw 官方",

@@ -46,6 +46,7 @@ fn get_agents_internal(db: &Mutex<Database>) -> Result<Vec<AgentInfo>, String> {
                     version: version.clone(),
                     entry: "index.html".to_string(),
                     permissions: vec![],
+                    capabilities: None,
                     icon: None,
                     description: None,
                     author: None,
@@ -145,6 +146,7 @@ pub struct AgentManifest {
     pub version: String,
     pub entry: String,                // 入口文件路径（如 index.html）
     pub permissions: Vec<String>,     // 所需权限列表
+    pub capabilities: Option<Vec<String>>, // Agent 能力列表（CEO Agent 任务分派用）
     pub icon: Option<String>,         // 图标路径或 base64
     pub description: Option<String>,
     pub author: Option<String>,

@@ -350,3 +350,98 @@ pub fn init_free_plan(db: &Database, user_id: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+// ========== Token 新定价系统 (PRD v8.0) ==========
+
+/// Token 定价规则（与 PostgreSQL token_pricing_rules 保持一致）
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TokenPricingRule {
+    pub resource_type: String,
+    pub action_name: String,
+    pub description: Option<String>,
+    pub pt_cost: i64,
+    pub unit: String,
+    pub sort_order: i64,
+}
+
+/// Token 余额摘要
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TokenBalanceInfo {
+    pub user_id: String,
+    pub balance: i64,
+    pub today_used: i64,
+    pub daily_avg_30d: i64,
+    pub estimated_days: i64,
+    pub total_purchased: i64,
+    pub total_used: i64,
+}
+
+/// 获取 Token 默认定价规则
+pub fn get_token_pricing() -> Vec<TokenPricingRule> {
+    vec![
+        TokenPricingRule { resource_type: "product_sync".into(), action_name: "商品同步".into(), description: Some("单个商品从桌面端同步到云端".into()), pt_cost: 50, unit: "per_item".into(), sort_order: 1 },
+        TokenPricingRule { resource_type: "ai_theme".into(), action_name: "AI主题生成".into(), description: Some("AI生成完整商城主题和样式".into()), pt_cost: 5000, unit: "per_request".into(), sort_order: 2 },
+        TokenPricingRule { resource_type: "ai_theme_tweak".into(), action_name: "AI主题微调".into(), description: Some("对已有主题的单项调整".into()), pt_cost: 1000, unit: "per_request".into(), sort_order: 3 },
+        TokenPricingRule { resource_type: "order_process".into(), action_name: "订单处理".into(), description: Some("每笔商城订单的创建和处理".into()), pt_cost: 10, unit: "per_item".into(), sort_order: 4 },
+        TokenPricingRule { resource_type: "api_write".into(), action_name: "API写操作".into(), description: Some("外部API写操作".into()), pt_cost: 5, unit: "per_request".into(), sort_order: 5 },
+        TokenPricingRule { resource_type: "api_read".into(), action_name: "API读操作".into(), description: Some("外部API查询操作".into()), pt_cost: 1, unit: "per_request".into(), sort_order: 6 },
+        TokenPricingRule { resource_type: "custom_domain".into(), action_name: "自定义域名".into(), description: Some("绑定自定义域名的月租".into()), pt_cost: 2000, unit: "per_month".into(), sort_order: 7 },
+        TokenPricingRule { resource_type: "ssl_cert".into(), action_name: "SSL证书".into(), description: Some("自动SSL证书管理".into()), pt_cost: 1000, unit: "per_month".into(), sort_order: 8 },
+        TokenPricingRule { resource_type: "cdn_storage".into(), action_name: "静态资源托管".into(), description: Some("商品图片等资源CDN托管".into()), pt_cost: 1, unit: "per_mb_month".into(), sort_order: 9 },
+        TokenPricingRule { resource_type: "realtime_sync".into(), action_name: "实时同步保活".into(), description: Some("桌面端实时同步通道".into()), pt_cost: 500, unit: "per_day".into(), sort_order: 10 },
+        TokenPricingRule { resource_type: "seo_report".into(), action_name: "SEO优化报告".into(), description: Some("AI生成SEO优化建议".into()), pt_cost: 3000, unit: "per_request".into(), sort_order: 11 },
+        TokenPricingRule { resource_type: "data_export".into(), action_name: "数据导出".into(), description: Some("导出商品/订单数据".into()), pt_cost: 100, unit: "per_request".into(), sort_order: 12 },
+        TokenPricingRule { resource_type: "product_hosting".into(), action_name: "商品数据托管".into(), description: Some("商品信息存储（按月底存量扣费）".into()), pt_cost: 2, unit: "per_item_month".into(), sort_order: 13 },
+        TokenPricingRule { resource_type: "image_storage".into(), action_name: "图片/CDN存储".into(), description: Some("商品图片存储和CDN分发".into()), pt_cost: 1, unit: "per_mb_month".into(), sort_order: 14 },
+        TokenPricingRule { resource_type: "order_retention".into(), action_name: "订单数据留存".into(), description: Some("订单历史数据归档存储".into()), pt_cost: 1, unit: "per_hundred_month".into(), sort_order: 15 },
+        TokenPricingRule { resource_type: "page_hosting".into(), action_name: "商城页面托管".into(), description: Some("商城基础页面托管".into()), pt_cost: 500, unit: "per_month".into(), sort_order: 16 },
+    ]
+}
+
+/// 估算 Token 消耗
+pub fn estimate_token_cost(resource_type: &str, quantity: i64) -> i64 {
+    let pricing = get_token_pricing();
+    pricing.iter()
+        .find(|r| r.resource_type == resource_type)
+        .map(|r| r.pt_cost * quantity)
+        .unwrap_or(0)
+}
+
+/// 获取 Token 余额摘要（桌面端本地）
+/// 注意：桌面端本地主要计费在云端进行，此处返回本地记录的摘要信息
+pub fn get_token_balance(db: &Database, user_id: &str) -> Result<TokenBalanceInfo, String> {
+    let conn = db.connection();
+
+    // 获取本地 token_usage_logs 中的当日消耗
+    let today_used: i64 = conn.query_row(
+        "SELECT COALESCE(SUM(tokens_consumed), 0) FROM token_usage_logs
+         WHERE user_id = ?1 AND DATE(created_at) = DATE('now')",
+        params![user_id],
+        |row| row.get(0),
+    ).unwrap_or(0);
+
+    // 近30天日均消耗
+    let monthly_avg: f64 = conn.query_row(
+        "SELECT COALESCE(AVG(daily_total), 0) FROM (
+            SELECT SUM(tokens_consumed) as daily_total
+            FROM token_usage_logs
+            WHERE user_id = ?1 AND created_at >= DATE('now', '-30 days')
+            GROUP BY DATE(created_at)
+        )",
+        params![user_id],
+        |row| row.get(0),
+    ).unwrap_or(0.0);
+
+    let daily_avg = monthly_avg.round() as i64;
+    let estimated_days = if daily_avg > 0 { 30 } else { 30 };
+
+    Ok(TokenBalanceInfo {
+        user_id: user_id.to_string(),
+        balance: 0,
+        today_used,
+        daily_avg_30d: daily_avg,
+        estimated_days,
+        total_purchased: 0,
+        total_used: today_used,
+    })
+}

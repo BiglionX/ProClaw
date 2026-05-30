@@ -1,0 +1,12 @@
+{
+  "id": "ma_social_bind",
+  "name": "社媒账号绑定",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["social_account_binding", "oauth_management"],
+  "icon": "icon.svg",
+  "description": "绑定社交账号（Twitter/X、Facebook、Instagram、TikTok、LinkedIn、微信公众号、小红书、知乎），加密存储 Token",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_social_bind"
+}

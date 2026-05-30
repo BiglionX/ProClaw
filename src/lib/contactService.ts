@@ -42,6 +42,13 @@ export interface AddContactInput {
 
 const MOCK_CONTACTS: Contact[] = [
   {
+    id: 'ceo-agent', name: 'CEO Agent', phone: '',
+    contact_type: 'team', is_active: true,
+    created_at: '2026-01-01', updated_at: '2026-05-29',
+    last_message: '您好，我是 CEO Agent，有什么可以帮您？', last_message_time: Date.now() - 600000,
+    last_is_read: false, last_from: 'ceo-agent', unread_count: 1,
+  },
+  {
     id: '1', name: '张三 (客户)', phone: '13800138001', email: 'zhangsan@email.com',
     contact_type: 'external', external_type: 'customer', is_active: true,
     created_at: '2026-01-15', updated_at: '2026-05-20',

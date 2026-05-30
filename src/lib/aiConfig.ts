@@ -13,7 +13,8 @@ export type TaskType =
   | 'inventory_optimization'
   | 'anomaly_detection'
   | 'purchase_suggestion'
-  | 'business_insight';
+  | 'business_insight'
+  | 'ceo_decision';
 
 export interface AIConfig {
   defaultProvider: string;

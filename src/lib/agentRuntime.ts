@@ -76,6 +76,30 @@ export interface AgentManifest {
   description?: string;
   author?: string;
   homepage?: string;
+  capabilities?: string[];
+}
+
+// ==================== CEO Agent 任务相关类型 ====================
+
+/** CEO Agent 分派的任务 */
+export interface CeoDispatchedTask {
+  taskId: string;
+  type: string;
+  priority: number;
+  description: string;
+  expected_output: string;
+  deadline: string;
+  context_snapshot: string;
+  assigned_to: string;
+}
+
+/** 子 Agent 完成任务后的结果 */
+export interface CeoTaskResult {
+  taskId: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+  output: string;
+  error?: string;
+  completedAt: number;
 }
 
 // ==================== API 桥接 ====================
@@ -392,6 +416,61 @@ class AgentRuntimeManager {
     } else if (action.triggerMethod) {
       // 通过 postMessage 调用 Agent 方法
       await this.request(agentId, action.triggerMethod, ...(action.triggerParams || []));
+    }
+  }
+
+  // ==================== CEO Agent 任务分派 API ====================
+
+  /**
+   * 向子 Agent 分派任务（通过 postMessage 发送 onTask 通知）
+   */
+  async dispatchTask(agentId: string, task: CeoDispatchedTask): Promise<boolean> {
+    const instance = this.instances.get(agentId);
+    if (!instance || instance.state !== 'running') {
+      console.warn(`[AgentRuntime] Cannot dispatch task to ${agentId}: agent not running`);
+      return false;
+    }
+
+    try {
+      // 通过 postMessage 向子 Agent 发送 onTask 事件
+      await this.request(agentId, 'onTask', task);
+      return true;
+    } catch (e) {
+      console.error(`[AgentRuntime] Failed to dispatch task to ${agentId}:`, e);
+      return false;
+    }
+  }
+
+  /**
+   * 子 Agent 完成任务后调用此方法返回结果给 CEO Agent
+   */
+  async completeTask(taskId: string, result: CeoTaskResult): Promise<void> {
+    // 记录任务完成
+    console.log(`[AgentRuntime] Task ${taskId} completed with status: ${result.status}`);
+
+    // 通过 Tauri 后端更新任务状态
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('ceo_update_task_status', {
+        taskId,
+        status: result.status,
+        result: JSON.stringify(result),
+      });
+    } catch (e) {
+      console.error('[AgentRuntime] Failed to update task status:', e);
+    }
+
+    // 通知 CEO Agent 任务已完成
+    const ceoInstance = this.instances.get('ceo-agent');
+    if (ceoInstance) {
+      this.postMessage('ceo-agent', {
+        type: 'proclaw_event',
+        payload: {
+          event: 'task_completed',
+          taskId,
+          result,
+        },
+      });
     }
   }
 

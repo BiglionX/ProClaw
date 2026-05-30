@@ -20,7 +20,8 @@ import { useNavigate } from 'react-router-dom';
 import { useCallback, useState } from 'react';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
-import UserCenterPage from './UserCenterPage';
+import PreferenceSettings from '../components/CEO/PreferenceSettings';
+import CompanyConfigManager from '../components/CEO/CompanyConfigManager';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -105,32 +106,27 @@ export default function SettingsPage() {
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab label="👤 用户中心" {...a11yProps(0)} />
-          <Tab label="🤖 AI 模型设置" {...a11yProps(1)} />
-          <Tab label="🗄️ 数据库设置" {...a11yProps(2)} />
-          <Tab label="🔍 指令分析" {...a11yProps(3)} />
-          <Tab label="ℹ️ 系统信息" {...a11yProps(4)} />
-          <Tab label="📧 邀请管理" {...a11yProps(5)} />
+          <Tab label="🤖 AI 模型设置" {...a11yProps(0)} />
+          <Tab label="🗄️ 数据库设置" {...a11yProps(1)} />
+          <Tab label="🔍 指令分析" {...a11yProps(2)} />
+          <Tab label="ℹ️ 系统信息" {...a11yProps(3)} />
+          <Tab label="📧 邀请管理" {...a11yProps(4)} />
+          <Tab label="🧠 CEO Agent" {...a11yProps(5)} />
         </Tabs>
       </Paper>
 
-      {/* Tab 0: 用户中心 */}
+      {/* Tab 0: AI 模型设置 */}
       <TabPanel value={tabValue} index={0}>
-        <UserCenterPage />
-      </TabPanel>
-
-      {/* Tab 1: AI 模型设置 */}
-      <TabPanel value={tabValue} index={1}>
         <AISettings />
       </TabPanel>
 
-      {/* Tab 2: 数据库设置 */}
-      <TabPanel value={tabValue} index={2}>
+      {/* Tab 1: 数据库设置 */}
+      <TabPanel value={tabValue} index={1}>
         <DatabaseSettings />
       </TabPanel>
 
-      {/* Tab 3: 指令分析 */}
-      <TabPanel value={tabValue} index={3}>
+      {/* Tab 2: 指令分析 */}
+      <TabPanel value={tabValue} index={2}>
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -202,8 +198,8 @@ export default function SettingsPage() {
         </Card>
       </TabPanel>
 
-      {/* Tab 4: 系统信息 */}
-      <TabPanel value={tabValue} index={4}>
+      {/* Tab 3: 系统信息 */}
+      <TabPanel value={tabValue} index={3}>
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -299,6 +295,14 @@ export default function SettingsPage() {
             </Dialog>
           </CardContent>
         </Card>
+      </TabPanel>
+
+      {/* Tab 5: CEO Agent 偏好设置 */}
+      <TabPanel value={tabValue} index={5}>
+        <PreferenceSettings />
+        <Box sx={{ mt: 3 }}>
+          <CompanyConfigManager />
+        </Box>
       </TabPanel>
     </Box>
   );

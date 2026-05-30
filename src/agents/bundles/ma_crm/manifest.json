@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "entry": "index.html",
   "permissions": ["read_user", "read_contacts", "send_message"],
+  "capabilities": ["contact_management", "communication_tracking"],
   "icon": "icon.svg",
   "description": "管理客户联系人、沟通记录、商机跟踪",
   "author": "ProClaw 官方",

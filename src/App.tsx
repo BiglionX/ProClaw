@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Box } from '@mui/material';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/Layout/AppLayout';
 import { useAuthStore } from './lib/authStore';
@@ -8,8 +9,10 @@ import DataCenterPage from './pages/DataCenterPage';
 import FAQManagementPage from './pages/FAQManagementPage';
 import SupplyChainPage from './pages/SupplyChainPage';
 import LoginPage from './pages/LoginPage';
+import LoginDialog from './components/Auth/LoginDialog';
 import ProductsPage from './pages/ProductsPage';
 import RegisterPage from './pages/RegisterPage';
+import UserCenterPage from './pages/UserCenterPage';
 import SettingsPage from './pages/SettingsPage';
 import SetupPage from './pages/SetupPage';
 import { SetupWizard } from './components/SetupWizard';
@@ -17,7 +20,6 @@ import TeamsPage from './pages/TeamsPage';
 import TestPage from './pages/TestPage';
 import UnrecognizedCommandsPage from './pages/UnrecognizedCommandsPage';
 import UserManagementPage from './pages/UserManagementPage';
-import DevicePairingPage from './pages/DevicePairingPage';
 import AISalesOrderPage from './pages/AISalesOrderPage';
 import ContactsPage from './pages/ContactsPage';
 import ChatPage from './pages/ChatPage';
@@ -25,16 +27,18 @@ import MessagesPage from './pages/MessagesPage';
 import CallPage from './pages/CallPage';
 import IncomingCallDialog from './components/Call/IncomingCallDialog';
 import CloudStorePage from './pages/CloudStorePage';
+import ProjectDashboardPage from './pages/ProjectDashboardPage';
 import AgentManagerPage from './pages/AgentManagerPage';
 import FinanceAgentPage from './pages/FinanceAgentPage';
 import { IS_VIRTUAL_COMPANY } from './config/appMode';
+import OperationsDashboard from './components/OperationsCenter/OperationsDashboard';
 
 // 添加启动日志
 console.log('App component rendering...');
 
 // 受保护的路由组件 - 使用 AppLayout 包装
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, checkAuth } = useAuthStore();
+  const { user, checkAuth, openLoginDialog } = useAuthStore();
 
   useEffect(() => {
     // 如果是模拟账号,跳过 checkAuth (因为 Supabase 中没有 session)
@@ -44,8 +48,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [checkAuth, user]);
 
+  useEffect(() => {
+    if (!user) {
+      // 延迟打开弹窗,避免在初始化过程中闪烁
+      const timer = setTimeout(() => openLoginDialog(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [user, openLoginDialog]);
+
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: '#1a1a1a' }} />
+    );
   }
 
   return <AppLayout>{children}</AppLayout>;
@@ -54,8 +68,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <HashRouter>
-      {/* 全局来电弹窗 */}
+      {/* 全局弹窗 */}
       <IncomingCallDialog />
+      <LoginDialog />
       <Routes>
         {/* 公开路由 */}
         {/* 安装向导 - 独立无边框窗口使用 */}
@@ -154,14 +169,6 @@ function App() {
           }
         />
         <Route
-          path="/device-pairing"
-          element={
-            <ProtectedRoute>
-              <DevicePairingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/ai-sales-order"
           element={
             <ProtectedRoute>
@@ -202,6 +209,15 @@ function App() {
           }
         />
 
+        <Route
+          path="/ucenter"
+          element={
+            <ProtectedRoute>
+              <UserCenterPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Agent 管理 (PRD v6.0) - 仅虚拟公司版 */}
         {IS_VIRTUAL_COMPANY && (
           <Route
@@ -209,6 +225,18 @@ function App() {
             element={
               <ProtectedRoute>
                 <AgentManagerPage />
+              </ProtectedRoute>
+            }
+          />
+        )}
+
+        {/* 项目概览 (CEO Agent 仪表板) - 仅虚拟公司版 */}
+        {IS_VIRTUAL_COMPANY && (
+          <Route
+            path="/project-overview"
+            element={
+              <ProtectedRoute>
+                <ProjectDashboardPage />
               </ProtectedRoute>
             }
           />
@@ -225,6 +253,16 @@ function App() {
             }
           />
         )}
+
+        {/* 运营中心路由 */}
+        <Route
+          path="/operations"
+          element={
+            <ProtectedRoute>
+              <OperationsDashboard />
+            </ProtectedRoute>
+          }
+        />
 
         {/* 云商城路由 */}
         <Route

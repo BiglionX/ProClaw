@@ -51,7 +51,7 @@ const RegisterPage: React.FC = () => {
       
       // 等待 profile 加载后跳转到用户中心
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/user');
       }, 100);
     } catch (err) {
       console.error('Registration error:', err);

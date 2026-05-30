@@ -1,0 +1,12 @@
+{
+  "id": "ma_content_gen",
+  "name": "内容生成专家",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "http_request", "show_notification"],
+  "capabilities": ["content_generation", "deepseek_integration", "blog_publishing"],
+  "icon": "icon.svg",
+  "description": "根据 SEO 关键词生成技术博客和产品更新文章，支持中英文，集成 DeepSeek 大模型，支持 Boss 确认发布",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_content_gen"
+}

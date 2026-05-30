@@ -35,6 +35,7 @@ interface AuthState {
   session: Session | null;
   isLoading: boolean;
   error: string | null;
+  loginDialogOpen: boolean;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -42,6 +43,8 @@ interface AuthState {
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   clearError: () => void;
+  openLoginDialog: () => void;
+  closeLoginDialog: () => void;
 }
 
 export const useAuthStore = create<AuthState>(set => ({
@@ -49,6 +52,7 @@ export const useAuthStore = create<AuthState>(set => ({
   session: null,
   isLoading: false,
   error: null,
+  loginDialogOpen: false,
 
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
@@ -155,4 +159,6 @@ export const useAuthStore = create<AuthState>(set => ({
   },
 
   clearError: () => set({ error: null }),
+  openLoginDialog: () => set({ loginDialogOpen: true }),
+  closeLoginDialog: () => set({ loginDialogOpen: false, error: null }),
 }));

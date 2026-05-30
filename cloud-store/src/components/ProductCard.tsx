@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Product } from '@/lib/api';
 
 interface ProductCardProps {
@@ -15,10 +16,12 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* 商品图片 */}
         <div className="relative h-48 bg-gray-200 flex items-center justify-center">
           {product.image ? (
-            <img
+            <Image
               src={product.image}
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              width={200}
+              height={200}
             />
           ) : (
             <span className="text-gray-400 text-6xl">📦</span>
