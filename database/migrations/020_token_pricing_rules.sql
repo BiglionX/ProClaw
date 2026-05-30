@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS user_token_config (
     auto_recharge_enabled BOOLEAN DEFAULT FALSE,
     notification_email BOOLEAN DEFAULT TRUE,
     notification_wechat BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME STAMP DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

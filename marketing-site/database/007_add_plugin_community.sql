@@ -11,7 +11,7 @@
 CREATE TABLE IF NOT EXISTS plugin_reviews (
     id TEXT PRIMARY KEY,
     plugin_id TEXT NOT NULL REFERENCES industry_plugins(id) ON DELETE CASCADE,
-    user_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
     title TEXT,
     content TEXT,
