@@ -4,7 +4,10 @@
  * - 项目上下文操作 (PCP)
  * - 任务分派与跟踪
  * - 子 Agent 发现
+ * - AI Team 群聊消息桥接
  */
+
+import { pushAITeamTaskEvent, pushAITeamSystemEvent, buildGroupId, AI_TEAM_GROUPS } from './contactService';
 
 // ==================== 类型定义 ====================
 
@@ -152,7 +155,7 @@ export const proclawContext = {
 
 export const proclawTasks = {
   /** 分派任务给子 Agent */
-  async dispatch(agentId: string, task: Task): Promise<CeoTaskRecord> {
+  async dispatch(agentId: string, task: Task, teamId?: string): Promise<CeoTaskRecord> {
     const taskInput: CeoTaskInput = {
       assigned_agent_id: agentId,
       type: task.type,
@@ -165,6 +168,23 @@ export const proclawTasks = {
         context_snapshot: task.context_snapshot,
       }),
     };
+    
+    // 🔗 桥接到 AI Team 群聊
+    try {
+      const groupId = teamId ? buildGroupId(teamId) : Object.keys(AI_TEAM_GROUPS)[0];
+      if (groupId) {
+        pushAITeamTaskEvent('ceo-agent', 'CEO Agent', {
+          taskId: task.taskId,
+          type: task.type,
+          priority: task.priority,
+          description: task.description,
+          expected_output: task.expected_output,
+          deadline: task.deadline,
+          assigned_to: agentId,
+        }, 'task_dispatch', groupId);
+      }
+    } catch { /* 非关键路径，静默失败 */ }
+    
     return invoke<CeoTaskRecord>('ceo_create_task', { task: taskInput });
   },
 
@@ -192,7 +212,34 @@ export const proclawTasks = {
     taskId: string,
     status: string,
     result?: string,
+    agentId?: string,
+    teamId?: string,
   ): Promise<void> {
+    // 🔗 桥接到 AI Team 群聊
+    try {
+      const groupId = teamId ? buildGroupId(teamId) : Object.keys(AI_TEAM_GROUPS)[0];
+      const agentName = agentId || '子 Agent';
+      const statusCn: Record<string, string> = {
+        pending: '待处理', in_progress: '进行中', completed: '已完成', failed: '失败', cancelled: '已取消',
+      };
+      if (groupId) {
+        pushAITeamTaskEvent(agentId || 'ceo-agent', agentName, {
+          taskId,
+          status,
+          description: `任务 ${taskId} 状态更新`,
+          output: result || '',
+        }, 'task_update', groupId);
+        if (status === 'completed' || status === 'failed') {
+          pushAITeamSystemEvent(
+            `${status === 'completed' ? '✅' : '❌'} ${agentName} ${statusCn[status] || status}了任务: ${taskId}${result ? `\n结果：${result.slice(0, 100)}${result.length > 100 ? '...' : ''}` : ''}`,
+            groupId,
+            agentId || 'ceo-agent',
+            agentName
+          );
+        }
+      }
+    } catch { /* 非关键路径，静默失败 */ }
+    
     return invoke<void>('ceo_update_task_status', {
       taskId,
       status,

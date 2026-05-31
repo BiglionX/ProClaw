@@ -3,6 +3,7 @@ import {
   Person as PersonIcon,
   PersonAdd as PersonAddIcon,
   Search as SearchIcon,
+  Groups as GroupIcon,
 } from '@mui/icons-material';
 import {
   Avatar,
@@ -62,6 +63,7 @@ export default function ContactsPage() {
   const getFilteredContacts = () => {
     if (filterType === 'all') return contacts;
     if (filterType === 'unread') return contacts.filter(c => (c.unread_count || 0) > 0);
+    if (filterType === 'group') return contacts.filter(c => c.contact_type === 'group');
     if (filterType === 'customer') return contacts.filter(c => c.external_type === 'customer');
     if (filterType === 'supplier') return contacts.filter(c => c.external_type === 'supplier');
     if (filterType === 'team') return contacts.filter(c => c.contact_type === 'team');
@@ -83,13 +85,15 @@ export default function ContactsPage() {
   };
 
   const getTypeLabel = (c: Contact) => {
+    if (c.contact_type === 'group') return '群聊';
     if (c.contact_type === 'team') return '团队成员';
     if (c.external_type === 'supplier') return '供应商';
     if (c.external_type === 'both') return '客户/供应商';
     return '客户';
   };
 
-  const getTypeColor = (c: Contact): 'primary' | 'success' | 'warning' | 'default' => {
+  const getTypeColor = (c: Contact): 'primary' | 'success' | 'warning' | 'default' | 'error' => {
+    if (c.contact_type === 'group') return 'error';
     if (c.contact_type === 'team') return 'success';
     if (c.external_type === 'supplier') return 'warning';
     return 'primary';
@@ -152,6 +156,7 @@ export default function ContactsPage() {
               未读
             </Badge>
           </ToggleButton>
+          <ToggleButton value="group">群聊</ToggleButton>
           <ToggleButton value="team">团队</ToggleButton>
           <ToggleButton value="customer">客户</ToggleButton>
           <ToggleButton value="supplier">供应商</ToggleButton>
@@ -193,12 +198,12 @@ export default function ContactsPage() {
                     >
                       <Avatar
                         sx={{
-                          bgcolor: contact.contact_type === 'team' ? '#4caf50' : '#1976d2',
+                          bgcolor: contact.contact_type === 'group' ? '#ff6d00' : contact.contact_type === 'team' ? '#4caf50' : '#1976d2',
                           width: 44,
                           height: 44,
                         }}
                       >
-                        {contact.name.charAt(0)}
+                        {contact.contact_type === 'group' ? <GroupIcon /> : contact.name.charAt(0)}
                       </Avatar>
                     </Badge>
                   </ListItemAvatar>

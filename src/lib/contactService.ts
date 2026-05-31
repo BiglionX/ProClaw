@@ -1,6 +1,182 @@
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from './tauri';
 
+// ==================== 常量 ====================
+
+/** AI Team 群聊 ID 前缀：ai-team-group-{teamId} */
+export const AI_TEAM_GROUP_ID_PREFIX = 'ai-team-group-';
+
+/** 向后兼容：首个群组 ID（deprecated） */
+export const AI_TEAM_GROUP_ID = 'ai-team-group-mock-builtin-team';
+
+/** 单个 Agent 成员信息 */
+export interface AITeamMember {
+  name: string;
+  avatar: string;
+  role: string;
+}
+
+/** AI Team 群组配置 */
+export interface AITeamGroupConfig {
+  id: string;
+  teamId: string;
+  name: string;
+  icon: string;
+  description: string;
+  color: string;
+  members: Record<string, AITeamMember>;
+}
+
+/** 群组 ID 构建器 */
+export function buildGroupId(teamId: string): string {
+  return `${AI_TEAM_GROUP_ID_PREFIX}${teamId}`;
+}
+
+/** 从群组 ID 提取团队 ID */
+export function parseTeamId(groupId: string): string {
+  return groupId.startsWith(AI_TEAM_GROUP_ID_PREFIX) ? groupId.slice(AI_TEAM_GROUP_ID_PREFIX.length) : groupId;
+}
+
+/** 判断是否为 AI Team 群聊 ID */
+export function isAITeamGroupId(id: string): boolean {
+  return id.startsWith(AI_TEAM_GROUP_ID_PREFIX);
+}
+
+/** 动态群组配置注册表（由 syncAITeamGroups 填充） */
+export const AI_TEAM_GROUPS: Record<string, AITeamGroupConfig> = {};
+
+/** 向后兼容：所有 AI Team 成员（摊平，由 syncAITeamGroups 填充） */
+export const AI_TEAM_MEMBERS: Record<string, AITeamMember> = {};
+
+/** 获取群组配置 */
+export function getAITeamGroupConfig(id: string): AITeamGroupConfig | undefined {
+  return AI_TEAM_GROUPS[id];
+}
+
+/** 默认群组颜色调色板 */
+const GROUP_COLORS = ['#ff6d00', '#ff3b30', '#2196f3', '#4caf50', '#9c27b0', '#00bcd4', '#ff9800', '#607d8b'];
+
+/** 默认 Agent 头像映射（基于 agent_id 关键词匹配） */
+function getDefaultAgentAvatar(agentId: string, role: string): string {
+  const keywords: [string[], string][] = [
+    [['ceo'], '🧠'],
+    [['finance', '财务', 'financial'], '💰'],
+    [['crm', '客户', 'customer', '客服'], '🤝'],
+    [['inventory', '库存', 'stock'], '📦'],
+    [['purchase', '采购', 'buy'], '🛒'],
+    [['sales', '销售', 'sell'], '💼'],
+    [['business', '业务', 'analyst'], '📈'],
+    [['social', '社媒', '运营'], '📢'],
+    [['content', '内容', '文案', '写作'], '✍️'],
+    [['conversion', '转化'], '📊'],
+    [['seo', '搜索'], '🔍'],
+    [['site', '网站', 'analytics'], '🌐'],
+    [['doc', '文档', 'document'], '📄'],
+    [['task', '任务'], '📋'],
+    [['hr', '人事', 'human'], '👥'],
+    [['image', '图片', '找图'], '🖼️'],
+  ];
+  const lower = (agentId + role).toLowerCase();
+  for (const [keys, emoji] of keywords) {
+    if (keys.some(k => lower.includes(k))) return emoji;
+  }
+  return '🤖';
+}
+
+/**
+ * 从实际 AI 团队列表同步群组配置
+ * 应在 TeamsPage 加载团队后调用
+ */
+export function syncAITeamGroups(teams: { id: string; name: string; description?: string; category?: string; members?: { agent_id: string; role: string; responsibilities?: string }[] }[]): void {
+  // 清空旧数据
+  for (const key of Object.keys(AI_TEAM_GROUPS)) delete AI_TEAM_GROUPS[key];
+  for (const key of Object.keys(AI_TEAM_MEMBERS)) delete AI_TEAM_MEMBERS[key];
+
+  // 清空旧的群组 mock contacts（保留非群组的联系人）
+  for (let i = MOCK_CONTACTS.length - 1; i >= 0; i--) {
+    if (MOCK_CONTACTS[i].contact_type === 'group') MOCK_CONTACTS.splice(i, 1);
+  }
+
+  teams.forEach((team, idx) => {
+    const groupId = buildGroupId(team.id);
+    const color = GROUP_COLORS[idx % GROUP_COLORS.length];
+
+    // 构建成员映射（CEO Agent 始终作为主控官加入）
+    const members: Record<string, AITeamMember> = {
+      'ceo-agent': { name: 'CEO Agent', avatar: '🧠', role: '主控官' },
+    };
+
+    if (team.members) {
+      team.members.forEach(m => {
+        members[m.agent_id] = {
+          name: m.role,
+          avatar: getDefaultAgentAvatar(m.agent_id, m.role),
+          role: m.responsibilities || m.role,
+        };
+      });
+    }
+
+    const nameEmoji = team.name.match(/[\p{Emoji}]/u);
+    const icon = nameEmoji ? nameEmoji[0] : '🤖';
+
+    AI_TEAM_GROUPS[groupId] = {
+      id: groupId,
+      teamId: team.id,
+      name: team.name,
+      icon,
+      description: team.description || team.category || `${team.name}的工作群`,
+      color,
+      members,
+    };
+
+    Object.assign(AI_TEAM_MEMBERS, members);
+
+    // 在 mock contacts 中创建群组联系人
+    const memberCount = Object.keys(members).length;
+    MOCK_CONTACTS.unshift({
+      id: groupId,
+      name: `${icon} ${team.name}`,
+      phone: '',
+      contact_type: 'group',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_message: `🎉 AI Team 工作群已创建 · ${memberCount}人 · CEO Agent 协调中`,
+      last_message_time: Date.now(),
+      last_is_read: false,
+      last_from: 'system',
+      last_from_name: '📢 系统',
+      unread_count: 1,
+    });
+
+    // 创建种子消息
+    if (!MOCK_MESSAGES[groupId]) {
+      MOCK_MESSAGES[groupId] = [
+        {
+          id: `ai-init-${team.id}`,
+          from_user: 'system',
+          from_user_name: '📢 系统',
+          to_user: groupId,
+          content: `🎉 「${team.name}」AI Team 工作群已创建。CEO Agent 将在此协调 ${memberCount - 1} 个 AI Agent 的工作，您（Boss 👑）可以随时视察和发号施令。`,
+          content_type: 'system_event',
+          is_read: false,
+          created_at: Date.now(),
+        },
+        {
+          id: `ai-init2-${team.id}`,
+          from_user: 'ceo-agent',
+          from_user_name: 'CEO Agent',
+          to_user: groupId,
+          content: `各位 Agent 注意，Boss 已加入「${team.name}」工作群。我是 CEO Agent（主控官），会根据 Boss 的战略目标进行任务分派。团队成员：${team.members?.map(m => m.role).join('、') || '待配置'}。`,
+          content_type: 'text',
+          is_read: false,
+          created_at: Date.now() + 1000,
+        },
+      ];
+    }
+  });
+}
+
 // ==================== 类型定义 ====================
 
 export interface Contact {
@@ -8,25 +184,26 @@ export interface Contact {
   name: string;
   phone?: string;
   email?: string;
-  contact_type: 'internal' | 'external' | 'team';
+  contact_type: 'internal' | 'external' | 'team' | 'group';
   external_type?: 'customer' | 'supplier' | 'both';
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  // 最近对话信息
   last_message?: string;
   last_message_time?: number;
   last_is_read?: boolean;
   last_from?: string;
+  last_from_name?: string;
   unread_count?: number;
 }
 
 export interface Message {
   id: string;
   from_user: string;
+  from_user_name?: string;
   to_user: string;
   content: string;
-  content_type: 'text' | 'image' | 'file' | 'order_card';
+  content_type: 'text' | 'image' | 'file' | 'order_card' | 'system_event' | 'task_dispatch' | 'task_update';
   is_read: boolean;
   created_at: number;
 }
@@ -41,8 +218,9 @@ export interface AddContactInput {
 // ==================== Mock 数据（浏览器模式） ====================
 
 const MOCK_CONTACTS: Contact[] = [
+  // group 类型的联系人由 syncAITeamGroups 动态插入
   {
-    id: 'ceo-agent', name: 'CEO Agent', phone: '',
+    id: 'ceo-agent', name: '🧠 CEO Agent', phone: '',
     contact_type: 'team', is_active: true,
     created_at: '2026-01-01', updated_at: '2026-05-29',
     last_message: '您好，我是 CEO Agent，有什么可以帮您？', last_message_time: Date.now() - 600000,
@@ -91,6 +269,7 @@ const MOCK_CONTACTS: Contact[] = [
 ];
 
 const MOCK_MESSAGES: Record<string, Message[]> = {
+  // 群聊消息由 syncAITeamGroups 动态创建种子消息
   '1': [
     { id: 'm1', from_user: '1', to_user: 'self', content: '老板你好，我要下单50箱矿泉水', content_type: 'text', is_read: true, created_at: Date.now() - 7200000 },
     { id: 'm2', from_user: 'self', to_user: '1', content: '好的，你的订单收到了，下午发货', content_type: 'text', is_read: true, created_at: Date.now() - 7100000 },
@@ -146,13 +325,74 @@ export async function getRecentContacts(currentUserId: string): Promise<Contact[
   return res?.data || [];
 }
 
-/** 获取两个用户之间的消息 */
+/** 获取消息 */
 export async function getMessages(fromUser: string, toUser: string, limit = 50): Promise<Message[]> {
   if (!isTauri()) {
-    return MOCK_MESSAGES[toUser] || MOCK_MESSAGES[fromUser] || [];
+    // 群聊：toUser 或 fromUser 任一匹配 ai-team-group- 前缀即返回该群聊消息
+    if (toUser.startsWith(AI_TEAM_GROUP_ID_PREFIX) || fromUser.startsWith(AI_TEAM_GROUP_ID_PREFIX)) {
+      const groupId = toUser.startsWith(AI_TEAM_GROUP_ID_PREFIX) ? toUser : fromUser;
+      return [...(MOCK_MESSAGES[groupId] || [])];
+    }
+    return [...(MOCK_MESSAGES[toUser] || MOCK_MESSAGES[fromUser] || [])];
   }
   const res: any = await invoke('get_messages', { from_user: fromUser, to_user: toUser, limit });
   return res?.data || [];
+}
+
+/** 向 AI Team 群聊发送系统事件消息 */
+export function pushAITeamSystemEvent(content: string, groupId: string, fromUser = 'system', fromUserName = '📢 系统'): void {
+  const newMsg: Message = {
+    id: `ai-sys-${Date.now()}`,
+    from_user: fromUser,
+    from_user_name: fromUserName,
+    to_user: groupId,
+    content,
+    content_type: 'system_event',
+    is_read: false,
+    created_at: Date.now(),
+  };
+  if (!MOCK_MESSAGES[groupId]) MOCK_MESSAGES[groupId] = [];
+  MOCK_MESSAGES[groupId].push(newMsg);
+  const aiTeam = MOCK_CONTACTS.find(c => c.id === groupId);
+  if (aiTeam) {
+    aiTeam.last_message = `📢 ${content}`;
+    aiTeam.last_message_time = Date.now();
+    aiTeam.last_from = fromUser;
+    aiTeam.last_from_name = fromUserName;
+    aiTeam.unread_count = (aiTeam.unread_count || 0) + 1;
+  }
+}
+
+/** 向 AI Team 群聊推送任务分派/更新事件 */
+export function pushAITeamTaskEvent(
+  fromUser: string,
+  fromUserName: string,
+  taskData: Record<string, unknown>,
+  eventType: 'task_dispatch' | 'task_update',
+  groupId: string,
+): void {
+  const newMsg: Message = {
+    id: `ai-task-${Date.now()}`,
+    from_user: fromUser,
+    from_user_name: fromUserName,
+    to_user: groupId,
+    content: JSON.stringify(taskData),
+    content_type: eventType,
+    is_read: false,
+    created_at: Date.now(),
+  };
+  if (!MOCK_MESSAGES[groupId]) MOCK_MESSAGES[groupId] = [];
+  MOCK_MESSAGES[groupId].push(newMsg);
+  const aiTeam = MOCK_CONTACTS.find(c => c.id === groupId);
+  if (aiTeam) {
+    const actionCn = eventType === 'task_dispatch' ? '任务分派' : '任务更新';
+    const desc = (taskData.description as string) || (taskData.taskId as string) || '未知任务';
+    aiTeam.last_message = `📋 [${actionCn}] ${fromUserName}: ${desc}`;
+    aiTeam.last_message_time = Date.now();
+    aiTeam.last_from = fromUser;
+    aiTeam.last_from_name = fromUserName;
+    aiTeam.unread_count = (aiTeam.unread_count || 0) + 1;
+  }
 }
 
 /** 发送消息 */
@@ -167,7 +407,6 @@ export async function sendMessage(fromUser: string, toUser: string, content: str
       is_read: false,
       created_at: Date.now(),
     };
-    // 追加到 mock 数据
     if (!MOCK_MESSAGES[toUser]) MOCK_MESSAGES[toUser] = [];
     MOCK_MESSAGES[toUser].push(newMsg);
     return newMsg;

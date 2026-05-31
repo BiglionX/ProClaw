@@ -13,7 +13,7 @@ export interface TestResult {
 export interface LLMProviderInfo {
   id: string;
   name: string;
-  type: 'openai' | 'deepseek' | 'anthropic' | 'ollama' | 'custom';
+  type: 'default' | 'openai' | 'deepseek' | 'anthropic' | 'ollama' | 'custom';
   model: string;
   isActive: boolean;
 }
@@ -34,6 +34,34 @@ export class LLMProviderManager {
     this.config = config;
     this.providers.clear();
     this.providerInfo.clear();
+
+    // 初始化 ProClaw 默认集成 LLM
+    if (config.providers.some(p => p.type === 'default' && p.isActive)) {
+      const defaultProvider = config.providers.find(p => p.type === 'default');
+      if (defaultProvider) {
+        try {
+          const chatModel = new ChatOpenAI({
+            modelName: defaultProvider.model || 'proclaw-gpt-4',
+            apiKey: defaultProvider.apiKey || 'proclaw-default',
+            temperature: config.temperatureByTask?.business_insight ?? config.temperature,
+            maxTokens: config.maxTokens,
+            configuration: {
+              baseURL: defaultProvider.endpoint || 'https://ai.proclaw.cc/api/v1',
+            },
+          });
+          this.providers.set('default-service', chatModel);
+          this.providerInfo.set('default-service', {
+            id: 'default-service',
+            name: 'ProClaw 集成 LLM',
+            type: 'default',
+            model: defaultProvider.model,
+            isActive: true,
+          });
+        } catch (error) {
+          console.error('Failed to initialize default LLM:', error);
+        }
+      }
+    }
 
     // 初始化 DeepSeek (使用 OpenAI 兼容 API)
     if (config.providers.some(p => p.type === 'deepseek' && p.isActive)) {
@@ -258,8 +286,17 @@ export function getLLMProviderManager(): LLMProviderManager {
 
 /**
  * 便捷函数：获取适合任务的LLM
+ * 自动初始化（若尚未初始化），无需外部调用 initialize()
  */
 export async function getLLMForTask(taskType: TaskType): Promise<BaseChatModel> {
   const manager = getLLMProviderManager();
+
+  // 自动初始化：如果还没有 providers，从存储的配置中初始化
+  if (!manager.hasAvailableProviders()) {
+    const { getAIConfig } = await import('./aiConfig');
+    const config = await getAIConfig();
+    await manager.initialize(config);
+  }
+
   return await manager.getProvider(taskType);
 }

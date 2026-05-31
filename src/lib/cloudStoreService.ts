@@ -274,13 +274,6 @@ export async function updateCloudStore(storeId: string, data: Partial<CloudStore
 }
 
 /**
- * 升级套餐
- */
-export async function upgradePlan(storeId: string, planType: PlanType): Promise<CloudStore> {
-  return callBackend<CloudStore>('upgrade_store_plan', { storeId, planType });
-}
-
-/**
  * 重置 API Key
  */
 export async function resetApiKey(storeId: string): Promise<{ api_key: string }> {
@@ -386,40 +379,43 @@ export async function getStoreStats(storeId: string, days?: number): Promise<Sto
   return callBackend<StoreStats>('get_store_stats', { storeId, days: days || 7 });
 }
 
-// ========== 套餐信息 ==========
+// ========== 套餐信息（功能级别标记，已切换为 Token 计费模式） ==========
+// 注：云商城已全面切换为 Token 按量计费（PRD v8.0），
+// plan_type 仅作为功能级别标记保留，不再作为计费依据。
+// 详细定价请查看 Token 计费页面。
 
 export const PLAN_INFO: Record<PlanType, PlanInfo> = {
   free: {
     type: 'free',
-    name: '免费版',
+    name: '免费体验',
     price: 0,
-    product_limit: 20,
-    order_limit: 10,
-    features: ['20 个商品', '10 单/月', 'ProClaw 子域名', '基础主题'],
+    product_limit: 0,
+    order_limit: 0,
+    features: ['Token 计费，按需付费', '免费注册赠送 50,000 PT', '前 20 个商品免费同步', '100 MB 免费图片存储', 'ProClaw 子域名永久免费'],
   },
   basic: {
     type: 'basic',
-    name: '基础版',
-    price: 29,
-    product_limit: 200,
-    order_limit: 100,
-    features: ['200 个商品', '100 单/月', '自定义域名', 'AI 主题生成', '基础数据分析'],
+    name: 'Token 计费',
+    price: 0,
+    product_limit: 0,
+    order_limit: 0,
+    features: ['按 Token 计费（1 PT = ¥0.001）', '无商品数量上限', '无订单数量上限', '自定义域名', 'AI 主题生成', '实时同步'],
   },
   professional: {
     type: 'professional',
-    name: '专业版',
-    price: 99,
-    product_limit: 2000,
-    order_limit: 2000,
-    features: ['2000 个商品', '2000 单/月', '自定义域名', 'AI 主题生成', '高级数据分析', '优先支持'],
+    name: 'Token 计费',
+    price: 0,
+    product_limit: 0,
+    order_limit: 0,
+    features: ['按 Token 计费（1 PT = ¥0.001）', '无限商品同步', '无限订单处理', '自定义域名 + SSL', 'AI 主题生成/微调', '高级数据分析', '优先支持'],
   },
   enterprise: {
     type: 'enterprise',
-    name: '企业版',
-    price: 299,
-    product_limit: -1, // 不限
-    order_limit: -1,
-    features: ['不限商品', '不限订单', '自定义域名', 'AI 主题生成', '高级数据分析', '专属支持', 'API 对接'],
+    name: 'Token 计费',
+    price: 0,
+    product_limit: 0,
+    order_limit: 0,
+    features: ['按 Token 计费（1 PT = ¥0.001）', '无限资源使用', '自定义域名 + SSL', 'AI 主题生成/微调', '高级数据分析', '专属支持', 'API 对接'],
   },
 };
 

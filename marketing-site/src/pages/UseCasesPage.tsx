@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import PageHeader from '../components/shared/PageHeader';
+import CTASection from '../components/shared/CTASection';
 import { getPublishedPlugins } from '../lib/pluginService';
 
 type IndustryFilter = 'all' | string;
@@ -108,17 +109,10 @@ const UseCasesPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
-            选对你的场景，看看 ProClaw 能帮什么忙
-          </h1>
-          <p className="text-xl text-gray-500 max-w-3xl mx-auto">
-            4 个行业场景，看看哪个说的是你
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="选对你的场景，看看 ProClaw 能帮什么忙"
+        description="4 个行业场景，看看哪个说的是你"
+      />
 
       {/* Industry Filter Tabs */}
       <div className="bg-white border-b border-gray-200">
@@ -184,21 +178,12 @@ const UseCasesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom CTA */}
-      <div className="bg-gray-900 py-16">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">一个软件，所有行业</h2>
-          <p className="text-gray-400 mb-8">
-            下载基础桌面端，安装时选择行业即可自动下载对应插件。免费使用，无需承诺。
-          </p>
-          <Link
-            to="/download"
-            className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all inline-block shadow-lg hover:shadow-xl"
-          >
-            免费下载桌面端
-          </Link>
-        </div>
-      </div>
+      <CTASection
+        title="一个软件，所有行业"
+        description="下载基础桌面端，安装时选择行业即可自动下载对应插件。免费使用，无需承诺。"
+        primaryButtonText="免费下载桌面端"
+        primaryButtonLink="/download"
+      />
 
       <Footer />
     </div>

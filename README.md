@@ -8,24 +8,27 @@
 [![Version](https://img.shields.io/badge/version-1.0.0--beta.2-green.svg)](https://github.com/BiglionX/ProClaw/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.11-blue.svg)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![Stars](https://img.shields.io/github/stars/BiglionX/ProClaw?style=social)](https://github.com/BiglionX/ProClaw)
 
 ## 🎯 项目定位
 
-ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应用架构（Tauri + React），为中小商户提供智能化的业务管理解决方案。支持双模式运行（进销存版 / 虚拟公司版），并配备移动端 App、云托管商城、AI 经营团队等完整生态。
+ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应用架构（Tauri + React），为中小商户提供智能化的业务管理解决方案。支持三模式运行（Light 进销存版 / 标准进销存版 / 虚拟公司版），并配备移动端 App、云托管商城、AI 经营团队、行业插件等完整生态。
 
 **核心特点**：
-- 🤖 **AI 经营团队** - 7+ 专业 Agent 协同工作，自然语言交互
-- 🏢 **双模式架构** - 进销存版 / 虚拟公司版（含 CEO Agent 主控官）
+- 🤖 **AI 经营团队** - 25+ 专业 Agent 协同工作，自然语言交互
+- 🏢 **三模式架构** - Light 进销存版 / 标准进销存版 / 虚拟公司版（含 CEO Agent 主控官）
+- 🏭 **行业插件** - 餐饮（POS/桌台/KDS）、美业（预约/服务/员工/营销）、宠物（档案/寄养/美容）
 - 💾 **本地优先** - 数据本地存储（SQLCipher 加密），完全自主可控
-- ☁️ **云托管可选** - 支持 Supabase 云端同步和协作
+- ☁️ **云托管可选** - 支持 Supabase 云端同步、Token 计费、债务保护
 - 🔌 **全栈生态** - 桌面端 + 移动端 App + 云托管商城 + 营销站点
-- 🔑 **Token管理** - API密钥管理、用量统计、成本控制
+- 🔑 **Token管理** - API密钥管理、用量统计、成本控制、月度账单
 
 ## ✨ 核心功能
 
 ### 1. AI 经营智能体
 - **AI 经营团队**：内置 7 个专业 Agent（库存管理、销售预测、数据分析、采购管理、财务管理、客户服务、AI 智能找图）
+- **Agent 生态 (25+ Bundles)**：CRM、文档生成、HR、任务管理、内容生成、转化优化、SEO、社交媒体运营（CN/US/SEA）等
 - **CEO Agent 主控官系统 (PRD v6.2/v6.3)**：
   - 项目上下文协议 (PCP)：愿景/目标/约束/里程碑/决策管理
   - 任务分派与跟踪：自动分配任务给子 Agent，实时追踪状态
@@ -51,6 +54,7 @@ ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应
 - 角色权限管理（店主/仓管/财务/采购/销售/客服）
 - **员工邀请与角色分配 (PRD v4.3)**
 - **外部伙伴邀请与自动关联 (PRD v4.2)**
+- **用户中心 (PRD v5.1)**：个人资料、订阅管理、操作日志
 
 ### 4. 安装向导 (CEO Agent 对话式配置)
 - CEO Agent 对话引导安装流程
@@ -65,10 +69,11 @@ ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应
 - **消息系统**：联系人管理、实时消息、通话记录
 
 ### 6. 云托管商城 (CloudStore)
-- AI 生成的独立电商站点（Next.js 16）
+- AI 生成的独立电商站点（Next.js 16 + React 19）
 - 商城主题自定义（颜色/布局/字体/Logo/Banner）
 - 商品同步管理（从本地产品库同步）
 - 订单管理、优惠券管理、商品评价管理
+- 购物车、结算、支付集成
 - 多套餐订阅（免费/基础/专业）
 - 独立子域名 + 自定义域名
 
@@ -79,11 +84,24 @@ ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应
 - **Agent 安全**：权限控制和安全策略
 - **Agent 包**：ZIP 打包分发机制
 
-### 8. 技能商店生态
-- 可扩展的插件系统
-- 财务管理、会员管理、电商对接等技能
-- 开发者可创建自定义技能
-- 收益分成机制
+### 8. 行业插件系统（Phase 4）
+- **🍽️ 餐饮行业**：POS 收银、桌台管理、厨房显示系统 (KDS)、菜单管理
+- **💇 美业行业**：预约管理、服务项目、员工管理、营销活动
+- **🐾 宠物行业**：宠物档案、寄养管理、美容服务
+- **☁️ Cloud 版**：Token 计费、债务保护、月度账单、云端备份
+- **👥 会员管理**：跨行业通用会员体系
+
+### 9. 运营与营销生态
+- **运营中心**：统一运营看板、数据监控
+- **营销网站 (PRD v7.0/v7.1)**：品牌落地页、用户引导、10+ 管理后台页面
+- **AI 知识库**：三库合一（媒体库 + 问答库 + 资料库），FAQ 自动采集
+- **网站运营 AI Team**：SEO 优化、内容生成、社媒运营（中国/美国/东南亚）
+
+### 10. Light 极简版 (ProClaw-Light)
+- 专注核心进销存功能，轻量级商户管理
+- 简化的导航和页面布局
+- 安装向导引导式配置
+- 适合单一门店、个体商户快速上手
 
 ## 🚀 快速开始
 
@@ -132,10 +150,13 @@ VITE_DEMO_MODE=true
 ### 开发模式
 
 ```bash
-# 桌面端开发（默认进销存版）
+# 桌面端开发（默认标准进销存版）
 npm run tauri dev
 
-# 虚拟公司版构建
+# Light 极简版开发
+$env:VITE_BUILD_MODE='light'; npm run tauri dev
+
+# 虚拟公司版开发
 $env:VITE_BUILD_MODE='virtual_company'; npm run tauri dev
 ```
 
@@ -144,8 +165,11 @@ $env:VITE_BUILD_MODE='virtual_company'; npm run tauri dev
 ### 构建生产版本
 
 ```bash
-# 进销存版
+# 标准进销存版
 npm run tauri build
+
+# Light 极简版
+$env:VITE_BUILD_MODE='light'; npm run tauri build
 
 # 虚拟公司版
 $env:VITE_BUILD_MODE='virtual_company'; npm run tauri build
@@ -230,10 +254,11 @@ npm run dev
 | **数据库** | SQLite + SQLCipher (本地) + Supabase (云端) |
 | **HTTP 服务** | Axum 0.7 + WebSocket |
 | **AI 框架** | LangChain + Dify + Ollama |
-| **加密** | AES-256-GCM + Argon2 + HMAC-SHA256 |
+| **加密** | AES-256-GCM + Argon2 + HMAC-SHA256 + Ed25519 |
 | **图表** | Recharts + simple-statistics |
-| **移动端** | Expo + React Native (iOS/Android/Web) |
-| **云商城** | Next.js 16 + Tailwind CSS 4 |
+| **移动端** | Expo 52 + React Native 0.76 (iOS/Android/Web) |
+| **云商城** | Next.js 16 + React 19 + Tailwind CSS 4 |
+| **营销站** | Vite 5 + React 18 + MUI 5 |
 | **测试** | Vitest + Playwright + Rust #[test] |
 
 ## 🏗️ 架构设计
@@ -247,11 +272,16 @@ npm run dev
 │  │  React 18 + TypeScript + MUI + Tailwind          │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌────────────────┐   │   │
 │  │  │ AI经营团队│ │ CEO Agent │ │ 进销存管理      │   │   │
-│  │  │ 7 Agents  │ │ 主控官   │ │ 产品/采购/销售  │   │   │
+│  │  │ 25+ Agent │ │ 主控官   │ │ 产品/采购/销售  │   │   │
 │  │  └──────────┘ └──────────┘ └────────────────┘   │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌────────────────┐   │   │
-│  │  │ 设备配对  │ │ 通话/消息 │ │ 安装向导        │   │   │
-│  │  └──────────┘ └──────────┘ └────────────────┘   │   │
+│  │  │ 行业插件  │ │ 运营中心 │ │ 用户中心        │   │   │
+│  │  │ 餐饮/美业 │ │ 数据看板 │ │ 个人/订阅/日志  │   │   │
+│  │  │ 宠物/Cloud│ └──────────┘ └────────────────┘   │   │
+│  │  └──────────┘ ┌──────────┐ ┌────────────────┐   │   │
+│  │               │ 设备配对  │ │ AI 知识库       │   │   │
+│  │               │ 通话/消息 │ │ 媒体/问答/资料  │   │   │
+│  │               └──────────┘ └────────────────┘   │   │
 │  └─────────────────────────────────────────────────┘   │
 │                                                         │
 │  Tauri Core (Rust)                                      │
@@ -259,6 +289,7 @@ npm run dev
 │  │  SQLite + SQLCipher │ 文件系统 │ 系统托盘/通知   │   │
 │  │  Axum HTTP Server  │ WebSocket │ API 路由       │   │
 │  │  Agent 沙箱/安全    │ 同步引擎 │ 云端备份        │   │
+│  │  插件管理器         │ 审批引擎 │ 邀请码管理      │   │
 │  └─────────────────────────────────────────────────┘   │
 │                                                         │
 │         ↕ WebSocket / HTTPS                             │
@@ -273,7 +304,7 @@ npm run dev
 │  iOS/Android/Web         │  AI 生成电商独立站           │
 ├─────────────────────────────────────────────────────────┤
 │  Marketing Site (Vite + React)                          │
-│  营销落地页 / 用户引导 / 管理后台                       │
+│  营销落地页 / 用户引导 / 10+ 管理后台页面               │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -281,12 +312,15 @@ npm run dev
 
 | 维度 | 数据 |
 |------|------|
-| **前端页面** | 35+ 个路由页面 |
-| **前端组件** | 60+ 个 UI 组件 |
-| **前端服务模块** | 56 个 lib 模块 |
-| **Rust 后端** | 30+ 个命令模块，22 个 API 端点 |
+| **前端页面** | 55+ 个路由页面（含行业插件） |
+| **前端组件** | 70+ 个 UI 组件（14 个组件目录） |
+| **前端服务模块** | 65 个 lib 模块 |
+| **Rust 后端** | 31+ 个命令模块，22 个 API 端点 |
+| **Agent Bundles** | 25 个行业 Agent 包 |
+| **行业插件** | 7 个插件（餐饮/美业/宠物/Cloud/零售/库存/虚拟公司） |
+| **数据库迁移** | 12 个迁移脚本 |
 | **单元测试** | 15 个测试模块，~200+ 测试用例 |
-| **E2E 测试** | 9 个 spec 文件 |
+| **E2E 测试** | 17 个 spec 文件 |
 | **Rust 测试** | ~40 个测试用例 |
 | **安装包大小** | ~6.8 MB (Windows x64) |
 
@@ -308,14 +342,27 @@ npm run dev
 - [API 文档](docs/API_DOCUMENTATION.md)
 - [数据库 Schema](docs/DATABASE_SCHEMA.md)
 - [已知问题](docs/KNOWN_ISSUES.md)
-- [PRD v4.0 产品需求](docs/ProClaw_PRD_v4.0.md)
-- [PRD v5.0 云商城](docs/需求文档：ProClaw 云托管商城（AI 生成独立站）PRD v5.0.md)
-- [PRD v6.0 虚拟公司版](docs/需求文档：ProClaw 虚拟公司版（Agent 化架构）PRD v6.0.md)
-- [PRD v6.1 安装向导](docs/需求文档：ProClaw 安装向导（CEO Agent 对话式配置）PRD v6.1.md)
-- [PRD v6.2 CEO Agent 主控官](docs/需求文档：CEO Agent 作为主控官 - 项目上下文协议与任务分派（PRD v6.2）.md)
-- [PRD v6.3 决策确认机制](docs/需求文档：CEO Agent 决策确认机制与个性化学习（PRD v6.3）.md)
-- [PRD v4.2 外部伙伴邀请](docs/需求文档：ProClaw 外部伙伴邀请与自动关联机制（PRD v4.2）.md)
-- [PRD v4.3 员工邀请与角色分配](docs/需求文档：ProClaw 员工邀请与角色权限自动分配（PRD v4.3）.md)
+- [项目定位](docs/PROJECT_POSITIONING.md)
+- [实施计划](docs/IMPLEMENTATION_PLAN.md)
+
+### PRD 产品需求
+- [PRD v4.0 核心需求](docs/prd/ProClaw_PRD_v4.0.md)
+- [PRD v4.1 音视频通话](docs/prd/ProClaw 手机端音视频通话功能需求（补充 v4.1）.md)
+- [PRD v4.2 外部伙伴邀请](docs/prd/需求文档：ProClaw 外部伙伴邀请与自动关联机制（PRD v4.2）.md)
+- [PRD v4.3 员工邀请与角色分配](docs/prd/需求文档：ProClaw 员工邀请与角色权限自动分配（PRD v4.3）.md)
+- [PRD v5.0 云托管商城](docs/prd/需求文档：ProClaw 云托管商城（AI 生成独立站）PRD v5.0.md)
+- [PRD v5.1 用户中心](docs/prd/需求文档：ProClaw 用户中心（PRD v5.1）.md)
+- [PRD v6.0 虚拟公司版](docs/prd/需求文档：ProClaw 虚拟公司版（Agent 化架构）PRD v6.0.md)
+- [PRD v6.1 安装向导](docs/prd/需求文档：ProClaw 安装向导（CEO Agent 对话式配置）PRD v6.1.md)
+- [PRD v6.2 CEO Agent 主控官](docs/prd/需求文档：CEO Agent 作为主控官 - 项目上下文协议与任务分派（PRD v6.2）.md)
+- [PRD v6.3 决策确认机制](docs/prd/需求文档：CEO Agent 决策确认机制与个性化学习（PRD v6.3）.md)
+- [PRD v7.0 网站运营 AI & 社媒](docs/prd/需求文档：ProClaw 网站运营 AI Team 与多区域社媒运营（PRD v7.0）.md)
+- [PRD v7.1 营销网站用户中心](docs/prd/需求文档：ProClaw 营销网站用户中心（PRD v7.1）.md)
+- [PRD v8.0 Token 计费改造](docs/prd/需求文档：ProClaw 云托管商城 Token 计费模式改造（PRD v8.0）.md)
+- [行业插件架构升级](docs/prd/需求文档：ProClaw 插件化行业版架构升级.md)
+- [行业插件功能实现](docs/prd/需求文档：行业插件功能实现（餐饮 美业 宠物 Cloud）.md)
+- [ProClaw-Light 桌面端需求](docs/prd/需求文档：ProClaw-Light 桌面端需求.md)
+- [ProClaw Cloud 托管版](docs/prd/需求：ProClaw Cloud 托管版（Web 端 + 按 token 计费）.md)
 
 ### 发布文档
 - [Beta 发布就绪](docs/releases/BETA_RELEASE_READY.md)
@@ -325,16 +372,23 @@ npm run dev
 - [测试交付检查清单](docs/releases/TEST_DELIVERY_CHECKLIST.md)
 
 ### 功能文档
-- [AI 聊天窗口增强](docs/AI_CHAT_WINDOW_ENHANCEMENTS.md)
-- [AI 决策系统](docs/AI_DECISION_SYSTEM.md)
-- [AI 引导系统优化](docs/AI_GUIDE_SYSTEM_OPTIMIZATION.md)
-- [FAQ 自动采集系统](docs/FAQ_AUTO_COLLECTION_SYSTEM.md)
-- [电商产品库](docs/ECOMMERCE_PRODUCT_LIBRARY_README.md)
-- [仪表盘改进](docs/DASHBOARD_IMPROVEMENTS.md)
-- [多图片上传](docs/MULTI_IMAGE_UPLOAD_FEATURE.md)
-- [自动编码生成](docs/AUTO_GENERATE_CODE_IMPLEMENTATION.md)
-- [采购销售订单自动编码](docs/PURCHASE_SALES_ORDER_AUTO_CODE_FEATURE.md)
-- [供应商客户自动编码](docs/SUPPLIER_CUSTOMER_AUTO_CODE_FEATURE.md)
+- [AI 聊天窗口增强](docs/features/AI_CHAT_WINDOW_ENHANCEMENTS.md)
+- [AI 决策系统](docs/features/AI_DECISION_SYSTEM.md)
+- [AI 引导系统优化](docs/features/AI_GUIDE_SYSTEM_OPTIMIZATION.md)
+- [管理员后台总览](docs/features/ADMIN_DASHBOARD_COMPLETE_OVERVIEW.md)
+- [FAQ 自动采集系统](docs/features/FAQ_AUTO_COLLECTION_SYSTEM.md)
+- [FAQ 快速开始](docs/features/FAQ_QUICK_START.md)
+- [电商产品库说明](docs/features/ECOMMERCE_PRODUCT_LIBRARY_README.md)
+- [仪表盘改进](docs/features/DASHBOARD_IMPROVEMENTS.md)
+- [仪表盘快速启动](docs/features/DASHBOARD_QUICKSTART.md)
+- [多图片上传](docs/features/MULTI_IMAGE_UPLOAD_FEATURE.md)
+- [自动编码生成](docs/features/AUTO_GENERATE_CODE_IMPLEMENTATION.md)
+- [采购销售订单自动编码](docs/features/PURCHASE_SALES_ORDER_AUTO_CODE_FEATURE.md)
+- [供应商客户自动编码](docs/features/SUPPLIER_CUSTOMER_AUTO_CODE_FEATURE.md)
+- [商品编号自动生成](docs/features/AUTO_GENERATE_PRODUCT_CODE.md)
+- [用户中心同步](docs/features/USER_CENTER_SYNC.md)
+- [Rust 后端 SPU/SKU 指南](docs/features/RUST_BACKEND_SPU_SKU_GUIDE.md)
+- [超级管理员账户](docs/features/SUPER_ADMIN_ACCOUNT.md)
 
 ### 营销网站
 - [营销网站](marketing-site/README.md) - Vite + React 营销落地页

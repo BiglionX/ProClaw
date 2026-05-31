@@ -5,32 +5,48 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { useAuthStore } from './lib/authStore';
 import { NotificationProvider } from './lib/notificationContext';
 
-// Pages
+// Pages - 首屏同步加载
 import HomePage from './pages/HomePage';
-import FeaturesPage from './pages/FeaturesPage';
-import PricingPage from './pages/PricingPage';
-import DownloadPage from './pages/DownloadPage';
-import ChangelogPage from './pages/ChangelogPage';
-import UseCasesPage from './pages/UseCasesPage';
-import FAQPage from './pages/FAQPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import UserDashboard from './pages/UserDashboard';
-import UserCenterPage from './pages/UserCenterPage';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminUsersPage from './pages/admin/AdminUsersPage';
-import AdminPackagesPage from './pages/admin/AdminPackagesPage';
-import AdminOrdersPage from './pages/admin/AdminOrdersPage';
-import AdminIntegrationsPage from './pages/admin/AdminIntegrationsPage';
-import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
-import AdminSettingsPage from './pages/admin/AdminSettingsPage';
-import AdminReportsPage from './pages/admin/AdminReportsPage';
-import AdminTasksPage from './pages/admin/AdminTasksPage';
-import AdminRateLimitingPage from './pages/admin/AdminRateLimitingPage';
-import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
-import AdminTokenMonitorPage from './pages/admin/AdminTokenMonitorPage';
-import AdminPluginsPage from './pages/admin/AdminPluginsPage';
-import PluginStorePage from './pages/PluginStorePage';
+
+// Pages - 懒加载
+const FeaturesPage = React.lazy(() => import('./pages/FeaturesPage'));
+const PricingPage = React.lazy(() => import('./pages/PricingPage'));
+const DownloadPage = React.lazy(() => import('./pages/DownloadPage'));
+const ChangelogPage = React.lazy(() => import('./pages/ChangelogPage'));
+const UseCasesPage = React.lazy(() => import('./pages/UseCasesPage'));
+const FAQPage = React.lazy(() => import('./pages/FAQPage'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
+const UserDashboard = React.lazy(() => import('./pages/UserDashboard'));
+const UserCenterPage = React.lazy(() => import('./pages/UserCenterPage'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const AdminUsersPage = React.lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminPackagesPage = React.lazy(() => import('./pages/admin/AdminPackagesPage'));
+const AdminOrdersPage = React.lazy(() => import('./pages/admin/AdminOrdersPage'));
+const AdminIntegrationsPage = React.lazy(() => import('./pages/admin/AdminIntegrationsPage'));
+const AdminAnalyticsPage = React.lazy(() => import('./pages/admin/AdminAnalyticsPage'));
+const AdminSettingsPage = React.lazy(() => import('./pages/admin/AdminSettingsPage'));
+const AdminReportsPage = React.lazy(() => import('./pages/admin/AdminReportsPage'));
+const AdminTasksPage = React.lazy(() => import('./pages/admin/AdminTasksPage'));
+const AdminRateLimitingPage = React.lazy(() => import('./pages/admin/AdminRateLimitingPage'));
+const AdminAuditLogsPage = React.lazy(() => import('./pages/admin/AdminAuditLogsPage'));
+const AdminTokenMonitorPage = React.lazy(() => import('./pages/admin/AdminTokenMonitorPage'));
+const AdminPluginsPage = React.lazy(() => import('./pages/admin/AdminPluginsPage'));
+const PluginStorePage = React.lazy(() => import('./pages/PluginStorePage'));
+const CateringSolutionPage = React.lazy(() => import('./pages/solutions/CateringSolutionPage'));
+const BeautySolutionPage = React.lazy(() => import('./pages/solutions/BeautySolutionPage'));
+const PetSolutionPage = React.lazy(() => import('./pages/solutions/PetSolutionPage'));
+const CloudSolutionPage = React.lazy(() => import('./pages/solutions/CloudSolutionPage'));
+
+// Loading fallback
+const PageLoading = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="text-center">
+      <div className="text-3xl mb-3 animate-pulse">&#x1F680;</div>
+      <p className="text-gray-400">加载中...</p>
+    </div>
+  </div>
+);
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: 'user' | 'admin' }> = ({ 
@@ -78,39 +94,49 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
-          <Route path="/features" element={<FeaturesPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/download" element={<DownloadPage />} />
-          <Route path="/changelog" element={<ChangelogPage />} />
-          <Route path="/use-cases" element={<UseCasesPage />} />
-          <Route path="/plugins" element={<PluginStorePage />} />
-          <Route path="/faq" element={<FAQPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/features" element={<React.Suspense fallback={<PageLoading />}><FeaturesPage /></React.Suspense>} />
+          <Route path="/pricing" element={<React.Suspense fallback={<PageLoading />}><PricingPage /></React.Suspense>} />
+          <Route path="/download" element={<React.Suspense fallback={<PageLoading />}><DownloadPage /></React.Suspense>} />
+          <Route path="/changelog" element={<React.Suspense fallback={<PageLoading />}><ChangelogPage /></React.Suspense>} />
+          <Route path="/use-cases" element={<React.Suspense fallback={<PageLoading />}><UseCasesPage /></React.Suspense>} />
+          <Route path="/plugins" element={<React.Suspense fallback={<PageLoading />}><PluginStorePage /></React.Suspense>} />
+          <Route path="/faq" element={<React.Suspense fallback={<PageLoading />}><FAQPage /></React.Suspense>} />
+          <Route path="/solutions/catering" element={<React.Suspense fallback={<PageLoading />}><CateringSolutionPage /></React.Suspense>} />
+          <Route path="/solutions/beauty" element={<React.Suspense fallback={<PageLoading />}><BeautySolutionPage /></React.Suspense>} />
+          <Route path="/solutions/pet" element={<React.Suspense fallback={<PageLoading />}><PetSolutionPage /></React.Suspense>} />
+          <Route path="/solutions/cloud" element={<React.Suspense fallback={<PageLoading />}><CloudSolutionPage /></React.Suspense>} />
+          <Route path="/login" element={<React.Suspense fallback={<PageLoading />}><LoginPage /></React.Suspense>} />
+          <Route path="/register" element={<React.Suspense fallback={<PageLoading />}><RegisterPage /></React.Suspense>} />
 
           {/* User Routes - 用户中心 */}
           <Route
             path="/user"
             element={
-              <ProtectedRoute>
-                <UserCenterPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute>
+                  <UserCenterPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
-                <UserDashboard />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute>
+                  <UserDashboard />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/user/*"
             element={
-              <ProtectedRoute>
-                <UserCenterPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute>
+                  <UserCenterPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
 
@@ -118,105 +144,131 @@ function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/users"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminUsersPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminUsersPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/packages"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminPackagesPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminPackagesPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/orders"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminOrdersPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminOrdersPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/integrations"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminIntegrationsPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminIntegrationsPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/analytics"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminAnalyticsPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminAnalyticsPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/settings"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminSettingsPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminSettingsPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/reports"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminReportsPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminReportsPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/tasks"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminTasksPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminTasksPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/rate-limiting"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminRateLimitingPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminRateLimitingPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/audit-logs"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminAuditLogsPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminAuditLogsPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/tokens"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminTokenMonitorPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminTokenMonitorPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
           <Route
             path="/admin/plugins"
             element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminPluginsPage />
-              </ProtectedRoute>
+              <React.Suspense fallback={<PageLoading />}>
+                <ProtectedRoute requiredRole="admin">
+                  <AdminPluginsPage />
+                </ProtectedRoute>
+              </React.Suspense>
             }
           />
 

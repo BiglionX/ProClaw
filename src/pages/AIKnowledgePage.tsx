@@ -5,9 +5,9 @@ import {
 } from '@mui/icons-material';
 import {
   Box,
-  Chip,
   Divider,
   Paper,
+  Stack,
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
@@ -50,98 +50,94 @@ export default function AIKnowledgePage() {
   }, []);
 
   return (
-    <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* 左侧 Tab 面板 */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* 顶部标题栏：左侧标题 + 右侧水平 Tab */}
       <Paper
         elevation={0}
         sx={{
-          width: 200,
           flexShrink: 0,
-          borderRight: '1px solid',
+          px: 3,
+          py: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid',
           borderColor: 'divider',
           borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
           backgroundColor: 'background.paper',
+          gap: 2,
         }}
       >
-        <Box sx={{ p: 2, pb: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1rem' }}>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.05rem' }}>
             AI 知识库
           </Typography>
           <Typography variant="caption" color="text.secondary">
             管理媒体素材、客服问答和业务资料
           </Typography>
         </Box>
-        <Divider />
-        <Box sx={{ flex: 1, py: 1 }}>
-          {TABS.map((tab) => {
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          {TABS.map((tab, i) => {
             const isActive = activeTab === tab.id;
             const count = counts[tab.countKey];
             return (
-              <Box
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  px: 2,
-                  py: 1.5,
-                  cursor: 'pointer',
-                  mx: 1,
-                  borderRadius: 1,
-                  backgroundColor: isActive ? 'rgba(99,102,241,0.1)' : 'transparent',
-                  color: isActive ? '#6366f1' : 'text.primary',
-                  '&:hover': {
-                    backgroundColor: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(0,0,0,0.04)',
-                  },
-                  transition: 'all 0.2s',
-                }}
-              >
+              <Box key={tab.id} sx={{ display: 'flex', alignItems: 'center' }}>
+                {i > 0 && (
+                  <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: 18 }} />
+                )}
                 <Box
+                  onClick={() => setActiveTab(tab.id)}
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 28,
-                    height: 28,
-                    borderRadius: 1,
-                    backgroundColor: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(0,0,0,0.04)',
+                    gap: 0.5,
+                    px: 1,
+                    py: 0.3,
+                    cursor: 'pointer',
+                    borderRadius: 0.8,
                     color: isActive ? '#6366f1' : 'text.secondary',
-                    flexShrink: 0,
+                    backgroundColor: isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
+                    '&:hover': {
+                      backgroundColor: isActive ? 'rgba(99,102,241,0.12)' : 'rgba(0,0,0,0.04)',
+                      color: isActive ? '#6366f1' : 'text.primary',
+                    },
+                    transition: 'all 0.15s',
                   }}
                 >
-                  {tab.icon}
+                  <Box component="span" sx={{ display: 'flex', fontSize: '0.85rem', opacity: isActive ? 1 : 0.6 }}>
+                    {tab.icon}
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: isActive ? 600 : 400,
+                      fontSize: '0.75rem',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {tab.label}
+                  </Typography>
+                  {count > 0 && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        fontWeight: 500,
+                        color: isActive ? '#6366f1' : 'text.disabled',
+                        ml: 0.2,
+                      }}
+                    >
+                      {count}
+                    </Typography>
+                  )}
                 </Box>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    flex: 1,
-                    fontWeight: isActive ? 600 : 400,
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  {tab.label}
-                </Typography>
-                <Chip
-                  label={count}
-                  size="small"
-                  sx={{
-                    height: 20,
-                    minWidth: 28,
-                    fontSize: '0.65rem',
-                    backgroundColor: isActive ? 'rgba(99,102,241,0.2)' : 'rgba(0,0,0,0.06)',
-                    color: isActive ? '#6366f1' : 'text.secondary',
-                  }}
-                />
               </Box>
             );
           })}
-        </Box>
+        </Stack>
       </Paper>
 
-      {/* 右侧内容面板 */}
+      {/* 内容面板 */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 0 }}>
         {activeTab === 'media' && <MediaLibraryPage />}
         {activeTab === 'qa' && <QALibraryPage />}

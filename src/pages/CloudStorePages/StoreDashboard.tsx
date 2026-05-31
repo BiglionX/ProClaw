@@ -2,15 +2,13 @@ import {
   Add as AddIcon,
   Launch as LaunchIcon,
   Refresh as RefreshIcon,
-  CheckCircle as CheckIcon,
   Visibility as PreviewIcon,
+  OpenInNew as TokenIcon,
 } from '@mui/icons-material';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -23,7 +21,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { getCloudStore, createCloudStore, getStoreStats, PLAN_INFO, PlanType, CloudStore, StoreStats } from '../../lib/cloudStoreService';
+import { useNavigate } from 'react-router-dom';
+import { getCloudStore, createCloudStore, getStoreStats, CloudStore, StoreStats } from '../../lib/cloudStoreService';
 import { isTauri } from '../../lib/tauri';
 
 interface StoreDashboardProps {
@@ -37,10 +36,10 @@ interface StoreDashboardProps {
 export default function StoreDashboard({
   loading, setLoading, setError, setSuccessMessage,
 }: StoreDashboardProps) {
+  const navigate = useNavigate();
   const [store, setStore] = useState<CloudStore | null>(null);
   const [stats, setStats] = useState<StoreStats | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>('basic');
   const [subdomain, setSubdomain] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -75,7 +74,7 @@ export default function StoreDashboard({
     }
     try {
       setLoading(true);
-      const newStore = await createCloudStore(selectedPlan, subdomain.trim());
+      const newStore = await createCloudStore('free', subdomain.trim());
       setStore(newStore);
       setOpenDialog(false);
       setSuccessMessage('商城开通成功！');
@@ -127,48 +126,42 @@ export default function StoreDashboard({
     return (
       <Box>
         <Alert severity="info" sx={{ mb: 3 }}>
-          您尚未开通云托管商城，请选择套餐并开通。
+          开通云托管商城，即可将商品同步到独立域名商城。
+          采用 Token 计费模式（1 PT = ¥0.001），按实际用量付费。
         </Alert>
 
-        {/* 套餐选择 */}
-        <Typography variant="h6" sx={{ mb: 2 }}>选择套餐</Typography>
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {(Object.keys(PLAN_INFO) as PlanType[]).map(planType => {
-            const plan = PLAN_INFO[planType];
-            const isSelected = selectedPlan === planType;
-            return (
-              <Grid item xs={12} sm={6} md={3} key={planType}>
-                <Card
-                  sx={{
-                    cursor: 'pointer',
-                    border: isSelected ? '2px solid' : '1px solid',
-                    borderColor: isSelected ? 'primary.main' : 'divider',
-                    height: '100%',
-                    transition: 'all 0.2s',
-                    '&:hover': { borderColor: 'primary.main', boxShadow: 2 },
-                  }}
-                  onClick={() => setSelectedPlan(planType)}
-                >
-                  <CardContent>
-                    <Typography variant="h6" sx={{ mb: 1 }}>
-                      {plan.name}
-                      {isSelected && <Chip label="已选" size="small" color="primary" sx={{ ml: 1 }} />}
-                    </Typography>
-                    <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
-                      {plan.price === 0 ? '免费' : `¥${plan.price}/月`}
-                    </Typography>
-                    {plan.features.map((feat, i) => (
-                      <Typography key={i} variant="body2" sx={{ mb: 0.5, display: 'flex', alignItems: 'center' }}>
-                        <CheckIcon sx={{ fontSize: 16, color: 'success.main', mr: 0.5 }} />
-                        {feat}
-                      </Typography>
-                    ))}
-                  </CardContent>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
+        {/* Token 计费说明 */}
+        <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: 'grey.50' }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Token 按量计费</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            云商城已全面切换为 Token 按量计费模式，告别固定月费：
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="免费注册" size="small" color="success" /> 注册即赠送 50,000 PT（≈¥50）
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="商品同步" size="small" /> 50 PT/个
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="订单处理" size="small" /> 10 PT/单
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="AI 主题" size="small" /> 5,000 PT/次
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="子域名" size="small" color="info" /> 永久免费
+            </Typography>
+          </Box>
+          <Button
+            size="small"
+            variant="text"
+            endIcon={<TokenIcon />}
+            onClick={() => navigate('/token-billing')}
+          >
+            查看完整定价
+          </Button>
+        </Paper>
 
         <Button
           variant="contained"
@@ -185,9 +178,9 @@ export default function StoreDashboard({
           <DialogTitle>开通云托管商城</DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                已选套餐：{PLAN_INFO[selectedPlan].name} {PLAN_INFO[selectedPlan].price > 0 && `(¥${PLAN_INFO[selectedPlan].price}/月)`}
-              </Typography>
+              <Alert severity="info" sx={{ mb: 1 }}>
+                开通免费，按 Token 计费。新用户获赠 50,000 PT。
+              </Alert>
               <TextField
                 label="子域名"
                 value={subdomain}
@@ -228,7 +221,7 @@ export default function StoreDashboard({
                 label={store.status === 'active' ? '已开通' : store.status === 'expired' ? '已过期' : '已停用'}
                 color={store.status === 'active' ? 'success' : 'error'}
               />
-              <Chip label={PLAN_INFO[store.plan_type].name} variant="outlined" />
+              <Chip label="Token 计费" variant="outlined" color="warning" />
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body1" color="primary.main" sx={{ fontWeight: 600 }}>{storeUrl}</Typography>
@@ -261,17 +254,15 @@ export default function StoreDashboard({
             { label: '总收入', value: `¥${stats.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, unit: '', color: '#f59e0b' },
           ].map(item => (
             <Grid item xs={12} sm={4} key={item.label}>
-              <Card sx={{ height: '100%', minHeight: 120 }}>
-                <CardContent>
-                  <Typography variant="h6" color="text.secondary" gutterBottom>{item.label}</Typography>
-                  <Typography variant="h4" component="span" sx={{ fontWeight: 700, color: item.color }} style={{ wordBreak: 'break-all' }}>
-                    {item.value}
-                  </Typography>
-                  {item.unit && (
-                    <Typography variant="body1" component="span" color="text.secondary" sx={{ ml: 0.5 }}>{item.unit}</Typography>
-                  )}
-                </CardContent>
-              </Card>
+              <Paper elevation={0} sx={{ p: 3, height: '100%', minHeight: 120, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>{item.label}</Typography>
+                <Typography variant="h4" component="span" sx={{ fontWeight: 700, color: item.color }} style={{ wordBreak: 'break-all' }}>
+                  {item.value}
+                </Typography>
+                {item.unit && (
+                  <Typography variant="body1" component="span" color="text.secondary" sx={{ ml: 0.5 }}>{item.unit}</Typography>
+                )}
+              </Paper>
             </Grid>
           ))}
         </Grid>

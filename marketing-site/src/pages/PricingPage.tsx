@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import PageHeader from '../components/shared/PageHeader';
 import TokenCostEstimator from '../components/TokenCostEstimator';
 
 const desktopPlans = [
@@ -96,15 +97,10 @@ const PricingPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">透明定价</h1>
-          <p className="text-xl text-gray-500 max-w-3xl mx-auto">
-            桌面端永久免费开源。云托管商城按需订阅，无隐藏费用。
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="透明定价"
+        description="桌面端永久免费开源。云托管商城按需订阅，无隐藏费用。"
+      />
 
       {/* Billing Tab Switch */}
       <div className="flex justify-center mt-10 mb-6">

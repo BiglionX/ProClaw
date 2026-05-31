@@ -10,6 +10,9 @@ import {
   AutoAwesome as MagicIcon,
   AutoAwesome as AutoAwesomeIcon,
   History as HistoryIcon,
+  Groups as GroupIcon,
+  Campaign as CampaignIcon,
+  Stop as StopIcon,
 } from '@mui/icons-material';
 import {
   Avatar,
@@ -28,7 +31,9 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Contact, Message, getContacts, getMessages, sendMessage } from '../lib/contactService';
+import { Contact, Message, getContacts, getMessages, sendMessage, isAITeamGroupId, getAITeamGroupConfig, type AITeamGroupConfig } from '../lib/contactService';
+import { generateGroupChatResponse, type ChatHistoryItem } from '../lib/aiTeamChatService';
+import { getTokenBalance, isDemoAccount } from '../lib/aiTeamTokenService';
 import { agentRuntime } from '../lib/agentRuntime';
 import desktopCallManager from '../services/CallManager';
 import ContextIndicator from '../components/CEO/ContextIndicator';
@@ -38,6 +43,14 @@ import DecisionHistoryPanel from '../components/CEO/DecisionHistoryPanel';
 import { proclawDecision } from '../lib/ceoController';
 
 const CEO_AGENT_ID = 'ceo-agent';
+
+// AI Team 群聊快捷命令
+const AI_TEAM_COMMANDS = [
+  { label: '/task list', desc: '查看所有任务进度' },
+  { label: '/report', desc: '要求 CEO 生成工作报告' },
+  { label: '/status', desc: '查看AI Team各成员状态' },
+  { label: '@all', desc: '通知所有AI Team成员' },
+];
 
 // CEO Agent 快捷命令
 const CEO_COMMANDS = [
@@ -54,11 +67,20 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [aiResponding, setAiResponding] = useState(false);
+  const [tokenBalance, setTokenBalance] = useState(isDemoAccount() ? getTokenBalance() : -1);
   const [actionAnchor, setActionAnchor] = useState<HTMLElement | null>(null);
   const [showDecisionHistory, setShowDecisionHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isCEO = contactId === CEO_AGENT_ID;
+  const isGroupChat = contactId ? isAITeamGroupId(contactId) : false;
+  const groupConfig: AITeamGroupConfig | undefined = isGroupChat && contactId ? getAITeamGroupConfig(contactId) : undefined;
+
+  // 群聊成员计数
+  const groupMemberCount = groupConfig ? Object.keys(groupConfig.members).length + 1 : 1; // +1 for Boss
+  const groupMembers = groupConfig?.members || {};
 
   // 获取所有聊天上下文的快捷操作
   const quickActions = agentRuntime.getAllQuickActions('chat');
@@ -98,13 +120,70 @@ export default function ChatPage() {
     setInput('');
     setSending(true);
     try {
-      const newMsg = await sendMessage('self', contactId, content);
+      // 群聊模式：from_user_name 显示为 "Boss 👑"
+      const fromUser = isGroupChat ? 'self' : 'self';
+      const newMsg = await sendMessage(fromUser, contactId, content);
+      // 群聊模式下补上发言人名称
+      if (isGroupChat) {
+        newMsg.from_user_name = 'Boss 👑';
+      }
       setMessages(prev => [...prev, newMsg]);
       scrollToBottom();
+
+      // 群聊模式：调用 LLM 让 CEO Agent 自动响应
+      if (isGroupChat && groupConfig) {
+        setSending(false); // 释放发送按钮
+        setAiResponding(true);
+        try {
+          // 创建 AbortController 以便用户可取消 AI 思考
+          const controller = new AbortController();
+          abortControllerRef.current = controller;
+
+          // 构建聊天历史
+          const history: ChatHistoryItem[] = messages.map(msg => {
+            if (msg.from_user === 'self') {
+              return { role: 'user' as const, name: 'Boss 👑', content: msg.content };
+            }
+            if (msg.content_type === 'system_event') {
+              return { role: 'system' as const, name: '系统', content: msg.content };
+            }
+            if (msg.from_user === 'ceo-agent') {
+              return { role: 'ceo' as const, name: 'CEO Agent', content: msg.content };
+            }
+            return { role: 'agent' as const, name: msg.from_user_name || msg.from_user, content: msg.content };
+          });
+          // 加上当前发送的消息
+          history.push({ role: 'user', name: 'Boss 👑', content });
+
+          const aiResponse = await generateGroupChatResponse(content, history, groupConfig, controller.signal);
+
+          // 用户取消：不需要显示任何内容
+          if (aiResponse.aborted) return;
+
+          // 将 AI 回复作为 ceo-agent 的消息写入
+          const aiMsg = await sendMessage('ceo-agent', contactId, aiResponse.replyContent);
+          aiMsg.from_user_name = 'CEO Agent';
+          aiMsg.content_type = 'text';
+          setMessages(prev => [...prev, aiMsg]);
+
+          // 更新 token 余额
+          if (isDemoAccount()) {
+            setTokenBalance(aiResponse.remainingTokens);
+          }
+          scrollToBottom();
+        } catch (aiErr) {
+          console.error('AI 响应失败:', aiErr);
+        } finally {
+          abortControllerRef.current = null;
+          setAiResponding(false);
+        }
+      }
     } catch (e) {
       console.error('发送失败:', e);
     } finally {
-      setSending(false);
+      if (!isGroupChat) {
+        setSending(false);
+      }
     }
   };
 
@@ -112,6 +191,14 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  /** 取消 AI 思考 */
+  const handleStopAI = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
   };
 
@@ -288,12 +375,31 @@ export default function ChatPage() {
         <IconButton onClick={() => navigate('/contacts')} size="small">
           <BackIcon />
         </IconButton>
-        <Avatar sx={{ bgcolor: isCEO ? '#7c4dff' : '#1976d2', width: 40, height: 40 }}>
-          {contact.name.charAt(0)}
+        <Avatar sx={{ bgcolor: isGroupChat ? (groupConfig?.color || '#ff6d00') : isCEO ? '#7c4dff' : '#1976d2', width: 40, height: 40 }}>
+          {isGroupChat ? groupConfig?.icon || <GroupIcon /> : contact.name.charAt(0)}
         </Avatar>
         <Box sx={{ flex: 1 }}>
-          <Typography fontWeight={600} fontSize="0.95rem">
-            {contact.name}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography fontWeight={600} fontSize="0.95rem" component="span">
+            {isGroupChat ? (groupConfig?.name || 'AI Team 工作群') : contact.name}
+            {isGroupChat && (
+              <Chip
+                label={`${groupMemberCount}人`}
+                size="small"
+                sx={{ ml: 1, height: 18, fontSize: '0.6rem', bgcolor: groupConfig?.color || '#ff6d00', color: 'white' }}
+              />
+            )}
+            {isGroupChat && isDemoAccount() && tokenBalance >= 0 && (
+              <Chip
+                label={`${tokenBalance.toLocaleString()} PT`}
+                size="small"
+                sx={{
+                  ml: 0.5, height: 18, fontSize: '0.6rem',
+                  bgcolor: tokenBalance <= 0 ? '#ef4444' : tokenBalance < 1000 ? '#f59e0b' : '#10b981',
+                  color: 'white',
+                }}
+              />
+            )}
             {isCEO && (
               <Chip
                 label="主控官"
@@ -302,17 +408,34 @@ export default function ChatPage() {
               />
             )}
           </Typography>
+        </Box>
           <Typography variant="caption" color="text.secondary">
-            {isCEO
-              ? '虚拟公司主控官 · 传达宏观意图，协调所有 Agent'
-              : contact.contact_type === 'team'
-                ? '团队成员'
-                : contact.external_type === 'supplier'
-                  ? '供应商'
-                  : '客户'}
-            {contact.phone && ` · ${contact.phone}`}
+            {isGroupChat
+              ? (groupConfig?.description || `Boss + ${groupMemberCount - 1} 个 AI Agent · CEO Agent 协调中`)
+              : isCEO
+                ? '虚拟公司主控官 · 传达宏观意图，协调所有 Agent'
+                : contact.contact_type === 'team'
+                  ? '团队成员'
+                  : contact.external_type === 'supplier'
+                    ? '供应商'
+                    : '客户'}
+            {!isGroupChat && contact.phone && ` · ${contact.phone}`}
           </Typography>
         </Box>
+        {isGroupChat && (
+          <Tooltip title="项目仪表板">
+            <IconButton size="small" onClick={() => window.dispatchEvent(new CustomEvent('proclaw:open-project-overview'))}>
+              <AutoAwesomeIcon fontSize="small" sx={{ color: groupConfig?.color || '#ff6d00' }} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {isGroupChat && (
+          <Tooltip title="@所有人">
+            <IconButton size="small" onClick={() => setInput(prev => prev ? prev + ' @all' : '@all ')}>
+              <CampaignIcon fontSize="small" sx={{ color: groupConfig?.color || '#ff6d00' }} />
+            </IconButton>
+          </Tooltip>
+        )}
         {isCEO && (
           <Tooltip title="决策历史">
             <IconButton size="small" onClick={() => setShowDecisionHistory(!showDecisionHistory)}>
@@ -327,7 +450,7 @@ export default function ChatPage() {
             </IconButton>
           </Tooltip>
         )}
-        {!isCEO && (
+        {!isCEO && !isGroupChat && (
           <>
             <Tooltip title="语音通话">
               <IconButton
@@ -357,7 +480,7 @@ export default function ChatPage() {
             </Tooltip>
           </>
         )}
-        <IconButton size="small"><MoreIcon fontSize="small" /></IconButton>
+        {!isGroupChat && <IconButton size="small"><MoreIcon fontSize="small" /></IconButton>}
       </Paper>
 
       {/* 消息列表 */}
@@ -376,7 +499,7 @@ export default function ChatPage() {
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <PersonIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
             <Typography color="text.secondary">
-              {isCEO ? '向 CEO Agent 描述您的业务方向或宏观目标' : '暂无消息，打个招呼吧！'}
+              {isGroupChat ? 'AI Team 工作群暂无消息。等待 CEO Agent 开始分派任务...' : isCEO ? '向 CEO Agent 描述您的业务方向或宏观目标' : '暂无消息，打个招呼吧！'}
             </Typography>
           </Box>
         ) : (
@@ -398,10 +521,59 @@ export default function ChatPage() {
 
               {group.items.map(msg => {
                 const isSelf = msg.from_user === 'self';
+                const isSystem = msg.content_type === 'system_event';
+                const isTaskDispatch = msg.content_type === 'task_dispatch';
+                const isTaskUpdate = msg.content_type === 'task_update';
 
-                // 尝试渲染不同类型的消息卡片
-                const taskData = parseTaskCard(msg);
-                const confirmData = parseConfirmationCard(msg);
+                // 群聊消息发言人名称
+                const senderName = msg.from_user_name || (isSelf ? '我' : (groupMembers[msg.from_user]?.name || contact?.name || msg.from_user));
+                const senderAvatar = isSelf ? '👑' : (groupMembers[msg.from_user]?.avatar || '🤖');
+                const senderColor = isSelf ? '#ff3b30' : (isCEO ? '#7c4dff' : (isGroupChat ? '#ff6d00' : '#1976d2'));
+
+                // 系统消息居中渲染
+                if (isSystem) {
+                  return (
+                    <Box key={msg.id} sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                      <Chip
+                        icon={<CampaignIcon sx={{ fontSize: 14 }} />}
+                        label={msg.content}
+                        size="small"
+                        sx={{
+                          bgcolor: '#fff3e0',
+                          color: '#e65100',
+                          border: '1px solid #ffe0b2',
+                          fontWeight: 500,
+                          fontSize: '0.7rem',
+                          py: 0.5,
+                          height: 'auto',
+                          '& .MuiChip-label': { whiteSpace: 'normal', py: 0.5 },
+                        }}
+                      />
+                    </Box>
+                  );
+                }
+
+                // 群聊任务卡片解析
+                let taskCardData: TaskCardData | null = null;
+                if (isGroupChat && (isTaskDispatch || isTaskUpdate)) {
+                  try {
+                    const parsed = JSON.parse(msg.content);
+                    taskCardData = {
+                      taskId: parsed.taskId || '',
+                      type: parsed.type || 'task',
+                      priority: parsed.priority || 5,
+                      description: parsed.description || '',
+                      expected_output: parsed.expected_output || parsed.output || '',
+                      deadline: parsed.deadline || '',
+                      assigned_to: parsed.assigned_to || '',
+                      status: parsed.status,
+                    };
+                  } catch { taskCardData = null; }
+                }
+
+                // 非群聊的原始 TaskCard/ConfirmationCard 解析
+                const legacyTaskData = !isGroupChat ? parseTaskCard(msg) : null;
+                const confirmData = !isGroupChat ? parseConfirmationCard(msg) : null;
 
                 return (
                   <Box
@@ -418,19 +590,26 @@ export default function ChatPage() {
                       sx={{
                         width: 32,
                         height: 32,
-                        bgcolor: isSelf ? '#ff3b30' : (isCEO ? '#7c4dff' : '#1976d2'),
+                        bgcolor: senderColor,
                         fontSize: '0.85rem',
                         flexShrink: 0,
                       }}
                     >
-                      {isSelf ? '我' : contact.name.charAt(0)}
+                      {senderAvatar}
                     </Avatar>
-                    <Box sx={{ maxWidth: '70%' }}>
-                      {/* 任务卡片 */}
-                      {taskData && !isSelf ? (
-                        <TaskCard task={taskData} onViewDetail={(tid) => console.log('View task:', tid)} />
+                    <Box sx={{ maxWidth: isGroupChat ? '75%' : '70%' }}>
+                      {/* 群聊: 显示发言人名字 */}
+                      {isGroupChat && !isSelf && (
+                        <Typography variant="caption" fontWeight={600} sx={{ mb: 0.2, color: '#e65100', fontSize: '0.65rem', display: 'block' }}>
+                          {senderName}
+                        </Typography>
+                      )}
+                      {/* 群聊任务卡片 */}
+                      {taskCardData ? (
+                        <TaskCard task={taskCardData} onViewDetail={(tid) => console.log('View task:', tid)} />
+                      ) : legacyTaskData && !isSelf ? (
+                        <TaskCard task={legacyTaskData} onViewDetail={(tid) => console.log('View task:', tid)} />
                       ) : confirmData && !isSelf ? (
-                        /* 确认卡片 */
                         <ConfirmationCard
                           data={confirmData}
                           onConfirm={() => handleConfirm(confirmData)}
@@ -444,11 +623,12 @@ export default function ChatPage() {
                           elevation={0}
                           sx={{
                             p: 1.5,
-                            bgcolor: isSelf ? '#1976d2' : 'white',
-                            color: isSelf ? 'white' : 'text.primary',
+                            bgcolor: isSelf ? (isGroupChat ? '#fff3e0' : '#1976d2') : 'white',
+                            color: isSelf ? (isGroupChat ? 'text.primary' : 'white') : 'text.primary',
                             borderRadius: 2,
                             borderTopRightRadius: isSelf ? 0.5 : 2,
                             borderTopLeftRadius: isSelf ? 2 : 0.5,
+                            border: isSelf && isGroupChat ? '1px solid #ffcc80' : undefined,
                           }}
                         >
                           <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
@@ -500,6 +680,28 @@ export default function ChatPage() {
           flexShrink: 0,
         }}
       >
+        {/* AI Team 群聊快捷指令 */}
+        {isGroupChat && !input.startsWith('/') && (
+          <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
+            {AI_TEAM_COMMANDS.map(cmd => (
+              <Chip
+                key={cmd.label}
+                label={cmd.label}
+                size="small"
+                variant="outlined"
+                onClick={() => setInput(cmd.label)}
+                sx={{
+                  height: 22,
+                  fontSize: '0.65rem',
+                  borderColor: '#ffcc80',
+                  color: '#e65100',
+                  '&:hover': { bgcolor: '#fff3e0' },
+                }}
+              />
+            ))}
+          </Box>
+        )}
+
         {/* CEO Agent 快捷命令建议 */}
         {isCEO && !input.startsWith('/') && (
           <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
@@ -519,6 +721,37 @@ export default function ChatPage() {
                 }}
               />
             ))}
+          </Box>
+        )}
+
+        {/* AI 思考中提示 + 停止按钮 */}
+        {isGroupChat && aiResponding && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, px: 1 }}>
+            <CircularProgress size={14} sx={{ color: '#ff6d00' }} />
+            <Typography variant="caption" sx={{ color: '#e65100', fontStyle: 'italic', flex: 1 }}>
+              CEO Agent 思考中...
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={handleStopAI}
+              sx={{
+                p: 0.25,
+                color: '#ef4444',
+                '&:hover': { bgcolor: '#fef2f2' },
+              }}
+              title="停止 AI 思考"
+            >
+              <StopIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
+
+        {/* Token 用完提示 */}
+        {isGroupChat && isDemoAccount() && tokenBalance <= 0 && (
+          <Box sx={{ mb: 1, p: 1, bgcolor: '#fef2f2', borderRadius: 1, border: '1px solid #fecaca' }}>
+            <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 500 }}>
+              Token 已用完（10,000 PT）。如需继续测试，请联系我们获取更多 Token。
+            </Typography>
           </Box>
         )}
 
@@ -569,8 +802,8 @@ export default function ChatPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={isCEO ? '向 CEO Agent 下达指令...' : '输入消息...'}
-            disabled={sending}
+            placeholder={isGroupChat && tokenBalance <= 0 && isDemoAccount() ? 'Token 已用完，无法发送消息' : isGroupChat && aiResponding ? 'CEO Agent 思考中，请稍候...' : isGroupChat ? '在 AI Team 群聊中发号施令...' : isCEO ? '向 CEO Agent 下达指令...' : '输入消息...'}
+            disabled={sending || aiResponding || (isGroupChat && isDemoAccount() && tokenBalance <= 0)}
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: 3,
@@ -580,7 +813,7 @@ export default function ChatPage() {
           />
           <IconButton
             onClick={handleSend}
-            disabled={!input.trim() || sending}
+            disabled={!input.trim() || sending || aiResponding || (isGroupChat && isDemoAccount() && tokenBalance <= 0)}
             sx={{
               bgcolor: '#1976d2',
               color: 'white',

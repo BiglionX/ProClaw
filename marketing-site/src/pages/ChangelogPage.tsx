@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import PageHeader from '../components/shared/PageHeader';
 
 interface Release {
   version: string;
@@ -125,15 +126,10 @@ const ChangelogPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">发布日志</h1>
-          <p className="text-xl text-gray-500">
-            跟踪 ProClaw 的每个版本更新与改进。
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="发布日志"
+        description="跟踪 ProClaw 的每个版本更新与改进。"
+      />
 
       {/* Release List */}
       <div className="flex-grow py-12">

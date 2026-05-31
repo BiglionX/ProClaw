@@ -1,5 +1,5 @@
-import { Button, Typography } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Typography, Box } from '@mui/material';
+import { Storefront as StorefrontIcon } from '@mui/icons-material';
 
 interface RecruitButtonProps {
   onClick: () => void;
@@ -7,33 +7,34 @@ interface RecruitButtonProps {
 
 export default function RecruitButton({ onClick }: RecruitButtonProps) {
   return (
-    <Button
-      variant="contained"
+    <Box
       onClick={onClick}
-      startIcon={<AddIcon />}
       sx={{
         position: 'fixed',
         bottom: 24,
-        right: 24,
+        right: 88, // 56px(FAB) + 8px(gap)
         zIndex: 1200,
-        bgcolor: '#ff3b30',
-        color: '#fff',
-        px: 3,
-        py: 1.5,
-        borderRadius: 28,
-        boxShadow: '0 4px 12px rgba(255, 59, 48, 0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.5,
+        px: 1.5,
+        py: 0.6,
+        borderRadius: 2,
+        bgcolor: 'rgba(0,0,0,0.06)',
+        color: '#666',
+        cursor: 'pointer',
+        userSelect: 'none',
+        transition: 'all 0.2s ease',
         '&:hover': {
-          bgcolor: '#d32f2f',
-          boxShadow: '0 6px 16px rgba(255, 59, 48, 0.5)',
+          bgcolor: 'rgba(0,0,0,0.1)',
+          color: '#333',
         },
-        fontWeight: 600,
-        gap: 1,
       }}
     >
-      <AddIcon />
-      <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
-        发现更多 Agent
+      <StorefrontIcon sx={{ fontSize: 16, opacity: 0.7 }} />
+      <Typography variant="caption" sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
+        Agent 市场
       </Typography>
-    </Button>
+    </Box>
   );
 }

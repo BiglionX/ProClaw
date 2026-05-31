@@ -2,16 +2,14 @@ import {
   VpnKey as ApiKeyIcon,
   Language as DomainIcon,
   Payment as PaymentIcon,
-  Upgrade as UpgradeIcon,
   ContentCopy as CopyIcon,
   CheckCircle as SslIcon,
+  OpenInNew as TokenIcon,
 } from '@mui/icons-material';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Divider,
@@ -21,7 +19,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { getCloudStore, updateCloudStore, upgradePlan, resetApiKey, CloudStore, PlanType, PLAN_INFO } from '../../lib/cloudStoreService';
+import { useNavigate } from 'react-router-dom';
+import { getCloudStore, updateCloudStore, resetApiKey, CloudStore } from '../../lib/cloudStoreService';
 
 interface StoreSettingsProps {
   loading: boolean;
@@ -34,6 +33,7 @@ interface StoreSettingsProps {
 export default function StoreSettings({
   loading, setLoading, setError, setSuccessMessage,
 }: StoreSettingsProps) {
+  const navigate = useNavigate();
   const [store, setStore] = useState<CloudStore | null>(null);
   const [customDomain, setCustomDomain] = useState('');
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
@@ -52,20 +52,6 @@ export default function StoreSettings({
   };
 
   useEffect(() => { loadStore(); }, []);
-
-  const handleUpgrade = async (planType: PlanType) => {
-    if (!store) return;
-    try {
-      setSaving(true);
-      const updated = await upgradePlan(store.id, planType);
-      setStore(updated);
-      setSuccessMessage(`已升级到${PLAN_INFO[planType].name}！`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '升级失败');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleResetApiKey = async () => {
     if (!store) return;
@@ -221,47 +207,44 @@ export default function StoreSettings({
           </Box>
         </Paper>
 
-        {/* 套餐管理 */}
+        {/* Token 计费信息 */}
         <Paper elevation={0} sx={{ p: 3, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <UpgradeIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography variant="h6">套餐管理</Typography>
+            <TokenIcon sx={{ mr: 1, color: 'warning.main' }} />
+            <Typography variant="h6">Token 计费</Typography>
           </Box>
           <Divider sx={{ mb: 3 }} />
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>当前套餐</Typography>
-            <Chip label={PLAN_INFO[store.plan_type].name} color="primary" />
-            {store.plan_type !== 'enterprise' && (
-              <Chip label="可升级" size="small" color="success" variant="outlined" sx={{ ml: 1 }} />
-            )}
+          <Alert severity="success" sx={{ mb: 2 }}>
+            云商城已全面切换为 Token 按量计费模式，告别固定月费。
+          </Alert>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <strong>计费标准：</strong>1 PT = ¥0.001，按实际用量付费。
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="商品同步" size="small" /> 50 PT/个
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="订单处理" size="small" /> 10 PT/单
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="AI 主题生成" size="small" /> 5,000 PT/次
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="自定义域名" size="small" /> 2,000 PT/月
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="实时同步保活" size="small" /> 500 PT/天
+            </Typography>
           </Box>
-          <Grid container spacing={2}>
-            {(Object.keys(PLAN_INFO) as PlanType[])
-              .filter(p => p !== store.plan_type)
-              .map(planType => {
-                const plan = PLAN_INFO[planType];
-                return (
-                  <Grid item xs={12} sm={6} md={3} key={planType}>
-                    <Card variant="outlined" sx={{ height: '100%' }}>
-                      <CardContent>
-                        <Typography variant="h6">{plan.name}</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
-                          {plan.price === 0 ? '免费' : `¥${plan.price}/月`}
-                        </Typography>
-                        <Button
-                          variant="outlined"
-                          fullWidth
-                          onClick={() => handleUpgrade(planType)}
-                          disabled={saving}
-                        >
-                          升级到{plan.name}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                );
-              })}
-          </Grid>
+          <Button
+            variant="contained"
+            color="warning"
+            endIcon={<TokenIcon />}
+            onClick={() => navigate('/token-billing')}
+          >
+            前往 Token 计费页面
+          </Button>
         </Paper>
       </Box>
     </Box>

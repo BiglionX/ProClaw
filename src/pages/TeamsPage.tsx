@@ -42,7 +42,9 @@ import {
   Tab,
 } from '@mui/material';
 import { isTauri, safeInvoke } from '../lib/tauri';
+import { syncAITeamGroups, buildGroupId } from '../lib/contactService';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { AiTeam, CreateTeamPayload, TeamMember, UpdateTeamPayload } from '../lib/teamTypes';
 import { PUBLISH_STATUS_MAP, PUBLISH_STATUS_COLOR } from '../lib/teamTypes';
 import { getWorkLogsGroupedByDate } from '../lib/teamWorkLogService';
@@ -54,10 +56,9 @@ import {
   generateCrossAuthToken,
   type TeamRecommendation,
 } from '../lib/aiTeamRecommendationService';
-import FloatingAgentChat from '../components/Agent/FloatingAgentChat';
-import type { TeamChatContext } from '../components/Agent/FloatingAgentChat';
 
 export default function TeamsPage() {
+  const navigate = useNavigate();
   const [teams, setTeams] = useState<AiTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState('');
@@ -69,9 +70,6 @@ export default function TeamsPage() {
   const [editTeam, setEditTeam] = useState<AiTeam | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState(0);
-
-  // AI 团队对话状态
-  const [chatContext, setChatContext] = useState<TeamChatContext | undefined>(undefined);
 
   // 导入方式选择对话框
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -196,6 +194,7 @@ export default function TeamsPage() {
       const result = await safeInvoke<AiTeam[]>('get_teams');
       if (result) {
         setTeams(result);
+        syncAITeamGroups(result);
         // 首次加载时若无任何团队，自动创建内置默认团队
         if (result.length === 0) {
           ensureBuiltinTeam();
@@ -203,6 +202,7 @@ export default function TeamsPage() {
       } else if (!isTauri()) {
         // 浏览器开发模式：展示模拟内置团队，方便 UI 调试
         setTeams([getMockBuiltinTeam()]);
+        syncAITeamGroups([getMockBuiltinTeam()]);
       }
     } catch (err) {
       console.error('Failed to load teams:', err);
@@ -490,7 +490,7 @@ export default function TeamsPage() {
               </Box>
             </CardContent>
             <CardActions sx={{ pt: 0, justifyContent: 'flex-end', gap: 0.5 }}>
-              <Tooltip title="对话"><IconButton size="small" onClick={() => setChatContext({ teamId: team.id, teamName: team.name })}><ChatIcon fontSize="small" /></IconButton></Tooltip>
+              <Tooltip title="对话"><IconButton size="small" onClick={() => navigate('/chat/' + buildGroupId(team.id))}><ChatIcon fontSize="small" /></IconButton></Tooltip>
               <Tooltip title="查看详情"><IconButton size="small" onClick={() => setDetailTeam(team)}><ViewIcon fontSize="small" /></IconButton></Tooltip>
               <Tooltip title="编辑"><IconButton size="small" onClick={() => setEditTeam(team)}><EditIcon fontSize="small" /></IconButton></Tooltip>
               <Tooltip title="导出"><IconButton size="small" onClick={() => handleExport(team)}><DownloadIcon fontSize="small" /></IconButton></Tooltip>
@@ -517,9 +517,9 @@ export default function TeamsPage() {
           onDelete={(id) => { setDetailTeam(null); setDeleteTarget(id); }}
           onExport={handleExport}
           onTogglePublish={handleTogglePublish}
-          onChat={(memberRole) => {
+          onChat={() => {
             setDetailTeam(null);
-            setChatContext({ teamId: detailTeam.id, teamName: detailTeam.name, memberRole });
+            navigate('/chat/' + buildGroupId(detailTeam.id));
           }} />
       )}
 
@@ -730,14 +730,6 @@ export default function TeamsPage() {
       </Dialog>
 
       <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar('')} message={snackbar} />
-
-      {/* FloatingAgentChat 团队对话 */}
-      {chatContext && (
-        <FloatingAgentChat
-          teamContext={chatContext}
-          onClose={() => setChatContext(undefined)}
-        />
-      )}
     </Box>
   );
 }

@@ -2,6 +2,7 @@ import {
   AccountCircle as ProfileIcon,
   Security as SecurityIcon,
   Smartphone as DevicesIcon,
+  Android as AndroidIcon,
   WorkspacePremium as SubscriptionIcon,
   Edit as EditIcon,
   Save as SaveIcon,
@@ -19,6 +20,7 @@ import {
   Percent as PercentIcon,
   Storage as StorageIcon,
   Logout as LogoutIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import {
   Box,
@@ -503,6 +505,22 @@ export default function UserCenterPage() {
               </Typography>
               <Alert severity="info" sx={{ fontSize: '0.8rem' }}>
                 确保移动端和桌面端在同一局域网内。配对码 5 分钟有效。
+              </Alert>
+              <Alert severity="success" sx={{ fontSize: '0.8rem', mt: 2 }} icon={<AndroidIcon />}>
+                还没有安装 App？{'\u00A0'}
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="success"
+                  component="a"
+                  href="https://proclaw.cc/download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  endIcon={<OpenInNewIcon />}
+                  sx={{ fontWeight: 700, fontSize: '0.8rem' }}
+                >
+                  下载 ProClaw 移动端 App
+                </Button>
               </Alert>
             </Box>
           </Box>

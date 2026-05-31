@@ -1,6 +1,7 @@
 import {
   Chat as ChatIcon,
   Search as SearchIcon,
+  Groups as GroupIcon,
 } from '@mui/icons-material';
 import {
   Avatar,
@@ -145,12 +146,12 @@ export default function MessagesPage() {
                     >
                       <Avatar
                         sx={{
-                          bgcolor: contact.unread_count ? '#ff3b30' : '#1976d2',
+                          bgcolor: contact.contact_type === 'group' ? '#ff6d00' : contact.unread_count ? '#ff3b30' : '#1976d2',
                           width: 44,
                           height: 44,
                         }}
                       >
-                        {contact.name.charAt(0)}
+                        {contact.contact_type === 'group' ? <GroupIcon /> : contact.name.charAt(0)}
                       </Avatar>
                     </Badge>
                   </ListItemAvatar>

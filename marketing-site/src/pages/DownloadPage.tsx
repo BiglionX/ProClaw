@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import PageHeader from '../components/shared/PageHeader';
 import { getPublishedPlugins } from '../lib/pluginService';
 import type { IndustryPlugin } from '../types';
 
@@ -71,18 +72,11 @@ const DownloadPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">下载 ProClaw</h1>
-          <p className="text-xl text-gray-500">
-            基础桌面端统一构建 · 按需下载行业插件
-          </p>
-          <p className="text-sm text-gray-400 mt-2">
-            当前版本：v0.1.0 | 发布日期：2026-05-26
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="下载 ProClaw"
+        description="基础桌面端统一构建 · 按需下载行业插件"
+        subtitle="当前版本：v1.0.0-beta.2 | 发布日期：2026-05-31"
+      />
 
       {/* Platform Cards - 基础桌面端 */}
       <div className="flex-grow py-12">
@@ -176,6 +170,38 @@ const DownloadPage: React.FC = () => {
             <p className="text-center text-gray-400 text-sm mt-6">
               💡 安装后选择行业即可自动下载对应插件
             </p>
+          </div>
+
+          {/* 移动端 App */}
+          <div className="mb-16">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+              移动端 App
+            </h2>
+            <p className="text-sm text-gray-500 text-center mb-8">
+              随时随地管理店铺，数据实时同步
+            </p>
+            <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+              <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center hover:border-green-300 hover:shadow-md transition-all">
+                <svg className="w-10 h-10 mx-auto mb-4 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 2h12a2 2 0 012 2v16a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm0 2v16h12V4H6zm5 14h2v-2h-2v2z"/>
+                </svg>
+                <h3 className="font-bold text-gray-900 mb-2">Android APK</h3>
+                <p className="text-sm text-gray-500 mb-4">适用于 Android 8.0+ 设备</p>
+                <span className="inline-block px-4 py-2 bg-green-100 text-green-700 text-sm font-medium rounded-lg">
+                  即将推出
+                </span>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center hover:border-gray-300 hover:shadow-md transition-all opacity-70">
+                <svg className="w-10 h-10 mx-auto mb-4 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M12.99 4.57c.7-.85 1.16-2.04 1.03-3.23-.99.04-2.2.66-2.91 1.49-.64.74-1.2 1.93-1.05 3.07 1.1.08 2.24-.56 2.93-1.33"/>
+                </svg>
+                <h3 className="font-bold text-gray-900 mb-2">iOS TestFlight</h3>
+                <p className="text-sm text-gray-500 mb-4">适用于 iOS 16+ 设备</p>
+                <span className="inline-block px-4 py-2 bg-gray-200 text-gray-500 text-sm font-medium rounded-lg">
+                  即将推出
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* System Requirements */}

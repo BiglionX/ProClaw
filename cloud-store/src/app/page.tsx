@@ -73,7 +73,7 @@ export default function HomePage() {
             <div className="text-4xl mb-3">💰</div>
             <h3 className="text-lg font-semibold mb-2">按 Token 计费</h3>
             <p className="text-blue-100/80 text-sm">
-              按实际使用量付费，用完即止。新用户赠送 1000 Token
+              按实际使用量付费，用完即止。新用户赠送 50,000 PT（≈¥50）
             </p>
           </div>
         </div>

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import PageHeader from '../components/shared/PageHeader';
+import CTASection from '../components/shared/CTASection';
 
 const features = [
   {
@@ -114,6 +115,19 @@ const features = [
       '每次发布前全量测试，有问题先修复再发布',
     ],
   },
+  {
+    id: 'industry-plugins',
+    title: '行业插件系统',
+    subtitle: '一个基础端，适配所有行业。插件按需下载。',
+    description: '安装统一的 ProClaw 桌面端后，根据你的行业选择对应插件。每个插件包含专属功能模块、操作面板和 AI 经营团队，即装即用。基础进销存适用于所有行业，插件为你提供行业专属的高级功能。',
+    highlights: [
+      '\uD83C\uDF7D\uFE0F 餐饮版：POS收银/桌台管理/KDS厨房显示',
+      '\uD83D\uDC87 美业版：预约管理/员工排班/营销活动',
+      '\uD83D\uDC3E 宠物版：宠物档案/寄养管理/美容预约',
+      '\u2601\uFE0F Cloud版：Token计费/云端备份/数据同步',
+      '\uD83D\uDD0C 更多行业插件持续开发中...',
+    ],
+  },
 ];
 
 const FeaturesPage: React.FC = () => {
@@ -121,16 +135,10 @@ const FeaturesPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      {/* Page Header */}
-      <div className="bg-white border-b border-gray-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">功能全景</h1>
-          <p className="text-xl text-gray-500 max-w-3xl mx-auto">
-            一个人管店、管库存、管订单、管客户。AI 帮你记账、分析、出报表，还能一键开网店。
-            来看看 ProClaw 到底能帮你做什么。
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="功能全景"
+        description="一个人管店、管库存、管订单、管客户。AI 帮你记账、分析、出报表，还能一键开网店。来看看 ProClaw 到底能帮你做什么。"
+      />
 
       {/* Feature Sections */}
       <div className="flex-grow">
@@ -169,21 +177,14 @@ const FeaturesPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Bottom CTA */}
-      <div className="bg-gray-900 py-16">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">先下载用用看，两个版本都免费</h2>
-          <p className="text-gray-400 mb-8">3 分钟完成安装，CEO Agent 对话引导配置。不满意？卸了就完了，没有任何损失。</p>
-          <div className="flex justify-center gap-4">
-            <Link to="/download" className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all">
-              免费下载桌面端
-            </Link>
-            <Link to="/pricing" className="px-8 py-4 border-2 border-gray-600 text-gray-300 hover:border-gray-400 hover:text-white font-medium rounded-lg transition-all">
-              查看云托管方案
-            </Link>
-          </div>
-        </div>
-      </div>
+      <CTASection
+        title="先下载用用看，两个版本都免费"
+        description="3 分钟完成安装，CEO Agent 对话引导配置。不满意？卸了就完了，没有任何损失。"
+        primaryButtonText="免费下载桌面端"
+        primaryButtonLink="/download"
+        secondaryButtonText="查看云托管方案"
+        secondaryButtonLink="/pricing"
+      />
 
       <Footer />
     </div>

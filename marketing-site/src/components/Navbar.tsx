@@ -6,8 +6,16 @@ const navLinks = [
   { path: '/', label: '首页' },
   { path: '/features', label: '功能' },
   { path: '/pricing', label: '定价' },
-  { path: '/use-cases', label: '场景' },
+  { path: '/download', label: '下载' },
+  { path: '/plugins', label: '插件市场' },
   { path: '/faq', label: 'FAQ' },
+];
+
+const solutionLinks = [
+  { path: '/solutions/catering', label: '餐饮', emoji: '\uD83C\uDF7D\uFE0F' },
+  { path: '/solutions/beauty', label: '美业', emoji: '\uD83D\uDC87' },
+  { path: '/solutions/pet', label: '宠物', emoji: '\uD83D\uDC3E' },
+  { path: '/solutions/cloud', label: 'Cloud 托管', emoji: '\u2601\uFE0F' },
 ];
 
 const Navbar: React.FC = () => {
@@ -15,13 +23,18 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [solutionDropdownOpen, setSolutionDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const solutionDropdownRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭下拉
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (solutionDropdownRef.current && !solutionDropdownRef.current.contains(e.target as Node)) {
+        setSolutionDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -64,6 +77,37 @@ const Navbar: React.FC = () => {
                 {link.label}
               </Link>
             ))}
+
+            {/* 行业方案 下拉 */}
+            <div className="relative" ref={solutionDropdownRef}>
+              <button
+                onClick={() => setSolutionDropdownOpen(!solutionDropdownOpen)}
+                onMouseEnter={() => setSolutionDropdownOpen(true)}
+                className="flex items-center gap-1 text-gray-600 hover:text-black font-semibold"
+              >
+                行业方案
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {solutionDropdownOpen && (
+                <div
+                  className="absolute left-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                  onMouseLeave={() => setSolutionDropdownOpen(false)}
+                >
+                  {solutionLinks.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setSolutionDropdownOpen(false)}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-black transition-colors"
+                    >
+                      {item.emoji} {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right Side: User State */}

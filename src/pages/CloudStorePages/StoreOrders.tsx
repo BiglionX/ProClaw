@@ -170,7 +170,7 @@ export default function StoreOrders({
           ))}
         </Box>
         <Box sx={{ flex: 1 }} />
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadOrders} disabled={loading}>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => loadOrders()} disabled={loading}>
           刷新
         </Button>
       </Paper>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import PageHeader from '../components/shared/PageHeader';
 
 interface FAQItem {
   question: string;
@@ -117,13 +118,10 @@ const FAQPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">常见问题</h1>
-          <p className="text-xl text-gray-500">共 {totalQuestions} 个问题，帮你快速了解 ProClaw</p>
-        </div>
-      </div>
+      <PageHeader
+        title="常见问题"
+        description={`共 ${totalQuestions} 个问题，帮你快速了解 ProClaw`}
+      />
 
       {/* FAQ Content */}
       <div className="flex-grow py-12">

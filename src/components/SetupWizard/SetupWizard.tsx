@@ -76,7 +76,7 @@ interface SetupConfigPayload {
 // ==================== 主组件 ====================
 
 export function SetupWizard() {
-  const mode = useAppModeStore(state => state.mode);
+  const mode = useAppModeStore(state => state.mode) as SetupContext['appMode'];
   const isLight = mode === 'light';
   const STEPS = getSteps(isLight);
 
@@ -110,7 +110,7 @@ export function SetupWizard() {
     await pm.setIndustry(industryId as any);
     setCurrentStep('greeting');
 
-    const newMode = useAppModeStore.getState().mode;
+    const newMode = useAppModeStore.getState().mode as SetupContext['appMode'];
     const newIsLight = newMode === 'light';
 
     const ctx: SetupContext = {

@@ -37,6 +37,7 @@ pub mod store_commands;
 pub mod ceo_commands;
 
 // 云备份模块（Cloud 版）
+pub mod secretary_commands;
 pub mod cloud_backup_commands;
 
 // 行业插件命令（Phase 4）
@@ -59,6 +60,7 @@ pub mod market_commands;
 use database::{Database, get_database_path};
 use store_commands::*;
 use ceo_commands::*;
+use secretary_commands::*;
 use sync_engine::*;
 use sync_engine::SyncEngine;
 use services::cloud_backup_service::CloudBackupService;
@@ -468,6 +470,12 @@ async fn main() {
             install_plugin,
             uninstall_plugin,
             get_plugin_assets_path,
+
+            // 商务秘书 Agent BAP (PRD v8.5)
+            bap_get_all,
+            bap_upsert,
+            bap_delete_by_type,
+            bap_reset_learning,
 
             // 云备份命令（Cloud 版）
             get_backup_history_cmd,
