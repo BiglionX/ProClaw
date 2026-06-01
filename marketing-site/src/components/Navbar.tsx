@@ -7,7 +7,6 @@ const navLinks = [
   { path: '/features', label: '功能' },
   { path: '/pricing', label: '定价' },
   { path: '/download', label: '下载' },
-  { path: '/plugins', label: '插件市场' },
   { path: '/faq', label: 'FAQ' },
 ];
 

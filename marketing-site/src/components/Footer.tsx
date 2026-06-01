@@ -37,6 +37,8 @@ const Footer: React.FC = () => {
               <li><a href="https://github.com/BigLionX/ProClaw/blob/main/docs/API_DOCUMENTATION.md" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">API 文档</a></li>
               <li><Link to="/changelog" className="text-gray-400 hover:text-white text-sm transition-colors">发布日志</Link></li>
               <li><a href="https://github.com/BigLionX/ProClaw/blob/main/docs/guides/INSTALLATION_GUIDE.md" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">安装指南</a></li>
+              <li><a href="https://skillhub.proclaw.cc" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">技能仓库</a></li>
+              <li><a href="https://nvwax.proclaw.cc" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">智能体工厂</a></li>
             </ul>
           </div>
 

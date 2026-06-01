@@ -257,6 +257,38 @@ const DownloadPage: React.FC = () => {
             </div>
           </div>
 
+          {/* SHA256 Checksums */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">文件校验 (SHA256)</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              下载后建议校验文件完整性，确保安装包未被篡改。
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="py-3 pr-4 text-sm font-semibold text-gray-900">文件</th>
+                    <th className="py-3 text-sm font-semibold text-gray-900">SHA256</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw Plus (桌面端)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">a5feadedb54ed6dfda4c8faa373dcdc6a56b234fa4b7b7428a602d9cd26a1dae</td>
+                  </tr>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw Light (桌面端)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">e4b4254ce027e3cf1678b67256ed5054b005c7f6b48bcdafde67434d7c65102b</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">移动端 App</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">89e7083fcf0f754788d272c2105250d632ac791883efb37ef3d72b432ac2b4c2</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Other options */}
           <div className="grid md:grid-cols-3 gap-6">
             <a
