@@ -21,7 +21,7 @@ export function ModelConfigStep({ onModelConfigured, appMode }: ModelConfigStepP
   const [backendType, setBackendType] = useState<'ollama' | 'llamacpp'>('ollama');
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
 
-  // 对于进销存版，简化模型配置
+  // 对于 ProClaw Plus 版，简化模型配置
   if (appMode === 'inventory') {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', maxWidth: 500, mx: 'auto' }}>

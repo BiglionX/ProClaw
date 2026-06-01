@@ -34,6 +34,7 @@ import ProjectDashboardPage from './pages/ProjectDashboardPage';
 import AgentManagerPage from './pages/AgentManagerPage';
 import FinanceAgentPage from './pages/FinanceAgentPage';
 import AIKnowledgePage from './pages/AIKnowledgePage';
+import CustomerServicePage from './pages/CustomerServicePage';
 import { useAppModeStore } from './config/appMode';
 import OperationsDashboard from './components/OperationsCenter/OperationsDashboard';
 
@@ -258,6 +259,16 @@ function App() {
           }
         />
 
+        {/* AI 客服管理路由 */}
+        <Route
+          path="/customer-service"
+          element={
+            <ProtectedRoute>
+              <CustomerServicePage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* AI 知识库路由（全版本） */}
         <Route
           path="/ai-knowledge"
@@ -317,7 +328,7 @@ function App() {
           }
         />
 
-        {/* 虚拟公司版专属路由：统一注册，由插件 manifest 控制导航可见性 */}
+        {/* ProClaw Light 版专属路由：统一注册，由插件 manifest 控制导航可见性 */}
         <Route
           path="/agents"
           element={

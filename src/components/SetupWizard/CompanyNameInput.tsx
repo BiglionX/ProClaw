@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Box, Button, TextField, Typography } from '@mui/material';
-import { CEOBubble } from './CEOBubble';
 
 interface CompanyNameInputProps {
   onNameConfirmed: (name: string) => void;
@@ -43,12 +42,6 @@ export function CompanyNameInput({ onNameConfirmed }: CompanyNameInputProps) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', maxWidth: 500, mx: 'auto' }}>
-      <CEOBubble
-        speaker="ceo"
-        text="请给我们公司取个名字吧（可以是真实公司名或任何您喜欢的名字，1-50个字符）。"
-        isTyping={false}
-      />
-
       <TextField
         fullWidth
         size="small"

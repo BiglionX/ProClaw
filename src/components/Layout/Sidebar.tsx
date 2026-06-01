@@ -14,6 +14,7 @@ import {
   BarChart as BarChartIcon,
   MenuBook as KnowledgeIcon,
   Extension as ExtensionIcon,
+  HeadsetMic as HeadsetIcon,
   // ========== Phase 4 行业插件图标 ==========
   Restaurant as RestaurantIcon,
   DesktopWindows as DesktopWindowsIcon,
@@ -69,6 +70,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   'paw': <PetsIcon />,
   'home': <HomeIcon />,
   'sparkles': <AutoAwesomeIcon />,
+  'headset': <HeadsetIcon />,
 };
 
 /** 基础默认导航项（无插件时回退） */
@@ -83,6 +85,7 @@ const DEFAULT_NAV_ITEMS: NavItem[] = [
   { text: '商品库', icon: <ProductsIcon />, path: '/products' },
   { text: '供应链', icon: <SupplyChainIcon />, path: '/supplychain' },
   { text: '云商城', icon: <StoreIcon />, path: '/cloud-store' },
+  { text: 'AI 客服', icon: <HeadsetIcon />, path: '/customer-service' },
 ];
 
 /** 将 PluginNavItem[] 转换为 NavItem[]（解析 icon 字符串为组件） */

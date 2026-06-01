@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
+import CustomerServiceProvider from '@/components/CustomerService/CustomerServiceProvider';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -25,6 +26,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+
+      {/* AI 客服悬浮组件 */}
+      <CustomerServiceProvider />
     </div>
   );
 }

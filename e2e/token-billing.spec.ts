@@ -26,8 +26,8 @@ test.describe('Token 计费 - 定价页展示', () => {
     await expect(page.locator('text=透明定价')).toBeVisible({ timeout: 10000 });
 
     // 默认选中桌面端 Tab
-    await expect(page.locator('text=进销存版')).toBeVisible();
-    await expect(page.locator('text=虚拟公司版')).toBeVisible();
+    await expect(page.locator('text=ProClaw Plus')).toBeVisible();
+    await expect(page.locator('text=ProClaw Light')).toBeVisible();
   });
 
   test('定价页云商城 Tab 应显示 Token 计费模式', async ({ page }) => {

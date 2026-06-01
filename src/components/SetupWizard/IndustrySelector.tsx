@@ -21,20 +21,14 @@ export interface IndustryOption {
 export const DEFAULT_INDUSTRIES: IndustryOption[] = [
   {
     id: 'inventory',
-    name: '进销存通用版',
+    name: 'ProClaw Plus 版',
     icon: '📦',
     description: '适用于大多数实体商户，含完整进销存管理、报表分析、AI经营团队',
     badge: '推荐',
   },
   {
-    id: 'light',
-    name: '极简零售版',
-    icon: '🛍️',
-    description: '县区小微商家首选，简化操作流程，聚焦核心业务',
-  },
-  {
     id: 'virtual_company',
-    name: '虚拟公司版',
+    name: 'ProClaw Light 版',
     icon: '🏢',
     description: '虚拟团队与Agent协作平台，CEO Agent主控官系统',
   },

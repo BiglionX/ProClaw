@@ -31,10 +31,10 @@ $env:VITE_BUILD_MODE = $Mode
 Write-Host "Build Mode: $Mode" -ForegroundColor Yellow
 if ($Mode -eq "virtual_company") {
     $env:CARGO_FEATURES = "virtual_company,custom-protocol"
-    $outputSuffix = "虚拟公司版"
+    $outputSuffix = "Light版"
 } else {
     $env:CARGO_FEATURES = "inventory,custom-protocol"
-    $outputSuffix = "进销存版"
+    $outputSuffix = "Plus版"
 }
 Write-Host "Output: ProClaw-$outputSuffix" -ForegroundColor Yellow
 Write-Host ""

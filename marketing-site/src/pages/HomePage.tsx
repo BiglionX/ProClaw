@@ -5,31 +5,31 @@ import Footer from '../components/Footer';
 
 const modeCards = [
   {
-    id: 'light',
-    title: 'ProClaw Light',
-    subtitle: '极简版',
-    desc: '单一门店、快速上手、完全免费。极简进销存，个体商户 3 分钟上手。',
-    color: 'bg-emerald-50 border-emerald-200 hover:border-emerald-400',
-    badge: 'bg-emerald-100 text-emerald-700',
-    link: '/download',
-  },
-  {
     id: 'standard',
-    title: 'ProClaw 标准版',
+    title: 'ProClaw Plus',
     subtitle: '完整进销存 + AI 团队',
-    desc: '完整进销存 + AI 团队 + 行业插件。适合需要多岗位协作的成长型商户。',
+    desc: '完整进销存管理 + AI 经营团队 + 行业插件。适合需要多岗位协作的成长型商户。',
     color: 'bg-blue-50 border-blue-200 hover:border-blue-400',
     badge: 'bg-blue-100 text-blue-700',
     link: '/features',
   },
   {
     id: 'virtual',
-    title: 'ProClaw 虚拟公司',
+    title: 'ProClaw Light',
     subtitle: 'CEO 主控官 + Agent 生态',
     desc: 'CEO Agent 主控官模式，搭配 Agent 生态，适合模拟经营与 AI 协作探索。',
     color: 'bg-purple-50 border-purple-200 hover:border-purple-400',
     badge: 'bg-purple-100 text-purple-700',
     link: '/features#agent-eco',
+  },
+  {
+    id: 'cloud',
+    title: 'ProClaw Cloud',
+    subtitle: '云托管商城',
+    desc: 'AI 自动生成独立网店，商品同步上架，客户下单自动记账扣库存，搭配 AI 客服。',
+    color: 'bg-cyan-50 border-cyan-200 hover:border-cyan-400',
+    badge: 'bg-cyan-100 text-cyan-700',
+    link: '/features#cloud-store',
   },
 ];
 
@@ -84,8 +84,8 @@ const featureCards = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
       </svg>
     ),
-    title: 'ProClaw Light',
-    desc: '极简进销存，个体商户 3 分钟上手。无需复杂配置，打开就能用，永远免费。',
+    title: 'ProClaw Plus 简化模式',
+    desc: '无需复杂配置，打开就能用，永远免费。极简进销存，个体商户 3 分钟上手。',
     link: '/download',
     tags: ['#免费', '#极简'],
   },
@@ -144,7 +144,7 @@ const HomePage: React.FC = () => {
               <div className="inline-flex flex-wrap gap-2 mb-6">
                 <span className="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-sm font-semibold">零技术门槛</span>
                 <span className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold">一个软件，所有行业</span>
-                <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">ProClaw Light 极简版</span>
+                <span className="px-3 py-1.5 bg-cyan-100 text-cyan-700 rounded-full text-sm font-semibold">ProClaw 产品家族</span>
               </div>
               <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
                 <span className="block text-gray-900">ProClaw</span>
@@ -154,7 +154,7 @@ const HomePage: React.FC = () => {
               </h1>
               <p className="mt-4 text-lg text-gray-600 leading-relaxed max-w-lg">
                 不用懂技术，不用配服务器。下载安装，跟它聊天，它帮你管店。
-                {'三模式适配：Light 极简版 / 标准进销存 / 虚拟公司 Agent 生态。数据 100% 在你电脑里。'}
+                {'双模式可选：ProClaw Plus / ProClaw Light，搭配 ProClaw Cloud 云托管商城。数据 100% 在你电脑里。'}
               </p>
               <ul className="mt-6 space-y-3 text-gray-600">
                 {[
@@ -382,7 +382,7 @@ const HomePage: React.FC = () => {
             先下载用用看，免费且开源
           </h2>
           <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">
-            Light 极简版 / 标准版 / 虚拟公司版，三模式任选。3 分钟完成安装，CEO Agent 对话引导选择行业。
+            ProClaw Plus / ProClaw Light / ProClaw Cloud，三款产品任选。3 分钟完成安装，CEO Agent 对话引导选择行业插件。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

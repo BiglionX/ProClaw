@@ -125,7 +125,7 @@ test.describe('ProClaw-Light 极简版 E2E', () => {
   });
 
   test.describe('设置页面 Light 版', () => {
-    test('设置页面应隐藏标准版特有选项卡', async ({ page }) => {
+    test('设置页面应隐藏 Plus 版特有选项卡', async ({ page }) => {
       await page.goto('/#/');
       await page.waitForLoadState('networkidle');
 

@@ -24,8 +24,8 @@ const faqData: FAQCategory[] = [
         featured: true,
       },
       {
-        question: '进销存版和虚拟公司版怎么选？',
-        answer: '进销存版面向实体商户，提供完整的产品库管理、采购销售、库存跟踪功能。虚拟公司版面向创业团队、自由职业者、虚拟组织，剥离进销存模块，以 Agent 化架构为基础，内置财务管理 Agent，支持从 Agent 市场安装其他能力（任务管理、CRM、文档协作等）。如果两者都需要，可以分别安装使用。',
+        question: 'ProClaw Plus 和 ProClaw Light 怎么选？',
+        answer: 'ProClaw Plus 面向实体商户，提供完整的产品库管理、采购销售、库存跟踪功能。ProClaw Light 面向创业团队、自由职业者、虚拟组织，剥离进销存模块，以 Agent 化架构为基础，内置财务管理 Agent，支持从 Agent 市场安装其他能力（任务管理、CRM、文档协作等）。如果两者都需要，可以分别安装使用。',
       },
       {
         question: '支持哪些操作系统？',
@@ -66,7 +66,7 @@ const faqData: FAQCategory[] = [
     questions: [
       {
         question: '使用 ProClaw 需要付费吗？',
-        answer: 'ProClaw 桌面端应用（进销存版和虚拟公司版）均永久免费开源 (GPL-3.0)。如果你使用 AI 功能，需要自行配置 LLM API Key，费用由模型提供商按用量收取。云托管商城是可选增值服务，提供免费版（20 商品/10 单月）和付费套餐（29元起）。详见定价页。',
+        answer: 'ProClaw 桌面端应用（ProClaw Plus 和 ProClaw Light）均永久免费开源 (GPL-3.0)。如果你使用 AI 功能，需要自行配置 LLM API Key，费用由模型提供商按用量收取。云托管商城是可选增值服务，提供免费版（20 商品/10 单月）和付费套餐（29元起）。详见定价页。',
         featured: true,
       },
       {

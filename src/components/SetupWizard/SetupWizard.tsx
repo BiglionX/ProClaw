@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, IconButton } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { safeInvoke } from '../../lib/tauri';
 import { useAppModeStore, PluginManager } from '../../config/appMode';
 import { CEOBubble } from './CEOBubble';
@@ -29,6 +30,7 @@ import {
   getLightPlatformBindDialogue,
   getLightContentInitDialogue,
   getLightCompletionDialogue,
+  getModelConfigDialogue,
   getPathSelectionDialogue,
   getProCloudConfirmDialogue,
 } from './dialogueScript';
@@ -108,6 +110,7 @@ export function SetupWizard() {
     }
 
     await pm.setIndustry(industryId as any);
+    pushStepHistory();
     setCurrentStep('greeting');
 
     const newMode = useAppModeStore.getState().mode as SetupContext['appMode'];
@@ -125,6 +128,8 @@ export function SetupWizard() {
       }
       const storeNodes = getLightStoreTypeDialogue(ctx);
       setDialogueNodes([...greetingNodes, ...storeNodes]);
+      pushStepHistory();
+      setCurrentStep('store_type');
     } else {
       const personalGreeting = await generatePersonalizedText('greeting', ctx);
       const greetingNodes = getGreetingDialogue(ctx);
@@ -137,6 +142,29 @@ export function SetupWizard() {
 
   const [installationComplete, setInstallationComplete] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ==================== 上一步（历史记录） ====================
+  // 记录每个步骤推进时的对话快照，用于返回上一步时还原
+  const stepHistoryRef = useRef<{ step: string; dialogueCount: number }[]>([]);
+  const currentStepRef = useRef(currentStep);
+  const dialogueCountRef = useRef(dialogueNodes.length);
+
+  useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
+  useEffect(() => { dialogueCountRef.current = dialogueNodes.length; }, [dialogueNodes]);
+
+  function pushStepHistory() {
+    stepHistoryRef.current.push({
+      step: currentStepRef.current,
+      dialogueCount: dialogueCountRef.current,
+    });
+  }
+
+  const handleBack = useCallback(() => {
+    const prevEntry = stepHistoryRef.current.pop();
+    if (!prevEntry) return;
+    setDialogueNodes((prev) => prev.slice(0, prevEntry.dialogueCount));
+    setCurrentStep(prevEntry.step as any);
+  }, []);
 
   // 初始化：检查安装状态 + 显示欢迎语
   useEffect(() => {
@@ -223,6 +251,7 @@ export function SetupWizard() {
       appMode: mode,
     };
     const importNodes = getLightDataImportDialogue(ctx);
+    pushStepHistory();
     setCurrentStep('data_import');
     setDialogueNodes((prev) => [...prev, ...importNodes]);
   }, [setupData.storeType]);
@@ -253,6 +282,7 @@ export function SetupWizard() {
       hasData: setupData.hasData,
     };
     const platformNodes = getLightPlatformBindDialogue(ctx);
+    pushStepHistory();
     setCurrentStep('platform_bind');
     setDialogueNodes((prev) => [...prev, ...platformNodes]);
   }, [setupData.storeType, setupData.hasData]);
@@ -278,12 +308,14 @@ export function SetupWizard() {
 
   const handlePlatformNext = useCallback(() => {
     const contentNodes = getLightContentInitDialogue();
+    pushStepHistory();
     setCurrentStep('content_init');
     setDialogueNodes((prev) => [...prev, ...contentNodes]);
   }, []);
 
   const handleContentNext = useCallback(() => {
     const completeNodes = getLightCompletionDialogue();
+    pushStepHistory();
     setCurrentStep('completion');
     setDialogueNodes((prev) => [...prev, ...completeNodes]);
   }, []);
@@ -314,6 +346,7 @@ export function SetupWizard() {
 
       // 空间足够，推进到公司名步骤
       const companyNodes = getCompanyNameDialogue(ctx);
+      pushStepHistory();
       setCurrentStep('company');
       setDialogueNodes((prev) => [...prev, ...companyNodes]);
     },
@@ -365,6 +398,8 @@ export function SetupWizard() {
       if (provider === 'procloud') {
         const confirmNodes = getProCloudConfirmDialogue();
         setDialogueNodes((prev) => [...prev, ...confirmNodes]);
+        pushStepHistory();
+        setCurrentStep('completion');
       } else if (provider === 'local') {
         const ctx: SetupContext = {
           installPath: setupData.installPath,
@@ -374,12 +409,28 @@ export function SetupWizard() {
           appMode: mode,
         };
         const completionNodes = getCompletionDialogue(ctx);
+        pushStepHistory();
         setCurrentStep('completion');
         setDialogueNodes((prev) => [...prev, ...completionNodes]);
       }
     },
     [setupData]
   );
+
+  // ==================== greeting 步骤推进 ====================
+
+  const handleGreetingNext = useCallback(() => {
+    // Light 版：greeting 后自动进入店铺类型选择（由 useEffect 处理），无需额外操作
+    if (isLight) return;
+    // 标准版：推进到路径选择
+    const ctx: SetupContext = {
+      appMode: mode,
+    };
+    const pathNodes = getPathSelectionDialogue(ctx);
+    pushStepHistory();
+    setCurrentStep('path');
+    setDialogueNodes((prev) => [...prev, ...pathNodes]);
+  }, [mode]);
 
   const handleEnterWorkspace = useCallback(async () => {
     if (!setupData.installPath || !setupData.companyName || !setupData.modelProvider) {
@@ -535,8 +586,20 @@ export function SetupWizard() {
                 // 根据选项 ID 判断对应的 Light 步骤推进
                 if (opt.action === 'confirm') {
                   handleClick = handleEnterWorkspace;
-                } else if (opt.id === 'store-next' || opt.id === 'start-setup') {
-                  handleClick = isLight ? handleStoreNext : undefined;
+                } else if (opt.id === 'store-next') {
+                  handleClick = handleStoreNext;
+                } else if (opt.id === 'start-setup') {
+                  handleClick = handleGreetingNext;
+                } else if (opt.id === 'company-next') {
+                  handleClick = () => {
+                    pushStepHistory();
+                    setCurrentStep('model');
+                    setDialogueNodes((prev) => [...prev, ...getModelConfigDialogue({
+                      installPath: setupData.installPath,
+                      companyName: setupData.companyName,
+                      appMode: mode,
+                    })]);
+                  };
                 } else if (opt.id === 'import-next') {
                   handleClick = handleImportNext;
                 } else if (opt.id === 'platform-next') {
@@ -573,10 +636,28 @@ export function SetupWizard() {
 
       {/* 输入区域 */}
       <Box sx={INPUT_AREA_SX}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>
-            Enter 确认 · ESC 取消
-          </span>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ flex: 1 }}>
+            {stepHistoryRef.current.length > 0 && (
+              <IconButton
+                onClick={handleBack}
+                size="small"
+                sx={{
+                  color: 'rgba(255,255,255,0.5)',
+                  '&:hover': { color: 'rgba(255,255,255,0.8)', bgcolor: 'rgba(255,255,255,0.05)' },
+                }}
+              >
+                <ArrowBackIcon fontSize="small" />
+                <span style={{ marginLeft: 4, fontSize: 12 }}>上一步</span>
+              </IconButton>
+            )}
+          </Box>
+          <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>
+              Enter 确认 · ESC 取消
+            </span>
+          </Box>
+          <Box sx={{ flex: 1 }} />
         </Box>
       </Box>
     </Box>

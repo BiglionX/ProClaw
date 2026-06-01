@@ -14,6 +14,7 @@ interface CEOBubbleProps {
 function CEOAvatar() {
   return (
     <Avatar
+      src="/agents/secretary/avatars/default.png"
       sx={{
         width: 40,
         height: 40,
@@ -29,9 +30,7 @@ function CEOAvatar() {
           },
         },
       }}
-    >
-      <Typography sx={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>C</Typography>
-    </Avatar>
+    />
   );
 }
 

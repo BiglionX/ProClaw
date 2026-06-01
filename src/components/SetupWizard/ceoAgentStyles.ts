@@ -24,6 +24,7 @@ export const BUBBLE_STYLES = {
 };
 
 export const STEP_LABELS: Record<string, string> = {
+  industry: '选择行业',
   greeting: '欢迎',
   path: '安装位置',
   company: '公司命名',

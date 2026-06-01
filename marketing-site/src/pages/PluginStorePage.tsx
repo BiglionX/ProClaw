@@ -36,7 +36,7 @@ const CATEGORIES = [
   { id: 'all', label: '全部' },
   { id: 'retail', label: '零售' },
   { id: 'inventory', label: '进销存' },
-  { id: 'virtual_company', label: '虚拟公司' },
+  { id: 'virtual_company', label: 'ProClaw Light' },
   { id: 'catering', label: '餐饮' },
   { id: 'beauty', label: '美业' },
   { id: 'pet', label: '宠物' },
