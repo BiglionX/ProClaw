@@ -74,6 +74,12 @@ hmac = "0.12"
 ed25519-dalek = { version = "2.1", features = ["batch", "digest"] }
 signature = "2"
 
+# 插件数据库迁移 checksum
+md-5 = "0.10"
+
+# 插件动态加载
+libloading = "0.8"
+
 [features]
 default = ["custom-protocol", "inventory"]
 custom-protocol = ["tauri/custom-protocol"]

@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import PageHeader from '../components/shared/PageHeader';
 import TokenCostEstimator from '../components/TokenCostEstimator';
+import RouteSEO from '../components/RouteSEO';
 
 const desktopPlans = [
   {
@@ -95,6 +96,7 @@ const PricingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <RouteSEO routeKey="pricing" />
       <Navbar />
 
       <PageHeader

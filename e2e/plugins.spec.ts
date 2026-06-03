@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import AdmZip from 'adm-zip';
 
 test.describe('行业插件系统 - Phase 4 生态', () => {
   test('插件商店页面应显示所有已发布插件', async ({ page }) => {
@@ -91,18 +94,71 @@ test.describe('行业插件系统 - Phase 4 生态', () => {
       id: 'test-plugin',
       name: '测试插件',
       version: '1.0.0',
-      description: '测试',
-      icon: '🔌',
+      description: 'Test',
+      icon: 'plug',
       compatibleAppVersion: '>=0.1.0',
       features: { modules: [], dashboards: [], reports: [] },
-      navigation: { add: [{ text: 'Test', icon: '🔌', path: '/test' }], remove: [] },
+      navigation: { add: [{ text: 'Test', icon: 'plug', path: '/test' }], remove: [] },
       ui: {},
       assets: { path: './assets', files: [] },
     };
 
-    // 验证有效 manifest 应有合法结构
     expect(validManifest.id).toBeTruthy();
     expect(validManifest.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(validManifest.navigation.add[0].path).toMatch(/^\//);
+  });
+
+  test('餐厅示例插件结构验证', async () => {
+    // 验证 catering 插件目录结构完整性
+    const pluginDir = path.resolve(process.cwd(), 'src/plugins/catering');
+
+    // 验证 manifest.json
+    const manifestPath = path.join(pluginDir, 'manifest.json');
+    expect(fs.existsSync(manifestPath)).toBeTruthy();
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    expect(manifest.id).toBe('catering');
+    expect(manifest.name).toBeTruthy();
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(manifest.permissions).toBeInstanceOf(Array);
+    expect(manifest.entry_points.frontend).toBe('frontend/index.js');
+    expect(manifest.entry_points.migrations).toBe('migrations/up.sql');
+
+    // 验证 migrations
+    const upSqlPath = path.join(pluginDir, 'migrations', 'up.sql');
+    expect(fs.existsSync(upSqlPath)).toBeTruthy();
+    const upSql = fs.readFileSync(upSqlPath, 'utf-8');
+    expect(upSql).toContain('CREATE TABLE IF NOT EXISTS catering_orders');
+
+    const downSqlPath = path.join(pluginDir, 'migrations', 'down.sql');
+    expect(fs.existsSync(downSqlPath)).toBeTruthy();
+    const downSql = fs.readFileSync(downSqlPath, 'utf-8');
+    expect(downSql).toContain('DROP TABLE IF EXISTS catering_orders');
+
+    // 验证 frontend entry
+    const fePath = path.join(pluginDir, 'frontend', 'index.js');
+    expect(fs.existsSync(fePath)).toBeTruthy();
+    const feContent = fs.readFileSync(fePath, 'utf-8');
+    expect(feContent).toContain('ProClawPlugin.registerRoute');
+    expect(feContent).toContain('/pos');
+    expect(feContent).toContain('/tables');
+    expect(feContent).toContain('/kitchen');
+  });
+
+  test('打包脚本应正确输出 .proclaw-plugin 文件', async () => {
+    const distFile = path.resolve(process.cwd(), 'dist/catering-1.0.0.proclaw-plugin');
+    expect(fs.existsSync(distFile)).toBeTruthy();
+
+    // 验证 ZIP 文件内的结构
+    const zip = new AdmZip(distFile);
+    const entries = zip.getEntries();
+    const entryNames = entries.map(function (e: any) { return e.entryName; });
+
+    expect(entryNames).toContain('manifest.json');
+    expect(entryNames.some(function (n: string) { return n.startsWith('migrations/') || n.startsWith('migrations\\'); })).toBeTruthy();
+    expect(entryNames.some(function (n: string) { return n.startsWith('frontend/') || n.startsWith('frontend\\'); })).toBeTruthy();
+
+    const pkgManifest = JSON.parse(zip.readAsText('manifest.json'));
+    expect(pkgManifest.id).toBe('catering');
+    expect(pkgManifest.version).toBe('1.0.0');
   });
 });

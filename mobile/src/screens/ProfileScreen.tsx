@@ -1,11 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, List, Avatar, Button, Switch, Divider, useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { clearTokens, isDemoMode } from '../services/AuthService';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { showToast } from '../components/Toast';
+import ProfileSwitcher from '../components/ProfileSwitcher';
+import { listProfiles, getProfilePluginPath } from '../services/ProfileManager';
+import { useAppStore } from '../stores/AppStore';
+import { getInstalledPlugins, InstalledPlugin, parseManifest } from '../services/PluginRegistry';
+import { getDatabase } from '../services/DatabaseFactory';
+import { hasBackupConfig } from '../services/BackupConfigStore';
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -14,11 +20,41 @@ const ProfileScreen: React.FC = () => {
   const [encryptData, setEncryptData] = useState(true);
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>('checking');
   const [demo, setDemo] = useState(false);
+  const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
+  const [backupConfigured, setBackupConfigured] = useState(false);
 
   useEffect(() => {
     checkCurrentConnection();
     checkDemo();
+    checkBackupConfig();
   }, []);
+
+  // 页面聚焦时刷新插件列表（安装/卸载后自动更新）
+  useFocusEffect(
+    useCallback(() => {
+      loadInstalledPlugins();
+      checkBackupConfig();
+    }, [])
+  );
+
+  const loadInstalledPlugins = async () => {
+    try {
+      const db = getDatabase();
+      const plugins = await getInstalledPlugins(db);
+      setInstalledPlugins(plugins);
+    } catch {
+      // Database not ready
+    }
+  };
+
+  const checkBackupConfig = async () => {
+    try {
+      const configured = await hasBackupConfig();
+      setBackupConfigured(configured);
+    } catch {
+      setBackupConfigured(false);
+    }
+  };
 
   const checkDemo = async () => {
     setDemo(await isDemoMode());
@@ -130,6 +166,87 @@ const ProfileScreen: React.FC = () => {
         />
         <Divider />
         <List.Item
+          title="云备份"
+          description={backupConfigured ? '端到端加密备份 - 已配置' : '端到端加密，数据自主可控'}
+          left={() => <List.Icon icon="cloud-upload" />}
+          right={() => (
+            <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
+          )}
+          onPress={() => navigation.navigate('BackupWallet')}
+        />
+        <Divider />
+        <List.Item
+          title="局域网同步"
+          description="同一 WiFi 下与桌面端直连同步"
+          left={() => <List.Icon icon="wifi" />}
+          right={() => (
+            <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
+          )}
+          onPress={() => navigation.navigate('LanSync')}
+        />
+        <Divider />
+        <List.Item
+          title="插件商店"
+          description="按需安装行业工作流插件"
+          left={() => <List.Icon icon="puzzle" />}
+          right={() => (
+            <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
+          )}
+          onPress={() => navigation.navigate('PluginStore')}
+        />
+        <Divider />
+        <List.Item
+          title="跨身份数据"
+          description="在不同身份间导入/导出业务数据"
+          left={() => <List.Icon icon="swap-horizontal-bold" />}
+          right={() => (
+            <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
+          )}
+          onPress={() => navigation.navigate('DataTransfer')}
+        />
+        <Divider />
+        {/* 已安装插件列表 */}
+        {installedPlugins.length > 0 && (
+          <>
+            <List.Subheader style={styles.sectionSubheader}>已安装插件</List.Subheader>
+            {installedPlugins.map((plugin, idx) => {
+              const manifest = parseManifest(plugin.manifestJson);
+              return (
+                <React.Fragment key={plugin.id}>
+                  {idx > 0 && <Divider />}
+                  <List.Item
+                    title={manifest?.name || plugin.name}
+                    description={`v${plugin.version} - 点击查看`}
+                    left={() => <List.Icon icon={manifest?.icon?.replace(/[\uD800-\uDFFF]/g, '') ? 'puzzle' : 'puzzle'} />}
+                    right={() => (
+                      <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
+                    )}
+                    onPress={() => navigation.navigate('PluginPage', {
+                      pluginId: plugin.id,
+                      pluginTitle: manifest?.name || plugin.name,
+                    })}
+                  />
+                </React.Fragment>
+              );
+            })}
+            <Divider />
+          </>
+        )}
+        <List.Item
+          title="身份管理"
+          description="切换、创建或管理身份"
+          left={() => <List.Icon icon="account-switch" />}
+          right={() => (
+            <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
+          )}
+          onPress={async () => {
+            const profiles = await listProfiles();
+            useAppStore.getState().setProfiles(profiles);
+            navigation.navigate('ProfileSelect');
+          }}
+        />
+        <Divider />
+        <List.Item
           title="清除缓存"
           description="清除本地缓存数据"
           left={() => <List.Icon icon="delete-sweep" />}
@@ -206,6 +323,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginHorizontal: 16,
     overflow: 'hidden',
+  },
+  sectionSubheader: {
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '500',
+    paddingLeft: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    backgroundColor: '#f8f8f8',
   },
   footer: {
     marginTop: 30,

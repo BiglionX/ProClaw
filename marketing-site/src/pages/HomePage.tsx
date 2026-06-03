@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import RouteSEO from '../components/RouteSEO';
 
 const modeCards = [
   {
@@ -133,6 +134,7 @@ const testimonialCards = [
 const HomePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <RouteSEO routeKey="home" />
       <Navbar />
 
       {/* Hero Section */}

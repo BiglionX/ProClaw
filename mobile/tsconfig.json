@@ -4,12 +4,14 @@
     "module": "commonjs",
     "lib": [
       "es2017",
-      "dom"
+      "dom",
+      "es2020.string"
     ],
     "jsx": "react-native",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+     "types": ["jest"],
     "resolveJsonModule": true,
     "moduleResolution": "node",
     "ignoreDeprecations": "6.0",

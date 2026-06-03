@@ -43,7 +43,8 @@ export interface PluginNavItem {
   group?: string;
 }
 
-/** 行业插件 Manifest（与需求文档 IndustryPluginManifest 一致） */
+/** 行业插件 Manifest（与需求文档 IndustryPluginManifest 一致）
+ * PRD v10.0 规范扩展：所有新增字段均为可选以保持向后兼容。 */
 export interface IndustryPluginManifest {
   id: string;
   name: string;
@@ -51,6 +52,10 @@ export interface IndustryPluginManifest {
   description: string;
   icon: string;
   compatibleAppVersion: string;
+  /** 最低 ProClaw 版本要求（PRD v10.0 新字段） */
+  minProclawVersion?: string;
+  /** 插件作者（PRD v10.0 新字段） */
+  author?: string;
   features: PluginFeatureConfig;
   navigation: {
     add: PluginNavItem[];
@@ -81,6 +86,20 @@ export interface IndustryPluginManifest {
     path: string;
     files: string[];
   };
+  /** 权限声明列表（PRD v10.0 新字段）
+   * 示例：["database:create_table", "database:read:products", "printer:write"] */
+  permissions?: string[];
+  /** 入口点配置（PRD v10.0 新字段） */
+  entryPoints?: {
+    /** 前端入口文件 */
+    frontend?: string;
+    /** 后端动态库路径 */
+    backend?: string;
+    /** 数据库迁移脚本路径 */
+    migrations?: string;
+  };
+  /** 插件配置界面 JSON Schema（PRD v10.0 新字段） */
+  settingsSchema?: Record<string, any>;
 }
 
 // ============ Zustand Store ============

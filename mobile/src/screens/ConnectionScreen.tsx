@@ -3,8 +3,12 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, TextInput, Button, Card, useTheme, HelperText, ActivityIndicator } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { pairDevice, setDemoMode } from '../services/AuthService';
-import { getLocalIPAddress } from '../services/ConnectionManager';
+import { getLocalIPAddress, isLanSyncAvailable } from '../services/ConnectionManager';
 import { showToast } from '../components/Toast';
+import { createProfile, setCurrentProfile } from '../services/ProfileManager';
+import { openDatabase } from '../services/DatabaseFactory';
+import { applySchema } from '../services/SchemaManager';
+import { useAppStore } from '../stores/AppStore';
 
 const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors } = useTheme();
@@ -38,6 +42,20 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setLoading(true);
     try {
       await pairDevice(serverUrl, pairingCode);
+
+      // 配对成功后自动创建默认身份（如果没有身份）
+      const { listProfiles } = await import('../services/ProfileManager');
+      const profiles = await listProfiles();
+      if (profiles.length === 0) {
+        const profile = await createProfile('默认身份');
+        await openDatabase(profile.id);
+        await setCurrentProfile(profile.id);
+        await applySchema(await (await import('../services/DatabaseFactory')).getDatabase());
+        useAppStore.getState().setProfiles([profile]);
+        useAppStore.getState().setPhase('ready');
+        console.log('[Connection] Created default profile:', profile.id);
+      }
+
       showToast('success', '配对成功', '正在跳转...');
       navigation.replace('Main');
     } catch (err: any) {
@@ -52,6 +70,20 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setDemoLoading(true);
     try {
       await setDemoMode();
+
+      // 演示模式自动创建演示身份
+      const { listProfiles } = await import('../services/ProfileManager');
+      const profiles = await listProfiles();
+      if (profiles.length === 0) {
+        const profile = await createProfile('演示身份');
+        await openDatabase(profile.id);
+        await setCurrentProfile(profile.id);
+        await applySchema(await (await import('../services/DatabaseFactory')).getDatabase());
+        useAppStore.getState().setProfiles([profile]);
+        useAppStore.getState().setPhase('ready');
+        console.log('[Connection] Created demo profile:', profile.id);
+      }
+
       showToast('success', '已进入演示模式', '可以浏览所有功能界面');
       navigation.replace('Main');
     } catch {
@@ -163,6 +195,15 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </View>
 
           <Button
+            mode="outlined"
+            icon="wifi"
+            onPress={() => navigation.navigate('LanSync')}
+            style={styles.lanBtn}
+          >
+            局域网同步
+          </Button>
+
+          <Button
             mode="elevated"
             icon="play-circle"
             onPress={handleDemoMode}
@@ -270,6 +311,11 @@ const styles = StyleSheet.create({
   scanBtn: {
     borderRadius: 10,
     borderColor: '#d1d5db',
+  },
+  lanBtn: {
+    borderRadius: 10,
+    borderColor: '#6366f1',
+    marginBottom: 8,
   },
   demoBtn: {
     borderRadius: 10,

@@ -260,6 +260,97 @@ class PluginLoader {
       return false;
     }
   }
+
+  /**
+   * 启用插件（持久化）
+   */
+  async enablePlugin(pluginId: string): Promise<boolean> {
+    try {
+      await safeInvoke('enable_plugin', { pluginId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 禁用插件（持久化）
+   */
+  async disablePlugin(pluginId: string): Promise<boolean> {
+    try {
+      await safeInvoke('disable_plugin', { pluginId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 获取插件启用状态
+   */
+  async getPluginEnabledStatus(pluginId: string): Promise<{ enabled: boolean } | null> {
+    try {
+      return await safeInvoke<{ enabled: boolean }>('get_plugin_enabled_status', { pluginId });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 获取所有插件的启用状态
+   */
+  async getAllPluginEnabledStatuses(): Promise<{ plugin_id: string; enabled: boolean }[]> {
+    try {
+      return (await safeInvoke<{ plugin_id: string; enabled: boolean }[]>('get_all_plugin_enabled_statuses')) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * 检查插件更新
+   * @param pluginId 插件ID
+   * @param currentVersion 当前版本号
+   * @param storeApiUrl 商店API基础URL
+   */
+  async checkUpdate(pluginId: string, currentVersion: string, storeApiUrl: string): Promise<{
+    has_update: boolean;
+    current_version: string;
+    latest_version: string;
+    download_url: string | null;
+    package_hash: string | null;
+    changelog: string | null;
+    is_force_update: boolean;
+  } | null> {
+    try {
+      return await safeInvoke<any>('check_plugin_update', {
+        pluginId,
+        currentVersion,
+        storeApiUrl,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 应用插件更新
+   * @param pluginId 插件ID
+   * @param downloadUrl 下载地址
+   * @param newVersion 新版本号
+   */
+  async applyUpdate(pluginId: string, downloadUrl: string, newVersion: string): Promise<string | null> {
+    try {
+      return await safeInvoke<string>('apply_plugin_update', {
+        pluginId,
+        downloadUrl,
+        newVersion,
+      });
+    } catch (err: any) {
+      console.error('应用更新失败:', err);
+      return null;
+    }
+  }
 }
 
 /** 插件加载器单例实例 */

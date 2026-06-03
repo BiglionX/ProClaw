@@ -1,32 +1,20 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import RouteSEO from './RouteSEO';
 import type { SolutionData } from '../lib/solutionData';
+import type { RouteKey } from '../config/seoMetadata';
 
 interface SolutionPageProps {
   data: SolutionData;
+  routeKey: RouteKey;
 }
 
-const SolutionPage: React.FC<SolutionPageProps> = ({ data }) => {
-  useEffect(() => {
-    document.title = data.seoTitle;
-    const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) {
-      metaDescription.setAttribute('content', data.seoDescription);
-    }
-    const metaKeywords = document.querySelector('meta[name="keywords"]');
-    if (metaKeywords) {
-      metaKeywords.setAttribute('content', data.seoKeywords);
-    }
-
-    return () => {
-      document.title = 'ProClaw - AI 驱动的商户经营操作系统';
-    };
-  }, [data]);
-
+const SolutionPage: React.FC<SolutionPageProps> = ({ data, routeKey }) => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <RouteSEO routeKey={routeKey} />
       <Navbar />
 
       {/* Hero */}

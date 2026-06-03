@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import PageHeader from '../components/shared/PageHeader';
+import RouteSEO from '../components/RouteSEO';
 
 interface FAQItem {
   question: string;
@@ -116,6 +117,7 @@ const FAQPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <RouteSEO routeKey="faq" />
       <Navbar />
 
       <PageHeader

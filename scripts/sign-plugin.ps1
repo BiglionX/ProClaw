@@ -2,16 +2,16 @@
 .SYNOPSIS
     ProClaw 行业插件 Ed25519 签名工具
 .DESCRIPTION
-    对已打包的 .proclaw-industry-plugin 文件进行 Ed25519 签名。
+    对已打包的 .proclaw-plugin 文件进行 Ed25519 签名。
     生成 .sig 签名文件，用于桌面端插件加载器的签名校验。
 .PARAMETER PackageFile
-    插件包文件路径（.proclaw-industry-plugin）
+    插件包文件路径（.proclaw-plugin）
 .PARAMETER PrivateKeyFile
     Ed25519 私钥文件路径（32 字节原始二进制，Hex 编码或 Base64 编码）
 .PARAMETER OutputDir
     签名文件输出目录，默认为插件包所在目录
 .EXAMPLE
-    .\sign-plugin.ps1 -PackageFile ./dist/inventory-1.0.0.proclaw-industry-plugin -PrivateKeyFile ./keys/private.key
+    .\sign-plugin.ps1 -PackageFile ./dist/inventory-1.0.0.proclaw-plugin -PrivateKeyFile ./keys/private.key
 #>
 
 param(

@@ -2,9 +2,23 @@
   "id": "catering",
   "name": "餐饮行业版",
   "version": "1.0.0",
+  "min_proclaw_version": "10.0.0",
+  "author": "ProClaw Labs",
   "description": "面向中小型餐馆、快餐店、饮品店，覆盖扫码点餐、后厨打印、桌台管理、团购对接、会员营销等场景。AI 菜单优化师 + 库存预测师辅助经营。",
   "icon": "🍽️",
   "compatibleAppVersion": ">=0.1.0",
+  "permissions": [
+    "database:create_table",
+    "database:read:*",
+    "database:write:*",
+    "menu:add",
+    "printer:write",
+    "notification:send"
+  ],
+  "entry_points": {
+    "frontend": "frontend/index.js",
+    "migrations": "migrations/up.sql"
+  },
   "features": {
     "modules": ["pos", "kitchen-display", "reservation", "scan-order", "delivery", "membership", "inventory", "purchase", "sales", "reports", "ai-teams", "ai-knowledge"],
     "dashboards": ["daily-sales", "popular-dishes", "table-occupancy", "delivery-stats"],
@@ -40,8 +54,32 @@
       { "label": "团购核销", "icon": "ticket", "action": "openGroupBuy", "color": "#10b981" }
     ]
   },
+  "settings_schema": {
+    "type": "object",
+    "properties": {
+      "printer_name": {
+        "type": "string",
+        "title": "默认打印机名称",
+        "default": ""
+      },
+      "auto_print_kds": {
+        "type": "boolean",
+        "title": "新订单自动打印后厨",
+        "default": true
+      },
+      "default_table_capacity": {
+        "type": "integer",
+        "title": "默认桌台容量",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20
+      }
+    }
+  },
   "assets": {
     "path": "./assets",
     "files": []
-  }
+  },
+  "category": "official",
+  "tags": ["餐饮", "POS", "KDS", "点餐", "后厨"]
 }

@@ -1,82 +1,41 @@
-import * as SQLite from 'expo-sqlite';
+/**
+ * DatabaseService (Native) - 兼容层
+ * 委托给 DatabaseFactory 实现多身份数据库管理。
+ */
 
-let db: SQLite.SQLiteDatabase | null = null;
+import {
+  openDatabase,
+  closeDatabase as factoryCloseDatabase,
+  closeAllDatabases,
+  getDatabase,
+  getCurrentProfileId,
+} from './DatabaseFactory';
 
+/**
+ * 初始化数据库（兼容旧接口）
+ * 注意：在新架构下，请在选择身份后调用 openDatabase()
+ */
 export const initDatabase = async (): Promise<void> => {
-  try {
-    db = await SQLite.openDatabaseAsync('proclaw_mobile.db');
-    await createTables();
-    console.log('Database initialized successfully');
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    throw error;
-  }
+  console.log('[DatabaseService] initDatabase() called - use openDatabase(profileId) instead');
 };
 
-const createTables = async (): Promise<void> => {
-  if (!db) throw new Error('Database not initialized');
+export { getDatabase, closeAllDatabases as closeDatabase };
 
-  const queries = [
-    `CREATE TABLE IF NOT EXISTS offline_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      endpoint TEXT NOT NULL,
-      method TEXT NOT NULL,
-      payload TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS products_cache (
-      id TEXT PRIMARY KEY,
-      sku TEXT NOT NULL,
-      name TEXT NOT NULL,
-      price REAL DEFAULT 0,
-      stock_quantity INTEGER DEFAULT 0,
-      cached_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS orders_cache (
-      id TEXT PRIMARY KEY,
-      order_type TEXT NOT NULL,
-      order_number TEXT NOT NULL,
-      total_amount REAL DEFAULT 0,
-      status TEXT DEFAULT 'draft',
-      cached_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sender_id TEXT NOT NULL,
-      receiver_id TEXT,
-      content TEXT NOT NULL,
-      message_type TEXT DEFAULT 'text',
-      is_read INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_offline_queue_created ON offline_queue(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_products_cache_sku ON products_cache(sku)`,
-    `CREATE INDEX IF NOT EXISTS idx_orders_cache_status ON orders_cache(status)`
-  ];
-
-  for (const query of queries) {
-    await db.execAsync(query);
-  }
-};
-
-export const getDatabase = (): SQLite.SQLiteDatabase => {
-  if (!db) throw new Error('Database not initialized. Call initDatabase() first.');
-  return db;
-};
-
-export const closeDatabase = async (): Promise<void> => {
-  if (db) {
-    await db.closeAsync();
-    db = null;
-  }
-};
-
+/**
+ * 清理缓存表（保留兼容）
+ */
 export const clearCache = async (): Promise<void> => {
-  if (!db) throw new Error('Database not initialized');
-  const tables = ['offline_queue', 'products_cache', 'orders_cache', 'messages'];
+  const db = getDatabase();
+  const tables = ['offline_queue', 'products_cache', 'customers_cache', 'orders_cache', 'messages'];
   for (const table of tables) {
-    await db.execAsync(`DELETE FROM ${table}`);
+    try {
+      await db.execAsync(`DELETE FROM ${table}`);
+    } catch {
+      // 表可能不存在
+    }
   }
 };
 
-export default { initDatabase, getDatabase, closeDatabase, clearCache };
+export { openDatabase, closeAllDatabases, getCurrentProfileId };
+
+export default { initDatabase, getDatabase, closeDatabase: closeAllDatabases, clearCache, openDatabase };

@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import PageHeader from '../components/shared/PageHeader';
 import CTASection from '../components/shared/CTASection';
+import RouteSEO from '../components/RouteSEO';
 import { getPublishedPlugins } from '../lib/pluginService';
 
 type IndustryFilter = 'all' | string;
@@ -107,6 +108,7 @@ const UseCasesPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <RouteSEO routeKey="useCases" />
       <Navbar />
 
       <PageHeader

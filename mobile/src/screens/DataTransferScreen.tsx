@@ -1,0 +1,702 @@
+/**
+ * DataTransferScreen - 跨身份数据导出/导入向导
+ * 允许用户将一个身份的数据导出并导入到另一个身份。
+ *
+ * 对应 PRD v11.0 第6.3节：数据共享机制
+ */
+
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { listProfiles, type Profile } from '../services/ProfileManager';
+import { exportProfileData, importProfileData } from '../services/DataExportService';
+import type { ExportDataPackage, ImportConfig } from '../services/DataExportService';
+import { useAppStore } from '../stores/AppStore';
+
+type WizardStep = 'select_profile' | 'select_tables' | 'configure' | 'progress' | 'result';
+
+const DEFAULT_EXPORT_TABLES = [
+  { key: 'product_spu', label: '商品 SPU', icon: 'package-variant-closed' },
+  { key: 'product_sku', label: '商品 SKU', icon: 'barcode' },
+  { key: 'product_categories', label: '商品分类', icon: 'shape' },
+  { key: 'product_images', label: '商品图片', icon: 'image-multiple' },
+  { key: 'brands', label: '品牌', icon: 'trademark' },
+  { key: 'customers', label: '客户', icon: 'account-group' },
+  { key: 'sales_orders', label: '销售订单', icon: 'file-document' },
+  { key: 'sales_order_items', label: '销售订单明细', icon: 'format-list-bulleted' },
+  { key: 'purchase_orders', label: '采购订单', icon: 'truck' },
+  { key: 'purchase_order_items', label: '采购订单明细', icon: 'clipboard-list' },
+  { key: 'inventory_transactions', label: '库存交易', icon: 'swap-horizontal-bold' },
+];
+
+const DataTransferScreen: React.FC = () => {
+  const [step, setStep] = useState<WizardStep>('select_profile');
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [currentProfile, setCurrentProfileState] = useState<Profile | null>(null);
+  const [selectedSource, setSelectedSource] = useState<Profile | null>(null);
+  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set(DEFAULT_EXPORT_TABLES.map(t => t.key)));
+  const [conflictStrategy, setConflictStrategy] = useState<ImportConfig['onConflict']>('skip');
+  const [clearBeforeImport, setClearBeforeImport] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
+  const [result, setResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
+  const [executing, setExecuting] = useState(false);
+
+  useEffect(() => {
+    loadProfiles();
+  }, []);
+
+  const loadProfiles = async () => {
+    const items = await listProfiles();
+    setProfiles(items);
+    const current = useAppStore.getState().currentProfile;
+    setCurrentProfileState(current);
+  };
+
+  const toggleTable = (tableKey: string) => {
+    setSelectedTables(prev => {
+      const next = new Set(prev);
+      if (next.has(tableKey)) {
+        next.delete(tableKey);
+      } else {
+        next.add(tableKey);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllTables = () => {
+    if (selectedTables.size === DEFAULT_EXPORT_TABLES.length) {
+      setSelectedTables(new Set());
+    } else {
+      setSelectedTables(new Set(DEFAULT_EXPORT_TABLES.map(t => t.key)));
+    }
+  };
+
+  const handleExecute = async () => {
+    if (!selectedSource || selectedTables.size === 0) return;
+
+    setExecuting(true);
+    setStep('progress');
+    setProgress({ current: 0, total: 0, message: '正在导出源身份数据...' });
+
+    try {
+      // 1. 导出源身份数据
+      const tableNames = Array.from(selectedTables);
+      const data = await exportProfileData(selectedSource.id, tableNames);
+
+      setProgress({ current: 1, total: 2, message: '正在导入到当前身份...' });
+
+      // 2. 导入到当前身份
+      const config: ImportConfig = {
+        onConflict: conflictStrategy,
+        includeRelated: true,
+        clearBeforeImport,
+      };
+      const importResult = await importProfileData(
+        currentProfile!.id,
+        data,
+        config
+      );
+
+      setResult(importResult);
+      setStep('result');
+    } catch (error: any) {
+      Alert.alert('传输失败', error?.message || '数据传输过程中发生错误');
+      setStep('select_profile');
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  const renderProfileStep = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>选择源身份</Text>
+      <Text style={styles.stepSubtitle}>
+        选择要从中导出数据的身份（当前身份作为导入目标）
+      </Text>
+
+      {currentProfile && (
+        <View style={styles.targetBadge}>
+          <MaterialCommunityIcons name="arrow-down-circle" size={20} color="#6366f1" />
+          <Text style={styles.targetBadgeText}>
+            导入目标：{currentProfile.name}
+          </Text>
+        </View>
+      )}
+
+      <FlatList
+        data={profiles.filter(p => p.id !== currentProfile?.id)}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.profileItem,
+              selectedSource?.id === item.id && styles.profileItemSelected,
+            ]}
+            onPress={() => setSelectedSource(item)}
+          >
+            <Text style={styles.profileAvatar}>{item.avatar || '👤'}</Text>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{item.name}</Text>
+              <Text style={styles.profileDate}>
+                创建于 {new Date(item.createdAt).toLocaleDateString('zh-CN')}
+              </Text>
+            </View>
+            {selectedSource?.id === item.id && (
+              <MaterialCommunityIcons name="check-circle" size={24} color="#6366f1" />
+            )}
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="information-outline" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>没有其他身份可供选择</Text>
+            <Text style={styles.emptyHint}>请先在身份管理页面创建其他身份</Text>
+          </View>
+        }
+      />
+
+      <TouchableOpacity
+        style={[styles.primaryButton, !selectedSource && styles.buttonDisabled]}
+        onPress={() => setStep('select_tables')}
+        disabled={!selectedSource}
+      >
+        <Text style={styles.primaryButtonText}>下一步：选择数据表</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderTablesStep = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <TouchableOpacity onPress={() => setStep('select_profile')}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#6366f1" />
+        </TouchableOpacity>
+        <Text style={styles.stepTitle}>选择要传输的数据表</Text>
+      </View>
+
+      <TouchableOpacity style={styles.selectAllRow} onPress={toggleAllTables}>
+        <MaterialCommunityIcons
+          name={selectedTables.size === DEFAULT_EXPORT_TABLES.length ? 'checkbox-marked' : 'checkbox-blank-outline'}
+          size={22}
+          color="#6366f1"
+        />
+        <Text style={styles.selectAllText}>
+          {selectedTables.size === DEFAULT_EXPORT_TABLES.length ? '取消全选' : '全选'}
+        </Text>
+        <Text style={styles.selectAllCount}>{selectedTables.size}/{DEFAULT_EXPORT_TABLES.length}</Text>
+      </TouchableOpacity>
+
+      <ScrollView style={styles.tableList}>
+        {DEFAULT_EXPORT_TABLES.map(table => (
+          <TouchableOpacity
+            key={table.key}
+            style={styles.tableItem}
+            onPress={() => toggleTable(table.key)}
+          >
+            <MaterialCommunityIcons
+              name={selectedTables.has(table.key) ? 'checkbox-marked' : 'checkbox-blank-outline'}
+              size={22}
+              color={selectedTables.has(table.key) ? '#6366f1' : '#ccc'}
+            />
+            <MaterialCommunityIcons name={table.icon as any} size={20} color="#666" style={styles.tableIcon} />
+            <Text style={styles.tableLabel}>{table.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <TouchableOpacity
+        style={[styles.primaryButton, selectedTables.size === 0 && styles.buttonDisabled]}
+        onPress={() => setStep('configure')}
+        disabled={selectedTables.size === 0}
+      >
+        <Text style={styles.primaryButtonText}>下一步：传输配置</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderConfigureStep = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <TouchableOpacity onPress={() => setStep('select_tables')}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#6366f1" />
+        </TouchableOpacity>
+        <Text style={styles.stepTitle}>传输配置</Text>
+      </View>
+
+      <View style={styles.configSummary}>
+        <Text style={styles.configSummaryText}>
+          从 <Text style={styles.configHighlight}>{selectedSource?.name}</Text> 传输
+          {selectedTables.size} 个表到 <Text style={styles.configHighlight}>{currentProfile?.name}</Text>
+        </Text>
+      </View>
+
+      <Text style={styles.configSectionTitle}>冲突处理策略</Text>
+      {([
+        { value: 'skip' as const, label: '跳过重复', desc: '目标身份已有相同ID的记录将被保留，不覆盖' },
+        { value: 'overwrite' as const, label: '覆盖', desc: '目标身份已有相同ID的记录将被覆盖' },
+      ]).map(option => (
+        <TouchableOpacity
+          key={option.value}
+          style={styles.optionRow}
+          onPress={() => setConflictStrategy(option.value)}
+        >
+          <MaterialCommunityIcons
+            name={conflictStrategy === option.value ? 'radiobox-marked' : 'radiobox-blank'}
+            size={22}
+            color={conflictStrategy === option.value ? '#6366f1' : '#ccc'}
+          />
+          <View style={styles.optionContent}>
+            <Text style={styles.optionLabel}>{option.label}</Text>
+            <Text style={styles.optionDesc}>{option.desc}</Text>
+          </View>
+        </TouchableOpacity>
+      ))}
+
+      <Text style={styles.configSectionTitle}>导入前操作</Text>
+      <TouchableOpacity
+        style={styles.optionRow}
+        onPress={() => setClearBeforeImport(!clearBeforeImport)}
+      >
+        <MaterialCommunityIcons
+          name={clearBeforeImport ? 'checkbox-marked' : 'checkbox-blank-outline'}
+          size={22}
+          color={clearBeforeImport ? '#ef4444' : '#ccc'}
+        />
+        <View style={styles.optionContent}>
+          <Text style={[styles.optionLabel, clearBeforeImport && { color: '#ef4444' }]}>
+            导入前清空目标表
+          </Text>
+          <Text style={styles.optionDesc}>先删除目标身份中的所有数据，再导入（不可恢复）</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.primaryButton, { backgroundColor: '#22c55e' }]}
+        onPress={handleExecute}
+      >
+        <Text style={styles.primaryButtonText}>开始传输</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderProgressStep = () => (
+    <View style={[styles.stepContainer, styles.centerStep]}>
+      <ActivityIndicator size="large" color="#6366f1" />
+      <Text style={styles.progressTitle}>正在传输数据...</Text>
+      <Text style={styles.progressMessage}>{progress.message}</Text>
+    </View>
+  );
+
+  const renderResultStep = () => (
+    <View style={[styles.stepContainer, styles.centerStep]}>
+      <MaterialCommunityIcons
+        name={result && result.errors.length === 0 ? 'check-circle' : 'alert-circle'}
+        size={64}
+        color={result && result.errors.length === 0 ? '#22c55e' : '#f59e0b'}
+      />
+      <Text style={styles.resultTitle}>
+        {result && result.errors.length === 0 ? '传输完成' : '传输完成（有警告）'}
+      </Text>
+
+      <View style={styles.resultCard}>
+        <View style={styles.resultRow}>
+          <Text style={styles.resultLabel}>成功导入</Text>
+          <Text style={styles.resultValue}>{result?.imported || 0} 条</Text>
+        </View>
+        <View style={styles.resultRow}>
+          <Text style={styles.resultLabel}>已跳过</Text>
+          <Text style={styles.resultValue}>{result?.skipped || 0} 条</Text>
+        </View>
+        {result && result.errors.length > 0 && (
+          <View style={styles.resultRow}>
+            <Text style={[styles.resultLabel, { color: '#ef4444' }]}>错误</Text>
+            <Text style={[styles.resultValue, { color: '#ef4444' }]}>{result.errors.length} 条</Text>
+          </View>
+        )}
+      </View>
+
+      {result && result.errors.length > 0 && (
+        <ScrollView style={styles.errorList}>
+          {result.errors.map((err, idx) => (
+            <Text key={idx} style={styles.errorText}>{err}</Text>
+          ))}
+        </ScrollView>
+      )}
+
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => {
+          setStep('select_profile');
+          setSelectedSource(null);
+          setResult(null);
+        }}
+      >
+        <Text style={styles.primaryButtonText}>完成</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* 步骤指示器 */}
+        <View style={styles.stepsIndicator}>
+          {['select_profile', 'select_tables', 'configure', 'progress', 'result'].map((s, idx) => {
+            const stepNames = ['选择身份', '选择表', '配置', '传输', '完成'];
+            const isActive = step === s;
+            const isDone = ['select_profile', 'select_tables', 'configure', 'progress', 'result'].indexOf(step) > idx;
+            return (
+              <View key={s} style={styles.stepDotRow}>
+                <View style={[styles.stepDot, isActive && styles.stepDotActive, isDone && styles.stepDotDone]}>
+                  <Text style={[styles.stepDotText, (isActive || isDone) && styles.stepDotTextActive]}>
+                    {isDone ? '✓' : idx + 1}
+                  </Text>
+                </View>
+                <Text style={[styles.stepDotLabel, isActive && styles.stepDotLabelActive]}>
+                  {stepNames[idx]}
+                </Text>
+                {idx < 4 && <View style={[styles.stepLine, isDone && styles.stepLineDone]} />}
+              </View>
+            );
+          })}
+        </View>
+
+        {step === 'select_profile' && renderProfileStep()}
+        {step === 'select_tables' && renderTablesStep()}
+        {step === 'configure' && renderConfigureStep()}
+        {step === 'progress' && renderProgressStep()}
+        {step === 'result' && renderResultStep()}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9ff',
+  },
+  content: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
+  stepsIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  stepDotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepDotActive: {
+    backgroundColor: '#6366f1',
+  },
+  stepDotDone: {
+    backgroundColor: '#22c55e',
+  },
+  stepDotText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#999',
+  },
+  stepDotTextActive: {
+    color: '#fff',
+  },
+  stepDotLabel: {
+    fontSize: 11,
+    color: '#999',
+    marginLeft: 4,
+    minWidth: 36,
+  },
+  stepDotLabelActive: {
+    color: '#6366f1',
+    fontWeight: '600',
+  },
+  stepLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: '#e0e0e0',
+    marginHorizontal: 4,
+  },
+  stepLineDone: {
+    backgroundColor: '#22c55e',
+  },
+  stepContainer: {
+    padding: 20,
+  },
+  centerStep: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  stepTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+    marginBottom: 8,
+    marginLeft: 12,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  targetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0ff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  targetBadgeText: {
+    fontSize: 14,
+    color: '#6366f1',
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  listContent: {
+    paddingBottom: 16,
+  },
+  profileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  profileItemSelected: {
+    borderColor: '#6366f1',
+    backgroundColor: '#f8f8ff',
+  },
+  profileAvatar: {
+    fontSize: 32,
+    marginRight: 14,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1a1a2e',
+  },
+  profileDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 12,
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: '#ccc',
+    marginTop: 4,
+  },
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8ff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0ff',
+  },
+  selectAllText: {
+    fontSize: 14,
+    color: '#6366f1',
+    fontWeight: '500',
+    marginLeft: 8,
+    flex: 1,
+  },
+  selectAllCount: {
+    fontSize: 13,
+    color: '#999',
+  },
+  tableList: {
+    maxHeight: 400,
+  },
+  tableItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  tableIcon: {
+    marginLeft: 10,
+    marginRight: 10,
+  },
+  tableLabel: {
+    fontSize: 15,
+    color: '#333',
+  },
+  primaryButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  buttonDisabled: {
+    backgroundColor: '#b1b3f1',
+  },
+  configSummary: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366f1',
+  },
+  configSummaryText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  configHighlight: {
+    fontWeight: '700',
+    color: '#6366f1',
+  },
+  configSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a2e',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  optionContent: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  optionLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333',
+  },
+  optionDesc: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  progressTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a1a2e',
+    marginTop: 20,
+  },
+  progressMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  resultTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+    marginTop: 16,
+  },
+  resultCard: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  resultLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  resultValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  errorList: {
+    maxHeight: 120,
+    width: '100%',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginBottom: 4,
+  },
+});
+
+export default DataTransferScreen;

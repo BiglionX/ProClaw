@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadServerUrl, getApiClient } from './AuthService';
 
-export type ConnectionMode = 'direct' | 'cloud_relay' | 'offline' | 'checking';
+export type ConnectionMode = 'direct' | 'cloud_relay' | 'lan' | 'offline' | 'checking';
 
 interface ConnectionStatus {
   mode: ConnectionMode;
@@ -116,10 +116,47 @@ export const scanQRCode = async (): Promise<string> => {
   return '';
 };
 
+/**
+ * 检查局域网同步是否可用
+ * 通过探测本地网络中的 ProClaw 同步服务实现
+ */
+export const isLanSyncAvailable = async (): Promise<boolean> => {
+  try {
+    const localIp = await getLocalIPAddress();
+    if (!localIp) return false;
+
+    const subnet = localIp.substring(0, localIp.lastIndexOf('.') + 1);
+    const testIps = [1, 2, 100, 101, 254];
+
+    const results = await Promise.all(
+      testIps.map(async (last) => {
+        try {
+          const ip = `${subnet}${last}`;
+          if (ip === localIp) return false;
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 1500);
+          const response = await fetch(`http://${ip}:8889/proclaw/sync/info`, {
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          return response.ok;
+        } catch {
+          return false;
+        }
+      })
+    );
+
+    return results.some(r => r);
+  } catch {
+    return false;
+  }
+};
+
 export default {
   startConnectionMonitor,
   stopConnectionMonitor,
   checkConnection,
   getConnectionMode,
-  getLocalIPAddress
+  getLocalIPAddress,
+  isLanSyncAvailable,
 };

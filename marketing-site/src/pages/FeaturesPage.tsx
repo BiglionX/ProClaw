@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import PageHeader from '../components/shared/PageHeader';
 import CTASection from '../components/shared/CTASection';
+import RouteSEO from '../components/RouteSEO';
 
 const features = [
   {
@@ -133,6 +134,7 @@ const features = [
 const FeaturesPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <RouteSEO routeKey="features" />
       <Navbar />
 
       <PageHeader

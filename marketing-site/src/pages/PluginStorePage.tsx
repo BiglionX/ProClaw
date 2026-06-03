@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import RouteSEO from '../components/RouteSEO';
 import {
   getPublishedPlugins,
   parseManifest,
@@ -44,6 +46,7 @@ const CATEGORIES = [
 ];
 
 export default function PluginStorePage() {
+  const navigate = useNavigate();
   const [cards, setCards] = useState<PluginCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<PluginCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +119,7 @@ export default function PluginStorePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <RouteSEO routeKey="plugins" />
       {/* Hero */}
       <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-teal-900 text-white">
         <div className="max-w-7xl mx-auto px-6 py-16">
@@ -201,7 +205,8 @@ export default function PluginStorePage() {
               return (
                 <div
                   key={card.plugin.id}
-                  className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg hover:border-gray-300 transition-all group"
+                  onClick={() => navigate(`/plugins/${card.plugin.id}`)}
+                  className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg hover:border-gray-300 transition-all group cursor-pointer"
                 >
                   {/* 顶栏 */}
                   <div className="px-5 pt-5 pb-3 flex items-start gap-4">

@@ -2,7 +2,7 @@
 .SYNOPSIS
     ProClaw 行业插件打包工具
 .DESCRIPTION
-    将插件目录（manifest.json + assets/）打包为 .proclaw-industry-plugin (tar.gz) 文件。
+    将插件目录（manifest.json + 资源文件）打包为 .proclaw-plugin (ZIP) 文件。
     可选集成 Ed25519 签名。
 .PARAMETER PluginDir
     插件目录路径，必须包含 manifest.json
@@ -13,8 +13,8 @@
 .PARAMETER PrivateKeyFile
     Ed25519 私钥文件路径（PEM 格式），Sign 为 true 时必填
 .EXAMPLE
-    .\package-plugin.ps1 -PluginDir ../src/plugins/inventory -OutputDir ./dist
-    .\package-plugin.ps1 -PluginDir ../src/plugins/retail -OutputDir ./dist -Sign -PrivateKeyFile ./keys/private.pem
+    .\package-plugin.ps1 -PluginDir ../src/plugins/catering -OutputDir ./dist
+    .\package-plugin.ps1 -PluginDir ../src/plugins/catering -OutputDir ./dist -Sign -PrivateKeyFile ./keys/private.pem
 #>
 
 param(
@@ -38,7 +38,7 @@ if (-not (Test-Path $manifestPath)) {
     exit 1
 }
 
-$manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+$manifest = Get-Content $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $pluginId = $manifest.id
 $version = $manifest.version
 $pluginName = $manifest.name
@@ -53,6 +53,22 @@ try {
     # 复制 manifest.json
     Copy-Item $manifestPath (Join-Path $tempDir "manifest.json")
 
+    # 复制 migrations 目录（如果存在）
+    $migrationsDir = Join-Path $PluginDir "migrations"
+    if (Test-Path $migrationsDir) {
+        Write-Host "[Package] 复制 migrations/ ..." -ForegroundColor Gray
+        $targetMigrations = Join-Path $tempDir "migrations"
+        Copy-Item -Recurse $migrationsDir $targetMigrations
+    }
+
+    # 复制 frontend 目录（如果存在）
+    $frontendDir = Join-Path $PluginDir "frontend"
+    if (Test-Path $frontendDir) {
+        Write-Host "[Package] 复制 frontend/ ..." -ForegroundColor Gray
+        $targetFrontend = Join-Path $tempDir "frontend"
+        Copy-Item -Recurse $frontendDir $targetFrontend
+    }
+
     # 复制 assets 目录（如果存在）
     $assetsDir = Join-Path $PluginDir "assets"
     if (Test-Path $assetsDir) {
@@ -66,47 +82,17 @@ try {
         New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
     }
 
-    # 打包为 tar.gz
-    $outputFile = Join-Path $OutputDir "$pluginId-$version.proclaw-industry-plugin"
+    # 打包为 ZIP
+    $outputFile = Join-Path $OutputDir "$pluginId-$version.proclaw-plugin"
 
     Write-Host "[Package] 正在打包 -> $outputFile" -ForegroundColor Yellow
 
-    # 切换到临时目录
-    Push-Location $tempDir
-    try {
-        # 使用 tar（Windows 10 17063+ 内置）
-        $tarFile = Join-Path $env:TEMP "$pluginId-$version.tar"
-        tar -cf $tarFile -- * 2>$null
-        if (-not (Test-Path $tarFile)) {
-            # 回退：使用 .NET 手动打包
-            Write-Host "[Package] tar 不可用，使用 .NET 打包..." -ForegroundColor Gray
-            Add-Type -AssemblyName System.IO.Compression.FileSystem
-            $tarFile = Join-Path $env:TEMP "$pluginId-$version.tar"
-            [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $tarFile.Replace('.tar', '.zip'))
-            # 将 zip 重命名为 .proclaw-industry-plugin
-            Move-Item $tarFile.Replace('.tar', '.zip') $outputFile -Force
-        } else {
-            # gzip 压缩
-            $gzFile = Join-Path $env:TEMP "$pluginId-$version.tar.gz"
-            if (Get-Command gzip -ErrorAction SilentlyContinue) {
-                gzip -f $tarFile
-            } else {
-                # 用 .NET 做 GZip
-                $bytes = [System.IO.File]::ReadAllBytes($tarFile)
-                $outStream = [System.IO.File]::OpenWrite($gzFile)
-                $gzipStream = New-Object System.IO.Compression.GzipStream($outStream, [System.IO.Compression.CompressionMode]::Compress)
-                $gzipStream.Write($bytes, 0, $bytes.Length)
-                $gzipStream.Close()
-                $outStream.Close()
-            }
-            Move-Item $gzFile $outputFile -Force
-        }
-
-        # 清理临时 tar 文件
-        if (Test-Path $tarFile) { Remove-Item $tarFile -Force }
-    } finally {
-        Pop-Location
-    }
+    # 使用 .NET ZIP 打包
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zipFile = Join-Path $env:TEMP "$pluginId-$version.zip"
+    if (Test-Path $zipFile) { Remove-Item $zipFile -Force }
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $zipFile)
+    Move-Item $zipFile $outputFile -Force
 
     if (-not (Test-Path $outputFile)) {
         Write-Error "打包失败：输出文件未生成"

@@ -338,7 +338,7 @@ class AgentRuntimeBridge {
     };
   }
 
-  /** 通知所有监听器 */
+ /** 通知所有监听器 */
   private notifyListeners(): void {
     const agentsList = this.getInstalledAgents();
     this.listeners.forEach(handlers => {
@@ -350,6 +350,114 @@ class AgentRuntimeBridge {
         }
       });
     });
+  }
+
+  /**
+   * 注册插件关联的 Agent（PRD 5.4）
+   * 插件安装成功后调用，将插件声明的 recommendedAgents 注册到 Agent 列表
+   * @param pluginId 插件ID
+   * @param pluginName 插件名称
+   * @param agentIds 推荐的 Agent ID 列表
+   */
+  registerPluginAgents(pluginId: string, pluginName: string, agentIds: string[]): void {
+    for (const agentId of agentIds) {
+      if (!this.agents.has(agentId)) {
+        const pluginAgent: AgentInfo = {
+          id: agentId,
+          name: `${pluginName} - ${agentId}`,
+          version: '1.0.0',
+          manifest: {
+            id: agentId,
+            name: `${pluginName} - ${agentId}`,
+            version: '1.0.0',
+            entry: 'index.html',
+            permissions: ['read_user', 'show_notification'],
+            description: `由插件 "${pluginName}" 推荐的 AI 团队`,
+            author: 'ProClaw Plugin',
+          },
+          enabled: true,
+          is_builtin: false,
+          installed_at: Date.now(),
+          last_updated: null,
+          permissions_granted: ['read_user', 'show_notification'],
+        };
+        this.agents.set(agentId, pluginAgent);
+        console.log(`[AgentBridge] Registered plugin agent: ${agentId} for plugin ${pluginName}`);
+      }
+    }
+    if (agentIds.length > 0) {
+      this.notifyListeners();
+    }
+  }
+
+  /**
+   * 卸载插件时清理关联的 Agent
+   * @param agentIds 要清理的 Agent ID 列表
+   */
+  unregisterPluginAgents(agentIds: string[]): void {
+    for (const agentId of agentIds) {
+      if (this.agents.has(agentId)) {
+        const agent = this.agents.get(agentId)!;
+        // 只清理非内置的插件推荐 Agent
+        if (!agent.is_builtin && agent.manifest.author === 'ProClaw Plugin') {
+          this.agents.delete(agentId);
+          console.log(`[AgentBridge] Unregistered plugin agent: ${agentId}`);
+        }
+      }
+    }
+    if (agentIds.length > 0) {
+      this.notifyListeners();
+    }
+  }
+
+  /**
+   * 安装推荐的 AI 团队
+   * 供 PluginDetailScreen 在安装插件后调用
+   * @param agentIds 推荐的 Agent ID 列表
+   * @param pluginName 插件名称
+   */
+  async installRecommendedAgents(
+    agentIds: string[],
+    pluginName: string
+  ): Promise<{ installed: number; skipped: number }> {
+    let installed = 0;
+    let skipped = 0;
+
+    for (const agentId of agentIds) {
+      if (this.agents.has(agentId)) {
+        skipped++;
+        continue;
+      }
+
+      const pluginAgent: AgentInfo = {
+        id: agentId,
+        name: `${pluginName} - ${agentId}`,
+        version: '1.0.0',
+        manifest: {
+          id: agentId,
+          name: `${pluginName} - ${agentId}`,
+          version: '1.0.0',
+          entry: 'index.html',
+          permissions: ['read_user', 'show_notification'],
+          description: `由插件 "${pluginName}" 推荐的 AI 团队，提供智能辅助功能`,
+          author: 'ProClaw Plugin',
+        },
+        enabled: true,
+        is_builtin: false,
+        installed_at: Date.now(),
+        last_updated: null,
+        permissions_granted: ['read_user', 'show_notification'],
+      };
+      this.agents.set(agentId, pluginAgent);
+      installed++;
+    }
+
+    if (installed > 0) {
+      this.notifyListeners();
+      console.log(`[AgentBridge] Installed ${installed} recommended agents for plugin ${pluginName}`);
+    }
+
+    return { installed, skipped };
   }
 }
 

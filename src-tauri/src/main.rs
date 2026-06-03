@@ -24,6 +24,7 @@ pub mod sales_commands;
 pub mod finance_commands;
 
 pub mod plugin_manager;
+pub mod plugin_loader;
 pub mod setup_commands;
 pub mod common_commands;
 pub mod team_commands;
@@ -84,6 +85,7 @@ use sales_commands::*;
 #[cfg(feature = "inventory")]
 use finance_commands::*;
 use plugin_manager::*;
+use plugin_loader::*;
 use setup_commands::*;
 use common_commands::*;
 use team_commands::*;
@@ -470,6 +472,29 @@ async fn main() {
             install_plugin,
             uninstall_plugin,
             get_plugin_assets_path,
+            // 插件数据库迁移 (PRD v10.0)
+            execute_plugin_migration,
+            get_plugin_migration_history,
+            // 插件后端动态加载 (PRD v10.0)
+            load_plugin_backend,
+            unload_plugin_backend,
+            get_loaded_backend_plugins,
+            // 插件数据库查询/写入 (PRD v10.0)
+            plugin_db_query,
+            plugin_db_execute,
+            // 插件权限 (PRD v10.0)
+            get_plugin_permissions,
+            verify_plugin_permission,
+            // 插件启用/禁用持久化
+            enable_plugin,
+            disable_plugin,
+            get_plugin_enabled_status,
+            get_all_plugin_enabled_statuses,
+            // 插件签名验证 (PRD v10.0)
+            verify_plugin_signature,
+            // 插件更新机制 (PRD v10.0)
+            check_plugin_update,
+            apply_plugin_update,
 
             // 商务秘书 Agent BAP (PRD v8.5)
             bap_get_all,

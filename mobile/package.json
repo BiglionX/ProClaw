@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "eject": "expo eject"
+    "eject": "expo eject",
+    "test": "jest --forceExit --detectOpenHandles"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.0",
@@ -26,6 +27,7 @@
     "expo-secure-store": "~14.0.0",
     "expo-sqlite": "~15.1.4",
     "expo-status-bar": "~2.0.0",
+    "jszip": "^3.10.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.9",
@@ -45,9 +47,34 @@
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@types/crypto-js": "^4.2.2",
+    "@types/jest": "^30.0.0",
     "@types/react": "~18.3.0",
     "@types/react-native-vector-icons": "^6.4.18",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.11",
     "typescript": "^5.3.0"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.json"
+        }
+      ]
+    },
+    "testMatch": [
+      "**/__tests__/**/*.test.ts",
+      "**/__tests__/**/*.test.tsx"
+    ],
+   "moduleNameMapper": {
+      "^@react-native-async-storage/async-storage$": "<rootDir>/node_modules/@react-native-async-storage/async-storage",
+      "^react-native$": "<rootDir>/__mocks__/react-native.ts"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(react-native|@react-native|expo|@expo)/)"
+    ],
+    "testEnvironment": "node"
   },
   "private": true,
   "expo": {
@@ -86,10 +113,13 @@
       ]
     },
     "plugins": [
-      ["react-native-webrtc", {
-        "cameraPermission": "ProClaw 需要使用摄像头进行视频通话",
-        "microphonePermission": "ProClaw 需要使用麦克风进行语音通话"
-      }]
+      [
+        "react-native-webrtc",
+        {
+          "cameraPermission": "ProClaw 需要使用摄像头进行视频通话",
+          "microphonePermission": "ProClaw 需要使用麦克风进行语音通话"
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png",

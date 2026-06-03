@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import PageHeader from '../components/shared/PageHeader';
+import RouteSEO from '../components/RouteSEO';
 import { getPublishedPlugins } from '../lib/pluginService';
 import type { IndustryPlugin } from '../types';
 
@@ -70,6 +71,7 @@ const DownloadPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <RouteSEO routeKey="download" />
       <Navbar />
 
       <PageHeader
