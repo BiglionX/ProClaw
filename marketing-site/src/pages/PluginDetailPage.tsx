@@ -83,7 +83,6 @@ export default function PluginDetailPage() {
 
   const handleInstall = async () => {
     if (!data) return;
-    const baseUrl = window.location.origin;
     const installUrl = `proclaw://install-plugin?id=${data.plugin.id}&version=${data.plugin.version}`;
 
     // 尝试通过 deep link 唤起桌面端

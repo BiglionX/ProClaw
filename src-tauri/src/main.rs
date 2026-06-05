@@ -65,6 +65,8 @@ use secretary_commands::*;
 use sync_engine::*;
 use sync_engine::SyncEngine;
 use services::cloud_backup_service::CloudBackupService;
+use services::nvwax_client::NvwaXClient;
+use services::nvwax_billing::NvwaXBilling;
 use api::AppState;
 use api::websocket::WebSocketManager;
 use utils::crypto::Aes256GcmCipher;
@@ -99,6 +101,7 @@ use cloud_backup_commands::*;
 use catering_commands::*;
 use beauty_commands::*;
 use pet_commands::*;
+use services::nvwax_commands::*;
 #[cfg(feature = "virtual_company")]
 use agent_commands::*;
 #[cfg(feature = "virtual_company")]
@@ -151,6 +154,23 @@ async fn main() {
     // Tauri State 使用 Mutex<Database>（不包 Arc），HTTP 服务器使用 Arc<Mutex<Database>>
     let db = Mutex::new(db);
 
+    // Phase 10: 初始化 NvwaX API 客户端和计费服务
+    let nvwax_api_key = std::env::var("NVWAX_API_KEY")
+        .unwrap_or_else(|_| String::new());
+    let nvwax_client = Arc::new(
+        NvwaXClient::new(nvwax_api_key.clone())
+    );
+    let nvwax_billing_db = Arc::new(Mutex::new(
+        Database::new(db_path.clone()).expect("Failed to create billing DB")
+    ));
+    let nvwax_billing = Arc::new(NvwaXBilling::new(nvwax_billing_db));
+
+    // NvwaX API Key 加密器（AES-256-GCM）
+    let nvwax_key_salt = b"nvwax_api_key_2024";
+    let nvwax_cipher = Arc::new(
+        Aes256GcmCipher::from_password("proclaw-nvwax-secure-key", nvwax_key_salt)
+    );
+
     // Phase 6: 初始化 JWT 密钥管理器
     let key_manager = KeyManager::from_env_or_default();
     let jwt_secret = key_manager.as_bytes().to_vec();
@@ -193,6 +213,9 @@ async fn main() {
         .manage(sync_engine)
         .manage(cloud_backup_service)
         .manage(ws_manager)
+        .manage(nvwax_client.clone())
+        .manage(nvwax_billing.clone())
+        .manage(nvwax_cipher.clone())
         .setup(|app| {
             use tauri::Manager;
             
@@ -531,6 +554,45 @@ async fn main() {
             pet_create_boarding,
             pet_get_boarding_records,
             pet_check_out_boarding,
+
+            // NvwaX API 集成命令
+            nvwax_search_agents,
+            nvwax_get_agent_detail,
+            nvwax_get_categories,
+            nvwax_search_aiteams,
+            nvwax_get_aiteam_detail,
+            nvwax_get_industries,
+            nvwax_get_plugin_detail,
+            nvwax_create_agent,
+            nvwax_get_agents,
+            nvwax_get_my_agent_detail,
+            nvwax_update_agent,
+            nvwax_delete_agent,
+            nvwax_publish_agent,
+            nvwax_unpublish_agent,
+            nvwax_create_aiteam,
+            nvwax_get_aiteams,
+            nvwax_get_my_aiteam_detail,
+            nvwax_update_aiteam,
+            nvwax_delete_aiteam,
+            nvwax_publish_aiteam,
+            nvwax_unpublish_aiteam,
+            nvwax_search_agents_global,
+            nvwax_search_skills,
+            nvwax_unified_search,
+            nvwax_export_agent,
+            nvwax_export_aiteam,
+            nvwax_batch_export,
+            nvwax_get_export_history,
+            nvwax_get_usage_stats,
+            nvwax_get_token_balance,
+            nvwax_record_consumption,
+            nvwax_sync_usage,
+            // NvwaX API Key 管理
+            get_nvwax_api_key,
+            save_nvwax_api_key,
+            clear_nvwax_api_key,
+            test_nvwax_connection,
         ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

@@ -53,9 +53,9 @@ import {
   generateTeamRecommendation,
   createRecommendedTeam,
   buildNvwaXUrl,
-  generateCrossAuthToken,
   type TeamRecommendation,
 } from '../lib/aiTeamRecommendationService';
+import MarketplaceDialog from '../components/NvwaX/MarketplaceDialog';
 
 export default function TeamsPage() {
   const navigate = useNavigate();
@@ -73,6 +73,8 @@ export default function TeamsPage() {
 
   // 导入方式选择对话框
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  // NvwaX 市场对话框
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
 
   // 智能推荐状态
   const [recommendOpen, setRecommendOpen] = useState(false);
@@ -669,20 +671,10 @@ export default function TeamsPage() {
             <Button
               variant="outlined"
               size="large"
-              startIcon={<OpenInNewIcon />}
+              startIcon={<AutoAwesomeIcon />}
               onClick={() => {
-                const nvwaxBase = import.meta.env.VITE_NVWAX_URL || 'http://localhost:3000';
-                const userEmail = useAuthStore.getState().user?.email;
-                // 构建市场 URL，附带跨服务预授权 Token
-                const params = new URLSearchParams();
-                params.set('ref', 'proclaw');
-                if (userEmail) {
-                  params.set('proclaw_token', generateCrossAuthToken(userEmail));
-                  params.set('proclaw_email', encodeURIComponent(userEmail));
-                }
-                window.open(`${nvwaxBase}/marketplace?${params.toString()}`, '_blank');
                 setImportDialogOpen(false);
-                setSnackbar('已打开 NVwaX Agent 市场' + (userEmail ? '（已自动登录）' : ''));
+                setMarketplaceOpen(true);
               }}
               sx={{
                 justifyContent: 'flex-start',
@@ -693,7 +685,7 @@ export default function TeamsPage() {
               }}
             >
               <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="body1" fontWeight={600}>从 NVwaX Agent 市场导入</Typography>
+                <Typography variant="body1" fontWeight={600}>从 NvwaX Agent 市场导入</Typography>
                 <Typography variant="caption" color="text.secondary">
                   浏览在线市场，选择虚拟公司配置并导入
                 </Typography>
@@ -728,6 +720,38 @@ export default function TeamsPage() {
           <Button onClick={() => setImportDialogOpen(false)}>取消</Button>
         </DialogActions>
       </Dialog>
+
+      {/* NvwaX 市场对话框 */}
+      <MarketplaceDialog
+        open={marketplaceOpen}
+        onClose={() => setMarketplaceOpen(false)}
+        onImportAiTeam={(aiteam) => {
+          // 将市场中选择的 AiTeam 导入到本地
+          safeInvoke('import_team', {
+            payload: {
+              name: aiteam.name,
+              source: 'nvwax-marketplace',
+              team_config: JSON.stringify({
+                members: aiteam.members?.map((m) => ({
+                  agent_id: m.agent_id,
+                  role: m.role || '成员',
+                })) || [],
+              }),
+              metadata: {
+                source: 'nvwax-marketplace',
+                nvwax_id: aiteam.id,
+                imported_at: new Date().toISOString(),
+              },
+            },
+          }).then(() => {
+            setSnackbar(`已导入 AiTeam "${aiteam.name}"`);
+            loadTeams();
+          }).catch((err) => {
+            setSnackbar('导入失败: ' + String(err));
+          });
+          setMarketplaceOpen(false);
+        }}
+      />
 
       <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar('')} message={snackbar} />
     </Box>

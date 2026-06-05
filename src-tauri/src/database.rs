@@ -77,6 +77,10 @@ impl Database {
         let decision_migration = include_str!("../../src/db/migrations/012_ceo_decision_logs.sql");
         self.conn.execute_batch(decision_migration).ok();
 
+        // 运行迁移：NvwaX API 消耗记录表
+        let nvwax_migration = include_str!("../../database/migrations/028_add_nvwax_usage_logs.sql");
+        self.conn.execute_batch(nvwax_migration).ok();
+
         // 自动安装内置 Agent
         let builtin_count: i64 = self.conn
             .query_row(
