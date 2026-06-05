@@ -539,6 +539,8 @@ pub struct NvwaXClient {
     base_url: String,
     http_client: reqwest::Client,
     cache: Mutex<NvwaXCache>,
+    /// API Key 为空时标记为关闭模式，所有请求直接返回空结果
+    closed: bool,
 }
 
 impl NvwaXClient {
@@ -550,12 +552,17 @@ impl NvwaXClient {
             .build()
             .expect("Failed to create HTTP client");
 
+        let closed = api_key.is_empty();
+        if closed {
+            eprintln!("[NvwaX] API Key 未配置，NvwaX 客户端将以关闭模式运行");
+        }
         Self {
             api_key,
             base_url: std::env::var("NVWAX_API_BASE")
                 .unwrap_or_else(|_| "https://nvwax.proclaw.cc/api/v1".to_string()),
             http_client,
             cache: Mutex::new(NvwaXCache::new()),
+            closed,
         }
     }
 
@@ -567,12 +574,14 @@ impl NvwaXClient {
             .user_agent("ProClaw/1.0")
             .build()
             .expect("Failed to create HTTP client");
+        let closed = api_key.is_empty();
 
         Self {
             api_key,
             base_url,
             http_client,
             cache: Mutex::new(NvwaXCache::new()),
+            closed,
         }
     }
 
@@ -790,6 +799,9 @@ impl NvwaXClient {
         &self,
         params: SearchParams,
     ) -> Result<AgentListResponse, NvwaXError> {
+        if self.closed {
+            return Ok(AgentListResponse { agents: vec![], pagination: None });
+        }
         let cache_key = Self::search_cache_key(
             params.q.as_deref(),
             params.category.as_deref(),
@@ -816,12 +828,18 @@ impl NvwaXClient {
 
     /// 获取 Agent 详情（市场）
     pub async fn get_agent_detail(&self, id: &str) -> Result<AgentDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.get::<AgentDetail>(&format!("/marketplace/agents/{}", id), None)
             .await
     }
 
     /// 获取分类列表
     pub async fn get_categories(&self) -> Result<Vec<Category>, NvwaXError> {
+        if self.closed {
+            return Ok(vec![]);
+        }
         // 检查缓存
         if let Ok(cache) = self.cache.lock() {
             if let Some(cached) = cache.get_categories() {
@@ -842,6 +860,9 @@ impl NvwaXClient {
         &self,
         params: SearchParams,
     ) -> Result<AiTeamListResponse, NvwaXError> {
+        if self.closed {
+            return Ok(AiTeamListResponse { aiteams: vec![], pagination: None });
+        }
         let cache_key = Self::search_cache_key(
             params.q.as_deref(),
             None,
@@ -868,12 +889,18 @@ impl NvwaXClient {
 
     /// 获取 AiTeam 详情（市场）
     pub async fn get_aiteam_detail(&self, id: &str) -> Result<AiTeamDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.get::<AiTeamDetail>(&format!("/marketplace/aiteams/{}", id), None)
             .await
     }
 
     /// 获取行业列表
     pub async fn get_industries(&self) -> Result<Vec<Industry>, NvwaXError> {
+        if self.closed {
+            return Ok(vec![]);
+        }
         // 检查缓存
         if let Ok(cache) = self.cache.lock() {
             if let Some(cached) = cache.get_industries() {
@@ -891,6 +918,9 @@ impl NvwaXClient {
 
     /// 获取行业插件详情
     pub async fn get_plugin_detail(&self, id: &str) -> Result<PluginDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.get::<PluginDetail>(&format!("/marketplace/plugins/{}", id), None)
             .await
     }
@@ -904,6 +934,9 @@ impl NvwaXClient {
         &self,
         payload: &CreateAgentPayload,
     ) -> Result<AgentDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post::<AgentDetail, CreateAgentPayload>("/agents", payload)
             .await
     }
@@ -913,6 +946,9 @@ impl NvwaXClient {
         &self,
         params: ListParams,
     ) -> Result<AgentListResponse, NvwaXError> {
+        if self.closed {
+            return Ok(AgentListResponse { agents: vec![], pagination: None });
+        }
         let query = serde_json::to_value(&params).ok();
         self.get::<AgentListResponse>("/agents", query.as_ref())
             .await
@@ -920,6 +956,9 @@ impl NvwaXClient {
 
     /// 获取 Agent 详情
     pub async fn get_my_agent_detail(&self, id: &str) -> Result<AgentDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.get::<AgentDetail>(&format!("/agents/{}", id), None)
             .await
     }
@@ -930,23 +969,35 @@ impl NvwaXClient {
         id: &str,
         payload: &UpdateAgentPayload,
     ) -> Result<AgentDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.put::<AgentDetail, UpdateAgentPayload>(&format!("/agents/{}", id), payload)
             .await
     }
 
     /// 删除 Agent
     pub async fn delete_agent(&self, id: &str) -> Result<(), NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.delete::<()>(&format!("/agents/{}", id)).await
     }
 
     /// 发布 Agent
     pub async fn publish_agent(&self, id: &str) -> Result<(), NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post_empty::<()>(&format!("/agents/{}/publish", id))
             .await
     }
 
     /// 取消发布 Agent
     pub async fn unpublish_agent(&self, id: &str) -> Result<(), NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post_empty::<()>(&format!("/agents/{}/unpublish", id))
             .await
     }
@@ -960,6 +1011,9 @@ impl NvwaXClient {
         &self,
         payload: &CreateAiTeamPayload,
     ) -> Result<AiTeamDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post::<AiTeamDetail, CreateAiTeamPayload>("/aiteams", payload)
             .await
     }
@@ -969,6 +1023,9 @@ impl NvwaXClient {
         &self,
         params: ListParams,
     ) -> Result<AiTeamListResponse, NvwaXError> {
+        if self.closed {
+            return Ok(AiTeamListResponse { aiteams: vec![], pagination: None });
+        }
         let query = serde_json::to_value(&params).ok();
         self.get::<AiTeamListResponse>("/aiteams", query.as_ref())
             .await
@@ -976,6 +1033,9 @@ impl NvwaXClient {
 
     /// 获取 AiTeam 详情
     pub async fn get_my_aiteam_detail(&self, id: &str) -> Result<AiTeamDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.get::<AiTeamDetail>(&format!("/aiteams/{}", id), None)
             .await
     }
@@ -986,23 +1046,35 @@ impl NvwaXClient {
         id: &str,
         payload: &UpdateAiTeamPayload,
     ) -> Result<AiTeamDetail, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.put::<AiTeamDetail, UpdateAiTeamPayload>(&format!("/aiteams/{}", id), payload)
             .await
     }
 
     /// 删除 AiTeam
     pub async fn delete_aiteam(&self, id: &str) -> Result<(), NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.delete::<()>(&format!("/aiteams/{}", id)).await
     }
 
     /// 发布 AiTeam
     pub async fn publish_aiteam(&self, id: &str) -> Result<(), NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post_empty::<()>(&format!("/aiteams/{}/publish", id))
             .await
     }
 
     /// 取消发布 AiTeam
     pub async fn unpublish_aiteam(&self, id: &str) -> Result<(), NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post_empty::<()>(&format!("/aiteams/{}/unpublish", id))
             .await
     }
@@ -1018,6 +1090,9 @@ impl NvwaXClient {
         page: Option<u32>,
         limit: Option<u32>,
     ) -> Result<Vec<AgentSummary>, NvwaXError> {
+        if self.closed {
+            return Ok(vec![]);
+        }
         let params = SearchParams {
             q: Some(q.to_string()),
             page,
@@ -1039,6 +1114,9 @@ impl NvwaXClient {
         page: Option<u32>,
         limit: Option<u32>,
     ) -> Result<Vec<Skill>, NvwaXError> {
+        if self.closed {
+            return Ok(vec![]);
+        }
         let params = SearchParams {
             q: Some(q.to_string()),
             page,
@@ -1058,6 +1136,9 @@ impl NvwaXClient {
         &self,
         params: UnifiedSearchParams,
     ) -> Result<SearchResult, NvwaXError> {
+        if self.closed {
+            return Ok(SearchResult { agents: vec![], skills: vec![] });
+        }
         let query = serde_json::to_value(&params).ok();
         self.get::<SearchResult>(
             "/search",
@@ -1076,6 +1157,9 @@ impl NvwaXClient {
         id: &str,
         payload: &ExportPayload,
     ) -> Result<ExportResult, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post::<ExportResult, ExportPayload>(
             &format!("/agents/{}/export", id),
             payload,
@@ -1089,6 +1173,9 @@ impl NvwaXClient {
         id: &str,
         payload: &ExportPayload,
     ) -> Result<ExportResult, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post::<ExportResult, ExportPayload>(
             &format!("/aiteams/{}/export", id),
             payload,
@@ -1101,6 +1188,9 @@ impl NvwaXClient {
         &self,
         payload: &BatchExportPayload,
     ) -> Result<Vec<ExportResult>, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         self.post::<Vec<ExportResult>, BatchExportPayload>("/export/batch", payload)
             .await
     }
@@ -1109,6 +1199,9 @@ impl NvwaXClient {
     pub async fn get_export_history(
         &self,
     ) -> Result<Vec<ExportResult>, NvwaXError> {
+        if self.closed {
+            return Ok(vec![]);
+        }
         self.get::<Vec<ExportResult>>("/export/history", None)
             .await
     }
@@ -1123,6 +1216,9 @@ impl NvwaXClient {
         &self,
         period: &str,
     ) -> Result<UsageStats, NvwaXError> {
+        if self.closed {
+            return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
+        }
         let query = serde_json::json!({"period": period});
         self.get::<UsageStats>(
             "/user/api-keys/usage",

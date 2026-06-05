@@ -146,6 +146,41 @@ interface Message {
   timestamp: Date;
 }
 
+// ============================================================
+// 打字机效果组件
+// ============================================================
+function TypewriterText({ text, speed = 35, onComplete }: {
+  text: string;
+  speed?: number;
+  onComplete?: () => void;
+}) {
+  const [displayed, setDisplayed] = useState('');
+  const indexRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    indexRef.current = 0;
+    setDisplayed('');
+
+    timerRef.current = setInterval(() => {
+      indexRef.current += 1;
+      if (indexRef.current >= text.length) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setDisplayed(text);
+        onComplete?.();
+      } else {
+        setDisplayed(text.slice(0, indexRef.current));
+      }
+    }, speed);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [text, speed]);
+
+  return <>{displayed}</>;
+}
+
 export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgentChatProps = {}) {
   const mode = useAppModeStore(state => state.mode);
   const [isOpen, setIsOpen] = useState(false);
@@ -870,74 +905,104 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
                   backgroundColor: '#fafafa',
                 }}
               >
-                {messages.map(message => (
-                  <Box
-                    key={message.id}
-                    sx={{
-                      display: 'flex',
-                      gap: 1.5,
-                      mb: 2,
-                      flexDirection:
-                        message.role === 'user' ? 'row-reverse' : 'row',
-                    }}
-                  >
-                    <Avatar
-                      src={message.role === 'assistant' ? AVATAR_PRESETS.find(p => p.key === secretaryAvatar)?.src : undefined}
+                {(() => {
+                  const lastAssistantIdx = (() => {
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                      if (messages[i].role === 'assistant') return i;
+                    }
+                    return -1;
+                  })();
+                  return messages.map((message, msgIdx) => (
+                    <Box
+                      key={message.id}
                       sx={{
-                        width: 32,
-                        height: 32,
-                        bgcolor:
-                          message.role === 'user' ? '#666' : '#888',
-                        flexShrink: 0,
-                        fontSize: '0.9rem',
+                        display: 'flex',
+                        gap: 1.5,
+                        mb: 2,
+                        flexDirection:
+                          message.role === 'user' ? 'row-reverse' : 'row',
                       }}
                     >
-                      {message.role === 'user' ? <PersonIcon /> : <BotIcon />}
-                    </Avatar>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 1.5,
-                        backgroundColor:
-                          message.role === 'user' ? '#f0f0f0' : '#ffffff',
-                        border: '1px solid',
-                        borderColor:
-                          message.role === 'user' ? '#ddd' : '#e0e0e0',
-                        borderRadius: 2,
-                        maxWidth: '80%',
-                      }}
-                    >
-                      <Typography
-                        variant="body2"
+                      <Avatar
+                        src={message.role === 'assistant' ? AVATAR_PRESETS.find(p => p.key === secretaryAvatar)?.src : undefined}
                         sx={{
-                          lineHeight: 1.6,
-                          whiteSpace: 'pre-wrap',
-                          '& strong': {
-                            fontWeight: 600,
-                            color: 'text.primary',
-                          },
+                          width: 32,
+                          height: 32,
+                          bgcolor:
+                            message.role === 'user' ? '#666' : '#888',
+                          flexShrink: 0,
+                          fontSize: '0.9rem',
                         }}
                       >
-                        {message.content}
-                      </Typography>
-                      <Typography
-                        variant="caption"
+                        {message.role === 'user' ? <PersonIcon /> : <BotIcon />}
+                      </Avatar>
+                      <Paper
+                        elevation={0}
                         sx={{
-                          display: 'block',
-                          mt: 0.5,
-                          color: 'text.secondary',
-                          fontSize: '0.65rem',
-                          textAlign: message.role === 'user' ? 'right' : 'left',
+                          p: 1.5,
+                          backgroundColor:
+                            message.role === 'user' ? '#f0f0f0' : '#ffffff',
+                          border: '1px solid',
+                          borderColor:
+                            message.role === 'user' ? '#ddd' : '#e0e0e0',
+                          borderRadius: 2,
+                          maxWidth: '80%',
+                          position: 'relative',
                         }}
                       >
-                        {message.timestamp.toLocaleTimeString('zh-CN', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Typography>
-                    </Paper>
-                  </Box>
-                ))}
+                        {/* AI 身份标识红点 */}
+                        {message.role === 'assistant' && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: -3,
+                              left: -3,
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              backgroundColor: '#FF3B30',
+                              border: '2px solid #fff',
+                              boxShadow: '0 1px 2px rgba(255,59,48,0.3)',
+                              zIndex: 1,
+                            }}
+                          />
+                        )}
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            lineHeight: 1.6,
+                            whiteSpace: 'pre-wrap',
+                            '& strong': {
+                              fontWeight: 600,
+                              color: 'text.primary',
+                            },
+                          }}
+                        >
+                          {message.role === 'assistant' && msgIdx === lastAssistantIdx && !isLoading ? (
+                            <TypewriterText text={message.content} />
+                          ) : (
+                            message.content
+                          )}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: 'block',
+                            mt: 0.5,
+                            color: 'text.secondary',
+                            fontSize: '0.65rem',
+                            textAlign: message.role === 'user' ? 'right' : 'left',
+                          }}
+                        >
+                          {message.timestamp.toLocaleTimeString('zh-CN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </Typography>
+                      </Paper>
+                    </Box>
+                  ));
+                })()}
 
                 {isLoading && (
                   <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>

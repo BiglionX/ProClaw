@@ -60,6 +60,7 @@ export default function PluginSettings() {
   const [uninstallConfirm, setUninstallConfirm] = useState<string | null>(null);
   const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+  const storeUrl = 'https://flowhub.proclaw.cc';
   const [checkingUpdates, setCheckingUpdates] = useState<Record<string, boolean>>({});
   const [updateInfo, setUpdateInfo] = useState<Record<string, {
     has_update: boolean;
@@ -139,9 +140,8 @@ export default function PluginSettings() {
   const handleCheckUpdate = async (pluginId: string, currentVersion: string) => {
     setCheckingUpdates((prev) => ({ ...prev, [pluginId]: true }));
     try {
-      // 默认商店 API 地址（实际应从配置读取）
-      const storeApiUrl = 'https://flowhub.proclaw.cc';
-      const result = await pluginLoader.checkUpdate(pluginId, currentVersion, storeApiUrl);
+      // 默认商店 API 地址（从常量读取）
+      const result = await pluginLoader.checkUpdate(pluginId, currentVersion, storeUrl);
       if (result) {
         setUpdateInfo((prev) => ({ ...prev, [pluginId]: result }));
         if (result.has_update) {
@@ -209,7 +209,11 @@ export default function PluginSettings() {
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <ExtensionIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography variant="h6">已安装的插件 ({plugins.length})</Typography>
+            <Typography variant="h6" sx={{ flex: 1 }}>已安装的插件 ({plugins.length})</Typography>
+            <Button size="small" startIcon={<ExtensionIcon />} onClick={() => window.open(storeUrl, '_blank')}
+              sx={{ textTransform: 'none', fontSize: '0.75rem' }}>
+              插件商店
+            </Button>
           </Box>
           <Divider sx={{ mb: 2 }} />
 
@@ -218,9 +222,12 @@ export default function PluginSettings() {
               <Typography variant="body1" color="text.secondary" gutterBottom>
                 暂无已安装的行业插件
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 请访问插件商店安装行业工作流插件
               </Typography>
+              <Button variant="outlined" startIcon={<ExtensionIcon />} onClick={() => window.open(storeUrl, '_blank')}>
+                前往插件商店
+              </Button>
             </Box>
           ) : (
             <List disablePadding>

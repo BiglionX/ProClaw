@@ -339,6 +339,18 @@ export class NvwaXService {
   // ============================================================
 
   /**
+   * 检查 NvwaX 服务是否已配置 API Key
+   */
+  static async isConfigured(): Promise<boolean> {
+    try {
+      const key = await safeInvoke<string | null>('get_nvwax_api_key');
+      return !!key;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * 检查 Token 余额并触发告警
    * 在每次重要的 API 调用后调用此方法
    * 如果余额低于阈值，触发 custom event 供 UI 组件捕获

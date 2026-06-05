@@ -28,6 +28,7 @@ import {
   Typography,
   Grid,
   Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -35,6 +36,7 @@ import {
   Download as DownloadIcon,
   AutoAwesome as AutoAwesomeIcon,
   Refresh as RefreshIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { NvwaXService } from '../../lib/nvwaxClient';
 import type {
@@ -375,9 +377,17 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [selectedIndustry, setSelectedIndustry] = useState('');
 
+  // 分类/行业加载错误
+  const [categoriesError, setCategoriesError] = useState('');
+  const [industriesError, setIndustriesError] = useState('');
+
   // 详情弹窗
   const [detailAgentId, setDetailAgentId] = useState<string | null>(null);
   const [detailAiTeamId, setDetailAiTeamId] = useState<string | null>(null);
+
+  // NvwaX 配置状态
+  const [configured, setConfigured] = useState(false);
+  const [configChecked, setConfigChecked] = useState(false);
 
   // 分页
   const [page, setPage] = useState(1);
@@ -420,8 +430,8 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
 
   /** 加载分类/行业列表 */
   useEffect(() => {
-    NvwaXService.getCategories().then(setCategories).catch(() => {});
-    NvwaXService.getIndustries().then(setIndustries).catch(() => {});
+    NvwaXService.getCategories().then(setCategories).catch((e) => setCategoriesError(String(e)));
+    NvwaXService.getIndustries().then(setIndustries).catch((e) => setIndustriesError(String(e)));
   }, []);
 
   useEffect(() => {
@@ -429,6 +439,18 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
       loadData();
     }
   }, [open, loadData]);
+
+  /** 检测 NvwaX 是否已配置 API Key */
+  useEffect(() => {
+    if (open) {
+      setConfigChecked(false);
+      setConfigured(false);
+      NvwaXService.isConfigured().then((ok) => {
+        setConfigured(ok);
+        setConfigChecked(true);
+      });
+    }
+  }, [open]);
 
   /** 搜索 */
   const handleSearch = () => {
@@ -464,6 +486,25 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
         </DialogTitle>
 
         <DialogContent>
+          {/* NvwaX 未配置引导 */}
+          {configured === false ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <AutoAwesomeIcon sx={{ fontSize: 64, color: '#6366f1', mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" gutterBottom>NvwaX 服务未配置</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}>
+                请先在系统设置中配置 NvwaX API Key，以启用 Agent 市场浏览、Agent/AiTeam 管理和发布功能。
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<SettingsIcon />}
+                onClick={() => { window.open('/settings', '_blank'); onClose(); }}
+                sx={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}
+              >
+                前往设置
+              </Button>
+            </Paper>
+          ) : (
+          <>
           {/* Tab 切换 */}
           <Tabs
             value={mode}
@@ -500,6 +541,12 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
           </Box>
 
           {/* 过滤器 */}
+          {configured && (categoriesError || industriesError) && (
+            <Alert severity="warning" sx={{ mb: 1, fontSize: '0.75rem', py: 0 }}>
+              {categoriesError && <div>分类加载失败: {categoriesError}</div>}
+              {industriesError && <div>行业加载失败: {industriesError}</div>}
+            </Alert>
+          )}
           <FilterBar
             categories={categories}
             industries={industries}
@@ -510,8 +557,16 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
             onIndustryChange={(c) => { setSelectedIndustry(c); setPage(1); }}
           />
 
+          {/* 检查配置中 */}
+          {!configChecked && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress size={24} sx={{ mr: 1 }} />
+              <Typography color="text.secondary">正在检查 NvwaX 配置...</Typography>
+            </Box>
+          )}
+
           {/* 列表 */}
-          {loading ? (
+          {configChecked && configured && (loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
               <CircularProgress />
             </Box>
@@ -570,6 +625,8 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
                 </Box>
               )}
             </>
+          ))}
+          </>
           )}
         </DialogContent>
       </Dialog>

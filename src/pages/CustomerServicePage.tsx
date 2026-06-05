@@ -18,6 +18,7 @@ import {
   Close as CloseIcon,
   Save as SaveIcon,
   Refresh as RefreshIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import {
   Box,
@@ -60,6 +61,7 @@ import {
   Badge,
 } from '@mui/material';
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // ===== 类型定义 =====
 
@@ -907,6 +909,7 @@ function SettingsTab() {
 // ===== 主页面 =====
 
 export default function CustomerServicePage() {
+  const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -916,13 +919,18 @@ export default function CustomerServicePage() {
   return (
     <Box>
       {/* 页面标题 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          AI 客服管理
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          管理云商城 AI 客服，查看聊天记录，维护问答库
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+        <IconButton size="small" onClick={() => navigate(-1)} sx={{ color: 'text.secondary' }}>
+          <ArrowBackIcon />
+        </IconButton>
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+            AI 客服管理
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            管理云商城 AI 客服，查看聊天记录，维护问答库
+          </Typography>
+        </Box>
       </Box>
 
       {/* Tab 导航 */}

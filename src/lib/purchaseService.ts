@@ -167,3 +167,49 @@ export async function getPurchaseOrderDetail(
 ): Promise<PurchaseOrderDetail> {
   return await invoke('get_purchase_order_detail', { orderId });
 }
+
+/**
+ * 确认收货 → 自动入库 + 记录库存交易
+ */
+export async function receivePurchaseOrder(
+  orderId: string
+): Promise<{ id: string; status: string; message: string }> {
+  return await invoke('receive_purchase_order_cmd', { orderId });
+}
+
+/**
+ * 更新采购订单（仅草稿状态）
+ */
+export async function updatePurchaseOrder(
+  orderId: string,
+  order: Partial<CreatePurchaseOrderInput>
+): Promise<{ id: string; message: string }> {
+  return await invoke('update_purchase_order_cmd', { orderId, order });
+}
+
+/**
+ * 删除采购订单（仅草稿/已取消状态）
+ */
+export async function deletePurchaseOrder(
+  orderId: string
+): Promise<{ id: string; message: string }> {
+  return await invoke('delete_purchase_order_cmd', { orderId });
+}
+
+/**
+ * 确认采购订单 (draft → confirmed)
+ */
+export async function confirmPurchaseOrder(
+  orderId: string
+): Promise<{ id: string; status: string; message: string }> {
+  return await invoke('confirm_purchase_order_cmd', { orderId });
+}
+
+/**
+ * 取消采购订单 (任意状态 → cancelled)
+ */
+export async function cancelPurchaseOrder(
+  orderId: string
+): Promise<{ id: string; status: string; message: string }> {
+  return await invoke('cancel_purchase_order_cmd', { orderId });
+}

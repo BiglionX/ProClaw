@@ -32,7 +32,6 @@
   },
   "navigation": {
     "add": [
-      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
       { "text": "云商城管理", "icon": "shopping-bag", "path": "/cloud-store", "group": "云服务" },
       { "text": "Token 计费", "icon": "finance", "path": "/token-billing", "group": "云服务" },
       { "text": "云备份", "icon": "database", "path": "/cloud-backup", "group": "云服务" },

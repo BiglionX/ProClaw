@@ -12,7 +12,6 @@
   },
   "navigation": {
     "add": [
-      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
       { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
       { "text": "销售管理", "icon": "shopping-cart", "path": "/sales", "group": "业务" },
       { "text": "库存管理", "icon": "truck", "path": "/inventory", "group": "业务" },

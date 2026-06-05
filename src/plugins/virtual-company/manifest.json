@@ -12,7 +12,6 @@
   },
   "navigation": {
     "add": [
-      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
       { "text": "用户中心", "icon": "user", "path": "/ucenter", "group": "系统" },
       { "text": "Agent管理", "icon": "shopping-bag", "path": "/agents", "group": "协作" },
       { "text": "项目概览", "icon": "database", "path": "/project-overview", "group": "协作" },

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import FloatingAgentChat from '../Agent/FloatingAgentChat';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
@@ -9,8 +11,32 @@ import { useAppModeStore } from '../../config/appMode';
 
 const TOPBAR_HEIGHT = 64;
 
+const pageVariants = {
+  initial: {
+    opacity: 0,
+    y: 8,
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.2,
+      ease: 'easeOut' as const,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -4,
+    transition: {
+      duration: 0.15,
+      ease: 'easeIn' as const,
+    },
+  },
+};
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const mode = useAppModeStore(state => state.mode);
+  const location = useLocation();
   const [marketOpen, setMarketOpen] = useState(false);
 
   // 监听全局事件打开市场
@@ -22,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <Box
-      sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8f8f8' }}
+      sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8F9FC' }}
     >
       <TopBar />
       <Sidebar />
@@ -35,7 +61,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           pb: 10, // 为浮动按钮留出更多空间
         }}
       >
-        {children}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </Box>
       {/* Light 版隐藏市场招募按钮和弹窗 */}
       {mode !== 'light' && (

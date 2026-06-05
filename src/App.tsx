@@ -3,7 +3,6 @@ import { Box } from '@mui/material';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/Layout/AppLayout';
 import { useAuthStore } from './lib/authStore';
-import AgentPage from './pages/AgentPage';
 import AIDemoPage from './pages/AIDemoPage';
 import DataCenterPage from './pages/DataCenterPage';
 import FAQManagementPage from './pages/FAQManagementPage';
@@ -107,14 +106,7 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
 
         {/* 受保护的路由 - 需要登录 */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <AgentPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/" element={<Navigate to="/datacenter" replace />} />
         <Route
           path="/datacenter"
           element={

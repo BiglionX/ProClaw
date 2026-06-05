@@ -1,4 +1,4 @@
-import { Info as InfoIcon, Analytics as AnalyticsIcon, Help as HelpIcon, Extension as ExtensionIcon } from '@mui/icons-material';
+import { Info as InfoIcon, Analytics as AnalyticsIcon, Help as HelpIcon } from '@mui/icons-material';
 import {
   Box,
   Button,
@@ -21,9 +21,6 @@ import { useCallback, useState } from 'react';
 import { useAppModeStore } from '../config/appMode';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
-import PreferenceSettings from '../components/CEO/PreferenceSettings';
-import CompanyConfigManager from '../components/CEO/CompanyConfigManager';
-import PluginSettings from '../components/Settings/PluginSettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -114,8 +111,6 @@ export default function SettingsPage() {
           {mode !== 'light' && <Tab label="🔍 指令分析" {...a11yProps(2)} />}
           <Tab label="ℹ️ 系统信息" {...a11yProps(3)} />
           {mode !== 'light' && <Tab label="📧 邀请管理" {...a11yProps(4)} />}
-          {mode !== 'light' && <Tab label="🧠 CEO Agent" {...a11yProps(5)} />}
-          <Tab label="🔌 插件管理" icon={<ExtensionIcon />} iconPosition="start" {...a11yProps(6)} />
         </Tabs>
       </Paper>
 
@@ -299,19 +294,6 @@ export default function SettingsPage() {
             </Dialog>
           </CardContent>
         </Card>
-      </TabPanel>
-
-      {/* Tab 5: CEO Agent 偏好设置 */}
-      <TabPanel value={tabValue} index={5}>
-        <PreferenceSettings />
-        <Box sx={{ mt: 3 }}>
-          <CompanyConfigManager />
-        </Box>
-      </TabPanel>
-
-      {/* Tab 6: 插件管理 */}
-      <TabPanel value={tabValue} index={6}>
-        <PluginSettings />
       </TabPanel>
     </Box>
   );

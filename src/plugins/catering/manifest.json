@@ -26,7 +26,6 @@
   },
   "navigation": {
     "add": [
-      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
       { "text": "收银台", "icon": "shopping-cart", "path": "/pos", "group": "前台" },
       { "text": "桌台管理", "icon": "table-restaurant", "path": "/tables", "group": "前台" },
       { "text": "后厨显示", "icon": "monitor", "path": "/kitchen", "group": "前台" },

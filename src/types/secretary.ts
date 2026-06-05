@@ -1,6 +1,6 @@
 /** 秘书 Agent 完整配置 */
 export interface SecretaryConfig {
-  /** 显示名称，默认 '小 Pro' */
+  /** 显示名称，默认 '小如' */
   name: string;
   /** 头像 key，默认 'default' */
   avatarKey: string;
@@ -63,7 +63,7 @@ export const SECRETARY_STORAGE_KEYS = {
 } as const;
 
 /** 默认名称 */
-export const DEFAULT_SECRETARY_NAME = '小 Pro';
+export const DEFAULT_SECRETARY_NAME = '小如';
 
 /** 默认头像 key */
 export const DEFAULT_AVATAR_KEY = 'default';

@@ -393,3 +393,66 @@ pub fn submit_sales_order_cmd(db: tauri::State<Mutex<Database>>, order_id: Strin
 
     Ok(serde_json::json!({"id": order_id, "status": "confirmed", "message": "Sales order submitted. Inventory deducted."}))
 }
+
+/// 取消销售订单 (任意状态 → cancelled)
+#[tauri::command]
+pub fn cancel_sales_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM sales_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Sales order not found".to_string())?;
+
+    if status == "delivered" || status == "cancelled" {
+        return Err(format!("Cannot cancel order with status '{}'", status));
+    }
+
+    conn.execute("UPDATE sales_orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "status": "cancelled", "message": "Sales order cancelled"}))
+}
+
+/// 标记销售订单已发货 (confirmed → shipped)
+#[tauri::command]
+pub fn mark_sales_shipped_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM sales_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Sales order not found".to_string())?;
+
+    if status != "confirmed" {
+        return Err(format!("Cannot ship order with status '{}'", status));
+    }
+
+    conn.execute("UPDATE sales_orders SET status = 'shipped', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "status": "shipped", "message": "Sales order marked as shipped"}))
+}
+
+/// 标记销售订单已送达 (shipped → delivered)
+#[tauri::command]
+pub fn mark_sales_delivered_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM sales_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Sales order not found".to_string())?;
+
+    if status != "shipped" {
+        return Err(format!("Cannot mark order delivered with status '{}'", status));
+    }
+
+    conn.execute("UPDATE sales_orders SET status = 'delivered', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "status": "delivered", "message": "Sales order marked as delivered"}))
+}

@@ -12,7 +12,6 @@
   },
   "navigation": {
     "add": [
-      { "text": "AI claw", "icon": "agent", "path": "/", "group": "首页" },
       { "text": "预约管理", "icon": "calendar", "path": "/appointments", "group": "前台" },
       { "text": "会员管理", "icon": "users", "path": "/members", "group": "客户" },
       { "text": "服务项目", "icon": "package", "path": "/services", "group": "业务" },

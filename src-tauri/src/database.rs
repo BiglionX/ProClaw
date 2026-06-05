@@ -81,6 +81,117 @@ impl Database {
         let nvwax_migration = include_str!("../../database/migrations/028_add_nvwax_usage_logs.sql");
         self.conn.execute_batch(nvwax_migration).ok();
 
+        // 运行迁移：采购退货表
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS purchase_returns (
+                id TEXT PRIMARY KEY,
+                pr_number TEXT UNIQUE NOT NULL,
+                purchase_order_id TEXT NOT NULL REFERENCES purchase_orders(id),
+                supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+                return_date DATE NOT NULL,
+                status TEXT DEFAULT 'draft' CHECK(status IN ('draft', 'confirmed', 'completed', 'cancelled')),
+                total_amount REAL DEFAULT 0,
+                refund_amount REAL DEFAULT 0,
+                reason TEXT,
+                notes TEXT,
+                created_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sync_status TEXT DEFAULT 'pending',
+                deleted_at TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS purchase_return_items (
+                id TEXT PRIMARY KEY,
+                purchase_return_id TEXT NOT NULL REFERENCES purchase_returns(id) ON DELETE CASCADE,
+                product_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                total_price REAL NOT NULL,
+                reason TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ").ok();
+
+        // 运行迁移：销售退货表
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS sales_returns (
+                id TEXT PRIMARY KEY,
+                sr_number TEXT UNIQUE NOT NULL,
+                sales_order_id TEXT NOT NULL REFERENCES sales_orders(id),
+                customer_id TEXT NOT NULL REFERENCES customers(id),
+                return_date DATE NOT NULL,
+                status TEXT DEFAULT 'draft' CHECK(status IN ('draft', 'confirmed', 'completed', 'cancelled')),
+                total_amount REAL DEFAULT 0,
+                refund_amount REAL DEFAULT 0,
+                reason TEXT,
+                notes TEXT,
+                created_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sync_status TEXT DEFAULT 'pending',
+                deleted_at TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS sales_return_items (
+                id TEXT PRIMARY KEY,
+                sales_return_id TEXT NOT NULL REFERENCES sales_returns(id) ON DELETE CASCADE,
+                product_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                total_price REAL NOT NULL,
+                reason TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ").ok();
+
+        // 运行迁移：付款交易表 + 对账规则表 + 对账单日志表（PRD v1.1）
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS payment_transactions (
+                id TEXT PRIMARY KEY,
+                order_type TEXT NOT NULL CHECK(order_type IN ('purchase','sales','purchase_return','sales_return')),
+                order_id TEXT NOT NULL,
+                transaction_type TEXT NOT NULL CHECK(transaction_type IN ('payment','receipt','refund')),
+                amount REAL NOT NULL,
+                transaction_date DATE NOT NULL,
+                payment_method TEXT,
+                voucher_no TEXT,
+                notes TEXT,
+                created_by TEXT,
+                counterparty_id TEXT,
+                counterparty_name TEXT,
+                counterparty_type TEXT CHECK(counterparty_type IN ('supplier','customer')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS reconciliation_rules (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                enabled INTEGER DEFAULT 1,
+                scope_type TEXT,
+                scope_ids TEXT,
+                trigger_type TEXT NOT NULL,
+                trigger_config TEXT NOT NULL,
+                statement_format TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                extra_emails TEXT,
+                last_run_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS reconciliation_logs (
+                id TEXT PRIMARY KEY,
+                rule_id TEXT REFERENCES reconciliation_rules(id),
+                counterparty_type TEXT,
+                counterparty_id TEXT,
+                counterparty_name TEXT,
+                statement_format TEXT,
+                generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sent_via TEXT,
+                sent_to TEXT,
+                status TEXT DEFAULT 'success',
+                error_message TEXT
+            );
+        ").ok();
+
         // 自动安装内置 Agent
         let builtin_count: i64 = self.conn
             .query_row(

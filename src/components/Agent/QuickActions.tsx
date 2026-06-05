@@ -1,182 +1,204 @@
 import {
   Add as AddIcon,
   Analytics as AnalyticsIcon,
-  Assessment as AssessmentIcon,
   Search as SearchIcon,
-  ShoppingCart as ShoppingCartIcon,
   TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
 import {
-  Avatar,
   Box,
   Card,
   CardActionArea,
   Chip,
-  Grid,
-  Paper,
   Typography,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
+interface QuickActionsProps {
+  /** 销售分析按钮回调，传入后替代导航行为 */
+  onSalesAnalysis?: () => void;
+}
+
 interface QuickAction {
   id: string;
   title: string;
-  description: string;
   icon: React.ReactNode;
   color: string;
   bgColor: string;
+  /** 渐变颜色方案 */
+  gradient: string;
   action: () => void;
+  /** 是否为 AI 推荐操作 */
+  aiRecommended?: boolean;
 }
 
-export default function QuickActions() {
+const CARD_SIZE = 100;
+
+export default function QuickActions({ onSalesAnalysis }: QuickActionsProps) {
   const navigate = useNavigate();
 
   const actions: QuickAction[] = [
     {
       id: 'add-product',
       title: '添加产品',
-      description: '快速录入新产品',
       icon: <AddIcon />,
-      color: '#1976d2',
-      bgColor: 'rgba(25, 118, 210, 0.1)',
-      action: () => {
-        navigate('/products');
-      },
+      color: '#FF3B30',
+      bgColor: 'rgba(255, 59, 48, 0.08)',
+      gradient: 'linear-gradient(180deg, rgba(255,59,48,0.06) 0%, rgba(255,59,48,0.01) 100%)',
+      action: () => navigate('/products'),
     },
     {
       id: 'search-inventory',
       title: '查询库存',
-      description: '查看当前库存状态',
       icon: <SearchIcon />,
-      color: '#2e7d32',
-      bgColor: 'rgba(46, 125, 50, 0.1)',
-      action: () => {
-        navigate('/inventory');
-      },
+      color: '#6366F1',
+      bgColor: 'rgba(99, 102, 241, 0.08)',
+      gradient: 'linear-gradient(180deg, rgba(99,102,241,0.06) 0%, rgba(99,102,241,0.01) 100%)',
+      action: () => navigate('/inventory'),
+      aiRecommended: true,
     },
     {
       id: 'sales-analysis',
       title: '销售分析',
-      description: '分析销售数据和趋势',
       icon: <AnalyticsIcon />,
-      color: '#ed6c02',
-      bgColor: 'rgba(237, 108, 2, 0.1)',
+      color: '#10B981',
+      bgColor: 'rgba(16, 185, 129, 0.08)',
+      gradient: 'linear-gradient(180deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.01) 100%)',
       action: () => {
-        navigate('/analytics');
+        if (onSalesAnalysis) onSalesAnalysis();
+        else navigate('/datacenter');
       },
     },
     {
       id: 'stock-alert',
       title: '库存预警',
-      description: '查看低库存警告',
       icon: <WarningIcon />,
-      color: '#d32f2f',
-      bgColor: 'rgba(211, 47, 47, 0.1)',
-      action: () => {
-        navigate('/inventory');
-      },
-    },
-    {
-      id: 'create-order',
-      title: '创建订单',
-      description: '新建采购或销售订单',
-      icon: <ShoppingCartIcon />,
-      color: '#7b1fa2',
-      bgColor: 'rgba(123, 31, 162, 0.1)',
-      action: () => {
-        // Beta 版本暂不支持
-        alert('订单功能将在 v1.0 正式版中提供');
-      },
-    },
-    {
-      id: 'reports',
-      title: '生成报表',
-      description: '查看业务报表',
-      icon: <AssessmentIcon />,
-      color: '#0288d1',
-      bgColor: 'rgba(2, 136, 209, 0.1)',
-      action: () => {
-        // Beta 版本暂不支持
-        alert('报表功能将在 v1.0 正式版中提供');
-      },
+      color: '#F59E0B',
+      bgColor: 'rgba(245, 158, 11, 0.08)',
+      gradient: 'linear-gradient(180deg, rgba(245,158,11,0.06) 0%, rgba(245,158,11,0.01) 100%)',
+      action: () => navigate('/inventory'),
     },
   ];
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 3,
-        borderRadius: 2,
-        border: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <TrendingUpIcon sx={{ color: '#ff3b30', mr: 1 }} />
-        <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+        <TrendingUpIcon sx={{ color: '#FF3B30', mr: 0.5, fontSize: 18 }} />
+        <Typography variant="body2" sx={{ fontWeight: 600, color: '#1A1A2E' }}>
           快捷操作
         </Typography>
         <Chip
-          label="智能推荐"
+          label="AI 推荐"
           size="small"
-          sx={{ 
+          sx={{
             ml: 'auto',
             bgcolor: 'rgba(255,59,48,0.1)',
-            color: '#ff3b30',
-            border: '1px solid rgba(255,59,48,0.3)'
+            color: '#FF3B30',
+            border: '1px solid rgba(255,59,48,0.3)',
+            height: 20,
+            fontSize: 11,
+            fontWeight: 600,
           }}
         />
       </Box>
 
-      <Grid container spacing={2}>
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1.5,
+          overflowX: 'auto',
+          pb: 1,
+          '&::-webkit-scrollbar': { height: 4 },
+          '&::-webkit-scrollbar-thumb': { bgcolor: '#ddd', borderRadius: 2 },
+        }}
+      >
         {actions.map(action => (
-          <Grid item xs={12} sm={6} md={4} key={action.id}>
+          <Box key={action.id} sx={{ flexShrink: 0, position: 'relative' }}>
             <Card
               elevation={0}
               sx={{
-                height: '100%',
+                width: CARD_SIZE,
+                height: CARD_SIZE,
                 border: '1px solid',
-                borderColor: 'divider',
-                transition: 'all 0.2s',
+                borderColor: action.aiRecommended ? 'rgba(99,102,241,0.3)' : 'divider',
+                borderRadius: 2,
+                background: action.gradient,
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  boxShadow: 2,
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
                   borderColor: action.color,
-                  transform: 'translateY(-2px)',
+                  transform: 'translateY(-3px) scale(1.03)',
                 },
+                // AI 推荐呼吸光晕
+                ...(action.aiRecommended ? {
+                  animation: 'aiPulse 2.5s ease-in-out infinite',
+                  '@keyframes aiPulse': {
+                    '0%, 100%': {
+                      boxShadow: '0 0 0 0 rgba(99,102,241,0.15)',
+                    },
+                    '50%': {
+                      boxShadow: '0 0 0 6px rgba(99,102,241,0)',
+                    },
+                  },
+                } : {}),
               }}
             >
-              <CardActionArea onClick={action.action} sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                  <Avatar
-                    sx={{
-                      bgcolor: action.bgColor,
-                      color: action.color,
-                      width: 48,
-                      height: 48,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {action.icon}
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography
-                      variant="subtitle1"
-                      sx={{ fontWeight: 600, mb: 0.5 }}
-                    >
-                      {action.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {action.description}
-                    </Typography>
-                  </Box>
+              <CardActionArea
+                onClick={action.action}
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: action.bgColor,
+                    color: action.color,
+                  }}
+                >
+                  {action.icon}
                 </Box>
+                <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2, color: '#4B5563' }}>
+                  {action.title}
+                </Typography>
               </CardActionArea>
             </Card>
-          </Grid>
+            {/* AI 推荐角标 */}
+            {action.aiRecommended && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #FF3B30 0%, #6366F1 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.5rem',
+                  color: '#fff',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                }}
+              >
+                AI
+              </Box>
+            )}
+          </Box>
         ))}
-      </Grid>
-    </Paper>
+      </Box>
+    </Box>
   );
 }

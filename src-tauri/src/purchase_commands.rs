@@ -428,3 +428,45 @@ pub fn receive_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: S
 
     Ok(serde_json::json!({"id": order_id, "status": "received", "message": "Purchase order received. Inventory updated."}))
 }
+
+/// 确认采购订单 (draft → confirmed)
+#[tauri::command]
+pub fn confirm_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Purchase order not found".to_string())?;
+
+    if status != "draft" {
+        return Err(format!("Cannot confirm order with status '{}'", status));
+    }
+
+    conn.execute("UPDATE purchase_orders SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "status": "confirmed", "message": "Purchase order confirmed"}))
+}
+
+/// 取消采购订单 (任意状态 → cancelled)
+#[tauri::command]
+pub fn cancel_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let status: String = conn.query_row(
+        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
+        |row| row.get(0),
+    ).map_err(|_| "Purchase order not found".to_string())?;
+
+    if status == "received" || status == "cancelled" {
+        return Err(format!("Cannot cancel order with status '{}'", status));
+    }
+
+    conn.execute("UPDATE purchase_orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({"id": order_id, "status": "cancelled", "message": "Purchase order cancelled"}))
+}

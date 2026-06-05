@@ -137,6 +137,11 @@ export async function createSalesOrder(
   return await invoke('create_sales_order', { order: finalInput });
 }
 
+export interface SalesOrderDetail {
+  order: SalesOrder;
+  items: SalesOrderItem[];
+}
+
 export async function getSalesOrders(options?: {
   status?: string;
   search?: string;
@@ -146,4 +151,65 @@ export async function getSalesOrders(options?: {
     return [];
   }
   return await invoke('get_sales_orders', { options });
+}
+
+export async function getSalesOrderDetail(
+  orderId: string
+): Promise<SalesOrderDetail> {
+  return await invoke('get_sales_order_detail', { orderId });
+}
+
+/**
+ * 提交销售订单 → 确认出库 + 自动扣减库存
+ */
+export async function submitSalesOrder(
+  orderId: string
+): Promise<{ id: string; status: string; message: string }> {
+  return await invoke('submit_sales_order_cmd', { orderId });
+}
+
+/**
+ * 更新销售订单（仅草稿状态）
+ */
+export async function updateSalesOrder(
+  orderId: string,
+  order: Partial<CreateSalesOrderInput>
+): Promise<{ id: string; message: string }> {
+  return await invoke('update_sales_order_cmd', { orderId, order });
+}
+
+/**
+ * 删除销售订单（仅草稿/已取消状态）
+ */
+export async function deleteSalesOrder(
+  orderId: string
+): Promise<{ id: string; message: string }> {
+  return await invoke('delete_sales_order_cmd', { orderId });
+}
+
+/**
+ * 取消销售订单 (任意状态 → cancelled)
+ */
+export async function cancelSalesOrder(
+  orderId: string
+): Promise<{ id: string; status: string; message: string }> {
+  return await invoke('cancel_sales_order_cmd', { orderId });
+}
+
+/**
+ * 标记销售订单已发货 (confirmed → shipped)
+ */
+export async function markSalesShipped(
+  orderId: string
+): Promise<{ id: string; status: string; message: string }> {
+  return await invoke('mark_sales_shipped_cmd', { orderId });
+}
+
+/**
+ * 标记销售订单已送达 (shipped → delivered)
+ */
+export async function markSalesDelivered(
+  orderId: string
+): Promise<{ id: string; status: string; message: string }> {
+  return await invoke('mark_sales_delivered_cmd', { orderId });
 }

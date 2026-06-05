@@ -1,29 +1,30 @@
 import {
+  Analytics as AnalyticsIcon,
+  AttachMoney as MoneyIcon,
+  BarChart as BarChartIcon,
+  Close as CloseIcon,
+  Dashboard as DashboardIcon,
   Inventory as InventoryIcon,
-  ShoppingCart as ShoppingCartIcon,
+  Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,
-  AttachMoney as MoneyIcon,
-  Assessment as ReportIcon,
-  Refresh as RefreshIcon,
-  ShowChart as ChartIcon,
-  AccountBalance as BalanceIcon,
-  Dashboard as DashboardIcon,
-  Analytics as AnalyticsIcon,
 } from '@mui/icons-material';
 import {
   Box,
   Button,
   Card,
   CardContent,
-  Chip,
-  CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Grid,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
   Select,
+  Skeleton,
   Tab,
   Table,
   TableBody,
@@ -36,801 +37,564 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar,
+  BarChart, Bar,
+  LineChart, Line,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend,
 } from 'recharts';
-import {
-  getInventoryStats, type InventoryStats,
-} from '../lib/inventoryService';
+
+import AIInsights, { type AIInsightItem } from '../components/DataCenter/AIInsights';
+import StatCard from '../components/DataCenter/StatCard';
+import { generateAIInsights } from '../lib/aiInsightEngine';
 import {
   getSalesTrend, getProductAnalytics,
   type SalesTrendData, type ProductAnalytics,
 } from '../lib/analyticsService';
-import {
-  getFinancialSummary, getProfitLossReport, getCashFlowReport,
-  type FinancialSummary, type ProfitLossReport, type CashFlowReport,
+import { getFinancialSummary,
+  type FinancialSummary,
 } from '../lib/financeService';
+import { getInventoryStats, type InventoryStats } from '../lib/inventoryService';
 import { getDatabaseStats } from '../lib/productService';
+import ProfitLossPage from './ProfitLossPage';
+import CashFlowPage from './CashFlowPage';
 
-/* ========== 通用组件 ========== */
+/* ========== 工具函数 ========== */
 
 const formatCurrency = (value: number) => {
-  if (value >= 10000) {
-    return `¥${(value / 10000).toFixed(1)}万`;
-  }
+  if (value >= 10000) return `¥${(value / 10000).toFixed(1)}万`;
   return `¥${value.toFixed(2)}`;
 };
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: string;
-  change?: string;
-  subtitle?: string;
-}
-
-function StatCard({ title, value, icon, color, change, subtitle }: StatCardProps) {
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        height: '100%',
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
-        transition: 'all 0.3s',
-        '&:hover': {
-          boxShadow: 3,
-          transform: 'translateY(-2px)',
-        },
-      }}
-    >
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box
-            sx={{
-              width: 56, height: 56, bgcolor: `${color}.light`,
-              borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            {icon}
-          </Box>
-          {change && (
-            <Chip
-              label={change} size="small"
-              color={change.startsWith('+') ? 'success' : 'error'}
-              variant="outlined" sx={{ fontWeight: 600 }}
-            />
-          )}
-        </Box>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>{value}</Typography>
-        <Typography variant="body2" color="text.secondary">{title}</Typography>
-        {subtitle && (
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-            {subtitle}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ========== 业务概览 Tab ========== */
-
-function DashboardTab() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
-  const [salesTrend, setSalesTrend] = useState<SalesTrendData | null>(null);
-  const [productAnalytics, setProductAnalytics] = useState<ProductAnalytics | null>(null);
-  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
-  const [dbStats, setDbStats] = useState<any>(null);
-
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [invStats, trendData, prodAnalytics, finSummary, dbStatistics] = await Promise.all([
-        getInventoryStats(), getSalesTrend('day'), getProductAnalytics(),
-        getFinancialSummary(), getDatabaseStats(),
-      ]);
-      setInventoryStats(invStats);
-      setSalesTrend(trendData);
-      setProductAnalytics(prodAnalytics);
-      setFinancialSummary(finSummary);
-      setDbStats(dbStatistics);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
-      console.error('Dashboard data loading error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadDashboardData(); }, []);
-
-  const getInventoryDistribution = () => {
-    if (!inventoryStats) return [];
-    const normalStock = inventoryStats.total_products - inventoryStats.low_stock_count - inventoryStats.zero_stock_count;
-    return [
-      { name: '正常库存', value: normalStock, color: '#4caf50' },
-      { name: '低库存', value: inventoryStats.low_stock_count, color: '#ff9800' },
-      { name: '零库存', value: inventoryStats.zero_stock_count, color: '#f44336' },
-    ].filter(item => item.value > 0);
-  };
-
-  const getSalesChartData = () => {
-    if (!salesTrend || !salesTrend.data) return [];
-    return salesTrend.data.slice(-7).map(item => ({
-      date: item.date.slice(5),
-      出库量: item.outbound_qty,
-      入库量: item.inbound_qty,
-      交易数: item.transaction_count,
-    }));
-  };
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  return (
-    <Box>
-      {error && (
-        <Box sx={{ mb: 2, p: 2, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
-          <Typography>{error}</Typography>
-        </Box>
-      )}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadDashboardData} disabled={loading}>
-          刷新数据
-        </Button>
-      </Box>
-
-      {/* 关键指标卡片 */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard title="产品总数" value={dbStats?.products_count || 0}
-            icon={<InventoryIcon sx={{ fontSize: 32, color: 'primary.main' }} />} color="primary"
-            subtitle={`${dbStats?.categories_count || 0} 个分类`} />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard title="本月销售额" value={formatCurrency(financialSummary?.monthly_revenue || 0)}
-            icon={<TrendingUpIcon sx={{ fontSize: 32, color: 'success.main' }} />} color="success"
-            change={`+${((financialSummary?.monthly_profit || 0) / Math.max(financialSummary?.monthly_revenue || 1, 1) * 100).toFixed(1)}%`}
-            subtitle={`利润: ${formatCurrency(financialSummary?.monthly_profit || 0)}`} />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard title="今日交易" value={inventoryStats?.today_transactions || 0}
-            icon={<ShoppingCartIcon sx={{ fontSize: 32, color: 'warning.main' }} />} color="warning"
-            subtitle={`库存价值: ${formatCurrency(inventoryStats?.total_value || 0)}`} />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard title="库存预警" value={inventoryStats?.low_stock_count || 0}
-            icon={<WarningIcon sx={{ fontSize: 32, color: 'info.main' }} />} color="info"
-            change={inventoryStats?.zero_stock_count ? `+${inventoryStats.zero_stock_count} 缺货` : undefined}
-            subtitle={`${inventoryStats?.zero_stock_count || 0} 个产品缺货`} />
-        </Grid>
-      </Grid>
-
-      {/* 财务概览 */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <MoneyIcon sx={{ mr: 1, color: 'success.main' }} />
-                <Typography variant="h6">应收账款</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: 'warning.main' }}>
-                {formatCurrency(financialSummary?.accounts_receivable || 0)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>待收回款项</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <MoneyIcon sx={{ mr: 1, color: 'error.main' }} />
-                <Typography variant="h6">应付账款</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: 'error.main' }}>
-                {formatCurrency(financialSummary?.accounts_payable || 0)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>待支付款项</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <ReportIcon sx={{ mr: 1, color: 'primary.main' }} />
-                <Typography variant="h6">营运资金</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                {formatCurrency(financialSummary?.working_capital || 0)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>可用流动资金</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* 图表区域 */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} lg={8}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-              📈 近7天销售趋势
-            </Typography>
-            {getSalesChartData().length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={getSalesChartData()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="出库量" stroke="#666" strokeWidth={2} dot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="入库量" stroke="#999" strokeWidth={2} dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 8 }}>
-                <Typography color="text.secondary">暂无销售数据</Typography>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-        <Grid item xs={12} lg={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider', height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-              📊 库存状态分布
-            </Typography>
-            {getInventoryDistribution().length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={getInventoryDistribution()} cx="50%" cy="50%" labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent! * 100).toFixed(0)}%`}
-                    outerRadius={80} fill="#8884d8" dataKey="value">
-                    {getInventoryDistribution().map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 8 }}>
-                <Typography color="text.secondary">暂无库存数据</Typography>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* 畅销产品和低库存预警 */}
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'success.main' }}>
-              🔥 畅销产品 TOP 5
-            </Typography>
-            {productAnalytics?.best_selling && productAnalytics.best_selling.length > 0 ? (
-              <Box>
-                {productAnalytics.best_selling.slice(0, 5).map((product, index) => (
-                  <Box key={product.id} sx={{ display: 'flex', justifyContent: 'space-between',
-                    alignItems: 'center', py: 1.5, borderBottom: index < 4 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Typography sx={{ fontWeight: 'bold',
-                        color: index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : 'text.secondary',
-                        minWidth: 30 }}>#{index + 1}</Typography>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{product.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">{product.sku}</Typography>
-                      </Box>
-                    </Box>
-                    <Chip label={`${product.total_sold} 件`} size="small" color="success" variant="outlined" />
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 4 }}><Typography color="text.secondary">暂无销售数据</Typography></Box>
-            )}
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'error.main' }}>
-              ⚠️ 低库存预警
-            </Typography>
-            {inventoryStats?.low_stock_products && inventoryStats.low_stock_products.length > 0 ? (
-              <Box>
-                {inventoryStats.low_stock_products.slice(0, 5).map((product, index) => (
-                  <Box key={product.id} sx={{ display: 'flex', justifyContent: 'space-between',
-                    alignItems: 'center', py: 1.5, borderBottom: index < 4 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{product.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        SPU: {product.spu_code} · {product.sku_count}个SKU
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Chip label={`当前: ${product.total_stock}`} size="small"
-                        color={product.total_stock === 0 ? 'error' : 'warning'} sx={{ mb: 0.5 }} />
-                      <Typography variant="caption" color="text.secondary">最低: {product.min_stock}</Typography>
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography color="text.secondary">✓ 库存充足，无预警</Typography>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
-  );
-}
-
-/* ========== 财务报表 Tab ========== */
-
-function FinanceTab() {
-  const [tabValue, setTabValue] = useState(0);
-  const [summary, setSummary] = useState<FinancialSummary | null>(null);
-  const [profitLoss, setProfitLoss] = useState<ProfitLossReport | null>(null);
-  const [cashFlow, setCashFlow] = useState<CashFlowReport | null>(null);
-
-  useEffect(() => {
-    getFinancialSummary().then(setSummary).catch(console.error);
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const endDate = now.toISOString().split('T')[0];
-    getProfitLossReport(startDate, endDate).then(setProfitLoss).catch(console.error);
-    getCashFlowReport(startDate, endDate).then(setCashFlow).catch(console.error);
-  }, []);
-
-  const fmt = (v: number) => `¥${v.toFixed(2)}`;
-
-  return (
-    <Box>
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="fullWidth">
-          <Tab icon={<BalanceIcon />} label="财务概览" />
-          <Tab icon={<MoneyIcon />} label="利润表" />
-          <Tab icon={<TrendingUpIcon />} label="现金流量表" />
-        </Tabs>
-      </Paper>
-
-      {tabValue === 0 && summary && (
-        <Box>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>本月收入</Typography>
-                  <Typography variant="h3">{fmt(summary.monthly_revenue)}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card sx={{ bgcolor: 'error.light', color: 'error.contrastText' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>本月支出</Typography>
-                  <Typography variant="h3">{fmt(summary.monthly_expense)}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card sx={{ bgcolor: summary.monthly_profit >= 0 ? 'primary.light' : 'warning.light', color: 'white' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>本月利润</Typography>
-                  <Typography variant="h3">{fmt(summary.monthly_profit)}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card sx={{ bgcolor: 'info.light', color: 'white' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>营运资金</Typography>
-                  <Typography variant="h3">{fmt(summary.working_capital)}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-          <Paper elevation={0} sx={{ mt: 3, borderRadius: 2, overflow: 'hidden' }}>
-            <TableContainer>
-              <Table>
-                <TableBody>
-                  <TableRow>
-                    <TableCell><Typography sx={{ fontWeight: 'bold' }}>应收账款</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ color: 'warning.main', fontWeight: 'bold' }}>{fmt(summary.accounts_receivable)}</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell><Typography sx={{ fontWeight: 'bold' }}>应付账款</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ color: 'error.main', fontWeight: 'bold' }}>{fmt(summary.accounts_payable)}</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell><Typography sx={{ fontWeight: 'bold' }}>库存价值</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ color: 'primary.main', fontWeight: 'bold' }}>{fmt(summary.inventory_value)}</Typography>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Box>
-      )}
-
-      {tabValue === 1 && profitLoss && (
-        <Box>
-          <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'primary.50' }}>
-              <Typography variant="h6">利润表 ({profitLoss.period.start} ~ {profitLoss.period.end})</Typography>
-            </Box>
-            <TableContainer>
-              <Table>
-                <TableBody>
-                  <TableRow>
-                    <TableCell><Typography sx={{ fontWeight: 'bold' }}>销售收入</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ color: 'success.main', fontWeight: 'bold' }}>{fmt(profitLoss.revenue)}</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell><Typography sx={{ fontWeight: 'bold' }}>销售成本</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ color: 'error.main', fontWeight: 'bold' }}>-{fmt(profitLoss.cost_of_goods_sold)}</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow sx={{ bgcolor: 'action.hover' }}>
-                    <TableCell><Typography sx={{ fontWeight: 'bold', fontSize: '1.1em' }}>毛利润</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ fontWeight: 'bold', fontSize: '1.1em',
-                        color: profitLoss.gross_profit >= 0 ? 'success.main' : 'error.main' }}>
-                        {fmt(profitLoss.gross_profit)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell><Typography sx={{ fontWeight: 'bold' }}>运营费用</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ color: 'error.main', fontWeight: 'bold' }}>-{fmt(profitLoss.operating_expenses)}</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow sx={{ bgcolor: 'primary.50' }}>
-                    <TableCell><Typography sx={{ fontWeight: 'bold', fontSize: '1.2em' }}>净利润</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ fontWeight: 'bold', fontSize: '1.2em',
-                        color: profitLoss.net_profit >= 0 ? 'success.main' : 'error.main' }}>
-                        {fmt(profitLoss.net_profit)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell><Typography sx={{ fontWeight: 'bold' }}>利润率</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ fontWeight: 'bold',
-                        color: profitLoss.profit_margin >= 20 ? 'success.main'
-                          : profitLoss.profit_margin >= 10 ? 'warning.main' : 'error.main' }}>
-                        {profitLoss.profit_margin.toFixed(2)}%
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Box>
-      )}
-
-      {tabValue === 2 && cashFlow && (
-        <Box>
-          <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'info.50' }}>
-              <Typography variant="h6">现金流量表 ({cashFlow.period.start} ~ {cashFlow.period.end})</Typography>
-            </Box>
-            <TableContainer>
-              <Table>
-                <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={2}>
-                      <Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>经营活动现金流</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell sx={{ pl: 4 }}>现金流入</TableCell>
-                    <TableCell align="right"><Typography sx={{ color: 'success.main' }}>{fmt(cashFlow.operating_activities.inflow)}</Typography></TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell sx={{ pl: 4 }}>现金流出</TableCell>
-                    <TableCell align="right"><Typography sx={{ color: 'error.main' }}>-{fmt(cashFlow.operating_activities.outflow)}</Typography></TableCell>
-                  </TableRow>
-                  <TableRow sx={{ bgcolor: 'action.hover' }}>
-                    <TableCell sx={{ pl: 4 }}><Typography sx={{ fontWeight: 'bold' }}>经营净现金流</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ fontWeight: 'bold', color: cashFlow.operating_activities.net >= 0 ? 'success.main' : 'error.main' }}>
-                        {fmt(cashFlow.operating_activities.net)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell colSpan={2}>
-                      <Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>投资活动现金流</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell sx={{ pl: 4 }}>净额</TableCell>
-                    <TableCell align="right">{fmt(cashFlow.investing_activities)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell colSpan={2}>
-                      <Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>筹资活动现金流</Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell sx={{ pl: 4 }}>净额</TableCell>
-                    <TableCell align="right">{fmt(cashFlow.financing_activities)}</TableCell>
-                  </TableRow>
-                  <TableRow sx={{ bgcolor: 'info.50' }}>
-                    <TableCell><Typography sx={{ fontWeight: 'bold', fontSize: '1.2em' }}>净现金流</Typography></TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ fontWeight: 'bold', fontSize: '1.2em',
-                        color: cashFlow.net_cash_flow >= 0 ? 'success.main' : 'error.main' }}>
-                        {fmt(cashFlow.net_cash_flow)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-/* ========== 数据分析 Tab ========== */
-
-function AnalyticsTab() {
-  const [salesTrend, setSalesTrend] = useState<SalesTrendData | null>(null);
-  const [productAnalytics, setProductAnalytics] = useState<ProductAnalytics | null>(null);
-  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [trendData, analyticsData] = await Promise.all([
-        getSalesTrend(period), getProductAnalytics(),
-      ]);
-      setSalesTrend(trendData);
-      setProductAnalytics(analyticsData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadData(); }, [period]);
-
-  return (
-    <Box>
-      {/* 控制栏 */}
-      <Paper elevation={0} sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>时间周期</InputLabel>
-          <Select value={period} label="时间周期" onChange={e => setPeriod(e.target.value as any)}>
-            <MenuItem value="day">按天 (30天)</MenuItem>
-            <MenuItem value="week">按周 (13周)</MenuItem>
-            <MenuItem value="month">按月 (12月)</MenuItem>
-          </Select>
-        </FormControl>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData} disabled={loading}>刷新</Button>
-      </Paper>
-
-      {/* 销售趋势图 */}
-      <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <TrendingUpIcon sx={{ mr: 1, color: 'primary.main' }} />
-          <Typography variant="h6">销售趋势</Typography>
-        </Box>
-        {salesTrend && salesTrend.data.length > 0 ? (
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={salesTrend.data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="outbound_qty" name="出库量" stroke="#666" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="inbound_qty" name="入库量" stroke="#999" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <ChartIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-            <Typography color="text.secondary">暂无销售数据</Typography>
-          </Box>
-        )}
-      </Paper>
-
-      {/* 交易数量柱状图 */}
-      {salesTrend && salesTrend.data.length > 0 && (
-        <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-          <Typography variant="h6" gutterBottom>交易数量趋势</Typography>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={salesTrend.data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="transaction_count" name="交易次数" fill="#666" />
-            </BarChart>
-          </ResponsiveContainer>
-        </Paper>
-      )}
-
-      {/* 产品分析 */}
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ color: 'success.main' }}>🔥 畅销产品 TOP 10</Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>排名</TableCell><TableCell>产品名称</TableCell><TableCell>SKU</TableCell><TableCell align="right">销量</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {productAnalytics?.best_selling.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}><Typography color="text.secondary">暂无数据</Typography></TableCell></TableRow>
-                  ) : (
-                    productAnalytics?.best_selling.map((product, index) => (
-                      <TableRow key={product.id} hover>
-                        <TableCell>
-                          <Typography sx={{ fontWeight: index < 3 ? 'bold' : 'normal',
-                            color: index === 0 ? '#666' : index === 1 ? '#888' : index === 2 ? '#999' : 'inherit' }}>
-                            #{index + 1}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.sku}</TableCell>
-                        <TableCell align="right">
-                          <Typography sx={{ fontWeight: 'bold', color: 'success.main' }}>{product.total_sold}</Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ color: 'warning.main' }}>⚠️ 滞销产品 TOP 10</Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>产品名称</TableCell><TableCell>SKU</TableCell><TableCell align="right">库存</TableCell><TableCell align="right">库存价值</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {productAnalytics?.slow_moving.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}><Typography color="text.secondary">暂无数据</Typography></TableCell></TableRow>
-                  ) : (
-                    productAnalytics?.slow_moving.map(product => (
-                      <TableRow key={product.id} hover>
-                        <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.sku}</TableCell>
-                        <TableCell align="right">
-                          <Typography sx={{ color: 'warning.main', fontWeight: 'bold' }}>{product.current_stock}</Typography>
-                        </TableCell>
-                        <TableCell align="right">¥{product.stock_value.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* 库存周转率 */}
-      <Paper elevation={0} sx={{ p: 3, mt: 3, borderRadius: 2 }}>
-        <Typography variant="h6" gutterBottom>📊 库存周转率 (按类别)</Typography>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>类别</TableCell><TableCell align="right">产品数</TableCell><TableCell align="right">总库存</TableCell>
-                <TableCell align="right">总销量</TableCell><TableCell align="right">周转率</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {productAnalytics?.turnover_by_category.length === 0 ? (
-                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}><Typography color="text.secondary">暂无数据</Typography></TableCell></TableRow>
-              ) : (
-                productAnalytics?.turnover_by_category.map(category => (
-                  <TableRow key={category.category} hover>
-                    <TableCell>{category.category}</TableCell>
-                    <TableCell align="right">{category.product_count}</TableCell>
-                    <TableCell align="right">{category.total_stock}</TableCell>
-                    <TableCell align="right">{category.total_sold}</TableCell>
-                    <TableCell align="right">
-                      <Typography sx={{ fontWeight: 'bold',
-                        color: parseFloat(category.turnover_rate) > 1 ? 'success.main'
-                          : parseFloat(category.turnover_rate) > 0.5 ? 'warning.main' : 'error.main' }}>
-                        {category.turnover_rate}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
-      {error && (
-        <Paper elevation={0} sx={{ mt: 3, p: 2, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 2 }}>
-          <Typography>{error}</Typography>
-        </Paper>
-      )}
-    </Box>
-  );
-}
 
 /* ========== 主页面 ========== */
 
 export default function DataCenterPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
+  const [dbStats, setDbStats] = useState<any>(null);
+  const [insights, setInsights] = useState<AIInsightItem[]>([]);
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsTrend, setAnalyticsTrend] = useState<SalesTrendData | null>(null);
+  const [analyticsProducts, setAnalyticsProducts] = useState<ProductAnalytics | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  // 加载概览数据
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [invStats, prodAnalytics, finSummary, dbStatistics] = await Promise.all([
+        getInventoryStats(), getProductAnalytics(),
+        getFinancialSummary(), getDatabaseStats(),
+      ]);
+      setInventoryStats(invStats);
+      setFinancialSummary(finSummary);
+      setDbStats(dbStatistics);
+
+      const generatedInsights = generateAIInsights({
+        lowStockCount: invStats?.low_stock_count || 0,
+        zeroStockCount: invStats?.zero_stock_count || 0,
+        totalProducts: dbStatistics?.spu_count || 0,
+        monthlyRevenue: finSummary?.monthly_revenue || 0,
+        monthlyProfit: finSummary?.monthly_profit || 0,
+        bestSellingProducts: prodAnalytics?.best_selling?.slice(0, 3),
+        lowStockProducts: invStats?.low_stock_products,
+        accountsReceivable: finSummary?.accounts_receivable || 0,
+        accountsPayable: finSummary?.accounts_payable || 0,
+      });
+      setInsights(generatedInsights);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 加载数据分析
+  const loadAnalyticsData = async () => {
+    try {
+      setAnalyticsLoading(true);
+      setAnalyticsError(null);
+      const [trendData, analyticsData] = await Promise.all([
+        getSalesTrend(period), getProductAnalytics(),
+      ]);
+      setAnalyticsTrend(trendData);
+      setAnalyticsProducts(analyticsData);
+    } catch (err) {
+      setAnalyticsError(err instanceof Error ? err.message : '加载数据失败');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
+  useEffect(() => { loadDashboardData(); }, []);
+  useEffect(() => { loadAnalyticsData(); }, [period]);
+
+  const finSummary = financialSummary;
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          数据中心
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          业务概览、财务报表与数据分析
-          <Typography component="span" sx={{ ml: 1, color: '#ff3b30', fontSize: '0.9em' }}>🦞</Typography>
-        </Typography>
+      {/* 页面标题行 + AI小如按钮在右侧 */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+            数据中心
+          </Typography>
+        </Box>
+        {/* AI 小如 —— 紧凑按钮 */}
+        <Box
+          onClick={() => setReportOpen(true)}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 1.5,
+            cursor: 'pointer',
+            border: '1px solid',
+            borderColor: 'rgba(255,59,48,0.15)',
+            bgcolor: 'rgba(255,59,48,0.04)',
+            transition: 'all 0.2s',
+            '&:hover': {
+              bgcolor: 'rgba(255,59,48,0.1)',
+              borderColor: 'rgba(255,59,48,0.3)',
+              transform: 'translateY(-1px)',
+            },
+          }}
+        >
+          <Box sx={{
+            width: 24, height: 24, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #FF3B30 0%, #6366F1 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
+          }}>如</Box>
+          <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#FF3B30' }}>
+            AI 分析
+          </Typography>
+        </Box>
       </Box>
 
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="fullWidth">
-          <Tab icon={<DashboardIcon />} label="业务概览" />
-          <Tab icon={<BalanceIcon />} label="财务报表" />
-          <Tab icon={<AnalyticsIcon />} label="数据分析" />
+      {/* 分列导航：业务分析 | 利润表 | 现金流量表 */}
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+          border: '1px solid',
+          borderColor: 'divider',
+          overflow: 'hidden',
+        }}
+      >
+        <Tabs
+          value={tabValue}
+          onChange={(_, v) => setTabValue(v)}
+          variant="fullWidth"
+          sx={{
+            minHeight: 48,
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#FF3B30',
+              height: 2,
+            },
+            '& .MuiTab-root': {
+              minHeight: 48,
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              color: 'rgba(0,0,0,0.5)',
+              '&.Mui-selected': {
+                color: '#FF3B30',
+                fontWeight: 600,
+              },
+            },
+            '& .MuiTab-iconWrapper': {
+              mr: 0.5,
+            },
+          }}
+        >
+          <Tab icon={<BarChartIcon sx={{ fontSize: 16 }} />} label="业务分析" iconPosition="start" />
+          <Tab icon={<MoneyIcon sx={{ fontSize: 16 }} />} label="利润表" iconPosition="start" />
+          <Tab icon={<TrendingUpIcon sx={{ fontSize: 16 }} />} label="现金流量表" iconPosition="start" />
         </Tabs>
       </Paper>
 
-      {tabValue === 0 && <DashboardTab />}
-      {tabValue === 1 && <FinanceTab />}
-      {tabValue === 2 && <AnalyticsTab />}
+      {/* Tab 0: 业务分析 */}
+      {tabValue === 0 && (
+        <>
+          {/* ========== 经营概览卡片 ========== */}
+          {loading ? (
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[1, 2, 3, 4].map(i => (
+                <Grid item xs={12} sm={6} md={3} key={i}>
+                  <Skeleton variant="rounded" height={120} />
+                </Grid>
+              ))}
+            </Grid>
+          ) : error ? (
+            <Paper elevation={0} sx={{ p: 3, mb: 3, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 2 }}>
+              <Typography>{error}</Typography>
+              <Button variant="outlined" size="small" onClick={loadDashboardData} sx={{ mt: 1 }}>
+                重试
+              </Button>
+            </Paper>
+          ) : (
+            <>
+              {/* 概览统计卡片 */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {inventoryStats && (
+                  <>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <StatCard
+                        icon={<InventoryIcon />}
+                        title="总产品数"
+                        value={inventoryStats.total_products}
+                        color="#6366F1"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <StatCard
+                        icon={<WarningIcon />}
+                        title="低库存预警"
+                        value={inventoryStats.low_stock_count}
+                        color={inventoryStats.low_stock_count > 0 ? '#F59E0B' : '#10B981'}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <StatCard
+                        icon={<WarningIcon />}
+                        title="零库存"
+                        value={inventoryStats.zero_stock_count}
+                        color={inventoryStats.zero_stock_count > 0 ? '#EF4444' : '#10B981'}
+                      />
+                    </Grid>
+                  </>
+                )}
+                {dbStats && (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <StatCard
+                      icon={<DashboardIcon />}
+                      title="SPU 总数"
+                      value={dbStats.spu_count || 0}
+                      color="#FF3B30"
+                    />
+                  </Grid>
+                )}
+              </Grid>
+
+              {/* 财务概览卡片 */}
+              {finSummary && (
+                <Grid container spacing={3} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                  <Card sx={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.02) 100%)', color: '#065F46' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>本月收入</Typography>
+                        <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.monthly_revenue)}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.02) 100%)', color: '#991B1B' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>本月支出</Typography>
+                        <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.monthly_expense)}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{
+                      background: finSummary.monthly_profit >= 0
+                        ? 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(99,102,241,0.02) 100%)'
+                        : 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.02) 100%)',
+                      color: finSummary.monthly_profit >= 0 ? '#4338CA' : '#92400E',
+                    }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>本月利润</Typography>
+                        <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.monthly_profit)}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card sx={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(99,102,241,0.02) 100%)', color: '#4338CA' }}>
+                      <CardContent>
+                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>营运资金</Typography>
+                        <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.working_capital)}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+                      <TableContainer>
+                        <Table>
+                          <TableBody>
+                            <TableRow>
+                              <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>应收账款</Typography></TableCell>
+                              <TableCell align="right">
+                                <Typography sx={{ color: '#F59E0B', fontWeight: 600, fontSize: '0.875rem' }}>{formatCurrency(finSummary.accounts_receivable)}</Typography>
+                              </TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>应付账款</Typography></TableCell>
+                              <TableCell align="right">
+                                <Typography sx={{ color: '#EF4444', fontWeight: 600, fontSize: '0.875rem' }}>{formatCurrency(finSummary.accounts_payable)}</Typography>
+                              </TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>库存价值</Typography></TableCell>
+                              <TableCell align="right">
+                                <Typography sx={{ color: '#FF3B30', fontWeight: 600, fontSize: '0.875rem' }}>{formatCurrency(finSummary.inventory_value)}</Typography>
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              )}
+
+              {/* AI 洞察 */}
+              {insights.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <AIInsights insights={insights} />
+                </Box>
+              )}
+
+              {/* ========== 销售数据分析 ========== */}
+              {/* 数据分析区域 */}
+              <Paper elevation={0} sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AnalyticsIcon sx={{ color: '#FF3B30' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.95rem' }}>销售数据分析</Typography>
+                </Box>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>时间周期</InputLabel>
+                  <Select value={period} label="时间周期" onChange={e => setPeriod(e.target.value as any)}>
+                    <MenuItem value="day">按天 (30天)</MenuItem>
+                    <MenuItem value="week">按周 (13周)</MenuItem>
+                    <MenuItem value="month">按月 (12月)</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadAnalyticsData} disabled={analyticsLoading}>刷新</Button>
+              </Paper>
+
+              {/* 销售趋势折线图 */}
+              <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <TrendingUpIcon sx={{ mr: 1, color: '#FF3B30' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.95rem' }}>销售趋势</Typography>
+                </Box>
+                {analyticsTrend?.data && analyticsTrend.data.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={350}>
+                    <LineChart data={analyticsTrend.data}>
+                      <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#999' }} angle={-45} textAnchor="end" height={60} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} />
+                      <Tooltip />
+                      <Legend wrapperStyle={{ fontSize: '0.75rem' }} iconType="circle" iconSize={8} />
+                      <Line type="monotone" dataKey="outbound_qty" name="出库量" stroke="#FF3B30" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="inbound_qty" name="入库量" stroke="#6366F1" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 8 }}>
+                    <Typography color="text.secondary">暂无销售数据</Typography>
+                  </Box>
+                )}
+              </Paper>
+
+              {/* 交易数量柱状图 */}
+              {analyticsTrend?.data && analyticsTrend.data.length > 0 && (
+                <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, fontSize: '0.95rem' }}>交易数量趋势</Typography>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={analyticsTrend.data}>
+                      <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#999' }} angle={-45} textAnchor="end" height={60} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} />
+                      <Tooltip />
+                      <Bar dataKey="transaction_count" name="交易次数" fill="url(#barGradient)" radius={[4, 4, 0, 0]}>
+                        <defs>
+                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#FF3B30" stopOpacity={0.8} />
+                            <stop offset="100%" stopColor="#FF3B30" stopOpacity={0.3} />
+                          </linearGradient>
+                        </defs>
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Paper>
+              )}
+
+              {/* 产品分析 */}
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: '#10B981', fontSize: '0.95rem' }}>🔥 畅销产品 TOP 10</Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell><Typography sx={{ fontSize: '0.875rem' }}>排名</Typography></TableCell><TableCell><Typography sx={{ fontSize: '0.875rem' }}>产品名称</Typography></TableCell><TableCell><Typography sx={{ fontSize: '0.875rem' }}>SKU</Typography></TableCell><TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>销量</Typography></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {analyticsProducts?.best_selling.length === 0 ? (
+                            <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}><Typography color="text.secondary">暂无数据</Typography></TableCell></TableRow>
+                          ) : (
+                            analyticsProducts?.best_selling.map((product, index) => (
+                              <TableRow key={product.id} hover>
+                                <TableCell>
+                                  <Typography sx={{
+                                    fontWeight: 600,
+                                    color: index === 0 ? '#FF3B30' : index === 1 ? '#6366F1' : index === 2 ? '#F59E0B' : 'inherit',
+                                    fontSize: '0.875rem'
+                                  }}>
+                                    #{index + 1}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell><Typography sx={{ fontSize: '0.875rem' }}>{product.name}</Typography></TableCell>
+                                <TableCell><Typography sx={{ fontSize: '0.875rem' }}>{product.sku}</Typography></TableCell>
+                                <TableCell align="right">
+                                  <Typography sx={{ fontWeight: 600, color: '#10B981', fontSize: '0.875rem' }}>{product.total_sold}</Typography>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: '#F59E0B', fontSize: '0.95rem' }}>⚠️ 滞销产品 TOP 10</Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell><Typography sx={{ fontSize: '0.875rem' }}>产品名称</Typography></TableCell><TableCell><Typography sx={{ fontSize: '0.875rem' }}>SKU</Typography></TableCell><TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>库存</Typography></TableCell><TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>库存价值</Typography></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {analyticsProducts?.slow_moving.length === 0 ? (
+                            <TableRow><TableCell colSpan={4} align="center" sx={{ py: 4 }}><Typography color="text.secondary">暂无数据</Typography></TableCell></TableRow>
+                          ) : (
+                            analyticsProducts?.slow_moving.map(product => (
+                              <TableRow key={product.id} hover>
+                                <TableCell><Typography sx={{ fontSize: '0.875rem' }}>{product.name}</Typography></TableCell>
+                                <TableCell><Typography sx={{ fontSize: '0.875rem' }}>{product.sku}</Typography></TableCell>
+                                <TableCell align="right"><Typography sx={{ color: '#F59E0B', fontWeight: 600, fontSize: '0.875rem' }}>{product.current_stock}</Typography></TableCell>
+                                <TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>¥{product.stock_value.toFixed(2)}</Typography></TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* 库存周转率 */}
+              <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, fontSize: '0.95rem' }}>📊 库存周转率 (按类别)</Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><Typography sx={{ fontSize: '0.875rem' }}>类别</Typography></TableCell><TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>产品数</Typography></TableCell><TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>总库存</Typography></TableCell>
+                        <TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>总销量</Typography></TableCell><TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>周转率</Typography></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {analyticsProducts?.turnover_by_category.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}><Typography color="text.secondary">暂无数据</Typography></TableCell></TableRow>
+                      ) : (
+                        analyticsProducts?.turnover_by_category.map(category => (
+                          <TableRow key={category.category} hover>
+                            <TableCell><Typography sx={{ fontSize: '0.875rem' }}>{category.category}</Typography></TableCell>
+                            <TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>{category.product_count}</Typography></TableCell>
+                            <TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>{category.total_stock}</Typography></TableCell>
+                            <TableCell align="right"><Typography sx={{ fontSize: '0.875rem' }}>{category.total_sold}</Typography></TableCell>
+                            <TableCell align="right">
+                              <Typography sx={{
+                                fontWeight: 600, fontSize: '0.875rem',
+                                color: parseFloat(category.turnover_rate) > 1 ? '#10B981' : parseFloat(category.turnover_rate) > 0.5 ? '#F59E0B' : '#EF4444'
+                              }}>
+                                {category.turnover_rate}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+
+              {/* 加载错误提示 */}
+              {analyticsError && (
+                <Paper elevation={0} sx={{ mt: 3, p: 2, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 2 }}>
+                  <Typography>{analyticsError}</Typography>
+                </Paper>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Tab 1: 利润表 */}
+      {tabValue === 1 && <ProfitLossPage />}
+
+      {/* Tab 2: 现金流量表 */}
+      {tabValue === 2 && <CashFlowPage />}
+
+      {/* AI 小如 —— 简报弹窗 */}
+      <Dialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 0 } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+            📋 AI 今日简报
+          </Typography>
+          <IconButton size="small" onClick={() => setReportOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          {insights.length > 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {insights.map((item, idx) => (
+                <Box
+                  key={idx}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1.5,
+                    backgroundColor: idx % 2 === 0 ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.05)',
+                    border: '1px solid',
+                    borderColor: idx % 2 === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontSize: '0.8rem', color: '#4B5563' }}>
+                    {item.message}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+              暂无分析数据，录入更多交易后 AI 将自动生成简报
+            </Typography>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </Box>
   );
 }

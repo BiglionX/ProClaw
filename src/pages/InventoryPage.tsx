@@ -4,6 +4,7 @@ import {
   TrendingDown as LowStockIcon,
   ArrowUpward as OutboundIcon,
   Refresh as RefreshIcon,
+  SmartToy as SmartToyIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -381,13 +382,35 @@ export default function InventoryPage() {
   return (
     <Box>
       {/* 页面标题 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          📊 进销存管理
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          库存管理、供应商管理和客户管理
-        </Typography>
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <Box>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+            📊 进销存管理
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            库存管理、供应商管理和客户管理
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<SmartToyIcon />}
+          size="small"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('proclaw:open-ai-chat', {
+              detail: { message: '分析库存状况，给出优化建议' },
+            }));
+          }}
+          sx={{
+            borderColor: 'rgba(99,102,241,0.3)',
+            color: '#6366F1',
+            '&:hover': {
+              borderColor: '#6366F1',
+              backgroundColor: 'rgba(99,102,241,0.06)',
+            },
+          }}
+        >
+          🤖 AI 助手
+        </Button>
       </Box>
 
       {/* Tab 导航 */}

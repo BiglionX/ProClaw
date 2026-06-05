@@ -21,7 +21,15 @@ pub mod purchase_commands;
 #[cfg(feature = "inventory")]
 pub mod sales_commands;
 #[cfg(feature = "inventory")]
+pub mod purchase_return_commands;
+#[cfg(feature = "inventory")]
+pub mod sales_return_commands;
+#[cfg(feature = "inventory")]
 pub mod finance_commands;
+#[cfg(feature = "inventory")]
+pub mod payment_commands;
+#[cfg(feature = "inventory")]
+pub mod reconciliation_commands;
 
 pub mod plugin_manager;
 pub mod plugin_loader;
@@ -85,7 +93,15 @@ use purchase_commands::*;
 #[cfg(feature = "inventory")]
 use sales_commands::*;
 #[cfg(feature = "inventory")]
+use purchase_return_commands::*;
+#[cfg(feature = "inventory")]
+use sales_return_commands::*;
+#[cfg(feature = "inventory")]
 use finance_commands::*;
+#[cfg(feature = "inventory")]
+use payment_commands::*;
+#[cfg(feature = "inventory")]
+use reconciliation_commands::*;
 use plugin_manager::*;
 use plugin_loader::*;
 use setup_commands::*;
@@ -150,26 +166,44 @@ async fn main() {
         &encryption_key
     ));
 
-    // 将主数据库包装在 Mutex 中以支持多线程访问
-    // Tauri State 使用 Mutex<Database>（不包 Arc），HTTP 服务器使用 Arc<Mutex<Database>>
-    let db = Mutex::new(db);
-
     // Phase 10: 初始化 NvwaX API 客户端和计费服务
-    let nvwax_api_key = std::env::var("NVWAX_API_KEY")
-        .unwrap_or_else(|_| String::new());
-    let nvwax_client = Arc::new(
-        NvwaXClient::new(nvwax_api_key.clone())
-    );
-    let nvwax_billing_db = Arc::new(Mutex::new(
-        Database::new(db_path.clone()).expect("Failed to create billing DB")
-    ));
-    let nvwax_billing = Arc::new(NvwaXBilling::new(nvwax_billing_db));
-
-    // NvwaX API Key 加密器（AES-256-GCM）
+    // 先创建加密器，用于读取数据库中存储的 API Key
     let nvwax_key_salt = b"nvwax_api_key_2024";
     let nvwax_cipher = Arc::new(
         Aes256GcmCipher::from_password("proclaw-nvwax-secure-key", nvwax_key_salt)
     );
+
+    // 优先使用环境变量 NVWAX_API_KEY，其次尝试从数据库加载已保存的 Key
+    let nvwax_api_key = {
+        if let Ok(key) = std::env::var("NVWAX_API_KEY") {
+            key
+        } else {
+            // 尝试从数据库读取已保存的 API Key（加密存储，需解密）
+            db.connection()
+                .query_row(
+                    "SELECT value FROM system_config WHERE key = 'nvwax_api_key'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .ok()
+                .and_then(|encrypted| {
+                    nvwax_cipher.decrypt_string(&encrypted).ok()
+                })
+                .unwrap_or_default()
+        }
+    };
+    let nvwax_client = Arc::new(
+        NvwaXClient::new(nvwax_api_key.clone())
+    );
+
+    // 将主数据库包装在 Mutex 中以支持多线程访问
+    // Tauri State 使用 Mutex<Database>（不包 Arc），HTTP 服务器使用 Arc<Mutex<Database>>
+    let db = Mutex::new(db);
+
+    let nvwax_billing_db = Arc::new(Mutex::new(
+        Database::new(db_path.clone()).expect("Failed to create billing DB")
+    ));
+    let nvwax_billing = Arc::new(NvwaXBilling::new(nvwax_billing_db));
 
     // Phase 6: 初始化 JWT 密钥管理器
     let key_manager = KeyManager::from_env_or_default();
@@ -321,16 +355,47 @@ async fn main() {
             get_approvals_cmd,
             approve_request_cmd,
             reject_request_cmd,
-            // 付款记录 (Phase 6)
+            // 付款记录与AR/AP台账 (Phase 6)
             record_payment_cmd,
+            record_receipt_cmd,
             get_payments_cmd,
+            get_ar_ap_summary_cmd,
+            get_ar_ap_detail_cmd,
+            // 对账管理 (Phase 5)
+            generate_statement,
+            send_statement_email,
+            create_reconciliation_rule,
+            update_reconciliation_rule,
+            delete_reconciliation_rule,
+            get_reconciliation_rules,
+            set_smtp_config,
+            get_smtp_config,
+            check_reconciliation_rules,
             // 补充的采购/销售命令
             update_purchase_order_cmd,
             delete_purchase_order_cmd,
             receive_purchase_order_cmd,
+            confirm_purchase_order_cmd,
+            cancel_purchase_order_cmd,
             update_sales_order_cmd,
             delete_sales_order_cmd,
             submit_sales_order_cmd,
+            cancel_sales_order_cmd,
+            mark_sales_shipped_cmd,
+            mark_sales_delivered_cmd,
+            // 采购退货
+            create_purchase_return,
+            get_purchase_returns,
+            get_purchase_return_detail,
+            confirm_purchase_return,
+            cancel_purchase_return,
+            update_purchase_return,
+            // 销售退货
+            create_sales_return,
+            get_sales_returns,
+            get_sales_return_detail,
+            confirm_sales_return,
+            cancel_sales_return,
             // 订阅与计费 (Phase 7)
             get_plans_cmd,
             get_my_subscription_cmd,

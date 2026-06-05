@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
+  SmartToy as SmartToyIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -498,6 +499,28 @@ export default function ProductsPage() {
             ),
           }}
         />
+        {/* AI 快捷入口 */}
+        <Button
+          variant="outlined"
+          startIcon={<SmartToyIcon />}
+          size="small"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('proclaw:open-ai-chat', {
+              detail: { message: '帮我在产品库中查找信息' },
+            }));
+          }}
+          sx={{
+            borderColor: 'rgba(99,102,241,0.3)',
+            color: '#6366F1',
+            '&:hover': {
+              borderColor: '#6366F1',
+              backgroundColor: 'rgba(99,102,241,0.06)',
+            },
+            fontSize: '0.8rem',
+          }}
+        >
+          🧠 AI 帮我找
+        </Button>
 
         {/* 分类筛选 */}
         <TextField

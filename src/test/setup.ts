@@ -14,7 +14,7 @@ vi.mock('@tauri-apps/api/event', () => ({
 
 // Mock isTauri to return true so service functions don't short-circuit in tests
 vi.mock('../lib/tauri', () => ({
-  isTauri: () => true,
+  isTauri: vi.fn(() => true),
   safeInvoke: vi.fn(),
 }));
 

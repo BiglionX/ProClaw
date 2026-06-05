@@ -1,6 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import App from './App';
+import proClawTheme from './config/theme';
 import './styles.css';
 
 // 全局错误处理
@@ -27,7 +30,10 @@ console.log('Environment:', import.meta.env.MODE);
 try {
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
-      <App />
+      <ThemeProvider theme={proClawTheme}>
+        <CssBaseline />
+        <App />
+      </ThemeProvider>
     </React.StrictMode>,
   );
 } catch (err) {
