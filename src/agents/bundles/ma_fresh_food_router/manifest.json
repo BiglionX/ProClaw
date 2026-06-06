@@ -1,0 +1,12 @@
+{
+  "id": "ma_fresh_food_router",
+  "name": "配送路线优化师",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "send_message"],
+  "capabilities": ["route_planning", "delivery_scheduling", "distance_calculation", "stop_optimization"],
+  "icon": "icon.svg",
+  "description": "配送路线优化师 - 智能路线规划、配送调度、距离计算、停靠点优化",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_fresh_food_router"
+}

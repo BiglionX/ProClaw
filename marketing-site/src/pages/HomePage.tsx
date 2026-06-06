@@ -26,8 +26,8 @@ const modeCards = [
   {
     id: 'cloud',
     title: 'ProClaw Cloud',
-    subtitle: '云托管商城',
-    desc: 'AI 自动生成独立网店，商品同步上架，客户下单自动记账扣库存，搭配 AI 客服。',
+    subtitle: '无需本地安装',
+    desc: '浏览器直接使用，无需下载安装。适合不想管 IT 只想用 AI 管店上云的商户。',
     color: 'bg-cyan-50 border-cyan-200 hover:border-cyan-400',
     badge: 'bg-cyan-100 text-cyan-700',
     link: '/features#cloud-store',
@@ -156,7 +156,7 @@ const HomePage: React.FC = () => {
               </h1>
               <p className="mt-4 text-lg text-gray-600 leading-relaxed max-w-lg">
                 不用懂技术，不用配服务器。下载安装，跟它聊天，它帮你管店。
-                {'双模式可选：ProClaw Plus / ProClaw Light，搭配 ProClaw Cloud 云托管商城。数据 100% 在你电脑里。'}
+                {'双模式可选：ProClaw Plus / ProClaw Light，搭配 ProClaw Cloud 无需安装直接使用。数据 100% 在你电脑里。'}
               </p>
               <ul className="mt-6 space-y-3 text-gray-600">
                 {[
@@ -384,7 +384,7 @@ const HomePage: React.FC = () => {
             先下载用用看，免费且开源
           </h2>
           <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">
-            ProClaw Plus / ProClaw Light / ProClaw Cloud，三款产品任选。3 分钟完成安装，CEO Agent 对话引导选择行业插件。
+            ProClaw Plus / ProClaw Light 免费下载安装，ProClaw Cloud 浏览器直接使用。CEO Agent 对话引导选择行业插件。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -393,6 +393,12 @@ const HomePage: React.FC = () => {
             >
               免费下载桌面端
             </Link>
+            <a
+              href="https://cloud.proclaw.com"
+              className="px-8 py-4 border-2 border-cyan-500 text-cyan-400 hover:border-cyan-400 hover:text-cyan-300 font-medium rounded-lg transition-all"
+            >
+              体验 Cloud 版
+            </a>
             <Link
               to="/solutions/catering"
               className="px-8 py-4 border-2 border-gray-600 text-gray-300 hover:border-gray-400 hover:text-white font-medium rounded-lg transition-all"

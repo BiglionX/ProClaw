@@ -1,0 +1,56 @@
+{
+  "id": "hardware",
+  "name": "五金行业版",
+  "version": "1.0.0",
+  "description": "面向五金批发店、建材五金店、工厂五金耗材供应，覆盖规格矩阵管理、多单位计价、挂账对账、板材切割计算等场景。AI 规格推荐 + 切割优化辅助经营。",
+  "icon": "🔩",
+  "compatibleAppVersion": ">=0.1.0",
+  "permissions": [
+    "database:create_table",
+    "database:read:*",
+    "database:write:*",
+    "notification:send"
+  ],
+  "entry_points": {
+    "frontend": "frontend/index.js",
+    "migrations": "migrations/up.sql"
+  },
+  "features": {
+    "modules": ["products", "sales", "supplychain", "inventory", "credit-ledger", "members", "reports", "ai-teams", "ai-knowledge"],
+    "dashboards": ["spec-matrix", "cutting-calc", "credit-overview", "sales-trend"],
+    "reports": ["sales-report", "credit-report", "spec-analysis", "material-usage-report"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "销售管理", "icon": "finance", "path": "/sales", "group": "业务" },
+      { "text": "供应链", "icon": "truck", "path": "/supplychain", "group": "业务" },
+      { "text": "库存管理", "icon": "inventory", "path": "/inventory", "group": "业务" },
+      { "text": "挂账对账", "icon": "dollar-sign", "path": "/hw-credit-ledger", "group": "财务" },
+      { "text": "客户管理", "icon": "users", "path": "/members", "group": "客户" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" }
+    ],
+    "remove": ["/datacenter", "/contacts", "/messages", "/cloud-store", "/ucenter", "/pos"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#64748b",
+      "secondary": "#cbd5e1"
+    },
+    "onboarding": "hardware-onboarding",
+    "quickActions": [
+      { "label": "新建销售", "icon": "shopping-cart", "action": "openNewSale", "color": "#64748b" },
+      { "label": "切割计算", "icon": "scissors", "action": "openCuttingCalc", "color": "#8b5cf6" },
+      { "label": "规格矩阵", "icon": "grid-3x3", "action": "openSpecMatrix", "color": "#f59e0b" },
+      { "label": "挂账催收", "icon": "alert-triangle", "action": "openCreditReminder", "color": "#ef4444" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  },
+  "category": "official",
+  "tags": ["五金", "规格矩阵", "挂账", "板材"]
+}

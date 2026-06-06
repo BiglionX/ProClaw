@@ -54,6 +54,16 @@ pub mod catering_commands;
 pub mod beauty_commands;
 pub mod pet_commands;
 
+// 八大新行业插件命令
+pub mod convenience_commands;
+pub mod liquor_commands;
+pub mod phone_accessories_commands;
+pub mod fresh_food_commands;
+pub mod auto_parts_commands;
+pub mod hardware_commands;
+pub mod decoration_material_commands;
+pub mod community_group_buy_commands;
+
 // 虚拟公司版模块
 #[cfg(feature = "virtual_company")]
 pub mod agent_commands;
@@ -117,6 +127,14 @@ use cloud_backup_commands::*;
 use catering_commands::*;
 use beauty_commands::*;
 use pet_commands::*;
+use convenience_commands::*;
+use liquor_commands::*;
+use phone_accessories_commands::*;
+use fresh_food_commands::*;
+use auto_parts_commands::*;
+use hardware_commands::*;
+use decoration_material_commands::*;
+use community_group_buy_commands::*;
 use services::nvwax_commands::*;
 #[cfg(feature = "virtual_company")]
 use agent_commands::*;
@@ -620,6 +638,65 @@ async fn main() {
             pet_create_boarding,
             pet_get_boarding_records,
             pet_check_out_boarding,
+
+            // 便利店行业插件命令
+            cv_get_expiry_alerts,
+            cv_get_daily_settlement,
+            cv_get_restock_suggestions,
+            cv_create_pos_order,
+            cv_add_expiry_tracking,
+            cv_get_expiry_tracking,
+
+            // 酒水批发行业插件命令
+            lw_get_credit_accounts,
+            lw_get_credit_transactions,
+            lw_create_credit_transaction,
+            lw_get_batches,
+            lw_create_batch,
+            lw_get_price_tiers,
+            lw_set_price_tier,
+
+            // 手机配件批发行业插件命令
+            pa_get_device_models,
+            pa_add_device_model,
+            pa_get_quotations,
+            pa_create_quotation,
+            pa_get_price_history,
+
+            // 食材配送行业插件命令
+            ff_get_delivery_routes,
+            ff_create_delivery_route,
+            ff_get_recurring_templates,
+            ff_get_freshness_alerts,
+
+            // 汽车配件行业插件命令
+            ap_search_by_oe,
+            ap_get_vehicle_models,
+            ap_add_vehicle_model,
+            ap_get_part_categories,
+            ap_add_oe_number,
+
+            // 五金行业插件命令
+            hw_get_spec_templates,
+            hw_set_spec_template,
+            hw_calculate_cutting,
+            hw_get_credit_accounts,
+            hw_get_unit_conversions,
+            hw_add_unit_conversion,
+
+            // 装修材料行业插件命令
+            dm_get_projects,
+            dm_create_project,
+            dm_get_bom_templates,
+            dm_create_bom_template,
+            dm_get_project_materials,
+
+            // 社区团购行业插件命令
+            gb_get_groups,
+            gb_create_group,
+            gb_get_orders,
+            gb_parse_jielong_text,
+            gb_verify_pickup,
 
             // NvwaX API 集成命令
             nvwax_search_agents,

@@ -1,0 +1,55 @@
+{
+  "id": "community-group-buy",
+  "name": "社区团购行业版",
+  "version": "1.0.0",
+  "description": "面向社区团长、微信群接龙运营者、自提点管理，覆盖开团选品、接龙统计、采购汇总、到货核销、团长收益核算等场景。AI 接龙文本智能解析 + 到货催取辅助经营。",
+  "icon": "🛒",
+  "compatibleAppVersion": ">=0.1.0",
+  "permissions": [
+    "database:create_table",
+    "database:read:*",
+    "database:write:*",
+    "notification:send"
+  ],
+  "entry_points": {
+    "frontend": "frontend/index.js",
+    "migrations": "migrations/up.sql"
+  },
+  "features": {
+    "modules": ["group-buy", "products", "supplychain", "inventory", "members", "reports", "ai-teams", "ai-knowledge"],
+    "dashboards": ["group-status", "jielong-stats", "pickup-waiting", "revenue-summary"],
+    "reports": ["group-report", "member-report", "revenue-report", "pickup-report"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "团购管理", "icon": "shopping-bag", "path": "/group-buy", "group": "前台" },
+      { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "供应链", "icon": "truck", "path": "/supplychain", "group": "业务" },
+      { "text": "库存管理", "icon": "inventory", "path": "/inventory", "group": "业务" },
+      { "text": "客户管理", "icon": "users", "path": "/members", "group": "客户" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" }
+    ],
+    "remove": ["/datacenter", "/contacts", "/messages", "/cloud-store", "/ucenter", "/sales", "/pos"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#0891b2",
+      "secondary": "#67e8f9"
+    },
+    "onboarding": "group-buy-onboarding",
+    "quickActions": [
+      { "label": "新建团购", "icon": "shopping-bag", "action": "openNewGroup", "color": "#0891b2" },
+      { "label": "接龙统计", "icon": "list", "action": "openJielongParser", "color": "#8b5cf6" },
+      { "label": "到货核销", "icon": "check-circle", "action": "openPickupVerify", "color": "#10b981" },
+      { "label": "催取通知", "icon": "bell", "action": "openPickupReminder", "color": "#ef4444" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  },
+  "category": "official",
+  "tags": ["社区团购", "团长", "接龙", "自提"]
+}

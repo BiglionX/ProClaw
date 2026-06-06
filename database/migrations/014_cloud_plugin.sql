@@ -25,10 +25,10 @@ CREATE TABLE IF NOT EXISTS cloud_backup_jobs (
 CREATE TABLE IF NOT EXISTS cloud_backup_config (
     id TEXT PRIMARY KEY DEFAULT 'default',
     user_id TEXT,
-    auto_backup BOOLEAN DEFAULT 0,
+    auto_backup BOOLEAN DEFAULT false,
     frequency TEXT DEFAULT 'daily',
     backup_time TEXT DEFAULT '02:00',
-    encrypt_backup BOOLEAN DEFAULT 1,
+    encrypt_backup BOOLEAN DEFAULT true,
     retention_days INT DEFAULT 30,
     updated_at TEXT
 );

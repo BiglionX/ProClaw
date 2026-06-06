@@ -288,6 +288,54 @@ impl Database {
                  vec!["read_user", "send_message", "show_notification"],
                  vec!["backup_status_query", "auto_backup_config", "restore_assistant", "backup_integrity_check", "disaster_recovery"],
                  "备份恢复助手 - 备份查询、自动备份、恢复引导、完整性检查、灾难恢复"),
+                // === 便利店 (Convenience) ===
+                ("proclaw-cv-assistant", "便利店经营助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+                 vec!["expiry_alert", "restock_suggestion", "daily_settlement", "pos_assistance"],
+                 "便利店经营助手 - 临期商品提醒、智能补货建议、日结汇总"),
+                // === 酒水批发 (Liquor Wholesale) ===
+                ("proclaw-lw-assistant", "酒水批发助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+                 vec!["batch_tracking", "credit_collection", "price_recommendation", "bundle_assembly"],
+                 "酒水批发助手 - 批次追踪、赊账催收、价格推荐、套装组合"),
+                // === 手机配件 (Phone Accessories) ===
+                ("proclaw-pa-assistant", "手机配件批发助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message"],
+                 vec!["sku_matrix_management", "quotation_assistance", "price_volatility_alert", "device_compatibility"],
+                 "手机配件批发助手 - SKU矩阵管理、报价辅助、价格波动预警、机型匹配"),
+                // === 食材配送 (Fresh Food Delivery) ===
+                ("proclaw-ff-assistant", "食材配送助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+                 vec!["recurring_order_management", "delivery_route_optimization", "freshness_alert", "weighing_pricing"],
+                 "食材配送助手 - 周期订单管理、配送路线优化、新鲜度预警、称重计价"),
+                ("proclaw-ff-router", "配送路线优化师",
+                 vec!["read_user", "read_orders", "send_message"],
+                 vec!["route_planning", "delivery_scheduling", "distance_calculation", "stop_optimization"],
+                 "配送路线优化师 - 智能路线规划、配送调度、距离计算、停靠点优化"),
+                // === 汽车配件 (Auto Parts) ===
+                ("proclaw-ap-assistant", "汽配查询助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message"],
+                 vec!["oe_number_query", "vin_decoder", "vehicle_model_match", "parts_recommendation"],
+                 "汽配查询助手 - OE号查询、VIN码车型识别、适配推荐、正品溯源"),
+                // === 五金 (Hardware) ===
+                ("proclaw-hw-assistant", "五金经营助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+                 vec!["spec_recommendation", "cutting_optimization", "credit_collection", "unit_conversion"],
+                 "五金经营助手 - 规格推荐、切割优化、挂账催收、单位转换"),
+                // === 装修材料 (Decoration Material) ===
+                ("proclaw-dm-assistant", "装修材料助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message"],
+                 vec!["project_accounting", "bom_recommendation", "color_batch_tracking", "site_delivery"],
+                 "装修材料助手 - 项目核算、材料清单推荐、色号追踪、工地配送"),
+                // === 社区团购 (Community Group Buy) ===
+                ("proclaw-gb-assistant", "社区团购助手",
+                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+                 vec!["jielong_parsing", "product_recommendation", "pickup_reminder", "group_profit_calc"],
+                 "社区团购助手 - 接龙文本解析、选品推荐、到货催取、团长收益核算"),
+                ("proclaw-gb-parser", "接龙文本解析器",
+                 vec!["read_user", "send_message"],
+                 vec!["text_parsing", "order_extraction", "quantity_counting", "format_conversion"],
+                 "接龙文本解析器 - 微信群接龙智能解析、订单提取、数量统计、格式转换"),
             ];
 
             for (id, name, permissions, capabilities, description) in &industry_builtins {

@@ -1,0 +1,12 @@
+{
+  "id": "ma_fresh_food_assistant",
+  "name": "食材配送助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+  "capabilities": ["recurring_order_management", "delivery_route_optimization", "freshness_alert", "weighing_pricing"],
+  "icon": "icon.svg",
+  "description": "食材配送助手 - 周期订单管理、配送路线优化、新鲜度预警、称重计价",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_fresh_food_assistant"
+}

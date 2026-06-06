@@ -1,0 +1,12 @@
+{
+  "id": "ma_auto_parts_assistant",
+  "name": "汽配查询助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message"],
+  "capabilities": ["oe_number_query", "vin_decoder", "vehicle_model_match", "parts_recommendation"],
+  "icon": "icon.svg",
+  "description": "汽配查询助手 - OE号查询、VIN码车型识别、适配推荐、正品溯源",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_auto_parts_assistant"
+}

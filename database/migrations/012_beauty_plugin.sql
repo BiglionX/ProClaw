@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS beauty_employee_schedules (
     employee_id TEXT,
     date TEXT,
     time_slots JSONB,
-    is_available BOOLEAN DEFAULT 1,
+    is_available BOOLEAN DEFAULT true,
     created_at TEXT
 );
 
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS beauty_employees (
     hire_date TEXT,
     service_ids JSONB,
     commission_rate REAL,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
     created_at TEXT
 );
 
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS beauty_services (
     member_price REAL,
     new_customer_price REAL,
     description TEXT,
-    is_active BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
     sort_order INT
 );
 

@@ -1,0 +1,12 @@
+{
+  "id": "ma_liquor_assistant",
+  "name": "酒水批发助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+  "capabilities": ["batch_tracking", "credit_collection", "price_recommendation", "bundle_assembly"],
+  "icon": "icon.svg",
+  "description": "酒水批发助手 - 批次追踪、赊账催收、价格推荐、套装组合",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_liquor_assistant"
+}

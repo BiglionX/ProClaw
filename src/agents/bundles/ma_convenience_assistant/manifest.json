@@ -1,0 +1,12 @@
+{
+  "id": "ma_convenience_assistant",
+  "name": "便利店经营助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+  "capabilities": ["expiry_alert", "restock_suggestion", "daily_settlement", "pos_assistance"],
+  "icon": "icon.svg",
+  "description": "便利店经营助手 - 临期商品提醒、智能补货建议、日结汇总",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_convenience_assistant"
+}

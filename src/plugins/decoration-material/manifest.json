@@ -1,0 +1,56 @@
+{
+  "id": "decoration-material",
+  "name": "装修材料行业版",
+  "version": "1.0.0",
+  "description": "面向装修公司、建材商、工地材料配送，覆盖项目管理、材料清单BOM、色号批号追踪、工地配送、项目利润核算等场景。AI 材料清单推荐 + 项目核算辅助经营。",
+  "icon": "🏗️",
+  "compatibleAppVersion": ">=0.1.0",
+  "permissions": [
+    "database:create_table",
+    "database:read:*",
+    "database:write:*",
+    "notification:send"
+  ],
+  "entry_points": {
+    "frontend": "frontend/index.js",
+    "migrations": "migrations/up.sql"
+  },
+  "features": {
+    "modules": ["projects", "products", "sales", "supplychain", "inventory", "members", "reports", "ai-teams", "ai-knowledge"],
+    "dashboards": ["project-profit", "material-bom", "delivery-status", "color-batch-track"],
+    "reports": ["project-report", "material-report", "profit-analysis", "batch-traceability"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "项目管理", "icon": "briefcase", "path": "/projects", "group": "业务" },
+      { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "销售管理", "icon": "finance", "path": "/sales", "group": "业务" },
+      { "text": "供应链", "icon": "truck", "path": "/supplychain", "group": "业务" },
+      { "text": "库存管理", "icon": "inventory", "path": "/inventory", "group": "业务" },
+      { "text": "客户管理", "icon": "users", "path": "/members", "group": "客户" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" }
+    ],
+    "remove": ["/datacenter", "/contacts", "/messages", "/cloud-store", "/ucenter", "/pos"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#ca8a04",
+      "secondary": "#fde047"
+    },
+    "onboarding": "decoration-onboarding",
+    "quickActions": [
+      { "label": "新建项目", "icon": "folder-plus", "action": "openNewProject", "color": "#ca8a04" },
+      { "label": "材料清单", "icon": "clipboard-list", "action": "openBomTemplate", "color": "#8b5cf6" },
+      { "label": "工地配送", "icon": "truck", "action": "openSiteDelivery", "color": "#f59e0b" },
+      { "label": "利润核算", "icon": "calculator", "action": "openProfitCalc", "color": "#10b981" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  },
+  "category": "official",
+  "tags": ["装修", "建材", "项目核算", "工地配送"]
+}

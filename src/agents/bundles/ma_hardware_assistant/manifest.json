@@ -1,0 +1,12 @@
+{
+  "id": "ma_hardware_assistant",
+  "name": "五金经营助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+  "capabilities": ["spec_recommendation", "cutting_optimization", "credit_collection", "unit_conversion"],
+  "icon": "icon.svg",
+  "description": "五金经营助手 - 规格推荐、切割优化、挂账催收、单位转换",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_hardware_assistant"
+}

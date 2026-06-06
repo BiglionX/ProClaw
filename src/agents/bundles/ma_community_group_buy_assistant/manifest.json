@@ -1,0 +1,12 @@
+{
+  "id": "ma_community_group_buy_assistant",
+  "name": "社区团购助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
+  "capabilities": ["jielong_parsing", "product_recommendation", "pickup_reminder", "group_profit_calc"],
+  "icon": "icon.svg",
+  "description": "社区团购助手 - 接龙文本解析、选品推荐、到货催取、团长收益核算",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_community_group_buy_assistant"
+}

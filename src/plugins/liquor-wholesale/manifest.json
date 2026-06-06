@@ -1,0 +1,56 @@
+{
+  "id": "liquor-wholesale",
+  "name": "酒水批发行业版",
+  "version": "1.0.0",
+  "description": "面向白酒/红酒/啤酒批发商、区域代理，覆盖品牌分级管理、多级定价、批次追踪、赊账对账、防窜货等场景。AI 批次追踪 + 赊账催收辅助经营。",
+  "icon": "🍷",
+  "compatibleAppVersion": ">=0.1.0",
+  "permissions": [
+    "database:create_table",
+    "database:read:*",
+    "database:write:*",
+    "notification:send"
+  ],
+  "entry_points": {
+    "frontend": "frontend/index.js",
+    "migrations": "migrations/up.sql"
+  },
+  "features": {
+    "modules": ["products", "sales", "supplychain", "inventory", "credit-ledger", "members", "reports", "ai-teams", "ai-knowledge"],
+    "dashboards": ["batch-track", "credit-overview", "sales-trend", "price-analysis"],
+    "reports": ["sales-report", "credit-report", "batch-report", "channel-report"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
+      { "text": "销售管理", "icon": "finance", "path": "/sales", "group": "业务" },
+      { "text": "供应链", "icon": "truck", "path": "/supplychain", "group": "业务" },
+      { "text": "库存管理", "icon": "inventory", "path": "/inventory", "group": "业务" },
+      { "text": "赊账对账", "icon": "dollar-sign", "path": "/credit-ledger", "group": "财务" },
+      { "text": "客户管理", "icon": "users", "path": "/members", "group": "客户" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
+      { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
+      { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" }
+    ],
+    "remove": ["/datacenter", "/contacts", "/messages", "/cloud-store", "/ucenter", "/pos"]
+  },
+  "ui": {
+    "theme": {
+      "primary": "#dc2626",
+      "secondary": "#fca5a5"
+    },
+    "onboarding": "liquor-onboarding",
+    "quickActions": [
+      { "label": "新增销售", "icon": "shopping-cart", "action": "openNewSale", "color": "#dc2626" },
+      { "label": "批次录入", "icon": "barcode", "action": "openBatchEntry", "color": "#f59e0b" },
+      { "label": "赊账催收", "icon": "alert-triangle", "action": "openCreditReminder", "color": "#ef4444" },
+      { "label": "套装组合", "icon": "package-plus", "action": "openBundleAssembly", "color": "#6366f1" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": []
+  },
+  "category": "official",
+  "tags": ["酒水", "批发", "批次管理", "价格分层"]
+}

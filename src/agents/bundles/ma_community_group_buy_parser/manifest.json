@@ -1,0 +1,12 @@
+{
+  "id": "ma_community_group_buy_parser",
+  "name": "接龙文本解析器",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "send_message"],
+  "capabilities": ["text_parsing", "order_extraction", "quantity_counting", "format_conversion"],
+  "icon": "icon.svg",
+  "description": "接龙文本解析器 - 微信群接龙智能解析、订单提取、数量统计、格式转换",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_community_group_buy_parser"
+}

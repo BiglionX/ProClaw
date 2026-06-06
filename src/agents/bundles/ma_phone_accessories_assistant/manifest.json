@@ -1,0 +1,12 @@
+{
+  "id": "ma_phone_accessories_assistant",
+  "name": "手机配件批发助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message"],
+  "capabilities": ["sku_matrix_management", "quotation_assistance", "price_volatility_alert", "device_compatibility"],
+  "icon": "icon.svg",
+  "description": "手机配件批发助手 - SKU矩阵管理、报价辅助、价格波动预警、机型匹配",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_phone_accessories_assistant"
+}

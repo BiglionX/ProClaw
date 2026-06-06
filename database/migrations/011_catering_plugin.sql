@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS pos_menu_items (
     category_id TEXT,
     name TEXT,
     price REAL,
-    is_available BOOLEAN DEFAULT 1,
+    is_available BOOLEAN DEFAULT true,
     sort_order INT DEFAULT 0
 );
 

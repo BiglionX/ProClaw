@@ -1,0 +1,12 @@
+{
+  "id": "ma_decoration_material_assistant",
+  "name": "装修材料助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "permissions": ["read_user", "read_orders", "read_inventory", "send_message"],
+  "capabilities": ["project_accounting", "bom_recommendation", "color_batch_tracking", "site_delivery"],
+  "icon": "icon.svg",
+  "description": "装修材料助手 - 项目核算、材料清单推荐、色号追踪、工地配送",
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/agents/ma_decoration_material_assistant"
+}

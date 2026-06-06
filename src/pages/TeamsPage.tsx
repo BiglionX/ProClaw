@@ -70,7 +70,7 @@ import MarketplaceDialog from '../components/NvwaX/MarketplaceDialog';
 import { NvwaXService } from '../lib/nvwaxClient';
 import BapSettingsPanel from '../components/Agent/BapSettingsPanel';
 import PreferenceSettings from '../components/CEO/PreferenceSettings';
-import PluginSettings from '../components/Settings/PluginSettings';
+import AiPluginPanel from '../components/Teams/AiPluginPanel';
 
 export default function TeamsPage() {
   const navigate = useNavigate();
@@ -479,9 +479,7 @@ export default function TeamsPage() {
           onOpenCeoConfig={() => setCeoConfigOpen(true)}
         />
       ) : activePageTab === 2 ? (
-        <Box sx={{ mt: 0 }}>
-          <PluginSettings />
-        </Box>
+        <AiPluginPanel />
       ) : (
         <>
 

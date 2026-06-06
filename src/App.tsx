@@ -57,6 +57,32 @@ import CloudBackupPage from './pages/cloud/CloudBackupPage';
 // 共用页面
 import MembersPage from './pages/MembersPage';
 
+// ========== 八大新行业插件占位页面 ==========
+// 便利店
+import ConveniencePosPage from './pages/convenience/ConveniencePosPage';
+import DailySettlementPage from './pages/convenience/DailySettlementPage';
+// 酒水批发
+import LiquorCreditLedgerPage from './pages/liquor/CreditLedgerPage';
+import BatchManagePage from './pages/liquor/BatchManagePage';
+// 手机配件
+import QuotationsPage from './pages/phone/QuotationsPage';
+import DeviceModelsPage from './pages/phone/DeviceModelsPage';
+// 食材配送
+import FreshFoodDeliveryPage from './pages/freshfood/DeliveryPage';
+import RecurringOrderPage from './pages/freshfood/RecurringOrderPage';
+// 汽车配件
+import VehicleDbPage from './pages/autoparts/VehicleDbPage';
+import OeSearchPage from './pages/autoparts/OeSearchPage';
+// 五金
+import HwCreditLedgerPage from './pages/hardware/CreditLedgerPage';
+import CuttingCalcPage from './pages/hardware/CuttingCalcPage';
+// 装修材料
+import DecorationProjectsPage from './pages/decoration/ProjectsPage';
+import MaterialBomPage from './pages/decoration/MaterialBomPage';
+// 社区团购
+import GroupBuyPage from './pages/groupbuy/GroupBuyPage';
+import PickupVerifyPage from './pages/groupbuy/PickupVerifyPage';
+
 // 添加启动日志
 console.log('App component rendering...');
 
@@ -458,6 +484,152 @@ function App() {
           element={
             <ProtectedRoute>
               <MembersPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ========== 八大新行业插件路由 ========== */}
+
+        {/* 便利店 */}
+        <Route
+          path="/convenience-pos"
+          element={
+            <ProtectedRoute>
+              <ConveniencePosPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/daily-settlement"
+          element={
+            <ProtectedRoute>
+              <DailySettlementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 酒水批发 */}
+        <Route
+          path="/credit-ledger"
+          element={
+            <ProtectedRoute>
+              <LiquorCreditLedgerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/batch-manage"
+          element={
+            <ProtectedRoute>
+              <BatchManagePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 手机配件 */}
+        <Route
+          path="/quotations"
+          element={
+            <ProtectedRoute>
+              <QuotationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/device-models"
+          element={
+            <ProtectedRoute>
+              <DeviceModelsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 食材配送 */}
+        <Route
+          path="/delivery"
+          element={
+            <ProtectedRoute>
+              <FreshFoodDeliveryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/recurring-orders"
+          element={
+            <ProtectedRoute>
+              <RecurringOrderPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 汽车配件 */}
+        <Route
+          path="/vehicle-db"
+          element={
+            <ProtectedRoute>
+              <VehicleDbPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/oe-search"
+          element={
+            <ProtectedRoute>
+              <OeSearchPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 五金 */}
+        <Route
+          path="/hw-credit-ledger"
+          element={
+            <ProtectedRoute>
+              <HwCreditLedgerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cutting-calc"
+          element={
+            <ProtectedRoute>
+              <CuttingCalcPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 装修材料 */}
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <DecorationProjectsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/material-bom"
+          element={
+            <ProtectedRoute>
+              <MaterialBomPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 社区团购 */}
+        <Route
+          path="/group-buy"
+          element={
+            <ProtectedRoute>
+              <GroupBuyPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pickup-verify"
+          element={
+            <ProtectedRoute>
+              <PickupVerifyPage />
             </ProtectedRoute>
           }
         />
