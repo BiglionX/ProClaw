@@ -42,6 +42,7 @@ import {
 } from '@mui/icons-material';
 import { pluginLoader } from '../../lib/pluginLoader';
 import type { IndustryPluginManifest } from '../../config/appMode';
+import { openExternalUrl } from '../../lib/tauri';
 
 /** 插件信息（来自 Tauri 后端） */
 interface InstalledPluginInfo {
@@ -210,7 +211,7 @@ export default function PluginSettings() {
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <ExtensionIcon sx={{ mr: 1, color: 'primary.main' }} />
             <Typography variant="h6" sx={{ flex: 1 }}>已安装的插件 ({plugins.length})</Typography>
-            <Button size="small" startIcon={<ExtensionIcon />} onClick={() => window.open(storeUrl, '_blank')}
+            <Button size="small" startIcon={<ExtensionIcon />} onClick={() => openExternalUrl(storeUrl)}
               sx={{ textTransform: 'none', fontSize: '0.75rem' }}>
               插件商店
             </Button>
@@ -225,7 +226,7 @@ export default function PluginSettings() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 请访问插件商店安装行业工作流插件
               </Typography>
-              <Button variant="outlined" startIcon={<ExtensionIcon />} onClick={() => window.open(storeUrl, '_blank')}>
+              <Button variant="outlined" startIcon={<ExtensionIcon />} onClick={() => openExternalUrl(storeUrl)}>
                 前往插件商店
               </Button>
             </Box>

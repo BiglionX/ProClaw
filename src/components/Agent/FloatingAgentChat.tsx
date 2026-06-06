@@ -700,7 +700,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
               width: 56,
               height: 56,
               bgcolor: 'transparent',
-              boxShadow: '0 4px 12px rgba(255,59,48,0.3)',
+              boxShadow: '0 0 12px rgba(255,59,48,0.6), 0 0 24px rgba(255,59,48,0.35), 0 0 48px rgba(255,59,48,0.15)',
               '&:hover': {
                 bgcolor: 'transparent',
               },

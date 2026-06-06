@@ -89,6 +89,8 @@ const DEFAULT_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' })[] = [
   { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter', _group: 'home', isLive: true },
   { text: '商品库', icon: <ProductsIcon />, path: '/products', _group: 'home' },
   { text: '供应链', icon: <FinanceIcon />, path: '/supplychain', _group: 'home' },
+  { text: '联系人', icon: <ContactsIcon />, path: '/contacts', _group: 'home' },
+  { text: '消息', icon: <ChatIcon />, path: '/messages', _group: 'home' },
   { text: 'AI 团队', icon: <TeamsIcon />, path: '/teams', _group: 'ai', badge: 2 },
   { text: 'AI 知识库', icon: <KnowledgeIcon />, path: '/ai-knowledge', _group: 'ai' },
 ];
@@ -119,13 +121,6 @@ function useNavItems(): NavItem[] {
   // 无插件时使用默认导航（回退行为）
   return DEFAULT_NAV_ITEMS;
 }
-
-/** 获取分组标签信息 */
-const GROUP_LABELS: Record<string, { label: string; emoji: string }> = {
-  home: { label: '首页', emoji: '🏠' },
-  ai: { label: 'AI 智能', emoji: '🧠' },
-  account: { label: '账户', emoji: '👤' },
-};
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -268,24 +263,6 @@ export default function Sidebar() {
       {/* ---- 导航列表 ---- */}
       {Object.entries(groupedItems).map(([group, items]) => (
         <Box key={group}>
-          {/* 分组标签 */}
-          {!collapsed && items.length > 0 && (
-            <Typography
-              variant="caption"
-              sx={{
-                px: 2,
-                py: 1,
-                display: 'block',
-                color: 'rgba(255,255,255,0.35)',
-                fontSize: '0.65rem',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-              }}
-            >
-              {GROUP_LABELS[group]?.emoji} {GROUP_LABELS[group]?.label}
-            </Typography>
-          )}
           <List sx={{ py: 0 }}>
             {items.map(renderNavItem)}
           </List>

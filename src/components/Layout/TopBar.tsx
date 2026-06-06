@@ -21,9 +21,11 @@ import {
   Breadcrumbs,
   Chip,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../lib/authStore';
+import { useNotificationStore } from '../../lib/notificationStore';
+import NotificationPanel from './NotificationPanel';
 import TokenDisplay from './TokenDisplay';
 
 /** 页面路径到中文名的映射 */
@@ -72,6 +74,16 @@ export default function TopBar() {
   const location = useLocation();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const breadcrumbs = useBreadcrumbs(location.pathname);
+  const unreadCount = useNotificationStore(s => s.notifications.filter(n => !n.isRead).length);
+  const togglePanel = useNotificationStore(s => s.togglePanel);
+  const startMockAutoPush = useNotificationStore(s => s.startMockAutoPush);
+  const stopMockAutoPush = useNotificationStore(s => s.stopMockAutoPush);
+
+  // 启动模拟自动推送（Phase 1 演示用，Phase 2 替换为 WebSocket）
+  useEffect(() => {
+    startMockAutoPush();
+    return () => stopMockAutoPush();
+  }, [startMockAutoPush, stopMockAutoPush]);
 
   const handleLogout = async () => {
     setAnchorEl(null);
@@ -202,6 +214,7 @@ export default function TopBar() {
           <IconButton
             size="large"
             color="inherit"
+            onClick={togglePanel}
             sx={{
               mr: 0.5,
               color: 'rgba(255,255,255,0.6)',
@@ -234,7 +247,7 @@ export default function TopBar() {
                 },
               }}
             >
-              3
+              {unreadCount > 99 ? '99+' : unreadCount}
             </Box>
           </IconButton>
         </Tooltip>
@@ -361,6 +374,7 @@ export default function TopBar() {
           )}
         </Box>
       </Toolbar>
+      <NotificationPanel />
     </AppBar>
   );
 }

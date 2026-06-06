@@ -14,6 +14,7 @@ const Footer: React.FC = () => {
               <li><Link to="/use-cases" className="text-gray-400 hover:text-white text-sm transition-colors">应用场景</Link></li>
               <li><Link to="/pricing" className="text-gray-400 hover:text-white text-sm transition-colors">定价</Link></li>
               <li><Link to="/download" className="text-gray-400 hover:text-white text-sm transition-colors">下载</Link></li>
+              <li><Link to="/flowhub" className="text-gray-400 hover:text-white text-sm transition-colors">FlowHub 插件市场</Link></li>
               <li><Link to="/faq" className="text-gray-400 hover:text-white text-sm transition-colors">常见问题</Link></li>
             </ul>
           </div>
@@ -37,6 +38,7 @@ const Footer: React.FC = () => {
               <li><a href="https://github.com/BigLionX/ProClaw/blob/main/docs/API_DOCUMENTATION.md" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">API 文档</a></li>
               <li><Link to="/changelog" className="text-gray-400 hover:text-white text-sm transition-colors">发布日志</Link></li>
               <li><a href="https://github.com/BigLionX/ProClaw/blob/main/docs/guides/INSTALLATION_GUIDE.md" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">安装指南</a></li>
+              <li><Link to="/flowhub" className="text-gray-400 hover:text-white text-sm transition-colors">FlowHub 插件市场</Link></li>
               <li><a href="https://skillhub.proclaw.cc" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">技能仓库</a></li>
               <li><a href="https://nvwax.proclaw.cc" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">智能体工厂</a></li>
             </ul>

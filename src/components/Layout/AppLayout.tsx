@@ -38,6 +38,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const mode = useAppModeStore(state => state.mode);
   const location = useLocation();
   const [marketOpen, setMarketOpen] = useState(false);
+  const [recruitVisible, setRecruitVisible] = useState(() => {
+    return localStorage.getItem('proclaw:recruit-visible') !== 'false';
+  });
+
+  const handleRecruitClose = () => {
+    setRecruitVisible(false);
+    localStorage.setItem('proclaw:recruit-visible', 'false');
+  };
 
   // 监听全局事件打开市场
   useEffect(() => {
@@ -74,8 +82,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </Box>
       {/* Light 版隐藏市场招募按钮和弹窗 */}
-      {mode !== 'light' && (
-        <RecruitButton onClick={() => setMarketOpen(true)} />
+      {mode !== 'light' && recruitVisible && (
+        <RecruitButton onClick={() => setMarketOpen(true)} onClose={handleRecruitClose} />
       )}
       {/* 浮动 AI 智能体对话 */}
       <FloatingAgentChat />

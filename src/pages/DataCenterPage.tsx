@@ -1,5 +1,6 @@
 import {
   Analytics as AnalyticsIcon,
+  Assignment as AssignmentIcon,
   AttachMoney as MoneyIcon,
   BarChart as BarChartIcon,
   Close as CloseIcon,
@@ -56,6 +57,7 @@ import { getInventoryStats, type InventoryStats } from '../lib/inventoryService'
 import { getDatabaseStats } from '../lib/productService';
 import ProfitLossPage from './ProfitLossPage';
 import CashFlowPage from './CashFlowPage';
+import AITaskOverview from '../components/DataCenter/AITaskOverview';
 
 /* ========== 工具函数 ========== */
 
@@ -217,6 +219,7 @@ export default function DataCenterPage() {
           <Tab icon={<BarChartIcon sx={{ fontSize: 16 }} />} label="业务分析" iconPosition="start" />
           <Tab icon={<MoneyIcon sx={{ fontSize: 16 }} />} label="利润表" iconPosition="start" />
           <Tab icon={<TrendingUpIcon sx={{ fontSize: 16 }} />} label="现金流量表" iconPosition="start" />
+          <Tab icon={<AssignmentIcon sx={{ fontSize: 16 }} />} label="AI 任务概览" iconPosition="start" />
         </Tabs>
       </Paper>
 
@@ -550,6 +553,9 @@ export default function DataCenterPage() {
 
       {/* Tab 2: 现金流量表 */}
       {tabValue === 2 && <CashFlowPage />}
+
+      {/* Tab 3: AI 任务概览 */}
+      {tabValue === 3 && <AITaskOverview />}
 
       {/* AI 小如 —— 简报弹窗 */}
       <Dialog

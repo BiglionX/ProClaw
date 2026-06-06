@@ -14,6 +14,7 @@ tauri-build = { version = "2.0.0", features = [] }
 tauri = { version = "2.11.0", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-shell = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rusqlite = { version = "0.31.0", features = ["bundled"] }
@@ -85,6 +86,10 @@ md-5 = "0.10"
 
 # 插件动态加载
 libloading = "0.8"
+
+[profile.dev]
+# 修复 LNK1140 PDB 超出限制错误
+incremental = false
 
 [features]
 default = ["custom-protocol", "inventory"]

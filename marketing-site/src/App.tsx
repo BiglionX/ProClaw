@@ -36,6 +36,7 @@ const AdminAuditLogsPage = React.lazy(() => import('./pages/admin/AdminAuditLogs
 const AdminTokenMonitorPage = React.lazy(() => import('./pages/admin/AdminTokenMonitorPage'));
 const AdminPluginsPage = React.lazy(() => import('./pages/admin/AdminPluginsPage'));
 const PluginStorePage = React.lazy(() => import('./pages/PluginStorePage'));
+const FlowHubPage = React.lazy(() => import('./pages/FlowHubPage'));
 const PluginDetailPage = React.lazy(() => import('./pages/PluginDetailPage'));
 const CateringSolutionPage = React.lazy(() => import('./pages/solutions/CateringSolutionPage'));
 const BeautySolutionPage = React.lazy(() => import('./pages/solutions/BeautySolutionPage'));
@@ -104,6 +105,7 @@ function App() {
           <Route path="/download" element={<React.Suspense fallback={<PageLoading />}><DownloadPage /></React.Suspense>} />
           <Route path="/changelog" element={<React.Suspense fallback={<PageLoading />}><ChangelogPage /></React.Suspense>} />
           <Route path="/use-cases" element={<React.Suspense fallback={<PageLoading />}><UseCasesPage /></React.Suspense>} />
+          <Route path="/flowhub" element={<React.Suspense fallback={<PageLoading />}><FlowHubPage /></React.Suspense>} />
           <Route path="/plugins" element={<React.Suspense fallback={<PageLoading />}><PluginStorePage /></React.Suspense>} />
           <Route path="/plugins/:pluginId" element={<React.Suspense fallback={<PageLoading />}><PluginDetailPage /></React.Suspense>} />
           <Route path="/faq" element={<React.Suspense fallback={<PageLoading />}><FAQPage /></React.Suspense>} />

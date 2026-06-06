@@ -243,6 +243,7 @@ async fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(db)
         .manage(sync_engine)
         .manage(cloud_backup_service)

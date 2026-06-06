@@ -22,7 +22,8 @@ export type RouteKey =
   | 'solutionsCatering'
   | 'solutionsBeauty'
   | 'solutionsPet'
-  | 'solutionsCloud';
+  | 'solutionsCloud'
+  | 'flowhub';
 
 export const seoConfig: Record<RouteKey, SeoMetadata> = {
   home: {
@@ -154,5 +155,15 @@ export const seoConfig: Record<RouteKey, SeoMetadata> = {
     ogTitle: 'Cloud 云托管方案 - ProClaw | 数据上云，经营无忧',
     ogDescription:
       'ProClaw Cloud 托管方案：Token计费、云端备份、数据同步、云商城托管。灵活的云服务方案，按需付费。',
+  },
+  flowhub: {
+    title: 'FlowHub 插件市场 - ProClaw | 行业工作流插件 · 即装即用 · 开放生态',
+    description:
+      'FlowHub 是 ProClaw 的行业工作流插件生态市场。提供餐饮 POS、美业预约、宠物管理等行业插件，即装即用，无限扩展。支持开发者投稿，共建插件生态。',
+    keywords:
+      'FlowHub, ProClaw插件, 行业插件, 插件市场, 餐饮插件, 美业插件, 宠物插件, 工作流插件, 开源插件生态',
+    ogTitle: 'FlowHub 插件市场 - ProClaw | 行业工作流插件 · 即装即用',
+    ogDescription:
+      'FlowHub 是 ProClaw 的行业工作流插件生态市场。餐饮 POS、美业预约、宠物管理，即装即用。支持开发者投稿。',
   },
 };

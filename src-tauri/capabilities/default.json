@@ -16,6 +16,8 @@
     "fs:allow-mkdir",
     "fs:scope-app-recursive",
     "fs:scope-data-recursive",
-    "fs:scope-download-recursive"
+    "fs:scope-download-recursive",
+    "shell:default",
+    "shell:allow-open"
   ]
 }
