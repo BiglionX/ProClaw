@@ -74,6 +74,10 @@ export const applySchema = async (db: IDatabase): Promise<void> => {
 const createSystemTables = async (db: IDatabase): Promise<void> => {
   const queries = [
     // 1. sync_metadata - 同步元数据（PRD 2.2）
+    // 采用 key-value 键值设计而非 PRD 的结构化表（id,last_sync_time,device_id,sync_token），
+    // 提供更高的扩展性，允许插件添加自定义同步元数据而不需改表结构。
+    // 关键字段通过 SyncMetadataManager 以约定 key 名读写：
+    //   'device_id', 'last_sync_time', 'sync_token'
     `CREATE TABLE IF NOT EXISTS sync_metadata (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL

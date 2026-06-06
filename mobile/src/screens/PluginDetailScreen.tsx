@@ -183,50 +183,73 @@ const PluginDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, 
   };
 
   /**
-   * 更新插件
+   * 更新插件完整流程：
+   * 1. 从 FlowHub 获取最新版本信息
+   * 2. 下载新版本 ZIP 到文件系统
+   * 3. 回滚旧版本数据库迁移（down.sql）
+   * 4. 执行新版本的数据库迁移（up.sql）
+   * 5. 重新注册插件信息
    */
   const handleUpdate = async () => {
-    // 先卸载再安装（简化实现）
     setOperationStatus('updating');
-    setOperationProgress('正在更新插件...');
+    setOperationProgress('正在获取最新版本...');
 
     try {
       const db = getDatabase();
+      const pluginPath = getProfilePluginPath('');
 
-      // 回滚旧版本
+      // 0. 从 FlowHub 获取最新版本信息
+      const latestInfo = await fetchPluginDetail(pluginInfo.id);
+      const targetInfo = latestInfo || pluginInfo;
+
+      // 1. 下载新版本插件 ZIP
+      setOperationProgress('正在下载新版本...');
+      const downloadResult = await downloadAndInstall(targetInfo, `${pluginPath}/${targetInfo.id}`);
+      if (!downloadResult) {
+        throw new Error('新版本下载失败');
+      }
+
+      // 2. 回滚旧版本数据库迁移
+      setOperationProgress('正在回滚旧版本数据库...');
       const downSql = getMockDownSql(pluginInfo.id);
       await rollbackPluginMigration(db, pluginInfo.id, downSql);
 
-      // 重新注册路由
-      registerPluginRoutes(pluginInfo.id, [
-        { path: `/${pluginInfo.id}`, component: 'PluginView', title: pluginInfo.name },
+      // 3. 执行新版本数据库迁移
+      setOperationProgress('正在执行新版本数据库迁移...');
+      const upSql = getMockUpSql(targetInfo.id);
+      const migrationResult = await runPluginMigration(db, targetInfo.id, upSql);
+      if (migrationResult.status === 'failed') {
+        throw new Error(`数据库迁移失败: ${migrationResult.error}`);
+      }
+
+      // 4. 重新注册路由
+      registerPluginRoutes(targetInfo.id, [
+        { path: `/${targetInfo.id}`, component: 'PluginView', title: targetInfo.name },
       ]);
 
-      // 重新安装
-      const upSql = getMockUpSql(pluginInfo.id);
-      await runPluginMigration(db, pluginInfo.id, upSql);
-
+      // 5. 更新插件注册信息
+      setOperationProgress('正在更新插件注册信息...');
       await registerPlugin(db, {
-        id: pluginInfo.id,
-        name: pluginInfo.name,
-        version: pluginInfo.version,
-        description: pluginInfo.description,
-        author: pluginInfo.author,
-        icon: pluginInfo.icon,
-        permissions: pluginInfo.permissions || [],
-        minAppVersion: pluginInfo.minAppVersion,
-        recommendedAgents: pluginInfo.recommendedAgents,
+        id: targetInfo.id,
+        name: targetInfo.name,
+        version: targetInfo.version,
+        description: targetInfo.description,
+        author: targetInfo.author,
+        icon: targetInfo.icon,
+        permissions: targetInfo.permissions || [],
+        minAppVersion: targetInfo.minAppVersion,
+        recommendedAgents: targetInfo.recommendedAgents,
         upSql,
-        downSql,
-        entryPoint: `plugins/${pluginInfo.id}/index.js`,
+        downSql: getMockDownSql(targetInfo.id),
+        entryPoint: `plugins/${targetInfo.id}/index.js`,
         routes: [
-          { path: `/${pluginInfo.id}`, component: 'PluginView', title: pluginInfo.name },
+          { path: `/${targetInfo.id}`, component: 'PluginView', title: targetInfo.name },
         ],
       });
 
       setOperationStatus('idle');
       setOperationProgress('');
-      Alert.alert('更新完成', `${pluginInfo.name} 已更新至 v${pluginInfo.version}`);
+      Alert.alert('更新完成', `${targetInfo.name} 已更新至 v${targetInfo.version}`);
     } catch (error: any) {
       setOperationStatus('idle');
       setOperationProgress('');

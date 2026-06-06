@@ -9,6 +9,8 @@ import { openDatabase, closeAllDatabases, getDatabase } from '../services/Databa
 import { applySchema, dropAllTables } from '../services/SchemaManager';
 import { setupChangeLogTriggers } from '../services/ChangeLogManager';
 import { initSyncMetadata, getOrCreateDeviceId } from '../services/SyncMetadataManager';
+import { unregisterPluginRoutes } from '../services/PluginRegistry';
+import { closeAllSyncConnections } from './SyncConnectionManager';
 
 export type AppPhase = 'loading' | 'profile_select' | 'ready' | 'error';
 export type ConnectionMode = 'offline' | 'cloud' | 'lan_sync';
@@ -64,6 +66,21 @@ export const switchProfile = async (profile: Profile): Promise<void> => {
 
   try {
     useAppStore.setState({ isSwitchingProfile: true });
+
+    // 0. 清理当前身份资源
+    // 清除所有插件动态路由
+    // 使用 'all' 作为特殊 ID 清空所有路由
+    const currentRoutes = (await import('../services/PluginRegistry')).getDynamicRoutes();
+    const pluginIds = [...new Set(currentRoutes.map(r => r.pluginId))];
+    for (const pid of pluginIds) {
+      unregisterPluginRoutes(pid);
+    }
+    // 重置同步连接
+    try {
+      await closeAllSyncConnections();
+    } catch (e) {
+      console.warn('[AppStore] Failed to close sync connections:', e);
+    }
 
     // 1. 关闭当前数据库
     await closeAllDatabases();

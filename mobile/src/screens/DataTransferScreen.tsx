@@ -19,31 +19,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { listProfiles, type Profile } from '../services/ProfileManager';
-import { exportProfileData, importProfileData } from '../services/DataExportService';
+import { exportProfileData, importProfileData, estimateRowCounts, DEFAULT_EXPORT_TABLES } from '../services/DataExportService';
 import type { ExportDataPackage, ImportConfig } from '../services/DataExportService';
 import { useAppStore } from '../stores/AppStore';
 
 type WizardStep = 'select_profile' | 'select_tables' | 'configure' | 'progress' | 'result';
 
-const DEFAULT_EXPORT_TABLES = [
-  { key: 'product_spu', label: '商品 SPU', icon: 'package-variant-closed' },
-  { key: 'product_sku', label: '商品 SKU', icon: 'barcode' },
-  { key: 'product_categories', label: '商品分类', icon: 'shape' },
-  { key: 'product_images', label: '商品图片', icon: 'image-multiple' },
-  { key: 'brands', label: '品牌', icon: 'trademark' },
-  { key: 'customers', label: '客户', icon: 'account-group' },
-  { key: 'sales_orders', label: '销售订单', icon: 'file-document' },
-  { key: 'sales_order_items', label: '销售订单明细', icon: 'format-list-bulleted' },
-  { key: 'purchase_orders', label: '采购订单', icon: 'truck' },
-  { key: 'purchase_order_items', label: '采购订单明细', icon: 'clipboard-list' },
-  { key: 'inventory_transactions', label: '库存交易', icon: 'swap-horizontal-bold' },
-];
+// 从 DataExportService 导入共享的 DEFAULT_EXPORT_TABLES
 
 const DataTransferScreen: React.FC = () => {
   const [step, setStep] = useState<WizardStep>('select_profile');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentProfile, setCurrentProfileState] = useState<Profile | null>(null);
   const [selectedSource, setSelectedSource] = useState<Profile | null>(null);
+  const [rowCounts, setRowCounts] = useState<Record<string, number> | null>(null);
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set(DEFAULT_EXPORT_TABLES.map(t => t.key)));
   const [conflictStrategy, setConflictStrategy] = useState<ImportConfig['onConflict']>('skip');
   const [clearBeforeImport, setClearBeforeImport] = useState(false);
@@ -60,6 +49,18 @@ const DataTransferScreen: React.FC = () => {
     setProfiles(items);
     const current = useAppStore.getState().currentProfile;
     setCurrentProfileState(current);
+  };
+
+  // 选择源身份时预估行数
+  const handleSelectSource = async (profile: Profile) => {
+    setSelectedSource(profile);
+    setRowCounts(null);
+    try {
+      const counts = await estimateRowCounts(profile.id);
+      setRowCounts(counts);
+    } catch {
+      // 行数预估失败不影响流程
+    }
   };
 
   const toggleTable = (tableKey: string) => {
@@ -143,7 +144,7 @@ const DataTransferScreen: React.FC = () => {
               styles.profileItem,
               selectedSource?.id === item.id && styles.profileItemSelected,
             ]}
-            onPress={() => setSelectedSource(item)}
+            onPress={() => handleSelectSource(item)}
           >
             <Text style={styles.profileAvatar}>{item.avatar || '👤'}</Text>
             <View style={styles.profileInfo}>
@@ -199,21 +200,27 @@ const DataTransferScreen: React.FC = () => {
       </TouchableOpacity>
 
       <ScrollView style={styles.tableList}>
-        {DEFAULT_EXPORT_TABLES.map(table => (
-          <TouchableOpacity
-            key={table.key}
-            style={styles.tableItem}
-            onPress={() => toggleTable(table.key)}
-          >
-            <MaterialCommunityIcons
-              name={selectedTables.has(table.key) ? 'checkbox-marked' : 'checkbox-blank-outline'}
-              size={22}
-              color={selectedTables.has(table.key) ? '#6366f1' : '#ccc'}
-            />
-            <MaterialCommunityIcons name={table.icon as any} size={20} color="#666" style={styles.tableIcon} />
-            <Text style={styles.tableLabel}>{table.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {DEFAULT_EXPORT_TABLES.map(table => {
+          const count = rowCounts?.[table.key];
+          return (
+            <TouchableOpacity
+              key={table.key}
+              style={styles.tableItem}
+              onPress={() => toggleTable(table.key)}
+            >
+              <MaterialCommunityIcons
+                name={selectedTables.has(table.key) ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                size={22}
+                color={selectedTables.has(table.key) ? '#6366f1' : '#ccc'}
+              />
+              <MaterialCommunityIcons name={table.icon as any} size={20} color="#666" style={styles.tableIcon} />
+              <Text style={styles.tableLabel}>{table.label}</Text>
+              {count !== undefined && (
+                <Text style={styles.tableCount}>{count > 0 ? `${count} 条` : '空'}</Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       <TouchableOpacity
@@ -581,6 +588,12 @@ const styles = StyleSheet.create({
   tableLabel: {
     fontSize: 15,
     color: '#333',
+    flex: 1,
+  },
+  tableCount: {
+    fontSize: 12,
+    color: '#999',
+    marginLeft: 8,
   },
   primaryButton: {
     backgroundColor: '#6366f1',

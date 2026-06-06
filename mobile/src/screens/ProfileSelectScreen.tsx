@@ -107,6 +107,17 @@ const ProfileSelectScreen: React.FC = () => {
     );
   };
 
+  // 格式化时间
+  const formatDate = (timestamp: number): string => {
+    if (!timestamp) return '从未使用';
+    const now = Date.now();
+    const diff = now - timestamp;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+    return new Date(timestamp).toLocaleDateString('zh-CN');
+  };
+
   // 渲染单个身份项
   const renderProfileItem = ({ item }: { item: Profile }) => {
     const isActive = isSwitching || deletingId === item.id;
@@ -122,9 +133,13 @@ const ProfileSelectScreen: React.FC = () => {
         <Text style={styles.profileAvatar}>{item.avatar || '👤'}</Text>
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{item.name}</Text>
-          <Text style={styles.profileDate}>
-            创建于 {new Date(item.createdAt).toLocaleDateString('zh-CN')}
-          </Text>
+          <View style={styles.profileMeta}>
+            <Text style={styles.profileDate}>
+              {formatDate(item.lastUsed)}
+            </Text>
+            {item.lastUsed !== item.createdAt && (
+              <Text style={styles.profileDate}> | 创建 {new Date(item.createdAt).toLocaleDateString('zh-CN')}</Text>
+            )}</View>
         </View>
         {isActive && (
           <ActivityIndicator size="small" color="#6366f1" />
@@ -157,8 +172,10 @@ const ProfileSelectScreen: React.FC = () => {
       {profiles.length === 0 && !showCreate ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📱</Text>
-          <Text style={styles.emptyText}>还没有身份</Text>
-          <Text style={styles.emptyHint}>创建一个身份开始使用 ProClaw</Text>
+          <Text style={styles.emptyText}>欢迎使用 ProClaw</Text>
+          <Text style={styles.emptyHint}>创建一个身份开始管理您的业务</Text>
+          <Text style={styles.emptyGuide}>每个身份拥有独立的数据和插件，</Text>
+          <Text style={styles.emptyGuide}>可服务于不同的公司或角色</Text>
         </View>
       ) : (
         <FlatList
@@ -267,6 +284,12 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
   },
+  profileMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
   profileName: {
     fontSize: 17,
     fontWeight: '600',
@@ -301,6 +324,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyGuide: {
+    fontSize: 13,
+    color: '#bbb',
+    marginTop: 2,
     textAlign: 'center',
   },
   addButton: {

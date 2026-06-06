@@ -1,13 +1,25 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "ProClaw Mobile",
+    "slug": "proclaw-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "backgroundColor": "#6366f1"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.proclaw.mobile",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "ProClaw 需要使用麦克风进行语音通话",
+        "NSCameraUsageDescription": "ProClaw 需要使用摄像头进行视频通话"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,11 +29,19 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.biglionx.mobile"
+      "package": "com.proclaw.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
+    "plugins": [
+    ],
     "extra": {
       "eas": {
         "projectId": "09c592c9-01be-4eb0-bf85-25b804ea67e7"

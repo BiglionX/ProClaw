@@ -34,6 +34,7 @@ const LanSyncScreen: React.FC = () => {
   const [pairingCode, setPairingCode] = useState('');
   const [direction, setDirection] = useState<SyncDirection>('merge');
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 });
+  const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -43,8 +44,14 @@ const LanSyncScreen: React.FC = () => {
   const handleScan = useCallback(async () => {
     setScreenState('scanning');
     setError(null);
+    setScanProgress({ current: 0, total: 0 });
     try {
-      const foundDevices = await scanLanDevices();
+      const foundDevices = await scanLanDevices(
+        [],
+        (current, total) => {
+          setScanProgress({ current, total });
+        }
+      );
       setDevices(foundDevices);
       setScreenState('devices');
       if (foundDevices.length === 0) {
@@ -63,6 +70,7 @@ const LanSyncScreen: React.FC = () => {
     setPairingCode('');
     setError(null);
   };
+  const [syncResult, setSyncResult] = useState<{ applied: number; conflicts: number; errors: string[] } | null>(null);
 
   // 配对并同步
   const handlePairAndSync = async () => {
@@ -97,6 +105,7 @@ const LanSyncScreen: React.FC = () => {
 
       // 执行同步
       const result = await lanSyncProvider.sync(direction);
+      setSyncResult({ applied: result.applied, conflicts: result.conflicts, errors: result.errors });
 
       if (result.success) {
         setScreenState('complete');
@@ -149,17 +158,30 @@ const LanSyncScreen: React.FC = () => {
         {/* 扫描设备 */}
         {(screenState === 'scanning' || screenState === 'devices') && (
           <>
-            <TouchableOpacity
-              style={styles.scanButton}
-              onPress={handleScan}
-              disabled={screenState === 'scanning'}
-            >
-              {screenState === 'scanning' ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.scanButtonText}>扫描设备</Text>
+            {screenState === 'scanning' && (
+              <View style={styles.scanningIndicator}>
+                <ActivityIndicator size="large" color="#6366f1" />
+                <Text style={styles.scanningLabel}>正在扫描局域网设备...</Text>
+                {scanProgress.total > 0 && (
+                  <View style={styles.scanProgressBar}>
+                    <View style={[styles.scanProgressFill, { width: `${Math.round((scanProgress.current / scanProgress.total) * 100)}%` }]} />
+                  </View>
+                )}
+                <Text style={styles.scanningCount}>
+                  已扫描 {scanProgress.current} / {scanProgress.total || 254} 个地址
+                </Text>
+              </View>
+            )}
+              {screenState !== 'scanning' && (
+                <TouchableOpacity
+                  style={styles.scanButton}
+                  onPress={handleScan}
+                  disabled={screenState === 'scanning'}
+                >
+                  <MaterialCommunityIcons name="wifi" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.scanButtonText}>重新扫描</Text>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
 
             {error && (
               <View style={styles.errorBox}>
@@ -333,6 +355,29 @@ const LanSyncScreen: React.FC = () => {
           <View style={styles.completeContainer}>
             <Text style={styles.completeIcon}>✅</Text>
             <Text style={styles.completeText}>同步完成</Text>
+            {syncResult && (
+              <View style={styles.syncSummaryCard}>
+                <View style={styles.syncSummaryRow}>
+                  <MaterialCommunityIcons name="swap-horizontal-bold" size={20} color="#22c55e" />
+                  <Text style={styles.syncSummaryLabel}>已处理变更</Text>
+                  <Text style={styles.syncSummaryValue}>{syncResult.applied} 条</Text>
+                </View>
+                {syncResult.conflicts > 0 && (
+                  <View style={styles.syncSummaryRow}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#f59e0b" />
+                    <Text style={styles.syncSummaryLabel}>冲突</Text>
+                    <Text style={[styles.syncSummaryValue, { color: '#f59e0b' }]}>{syncResult.conflicts} 条</Text>
+                  </View>
+                )}
+                {syncResult.errors.length > 0 && (
+                  <View style={styles.syncSummaryRow}>
+                    <MaterialCommunityIcons name="close-circle-outline" size={20} color="#ef4444" />
+                    <Text style={styles.syncSummaryLabel}>错误</Text>
+                    <Text style={[styles.syncSummaryValue, { color: '#ef4444' }]}>{syncResult.errors.length} 个</Text>
+                  </View>
+                )}
+              </View>
+            )}
             <TouchableOpacity
               style={styles.doneButton}
               onPress={() => {
@@ -364,6 +409,58 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a1a2e',
     marginBottom: 20,
+  },
+  scanningIndicator: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  scanningLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 16,
+  },
+  scanProgressBar: {
+    width: '80%',
+    height: 4,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 2,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  scanProgressFill: {
+    height: '100%',
+    backgroundColor: '#6366f1',
+    borderRadius: 2,
+  },
+  scanningCount: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 8,
+  },
+  syncSummaryCard: {
+    width: '100%',
+    backgroundColor: '#f8f9ff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  syncSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  syncSummaryLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  syncSummaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
   },
   scanButton: {
     backgroundColor: '#6366f1',

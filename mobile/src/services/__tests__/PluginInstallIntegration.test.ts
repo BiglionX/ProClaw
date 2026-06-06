@@ -12,6 +12,7 @@
 
 import { runPluginMigration, rollbackPluginMigration } from '../PluginMigration';
 import { registerPlugin, unregisterPlugin, getInstalledPlugins, isPluginInstalled } from '../PluginRegistry';
+import { registerPluginRoutes, unregisterPluginRoutes, getDynamicRoutes } from '../PluginRegistry';
 import type { PluginManifest } from '../PluginRegistry';
 import type { IDatabase } from '../DatabaseFactory';
 
@@ -98,6 +99,15 @@ class IntegrationMockDB implements IDatabase {
       const match = sql.match(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(\w+)/i);
       if (match) {
         this.createTable(match[1], []);
+      }
+      return;
+    }
+
+    // DROP TABLE
+    if (upper.startsWith('DROP TABLE')) {
+      const match = sql.match(/DROP TABLE\s+(?:IF EXISTS\s+)?(\w+)/i);
+      if (match) {
+        this.tables.delete(match[1]);
       }
       return;
     }
@@ -457,6 +467,213 @@ DROP TABLE IF EXISTS beauty_appointments;`,
         ['item_003', '宫保鸡丁', '主菜', 38, '经典川菜', Date.now(), 'clean', Date.now()]
       );
       expect(db.getAllRows('catering_menu_items')).toHaveLength(1);
+    });
+  });
+
+  describe('插件更新流程', () => {
+    const v1Manifest: PluginManifest = {
+      id: 'plugin_catering',
+      name: '餐厅管理插件 v1',
+      version: '1.0.0',
+      description: '餐饮行业工作流',
+      author: 'ProClaw Team',
+      icon: '🍽️',
+      permissions: ['products:read'],
+      minAppVersion: '1.0.0',
+      upSql: `-- @version 1
+CREATE TABLE IF NOT EXISTS catering_menu_items (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  price REAL NOT NULL,
+  last_modified INTEGER NOT NULL,
+  sync_status TEXT DEFAULT \'clean\',
+  created_at INTEGER NOT NULL
+);`,
+      downSql: `-- @version 1
+DROP TABLE IF EXISTS catering_menu_items;`,
+      entryPoint: 'plugins/catering/v1/index.js',
+      routes: [
+        { path: '/catering-v1', component: 'CateringViewV1', title: '餐厅管理' },
+      ],
+    };
+
+    const v2Manifest: PluginManifest = {
+      id: 'plugin_catering',
+      name: '餐厅管理插件 v2',
+      version: '2.0.0',
+      description: '餐饮行业工作流 - 新版',
+      author: 'ProClaw Team',
+      icon: '🍽️',
+      permissions: ['products:read', 'products:write', 'orders:read'],
+      minAppVersion: '2.0.0',
+      upSql: `-- @version 2
+CREATE TABLE IF NOT EXISTS catering_menu_items (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  price REAL NOT NULL,
+  category TEXT,
+  last_modified INTEGER NOT NULL,
+  sync_status TEXT DEFAULT \'clean\',
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS catering_delivery (
+  id TEXT PRIMARY KEY,
+  order_id TEXT,
+  address TEXT NOT NULL,
+  status TEXT DEFAULT \'pending\',
+  last_modified INTEGER NOT NULL,
+  sync_status TEXT DEFAULT \'clean\',
+  created_at INTEGER NOT NULL
+);`,
+      downSql: `-- @version 2
+DROP TABLE IF EXISTS catering_delivery;
+DROP TABLE IF EXISTS catering_menu_items;`,
+      entryPoint: 'plugins/catering/v2/index.js',
+      routes: [
+        { path: '/catering-v2', component: 'CateringViewV2', title: '餐厅管理(新版)' },
+      ],
+    };
+
+    it('应能完成插件升级：回滚旧迁移 -> 新版本迁移 -> 重新注册', async () => {
+      // === 1. 安装 v1 ===
+      await runPluginMigration(db, v1Manifest.id, v1Manifest.upSql);
+      await registerPlugin(db, v1Manifest);
+
+      // Verify v1 installed
+      let installed = await getInstalledPlugins(db);
+      expect(installed).toHaveLength(1);
+      expect(installed[0].version).toBe('1.0.0');
+
+      // Insert data into v1 table
+      await db.runAsync(
+        `INSERT INTO catering_menu_items (id, name, price, last_modified, sync_status, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        ['item_v1', '旧版菜单', 38, 1000, 'clean', 1000]
+      );
+      expect(db.getAllRows('catering_menu_items')).toHaveLength(1);
+
+      // === 2. 升级到 v2：先回滚旧版本 ===
+      const rollbackResult = await rollbackPluginMigration(db, v1Manifest.id, v1Manifest.downSql);
+      expect(rollbackResult.status).toBe('success');
+
+      // Old table should be dropped
+      expect(db.getAllRows('catering_menu_items')).toHaveLength(0);
+
+      // === 3. 执行新版本迁移 ===
+      const migrateResult = await runPluginMigration(db, v2Manifest.id, v2Manifest.upSql);
+      expect(migrateResult.status).toBe('success');
+
+      // Verify new tables exist
+      await db.runAsync(
+        `INSERT INTO catering_menu_items (id, name, price, category, last_modified, sync_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['item_v2', '新版菜单', 58, '主菜', 2000, 'clean', 2000]
+      );
+      expect(db.getAllRows('catering_menu_items')).toHaveLength(1);
+      expect(db.getAllRows('catering_menu_items')[0].category).toBe('主菜');
+
+      // New delivery table should exist
+      await db.runAsync(
+        `INSERT INTO catering_delivery (id, order_id, address, status, last_modified, sync_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['delivery_001', 'order_001', '北京市朝阳区', 'pending', 2000, 'clean', 2000]
+      );
+      expect(db.getAllRows('catering_delivery')).toHaveLength(1);
+
+      // === 4. 重新注册插件 ===
+      await registerPlugin(db, v2Manifest);
+      installed = await getInstalledPlugins(db);
+      expect(installed).toHaveLength(1);
+      expect(installed[0].version).toBe('2.0.0');
+    });
+
+    it('升级后旧数据应通过回滚被清除', async () => {
+      // Install v1 with data
+      await runPluginMigration(db, v1Manifest.id, v1Manifest.upSql);
+      await registerPlugin(db, v1Manifest);
+
+      await db.runAsync(
+        `INSERT INTO catering_menu_items (id, name, price, last_modified, sync_status, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        ['old_data', '旧数据', 10, 1000, 'clean', 1000]
+      );
+
+      // Rollback should clear all data
+      await rollbackPluginMigration(db, v1Manifest.id, v1Manifest.downSql);
+      expect(db.getAllRows('catering_menu_items')).toHaveLength(0);
+
+      // Apply v2 migration
+      await runPluginMigration(db, v2Manifest.id, v2Manifest.upSql);
+
+      // Old data should not exist
+      const items = db.getAllRows('catering_menu_items');
+      expect(items).toHaveLength(0);
+    });
+  });
+
+  describe('插件路由注册与清理', () => {
+    beforeEach(() => {
+      // Clear any existing routes before each test
+      const existingRoutes = getDynamicRoutes();
+      const existingIds = [...new Set(existingRoutes.map(r => r.pluginId))];
+      for (const pid of existingIds) {
+        unregisterPluginRoutes(pid);
+      }
+    });
+
+    it('安装注册路由 -> 卸载清理路由', async () => {
+      // Routes should start empty
+      expect(getDynamicRoutes()).toHaveLength(0);
+
+      // Register routes for catering plugin
+      registerPluginRoutes('plugin_catering', [
+        { path: '/catering', component: 'CateringView', title: '餐厅管理' },
+        { path: '/catering/orders', component: 'CateringOrdersView', title: '订单管理' },
+      ]);
+
+      expect(getDynamicRoutes()).toHaveLength(2);
+      expect(getDynamicRoutes().every(r => r.pluginId === 'plugin_catering')).toBe(true);
+
+      // Uninstall: clean up routes
+      unregisterPluginRoutes('plugin_catering');
+      expect(getDynamicRoutes()).toHaveLength(0);
+    });
+
+    it('更新插件时应注册新路由并清理旧路由', async () => {
+      // Register v1 routes
+      registerPluginRoutes('plugin_catering', [
+        { path: '/catering-v1', component: 'CateringViewV1', title: '餐厅管理' },
+      ]);
+      expect(getDynamicRoutes()).toHaveLength(1);
+      expect(getDynamicRoutes()[0].path).toBe('/catering-v1');
+
+      // Unregister old routes (update step)
+      unregisterPluginRoutes('plugin_catering');
+      expect(getDynamicRoutes()).toHaveLength(0);
+
+      // Register v2 routes
+      registerPluginRoutes('plugin_catering', [
+        { path: '/catering-v2', component: 'CateringViewV2', title: '餐厅管理(新版)' },
+        { path: '/catering-v2/delivery', component: 'DeliveryView', title: '配送管理' },
+      ]);
+      expect(getDynamicRoutes()).toHaveLength(2);
+      expect(getDynamicRoutes()[0].path).toBe('/catering-v2');
+    });
+
+    it('不同插件的路由应互不干扰', async () => {
+      registerPluginRoutes('plugin_catering', [
+        { path: '/catering', component: 'CateringView', title: '餐厅管理' },
+      ]);
+      registerPluginRoutes('plugin_beauty', [
+        { path: '/beauty', component: 'BeautyView', title: '美容管理' },
+      ]);
+      registerPluginRoutes('plugin_pet', [
+        { path: '/pet', component: 'PetView', title: '宠物管理' },
+      ]);
+
+      expect(getDynamicRoutes()).toHaveLength(3);
+
+      // Uninstall only beauty
+      unregisterPluginRoutes('plugin_beauty');
+      const routes = getDynamicRoutes();
+      expect(routes).toHaveLength(2);
+      expect(routes.map(r => r.pluginId).sort()).toEqual(['plugin_catering', 'plugin_pet']);
     });
   });
 });

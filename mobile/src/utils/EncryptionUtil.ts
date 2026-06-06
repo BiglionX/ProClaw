@@ -43,7 +43,7 @@ export const encryptData = (data: string, key?: string): string => {
     const encrypted = CryptoJS.AES.encrypt(data, useKey).toString();
     return encrypted;
   } catch (error) {
-    console.error('Encryption failed:', error);
+    console.error('[EncryptionUtil] Encryption failed:', error);
     throw new Error('数据加密失败');
   }
 };
@@ -58,7 +58,7 @@ export const decryptData = (encryptedData: string, key?: string): string => {
     const decrypted = bytes.toString(CryptoJS.enc.Utf8);
     return decrypted;
   } catch (error) {
-    console.error('Decryption failed:', error);
+    console.error('[EncryptionUtil] Decryption failed:', error);
     throw new Error('数据解密失败');
   }
 };
@@ -95,7 +95,7 @@ export const encryptBlock = (data: string, password: string): string => {
 
     return `${salt}:${iv}:${ciphertext}:${authTag}`;
   } catch (error) {
-    console.error('Block encryption failed:', error);
+    console.error('[EncryptionUtil] Block encryption failed:', error);
     throw new Error('数据加密失败');
   }
 };
@@ -159,7 +159,7 @@ export const decryptBlock = (encryptedBlock: string, password: string): string =
     }
     return result;
   } catch (error: any) {
-    console.error('Block decryption failed:', error);
+    console.error('[EncryptionUtil] Block decryption failed:', error);
     throw new Error(error?.message || '数据解密失败');
   }
 };

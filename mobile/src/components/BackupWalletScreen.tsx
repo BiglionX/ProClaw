@@ -34,6 +34,9 @@ import {
   clearBackupConfig,
   hasBackupConfig as checkHasBackupConfig,
 } from '../services/BackupConfigStore';
+import { getDatabase } from '../services/DatabaseFactory';
+import { cloudBackupProvider } from '../services/CloudBackupProvider';
+import { getPendingCount, getPendingChanges } from '../services/ChangeLogManager';
 
 const BackupWalletScreen: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -45,6 +48,19 @@ const BackupWalletScreen: React.FC = () => {
   const [storageUserId, setStorageUserId] = useState<string>('');
   const [lastSyncTime, setLastSyncTime] = useState<number>(0);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // 加载实时备份状态
+  const loadBackupStatus = async () => {
+    try {
+      const db = getDatabase();
+      const count = await getPendingCount(db);
+      setPendingCount(count);
+    } catch {
+      // 数据库未就绪
+    }
+  };
 
   // 页面加载时恢复已保存的备份配置
   useEffect(() => {
@@ -66,6 +82,7 @@ const BackupWalletScreen: React.FC = () => {
       }
     };
     restoreConfig();
+    loadBackupStatus();
   }, []);
 
   const handleSetup = () => {
@@ -120,6 +137,71 @@ const BackupWalletScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // 执行同步
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const db = getDatabase();
+      const config = await loadBackupConfig();
+      if (!config || !config.enabled) {
+        Alert.alert('提示', '请先开启云备份并设置密码');
+        return;
+      }
+
+      // 初始化云备份提供者
+      const initialized = await cloudBackupProvider.initializeFromStore(db);
+      if (!initialized) {
+        Alert.alert('同步失败', '无法初始化云备份，请检查配置');
+        return;
+      }
+
+      // 获取待同步变更
+      const pendingChanges = await getPendingChanges(db);
+      if (pendingChanges.length === 0) {
+        Alert.alert('同步完成', '没有待同步的数据变更');
+        setSyncing(false);
+        return;
+      }
+
+      // 构造同步包并上传
+      const deviceId = '';  // 由 provider 内部获取
+      const syncPkg = {
+        deviceId,
+        profileId: '',
+        timestamp: Date.now(),
+        changes: pendingChanges,
+      };
+
+      const uploadResult = await cloudBackupProvider.upload(syncPkg);
+      if (uploadResult.success) {
+        // 尝试下载远程变更
+        const { getLastSyncTime } = await import('../services/SyncMetadataManager');
+        const lastSync = await getLastSyncTime(db);
+        await cloudBackupProvider.download(lastSync, deviceId);
+
+        setLastSyncTime(Date.now());
+        await loadBackupStatus();
+        Alert.alert(
+          '同步完成',
+          `已上传 ${uploadResult.applied} 条变更`
+        );
+      } else {
+        Alert.alert('同步失败', uploadResult.errors.join('\n') || '未知错误');
+      }
+    } catch (error: any) {
+      Alert.alert('同步失败', error?.message || '同步过程中发生错误');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // 格式化时间
+  const formatSyncTime = (timestamp: number): string => {
+    if (!timestamp) return '尚未同步';
+    const d = new Date(timestamp);
+    return `${d.toLocaleDateString('zh-CN')} ${d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
   const handleToggleBackup = async (value: boolean) => {
@@ -254,16 +336,27 @@ const BackupWalletScreen: React.FC = () => {
               </View>
               <View style={styles.statusRow}>
                 <Text style={styles.statusLabel}>上次同步</Text>
-                <Text style={styles.statusValue}>尚未同步</Text>
+                <Text style={styles.statusValue}>{formatSyncTime(lastSyncTime)}</Text>
               </View>
               <View style={styles.statusRow}>
                 <Text style={styles.statusLabel}>待同步变更</Text>
-                <Text style={styles.statusValue}>0 条</Text>
+                <Text style={styles.statusValue}>{pendingCount} 条</Text>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>立即同步</Text>
+            <TouchableOpacity
+              style={[styles.secondaryButton, syncing && styles.secondaryButtonDisabled]}
+              onPress={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#6366f1" style={{ marginRight: 8 }} />
+                  <Text style={styles.secondaryButtonText}>同步中...</Text>
+                </View>
+              ) : (
+                <Text style={styles.secondaryButtonText}>立即同步</Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -548,6 +641,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 8,
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.6,
   },
   secondaryButtonText: {
     fontSize: 15,

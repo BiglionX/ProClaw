@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -60,9 +61,22 @@ const PluginStoreScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   }, []);
 
+  // 首次加载
   useEffect(() => {
     loadPlugins();
   }, [loadPlugins]);
+
+  // 每当页面获得焦点时刷新已安装状态（从插件详情页返回后自动更新）
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        // 仅刷新已安装状态，不重新获取插件列表
+        getInstalledPlugins(getDatabase()).catch(() => [] as InstalledPlugin[]).then(installed => {
+          setInstalledIds(new Set(installed.map(p => p.id)));
+        });
+      }
+    }, [loading])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

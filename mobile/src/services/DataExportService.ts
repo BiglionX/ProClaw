@@ -26,22 +26,31 @@ export interface ImportConfig {
   clearBeforeImport: boolean;
 }
 
+/** 导出表定义（含显示标签和图标） */
+export interface ExportTableDef {
+  key: string;
+  label: string;
+  icon: string;
+}
+
+export const DEFAULT_EXPORT_TABLES: ExportTableDef[] = [
+  { key: 'product_spu', label: '商品 SPU', icon: 'package-variant-closed' },
+  { key: 'product_sku', label: '商品 SKU', icon: 'barcode' },
+  { key: 'product_categories', label: '商品分类', icon: 'shape' },
+  { key: 'product_images', label: '商品图片', icon: 'image-multiple' },
+  { key: 'brands', label: '品牌', icon: 'trademark' },
+  { key: 'customers', label: '客户', icon: 'account-group' },
+  { key: 'sales_orders', label: '销售订单', icon: 'file-document' },
+  { key: 'sales_order_items', label: '销售订单明细', icon: 'format-list-bulleted' },
+  { key: 'purchase_orders', label: '采购订单', icon: 'truck' },
+  { key: 'purchase_order_items', label: '采购订单明细', icon: 'clipboard-list' },
+  { key: 'inventory_transactions', label: '库存交易', icon: 'swap-horizontal-bold' },
+];
+
 const EXPORT_VERSION = 1;
 
-/** 默认导出的业务表列表 */
-const DEFAULT_EXPORT_TABLES = [
-  'product_spu',
-  'product_sku',
-  'product_categories',
-  'product_images',
-  'brands',
-  'customers',
-  'sales_orders',
-  'sales_order_items',
-  'purchase_orders',
-  'purchase_order_items',
-  'inventory_transactions',
-];
+/** 默认导出的业务表名列表 */
+const DEFAULT_EXPORT_TABLE_NAMES = DEFAULT_EXPORT_TABLES.map(t => t.key);
 
 // 不应导出的系统表
 const SYSTEM_TABLES = new Set([
@@ -60,7 +69,7 @@ const SYSTEM_TABLES = new Set([
  */
 export const exportProfileData = async (
   profileId: string,
-  tableNames: string[] = DEFAULT_EXPORT_TABLES
+  tableNames: string[] = DEFAULT_EXPORT_TABLE_NAMES
 ): Promise<ExportDataPackage> => {
   console.log(`[DataExport] Exporting data from profile: ${profileId}`);
 
@@ -157,14 +166,51 @@ const importRow = async (
     );
   } else {
     // skip: 使用 INSERT OR IGNORE
-    await db.runAsync(
+    const result = await db.runAsync(
       `INSERT OR IGNORE INTO ${tableName} (${colNames}) VALUES (${placeholders})`,
       values
     );
+    // rowsAffected 为 0 表示该行已被跳过（UNIQUE 约束冲突）
+    // 抛出异常让调用方正确统计 skipped 数量
+    if (result && result.rowsAffected === 0) {
+      throw new Error(`UNIQUE constraint failed: row ${row.id || JSON.stringify(row)} already exists`);
+    }
   }
+};
+
+/**
+ * 预估指定身份各表的行数（用于 UI 显示数据量）
+ * @param profileId 身份ID
+ * @param tableNames 要预估的表名列表
+ * @returns 表名 -> 行数的映射
+ */
+export const estimateRowCounts = async (
+  profileId: string,
+  tableNames: string[] = DEFAULT_EXPORT_TABLE_NAMES
+): Promise<Record<string, number>> => {
+  const counts: Record<string, number> = {};
+
+  try {
+    const db = await openDatabase(profileId);
+
+    for (const tableName of tableNames) {
+      if (SYSTEM_TABLES.has(tableName)) continue;
+      try {
+        const row = await db.getFirstAsync(`SELECT COUNT(*) as count FROM ${tableName}`);
+        counts[tableName] = (row as any)?.count || 0;
+      } catch {
+        counts[tableName] = 0;
+      }
+    }
+  } catch (error) {
+    console.warn('[DataExport] Failed to estimate row counts:', error);
+  }
+
+  return counts;
 };
 
 export default {
   exportProfileData,
   importProfileData,
+  estimateRowCounts,
 };

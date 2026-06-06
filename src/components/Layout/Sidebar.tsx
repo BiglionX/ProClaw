@@ -53,7 +53,7 @@ interface NavItem {
   text: string;
   icon: React.ReactNode;
   path: string;
-  group?: 'home' | 'ai' | 'account';
+  group?: 'home' | 'ai' | 'account' | 'contact';
   badge?: number | string;
   isLive?: boolean;
 }
@@ -85,12 +85,13 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 };
 
 /** 基础默认导航项（无插件时回退） */
-const DEFAULT_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' })[] = [
+const DEFAULT_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' | 'contact' })[] = [
   { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter', _group: 'home', isLive: true },
   { text: '商品库', icon: <ProductsIcon />, path: '/products', _group: 'home' },
   { text: '供应链', icon: <FinanceIcon />, path: '/supplychain', _group: 'home' },
-  { text: '联系人', icon: <ContactsIcon />, path: '/contacts', _group: 'home' },
-  { text: '消息', icon: <ChatIcon />, path: '/messages', _group: 'home' },
+  { text: '云商城', icon: <StoreIcon />, path: '/cloud-store', _group: 'home' },
+  { text: '联系人', icon: <ContactsIcon />, path: '/contacts', _group: 'contact' },
+  { text: '消息', icon: <ChatIcon />, path: '/messages', _group: 'contact' },
   { text: 'AI 团队', icon: <TeamsIcon />, path: '/teams', _group: 'ai', badge: 2 },
   { text: 'AI 知识库', icon: <KnowledgeIcon />, path: '/ai-knowledge', _group: 'ai' },
 ];
@@ -261,7 +262,12 @@ export default function Sidebar() {
       }}
     >
       {/* ---- 导航列表 ---- */}
-      {Object.entries(groupedItems).map(([group, items]) => (
+      {Object.entries(groupedItems)
+        .sort(([a], [b]) => {
+          const order = ['home', 'ai', 'contact'];
+          return order.indexOf(a) - order.indexOf(b);
+        })
+        .map(([group, items]) => (
         <Box key={group}>
           <List sx={{ py: 0 }}>
             {items.map(renderNavItem)}

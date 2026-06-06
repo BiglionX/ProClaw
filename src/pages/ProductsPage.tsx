@@ -434,13 +434,8 @@ export default function ProductsPage() {
         mb: 3 
       }}>
         <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
             {libraryMode === 'simple' ? '📦 商品管理' : '🛍️ 电商商品库'}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {libraryMode === 'simple' 
-              ? '适合小商家、农场、手工作坊' 
-              : '支持多规格、多图、精细化库存管理'}
           </Typography>
         </Box>
         
