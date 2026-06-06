@@ -12,7 +12,7 @@ const Footer: React.FC = () => {
             <ul className="space-y-2">
               <li><Link to="/features" className="text-gray-400 hover:text-white text-sm transition-colors">功能全景</Link></li>
               <li><Link to="/use-cases" className="text-gray-400 hover:text-white text-sm transition-colors">应用场景</Link></li>
-              <li><Link to="/pricing" className="text-gray-400 hover:text-white text-sm transition-colors">定价</Link></li>
+              <li><Link to="/download#pricing" className="text-gray-400 hover:text-white text-sm transition-colors">定价</Link></li>
               <li><Link to="/download" className="text-gray-400 hover:text-white text-sm transition-colors">下载</Link></li>
               <li><Link to="/flowhub" className="text-gray-400 hover:text-white text-sm transition-colors">FlowHub 插件市场</Link></li>
               <li><Link to="/faq" className="text-gray-400 hover:text-white text-sm transition-colors">常见问题</Link></li>

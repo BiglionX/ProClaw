@@ -5,7 +5,7 @@ import { useAuthStore } from '../lib/authStore';
 const navLinks = [
   { path: '/', label: '首页' },
   { path: '/features', label: '功能' },
-  { path: '/pricing', label: '定价' },
+  { path: '/flowhub', label: 'AI插件' },
   { path: '/download', label: '下载' },
   { path: '/faq', label: 'FAQ' },
 ];

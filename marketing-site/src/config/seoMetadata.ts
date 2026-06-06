@@ -67,14 +67,14 @@ export const seoConfig: Record<RouteKey, SeoMetadata> = {
       '桌面端永久免费开源。云托管商城按 Token 计费，新用户赠送 50,000 PT（≈¥50）免费体验。无隐藏费用。',
   },
   download: {
-    title: '免费下载 - ProClaw 桌面端 | Windows · macOS · Linux',
+    title: '免费下载 - ProClaw | Plus/Light 桌面端 · Cloud 云商城 · 手机端 App',
     description:
-      '免费下载 ProClaw 桌面端，支持 Windows、macOS、Linux。3 分钟完成安装，CEO Agent 对话引导配置。开源免费，数据 100% 本地加密存储。',
+      '免费下载 ProClaw Plus（进销存版）和 Light（AI创业版）桌面端，支持 Windows、macOS、Linux。Cloud 云商城无需安装，浏览器直接使用。手机端 App 随时随地管理。桌面端永久免费开源，数据 100% 本地加密存储。',
     keywords:
-      'ProClaw下载, 免费下载, 进销存软件下载, Windows进销存, macOS进销存, Linux进销存, 开源软件下载',
-    ogTitle: '免费下载 - ProClaw 桌面端 | 支持 Windows · macOS · Linux',
+      'ProClaw下载, ProClaw Plus, ProClaw Light, ProClaw Cloud, 免费下载, 进销存软件下载, Windows进销存, macOS进销存, Linux进销存, ProClaw定价, Token计费, 开源软件下载',
+    ogTitle: '免费下载 - ProClaw | Plus/Light 桌面端 · Cloud · 手机端',
     ogDescription:
-      '免费下载 ProClaw 桌面端。支持 Windows、macOS、Linux。3 分钟安装，CEO Agent 对话引导配置。开源免费，数据本地加密存储。',
+      '免费下载 ProClaw Plus 和 Light 桌面端。Cloud 云商城无需安装。支持 Windows、macOS、Linux。桌面端永久免费开源，数据本地加密存储。',
   },
   faq: {
     title: '常见问题 - ProClaw | 安装 · 使用 · 定价 FAQ',

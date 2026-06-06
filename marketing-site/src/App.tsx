@@ -13,7 +13,6 @@ import StructuredData from './components/StructuredData';
 
 // Pages - 懒加载
 const FeaturesPage = React.lazy(() => import('./pages/FeaturesPage'));
-const PricingPage = React.lazy(() => import('./pages/PricingPage'));
 const DownloadPage = React.lazy(() => import('./pages/DownloadPage'));
 const ChangelogPage = React.lazy(() => import('./pages/ChangelogPage'));
 const UseCasesPage = React.lazy(() => import('./pages/UseCasesPage'));
@@ -101,7 +100,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/features" element={<React.Suspense fallback={<PageLoading />}><FeaturesPage /></React.Suspense>} />
-          <Route path="/pricing" element={<React.Suspense fallback={<PageLoading />}><PricingPage /></React.Suspense>} />
+          <Route path="/pricing" element={<Navigate to="/download#pricing" replace />} />
           <Route path="/download" element={<React.Suspense fallback={<PageLoading />}><DownloadPage /></React.Suspense>} />
           <Route path="/changelog" element={<React.Suspense fallback={<PageLoading />}><ChangelogPage /></React.Suspense>} />
           <Route path="/use-cases" element={<React.Suspense fallback={<PageLoading />}><UseCasesPage /></React.Suspense>} />
