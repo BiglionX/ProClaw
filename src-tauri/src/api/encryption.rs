@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn test_encrypt_decrypt_json() {
         let key = [0u8; 32];
-        let cipher = Aes256GcmCipher::new(&key);
+        let cipher = Aes256GcmCipher::new(&key).expect("test key must be 32 bytes");
 
         let data = json!({
             "message": "Hello, ProClaw!",

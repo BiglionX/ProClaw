@@ -13,7 +13,8 @@ const DEMO_CONTACT_COUNT = 10;
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionMode>('checking');
+  // 审计 R2-B3：'checking' 不在 ConnectionMode 类型中，使用联合类型
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionMode | 'checking'>('checking');
   const [latency, setLatency] = useState<number>(0);
   const [productCount, setProductCount] = useState<number>(0);
   const [customerCount, setCustomerCount] = useState<number>(0);
@@ -35,21 +36,26 @@ const HomeScreen: React.FC = () => {
         return;
       }
 
-      const [connStatus] = await Promise.all([
+      // 审计 R2-B5：移除 Promise.all 中无用的 limit:1 调用，直接全量查询并计数
+      const [connStatus, allProductsResult, allCustomersResult] = await Promise.allSettled([
         checkConnection(),
-        getProducts({ limit: 1 }).catch(() => []),
-        getCustomers({ limit: 1 }).catch(() => []),
+        getProducts(),
+        getCustomers(),
       ]);
-      setConnectionStatus(connStatus.mode);
-      setLatency(connStatus.latency || 0);
-      try {
-        const allProducts = await getProducts();
-        setProductCount(allProducts.length);
-      } catch { setProductCount(0); }
-      try {
-        const allCustomers = await getCustomers();
-        setCustomerCount(allCustomers.length);
-      } catch { setCustomerCount(0); }
+      if (allProductsResult.status === 'fulfilled') {
+        setProductCount(allProductsResult.value.length);
+      } else {
+        setProductCount(0);
+      }
+      if (allCustomersResult.status === 'fulfilled') {
+        setCustomerCount(allCustomersResult.value.length);
+      } else {
+        setCustomerCount(0);
+      }
+      if (connStatus.status === 'fulfilled') {
+        setConnectionStatus(connStatus.value.mode);
+        setLatency(connStatus.value.latency || 0);
+      }
     } catch (error) {
       setConnectionStatus('offline');
     } finally {
@@ -59,13 +65,20 @@ const HomeScreen: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    // 审计 R2-L2：组件卸载后不更新状态（虽然 clearInterval 已处理定时器，但回调可能已排队）
+    let mounted = true;
     const interval = setInterval(async () => {
       try {
         const conn = await checkConnection();
-        setConnectionStatus(conn.mode);
+        if (mounted) {
+          setConnectionStatus(conn.mode);
+        }
       } catch {}
     }, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, [loadData]);
 
   const onRefresh = async () => {

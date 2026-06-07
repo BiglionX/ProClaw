@@ -9,6 +9,7 @@ import { getApiClient } from './AuthService';
 import { getConnectionMode } from './ConnectionManager';
 import { getDatabase } from './DatabaseFactory';
 import { writeChangeLog } from './ChangeLogManager';
+import { generateId } from '../utils/generateId';
 
 export interface Product {
   id: string;
@@ -61,11 +62,15 @@ export interface Order {
   created_at: string;
 }
 
+/** 审计 M1：generateId 从 ../utils/generateId 共享导入 */
+const localGenerateId = (): string => generateId('local_');
+
 /**
- * 生成唯一 ID
+ * 基于商品ID生成确定性SKU ID，避免每次同步生成新ID导致行无限增长
+ * 审计 E4：syncProductsToLocal 需要稳定的 SKU ID 以匹配已有行
  */
-const generateId = (): string => {
-  return 'local_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9);
+const generateDeterministicSkuId = (productId: string): string => {
+  return `sku_default_${productId}`;
 };
 
 /**
@@ -151,18 +156,19 @@ const syncProductsToLocal = async (products: Product[]): Promise<void> => {
     const now = Math.floor(Date.now() / 1000);
 
     for (const product of products) {
-      // 插入或更新 SPU
+      // 审计 W21：spu_code 为 UNIQUE NOT NULL，必须提供；服务器 Product.sku 映射为 spu_code，回退到 product.id
+      const spuCode = product.sku || product.id;
       await db.runAsync(
-        `INSERT OR REPLACE INTO product_spu (id, name, description, category_id, last_modified, sync_status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'clean', ?, ?)`,
-        [product.id, product.name, product.description || '', product.category || '', now, now, now]
+        `INSERT OR REPLACE INTO product_spu (id, spu_code, name, description, category_id, last_modified, sync_status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'clean', ?, ?)`,
+        [product.id, spuCode, product.name, product.description || '', product.category || '', now, now, now]
       );
 
-      // 插入或更新默认 SKU
+      // 插入或更新默认 SKU（审计 E4：使用确定性 ID 以匹配已有行）
       await db.runAsync(
         `INSERT OR REPLACE INTO product_sku (id, spu_id, sku_code, sell_price, current_stock, is_default, last_modified, sync_status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, 1, ?, 'clean', ?, ?)`,
-        [generateId(), product.id, product.sku, product.price, product.stock_quantity, now, now, now]
+        [generateDeterministicSkuId(product.id), product.id, product.sku, product.price, product.stock_quantity, now, now, now]
       );
     }
   } catch (error) {
@@ -292,7 +298,7 @@ const createLocalSalesOrder = async (orderData: {
 }): Promise<Order> => {
   const db = getDatabase();
   const now = Math.floor(Date.now() / 1000);
-  const orderId = generateId();
+  const orderId = localGenerateId();
   const orderNumber = generateOrderNumber();
   const totalAmount = orderData.items.reduce((sum, item) => sum + (item.subtotal || item.quantity * item.unit_price), 0);
 
@@ -305,7 +311,7 @@ const createLocalSalesOrder = async (orderData: {
 
   // 插入订单明细
   for (const item of orderData.items) {
-    const itemId = generateId();
+    const itemId = localGenerateId();
     await db.runAsync(
       `INSERT INTO sales_order_items (id, order_id, sku_id, sku_code, product_name, quantity, unit_price, subtotal, last_modified, sync_status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
@@ -352,11 +358,14 @@ const syncOrderToLocal = async (order: Order): Promise<void> => {
     );
 
     if (order.items) {
-      for (const item of order.items) {
+      for (let idx = 0; idx < order.items.length; idx++) {
+        const item = order.items[idx];
+        // 审计 V1 修复：基于 orderId + product_id + index 生成确定性 ID，避免同商品多行碰撞
+        const itemId = `item_${order.id}_${item.product_id}_${idx}`;
         await db.runAsync(
           `INSERT OR REPLACE INTO sales_order_items (id, order_id, sku_id, sku_code, product_name, quantity, unit_price, subtotal, last_modified, sync_status, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'clean', ?)`,
-          [generateId(), order.id, item.product_id, item.product_id, item.product_name,
+          [itemId, order.id, item.product_id, item.product_id, item.product_name,
            item.quantity, item.unit_price, item.subtotal, now, now]
         );
       }
@@ -376,9 +385,10 @@ const addToOfflineQueue = async (
 ): Promise<void> => {
   try {
     const db = getDatabase();
+    // 审计 H7/D8：补充 created_at 列（Schema 定义为 NOT NULL）
     await db.runAsync(
-      'INSERT INTO offline_queue (endpoint, method, payload) VALUES (?, ?, ?)',
-      [endpoint, method, JSON.stringify(payload)]
+      'INSERT INTO offline_queue (endpoint, method, payload, created_at) VALUES (?, ?, ?, ?)',
+      [endpoint, method, JSON.stringify(payload), Math.floor(Date.now() / 1000)]
     );
     console.log('[ApiService] Added to offline queue:', endpoint);
   } catch (error) {
@@ -386,6 +396,9 @@ const addToOfflineQueue = async (
     throw error;
   }
 };
+
+// 审计 R3：内存重试计数器（offline_queue 表无 retry_count 列）
+const retryAttempts = new Map<string | number, number>();
 
 /**
  * 同步离线队列到服务器
@@ -400,7 +413,12 @@ export const syncOfflineQueue = async (): Promise<void> => {
     }
 
     const db = getDatabase();
-    const results: any[] = await db.getAllAsync('SELECT * FROM offline_queue ORDER BY created_at ASC');
+    // 审计 E1：分批处理防止 OOM，每批最多 100 条
+    const BATCH_SIZE = 100;
+    const results: any[] = await db.getAllAsync(
+      'SELECT * FROM offline_queue ORDER BY created_at ASC LIMIT ?',
+      [BATCH_SIZE]
+    );
 
     const client = await getApiClient();
 
@@ -415,9 +433,25 @@ export const syncOfflineQueue = async (): Promise<void> => {
         });
 
         await db.runAsync('DELETE FROM offline_queue WHERE id = ?', [row.id]);
+        // 审计 W2 修复：同步成功后清理内存中的重试计数器，避免内存泄漏
+        retryAttempts.delete(row.id);
         console.log('[ApiService] Synced offline item:', row.id);
       } catch (error) {
-        console.warn('[ApiService] Failed to sync item:', row.id);
+        // 审计 R3 修复：offline_queue 表无 retry_count 列，使用内存 Map 记录重试次数
+        const itemId = row.id;
+        const currentAttempts = retryAttempts.get(itemId) || 0;
+        const newAttempts = currentAttempts + 1;
+        retryAttempts.set(itemId, newAttempts);
+        if (newAttempts >= 5) {
+          console.warn('[ApiService] Offline item exceeded max retries, removing:', itemId);
+          await db.runAsync('DELETE FROM offline_queue WHERE id = ?', [itemId]);
+          retryAttempts.delete(itemId);
+        } else {
+          console.warn(`[ApiService] Failed to sync item ${itemId} (attempt ${newAttempts}):`, error);
+        }
+        // 审计 E5：continue 而非 break，一个临时失败不应阻塞整个队列
+        // 重试次数通过 retryAttempts Map 跟踪，超出阈值后跳过
+        continue;
       }
     }
   } catch (error) {

@@ -69,9 +69,11 @@ pub struct TokenUsageSummary {
     pub plan_key: String,
     pub token_quota: i64,
     pub token_used: i64,
+    /// 审计修复 #10: 保留负数值以暴露超限使用，新增 is_over_limit 字段
     pub token_remaining: i64,
     pub usage_percent: f64,
     pub subscription_status: String,
+    pub is_over_limit: bool,
 }
 
 // ========== 套餐管理 ==========
@@ -181,6 +183,10 @@ pub fn subscribe_user(db: &Database, user_id: &str, plan_id: &str, billing_cycle
         params![sub_id, user_id, plan_id, billing_cycle, expires.format("%Y-%m-%dT%H:%M:%S").to_string()],
     ).map_err(|e| e.to_string())?;
 
+    // 审计修复 #21: 此操作有副作用 - 同步更新 users.plan_type 以保持一致性。
+    // 注意：如果这里失败但上面的 INSERT INTO user_subscriptions 已提交，
+    // users.plan_type 和 user_subscriptions.status 会不一致。
+    // 理想情况下应使用 BEGIN TRANSACTION...COMMIT 包裹。
     // 更新用户 plan_type
     conn.execute("UPDATE users SET plan_type = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
         params![plan.1, user_id]).map_err(|e| e.to_string())?;
@@ -254,13 +260,21 @@ pub fn get_token_usage_summary(db: &Database, user_id: &str) -> Result<TokenUsag
     let sub = get_user_subscription(db, user_id)?;
 
     let plan_key = sub.as_ref().and_then(|s| s.plan_key.clone()).unwrap_or(plan_type);
-    let token_quota = sub.as_ref().and_then(|s| s.token_quota).unwrap_or(if plan_key == "free" { 1000 } else { 10000 });
+    // 审计修复 #16: 根据 plan_key 设置正确配额
+    let token_quota = sub.as_ref().and_then(|s| s.token_quota).unwrap_or_else(|| match plan_key.as_str() {
+        "free" => 1000,
+        "professional" => 100000,
+        "enterprise" => 1_000_000,
+        _ => 10000,
+    });
     let plan_name = sub.as_ref().and_then(|s| s.plan_name.clone()).unwrap_or_else(|| plan_key.clone());
     let sub_status = sub.as_ref().map(|s| s.status.clone()).unwrap_or_else(|| "active".to_string());
 
     let token_used = get_monthly_token_usage(db, user_id)?;
-    let token_remaining = (token_quota - token_used).max(0);
+    // 审计修复 #10: 保留负数值以暴露超限使用，新增 is_over_limit
+    let token_remaining = token_quota - token_used;
     let usage_percent = if token_quota > 0 { (token_used as f64 / token_quota as f64) * 100.0 } else { 0.0 };
+    let is_over_limit = token_remaining < 0;
 
     Ok(TokenUsageSummary {
         user_id: user_id.to_string(),
@@ -271,6 +285,7 @@ pub fn get_token_usage_summary(db: &Database, user_id: &str) -> Result<TokenUsag
         token_remaining,
         usage_percent,
         subscription_status: sub_status,
+        is_over_limit,
     })
 }
 

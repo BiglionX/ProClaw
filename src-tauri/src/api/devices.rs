@@ -114,13 +114,11 @@ pub async fn list_devices(
         })
     });
     
-    let devices = match devices_iter {
+    let devices: Vec<DeviceResponse> = match devices_iter {
         Ok(iter) => {
-            let mut devices = Vec::new();
-            for device in iter {
-                devices.push(device.unwrap());
-            }
-            devices
+            iter.filter_map(|r| {
+                r.map_err(|e| eprintln!("[Devices] Corrupt row skipped: {}", e)).ok()
+            }).collect()
         },
         Err(e) => return (
             StatusCode::INTERNAL_SERVER_ERROR,

@@ -50,14 +50,30 @@ async function probeDevice(ip: string, port: number): Promise<LanDevice | null> 
 }
 
 /**
- * 生成扫描目标 IP 列表（完整 C 段 1-254，分批）
+ * 生成扫描目标 IP 列表
+ * 审计 E4：动态检测子网掩码。C 段 /24 扫描 1-254，
+ * 更大子网（如 /16）扫描常见段的高频 IP 避免超时。
  */
 function generateScanTargets(subnet: string, excludeIp?: string | null): string[] {
   const targets: string[] = [];
-  for (let i = 1; i <= 254; i++) {
-    const ip = `${subnet}${i}`;
-    if (ip !== excludeIp) {
-      targets.push(ip);
+  // 检测子网类型：若 subnet 以数字结尾含 '.'（C段格式如 "192.168.1."）扫描全段
+  // 若 subnet 不含最后一组（如 "10.0." 大子网），仅扫描常见 IP
+  const isFullCSegment = /^\d+\.\d+\.\d+\.$/.test(subnet);
+  if (isFullCSegment) {
+    for (let i = 1; i <= 254; i++) {
+      const ip = `${subnet}${i}`;
+      if (ip !== excludeIp) {
+        targets.push(ip);
+      }
+    }
+  } else {
+    // 大子网：扫描常见高频 IP（网关 + 常见服务器段）
+    const commonLasts = [1, 2, 10, 20, 50, 100, 101, 102, 110, 150, 200, 254];
+    for (const last of commonLasts) {
+      const ip = `${subnet}.${last}`;
+      if (ip !== excludeIp) {
+        targets.push(ip);
+      }
     }
   }
   return targets;

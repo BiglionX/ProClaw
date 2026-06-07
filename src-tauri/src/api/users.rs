@@ -215,7 +215,9 @@ pub async fn create_user(
     // 分配角色
     if let Some(ref role_name) = payload.role {
         if let Err(e) = assign_user_role(&conn, &id, role_name) {
-            let _ = conn.execute("DELETE FROM users WHERE id = ?1", params![id]);
+            if let Err(db_err) = conn.execute("DELETE FROM users WHERE id = ?1", params![id]) {
+                eprintln!("[Users] Failed to rollback user after role assignment error: {}", db_err);
+            }
             return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e})));
         }
     }
@@ -384,7 +386,9 @@ fn assign_user_role(conn: &rusqlite::Connection, user_id: &str, role_name: &str)
     ).map_err(|_| format!("Role '{}' not found", role_name))?;
 
     // 清除旧角色
-    let _ = conn.execute("DELETE FROM user_roles WHERE user_id = ?1", params![user_id]);
+    if let Err(e) = conn.execute("DELETE FROM user_roles WHERE user_id = ?1", params![user_id]) {
+        eprintln!("[Users] Failed to clear existing roles for {}: {}", user_id, e);
+    }
 
     // 分配新角色
     conn.execute(

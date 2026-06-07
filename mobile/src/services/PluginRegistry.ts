@@ -16,6 +16,7 @@ interface DynamicRoute {
   componentName: string;
 }
 
+// 审计 I6：模块级可变状态在热重载时可能丢失，考虑后续持久化到 AsyncStorage/DB
 let dynamicRoutes: DynamicRoute[] = [];
 
 /** 路由变化回调函数类型 */
@@ -243,8 +244,13 @@ export const isUpdateAvailable = (
   current: string,
   latest: string
 ): boolean => {
+  // 审计 E8：校验版本号格式，包含非数字段时视为无法比较
   const currentParts = current.split('.').map(Number);
   const latestParts = latest.split('.').map(Number);
+  if (currentParts.some(isNaN) || latestParts.some(isNaN)) {
+    console.warn(`[PluginRegistry] Invalid version format: ${current} vs ${latest}`);
+    return false;
+  }
 
   for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
     const cur = currentParts[i] || 0;

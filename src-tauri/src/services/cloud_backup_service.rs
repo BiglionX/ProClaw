@@ -23,7 +23,8 @@ impl CloudBackupService {
     pub fn new(db: Database, encryption_key: &[u8]) -> Self {
         Self {
             db: Mutex::new(db),
-            cipher: Aes256GcmCipher::new(encryption_key),
+            cipher: Aes256GcmCipher::new(encryption_key)
+                .expect("CloudBackupService: encryption key must be 32 bytes"),
             supabase: SupabaseClient::from_env(),
         }
     }
@@ -297,7 +298,9 @@ impl CloudBackupService {
                         }
 
                         // 删除已拉取的消息
-                        let _ = self.supabase.delete_by_id("relay_messages", id).await;
+                        if let Err(e) = self.supabase.delete_by_id("relay_messages", id).await {
+                            eprintln!("[cloud_backup] Failed to delete relay message {}: {}", id, e);
+                        }
                     }
                 }
             }
@@ -311,11 +314,13 @@ impl CloudBackupService {
                 let content = msg.get("message").unwrap_or(&Value::Null);
                 let content_str = serde_json::to_string(content).unwrap_or_default();
 
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "INSERT OR IGNORE INTO relay_messages (id, receiver_id, message_type, content, status, direction)
                      VALUES (?1, ?2, 'chat', ?3, 'pending', 'incoming')",
                     params![relay_id, local_user_id, content_str],
-                );
+                ) {
+                    eprintln!("[cloud_backup] Failed to store relay message: {}", e);
+                }
             }
         }
 
@@ -622,10 +627,10 @@ impl CloudBackupService {
 
         // 启动轮询任务检查中继消息
         let supabase = self.supabase.clone();
-        let cipher_key = [0u8; 32]; // 使用与构造时相同的密钥
-        let cipher = Aes256GcmCipher::new(&cipher_key);
+        // 审计修复 #2: 使用 self.cipher 克隆，避免零密钥解密
+        let cipher = self.cipher.clone();
 
-        tokio::spawn(async move {
+        let _relay_handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
             loop {
                 interval.tick().await;
@@ -650,7 +655,9 @@ impl CloudBackupService {
                                         }
 
                                         // 删除已处理的消息
-                                        let _ = supabase.delete_by_id("relay_messages", id).await;
+                                        if let Err(e) = supabase.delete_by_id("relay_messages", id).await {
+                                            eprintln!("[Realtime] Failed to delete relay msg {}: {}", id, e);
+                                        }
                                     }
                                 }
                             }
@@ -675,7 +682,7 @@ mod tests {
     #[test]
     fn test_cipher_and_hash() {
         let key = b"0123456789abcdef0123456789abcdef";
-        let cipher = Aes256GcmCipher::new(key);
+        let cipher = Aes256GcmCipher::new(key).expect("create cipher");
 
         let plaintext = b"Hello, ProClaw Cloud Backup!";
         let encrypted = cipher.encrypt(plaintext).unwrap();

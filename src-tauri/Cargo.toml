@@ -1,7 +1,7 @@
 [package]
 name = "proclaw-desktop"
-version = "0.1.0"
-description = "Proclaw Desktop Application"
+version = "1.0.0"
+description = "ProClaw Desktop Application - AI-Powered Business Operating System"
 authors = ["You"]
 license = "MIT"
 repository = ""
@@ -90,6 +90,14 @@ libloading = "0.8"
 [profile.dev]
 # 修复 LNK1140 PDB 超出限制错误
 incremental = false
+
+[profile.release]
+# 生产发布优化：最大化性能、最小化体积
+opt-level = 3          # 最高优化级别
+lto = true             # 链接时优化，减少二进制体积
+codegen-units = 1      # 单代码生成单元，更激进的优化
+strip = "symbols"      # 剥离符号表
+panic = "abort"        # panic 时直接终止，减少二进制体积
 
 [features]
 default = ["custom-protocol", "inventory"]

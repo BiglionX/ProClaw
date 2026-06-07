@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { acceptInvitation, parseInviteLink, acceptEmployeeInvitation } from '../services/InvitationService';
+import { loadServerUrl } from '../services/AuthService';
 
 interface InvitationHandlerScreenProps {
   route: {
@@ -23,14 +24,21 @@ interface InvitationHandlerScreenProps {
   navigation: any;
 }
 
-const DEFAULT_HOST = 'http://localhost:8888';
+const DEFAULT_HOST = ''; // 审计 R2-S8：不再硬编码，由 loadServerUrl 动态提供
 
 export const InvitationHandlerScreen: React.FC<InvitationHandlerScreenProps> = ({
   route,
   navigation,
 }) => {
   const [inviteCode, setInviteCode] = useState('');
-  const [host, setHost] = useState(DEFAULT_HOST);
+  const [host, setHost] = useState(''); // 审计 R2-S8：动态加载，不再硬编码
+
+  // 加载默认服务器地址
+  useEffect(() => {
+    loadServerUrl().then(url => {
+      if (url && !host) setHost(url);
+    });
+  }, []);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -46,12 +54,17 @@ export const InvitationHandlerScreen: React.FC<InvitationHandlerScreenProps> = (
     const hostParam = route.params?.host;
     const typeParam = route.params?.type;
 
-    if (code) {
-      setInviteCode(code);
-      if (hostParam) setHost(hostParam);
-      if (typeParam) setInviteType(typeParam as any);
-      fetchInvitationInfo(code, hostParam || DEFAULT_HOST);
-    }
+    const initInvitation = async () => {
+      if (code) {
+        setInviteCode(code);
+        if (hostParam) setHost(hostParam);
+        if (typeParam) setInviteType(typeParam as any);
+        // 审计 R2-S8：fallback 链：route param → state → loadServerUrl → 默认 HTTPS
+        const effectiveHost = hostParam || host || await loadServerUrl() || 'https://localhost:8888';
+        fetchInvitationInfo(code, effectiveHost);
+      }
+    };
+    initInvitation();
   }, [route.params]);
 
   const fetchInvitationInfo = useCallback(async (code: string, apiHost: string) => {

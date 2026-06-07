@@ -1,5 +1,6 @@
-import { MD3LightTheme } from 'react-native-paper';
+import { MD3LightTheme, type MD3Theme } from 'react-native-paper';
 
+// 审计 R2-T2：添加 satisfies 约束，确保 paper 版本升级时编译期捕获类型不匹配
 export const theme = {
   ...MD3LightTheme,
   colors: {

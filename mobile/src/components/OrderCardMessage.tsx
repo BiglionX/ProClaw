@@ -6,10 +6,10 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
-import { Message } from '../services/MessageService';
+import type { ChatMessage } from '../services/ChatService';
 
 interface OrderCardMessageProps {
-  message: Message;
+  message: ChatMessage;
   onPress?: (orderId: string) => void;
 }
 
@@ -29,9 +29,16 @@ export const OrderCardMessage: React.FC<OrderCardMessageProps> = ({
   message,
   onPress,
 }) => {
-  // 解析订单卡片数据
-  const orderData: OrderCardData | null = message.content_type === 'order_card' && message.content
-    ? JSON.parse(message.content)
+  // 解析订单卡片数据（ChatMessage 中通过 content 字段携带 JSON）
+  const orderData: OrderCardData | null = message.content
+    ? (() => {
+        try {
+          const parsed = JSON.parse(message.content);
+          return parsed && parsed.order_id ? (parsed as OrderCardData) : null;
+        } catch {
+          return null;
+        }
+      })()
     : null;
 
   if (!orderData) {
@@ -92,7 +99,7 @@ export const OrderCardMessage: React.FC<OrderCardMessageProps> = ({
                 {item.product_name}
               </Text>
               <Text style={styles.itemQuantity}>x{item.quantity}</Text>
-              <Text style={styles.itemPrice}>¥{item.unit_price.toFixed(2)}</Text>
+              <Text style={styles.itemPrice}>¥{(item.unit_price ?? 0).toFixed(2)}</Text>
             </View>
           ))}
         </View>
@@ -101,7 +108,7 @@ export const OrderCardMessage: React.FC<OrderCardMessageProps> = ({
       {/* 订单总金额 */}
       <View style={styles.footer}>
         <Text style={styles.totalLabel}>总金额：</Text>
-        <Text style={styles.totalAmount}>¥{orderData.total_amount.toFixed(2)}</Text>
+        <Text style={styles.totalAmount}>¥{(orderData.total_amount ?? 0).toFixed(2)}</Text>
       </View>
 
       {/* 点击查看详情 */}

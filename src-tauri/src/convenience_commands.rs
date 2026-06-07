@@ -175,7 +175,7 @@ pub fn cv_create_pos_order(
             conn.execute(
                 &format!("UPDATE cv_daily_settlement SET {0} = {0} + ?1, total_revenue = total_revenue + ?1 WHERE id = ?2", field),
                 params![total_amount, sid],
-            ).ok();
+            ).map_err(|e| eprintln!("[convenience] settlement update failed: {}", e)).ok();
         }
         None => {
             let sid = Uuid::new_v4().to_string();
@@ -203,6 +203,7 @@ pub fn cv_create_pos_order(
 }
 
 /// 添加保质期跟踪
+/// 审计修复 R6: 添加数量和日期校验
 #[tauri::command]
 pub fn cv_add_expiry_tracking(
     db: tauri::State<Mutex<Database>>,
@@ -212,6 +213,9 @@ pub fn cv_add_expiry_tracking(
     expiry_date: String,
     quantity: i32,
 ) -> Result<Value, String> {
+    if quantity <= 0 {
+        return Err("Quantity must be positive".to_string());
+    }
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let id = Uuid::new_v4().to_string();

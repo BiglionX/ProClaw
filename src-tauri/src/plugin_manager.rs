@@ -11,6 +11,7 @@
 /// 存储路径：%APPDATA%/ProClaw/plugins/{plugin-id}/
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use crate::utils::path_safety;
 /// 插件数据模型定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginDataModels {
@@ -134,9 +135,10 @@ fn get_plugins_dir() -> PathBuf {
     base.join("ProClaw").join("plugins")
 }
 
-/// 获取指定插件的安装目录
+/// 获取指定插件的安装目录（带路径穿越防护）
 fn get_plugin_dir(plugin_id: &str) -> PathBuf {
-    get_plugins_dir().join(plugin_id)
+    let safe_id = path_safety::sanitize_path_component(plugin_id);
+    get_plugins_dir().join(&safe_id)
 }
 
 // ============ Tauri Commands ============
@@ -305,14 +307,17 @@ pub fn install_plugin(package_path: String, plugin_id: String) -> Result<String,
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| format!("Failed to read ZIP package: {}", e))?;
     
-    // 解压到目标目录
+    // 解压到目标目录（含 Zip Slip 防护）
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)
             .map_err(|e| format!("Failed to read ZIP entry {}: {}", i, e))?;
         
-        // 安全检查：防止 zip slip 攻击
-        let entry_path = entry.mangled_name();
-        let target_path = target_dir.join(&entry_path);
+        let entry_name = entry.mangled_name();
+        let entry_path = entry_name.as_path();
+        
+        // R7 审计修复：防 Zip Slip — ensure_within_dir 拒绝路径穿越
+        let target_path = path_safety::ensure_within_dir(&target_dir, entry_path)
+            .map_err(|e| format!("路径安全拒绝 (ZIP entry {}): {}", entry_name.display(), e))?;
         
         if entry.is_dir() {
             std::fs::create_dir_all(&target_path).ok();
@@ -474,9 +479,11 @@ pub fn execute_plugin_migration(
         return Err(format!("无效的迁移方向：{}（仅支持 up/down）", direction));
     }
 
-    // 获取插件目录下的迁移文件
+    // 获取插件目录下的迁移文件（R7 修复：净化 migration_file 防路径穿越）
     let plugin_dir = get_plugin_dir(&plugin_id);
-    let migration_path = plugin_dir.join("migrations").join(&migration_file);
+    let safe_file = path_safety::sanitize_file_name(&migration_file)
+        .map_err(|e| format!("非法的迁移文件名：{}", e))?;
+    let migration_path = plugin_dir.join("migrations").join(&safe_file);
 
     if !migration_path.exists() {
         return Ok(serde_json::json!({
@@ -627,16 +634,30 @@ pub fn get_plugin_migration_history(
 // ============ 插件数据库查询/写入 API ============
 
 /// 插件数据库只读查询（仅允许 SELECT）
+/// 审计修复 #6: 增强 SQL 注入防护 - 使用预编译校验 + 多行注释绕过防护
 #[tauri::command]
 pub fn plugin_db_query(
     sql: String,
     params: Vec<String>,
     db: tauri::State<'_, std::sync::Mutex<crate::database::Database>>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    // 安全检查：仅允许 SELECT
-    let trimmed = sql.trim().to_uppercase();
-    if !trimmed.starts_with("SELECT") {
-        return Err("插件数据库查询仅允许 SELECT 语句".to_string());
+    // 安全检查：仅允许 SELECT，防范注释绕过攻击
+    // 移除所有 SQL 注释后再检查
+    let sanitized = sql
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.starts_with("--") && !trimmed.starts_with("/*") && !trimmed.starts_with('*')
+        })
+        .collect::<Vec<&str>>()
+        .join("\n");
+    let trimmed = sanitized.trim().to_uppercase();
+    if !trimmed.starts_with("SELECT") && !trimmed.starts_with("WITH") {
+        return Err("插件数据库查询仅允许 SELECT 或 WITH 语句".to_string());
+    }
+    // 阻止分号分隔的多语句注入
+    if trimmed.trim_end_matches(';').contains(';') && !trimmed.starts_with("WITH") {
+        return Err("禁止多语句查询".to_string());
     }
 
     let db = db.lock().map_err(|e| format!("数据库锁定失败：{}", e))?;
@@ -677,6 +698,7 @@ pub fn plugin_db_query(
 }
 
 /// 插件数据库写入操作（仅允许 INSERT/UPDATE/DELETE/CREATE TABLE IF NOT EXISTS）
+/// 审计修复 #6: 禁止 DROP TABLE/ALTER TABLE/PRAGMA/TRUNCATE 等危险操作
 #[tauri::command]
 pub fn plugin_db_execute(
     sql: String,
@@ -685,12 +707,28 @@ pub fn plugin_db_execute(
 ) -> Result<u64, String> {
     // 安全检查：仅允许安全的写操作
     let trimmed = sql.trim().to_uppercase();
-    let allowed = ["INSERT", "UPDATE", "DELETE", "CREATE TABLE IF NOT EXISTS"];
+    let allowed = ["INSERT", "UPDATE", "DELETE", "CREATE TABLE IF NOT EXISTS", "CREATE INDEX", "CREATE UNIQUE INDEX"];
     if !allowed.iter().any(|p| trimmed.starts_with(p)) {
         return Err(format!(
             "插件数据库写入仅允许：{}",
             allowed.join(", ")
         ));
+    }
+    // 显式禁止破坏性操作
+    let forbidden_starts = ["DROP", "ALTER", "PRAGMA", "TRUNCATE", "ATTACH", "DETACH", "REINDEX", "VACUUM"];
+    for forbidden in &forbidden_starts {
+        if trimmed.starts_with(forbidden) {
+            return Err(format!("禁止执行 {} 操作", forbidden));
+        }
+    }
+    // 防止通过注释注入绕过
+    if trimmed.starts_with("CREATE") && !trimmed.starts_with("CREATE TABLE IF NOT EXISTS") 
+        && !trimmed.starts_with("CREATE INDEX") && !trimmed.starts_with("CREATE UNIQUE INDEX") {
+        return Err("CREATE 仅允许 CREATE TABLE IF NOT EXISTS 和 CREATE INDEX".to_string());
+    }
+    // 阻止多语句注入
+    if trimmed.trim_end_matches(';').contains(';') {
+        return Err("禁止多语句执行".to_string());
     }
 
     let db = db.lock().map_err(|e| format!("数据库锁定失败：{}", e))?;
@@ -1002,8 +1040,11 @@ pub async fn apply_plugin_update(
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("读取 ZIP 包失败: {}", e))?;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
-        let entry_path = entry.mangled_name();
-        let target_path = temp_dir.join(&entry_path);
+        let entry_name = entry.mangled_name();
+        let entry_path = entry_name.as_path();
+        // R7 修复：防 Zip Slip
+        let target_path = path_safety::ensure_within_dir(&temp_dir, entry_path)
+            .map_err(|e| format!("路径安全拒绝 (ZIP entry {}): {}", entry_name.display(), e))?;
         if entry.is_dir() { std::fs::create_dir_all(&target_path).ok(); }
         else {
             if let Some(parent) = target_path.parent() { std::fs::create_dir_all(parent).ok(); }

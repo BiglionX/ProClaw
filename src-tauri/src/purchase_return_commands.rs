@@ -245,7 +245,7 @@ pub fn confirm_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Str
         ).map_err(|_| format!("Product {} not found", pid))?;
 
         if current < *qty {
-            let _ = tx.rollback();
+            if let Err(rb) = tx.rollback() { eprintln!("[purchase_return] rollback failed: {}", rb); }
             return Err(format!("Insufficient stock for product {}. Current: {}, To return: {}", pid, current, qty));
         }
 

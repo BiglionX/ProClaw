@@ -166,7 +166,9 @@ export default function AgentView({ agent, visible, onClose }: AgentViewProps) {
     }
   };
 
-  const assetsUrl = `https://nvwa.proclaw.cc/agents/${agent.manifest.id}/${agent.manifest.version}/${agent.manifest.entry}`;
+  // 审计 R2-B2：使用 loadAgentView 获取经 encodeURIComponent 安全处理的 entryUrl
+  const viewConfig = agentRuntimeBridge.loadAgentView(agent);
+  const assetsUrl = viewConfig.entryUrl;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>

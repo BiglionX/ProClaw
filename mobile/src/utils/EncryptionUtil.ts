@@ -1,7 +1,7 @@
 import CryptoJS from 'crypto-js';
 
-// 默认密钥（仅用于向后兼容，新实现应使用 PBKDF2 派生密钥）
-const LEGACY_KEY = 'ProClaw@2024!Secure#Mobile#Key#2024';
+// 旧版硬编码密钥已移除（审计 S1/S2）
+// encryptData/decryptData 现在要求必须显式传入 key
 
 /**
  * PBKDF2 密钥派生
@@ -36,11 +36,13 @@ export const generateIV = (): string => {
 
 /**
  * 使用 AES 加密（兼容旧版）
+ * 审计 S6：当 key 为 string 时，CryptoJS.AES.encrypt 内部使用自己的 PBKDF2
+ * 派生 128 位密钥，与 encryptBlock 的显式 PBKDF2-256 位方案不兼容。
+ * 此函数仅用于兼容旧数据，新代码应使用 encryptBlock / encryptBlockB64。
  */
-export const encryptData = (data: string, key?: string): string => {
+export const encryptData = (data: string, key: string): string => {
   try {
-    const useKey = key || LEGACY_KEY;
-    const encrypted = CryptoJS.AES.encrypt(data, useKey).toString();
+    const encrypted = CryptoJS.AES.encrypt(data, key).toString();
     return encrypted;
   } catch (error) {
     console.error('[EncryptionUtil] Encryption failed:', error);
@@ -50,11 +52,11 @@ export const encryptData = (data: string, key?: string): string => {
 
 /**
  * 使用 AES 解密（兼容旧版）
+ * 审计 S6：与 encryptData 配套的兼容解密，仅用于旧数据迁移。
  */
-export const decryptData = (encryptedData: string, key?: string): string => {
+export const decryptData = (encryptedData: string, key: string): string => {
   try {
-    const useKey = key || LEGACY_KEY;
-    const bytes = CryptoJS.AES.decrypt(encryptedData, useKey);
+    const bytes = CryptoJS.AES.decrypt(encryptedData, key);
     const decrypted = bytes.toString(CryptoJS.enc.Utf8);
     return decrypted;
   } catch (error) {
@@ -153,8 +155,8 @@ export const decryptBlock = (encryptedBlock: string, password: string): string =
     });
 
     const result = decrypted.toString(CryptoJS.enc.Utf8);
-    // 空字符串可能是加密空字符串的有效结果，null/undefined 表示解密失败
-    if (result === null || result === undefined) {
+    // toString() 返回 string，解密失败时返回空字符串（审计 E7）
+    if (result === '') {
       throw new Error('解密失败：密码错误或数据已损坏');
     }
     return result;
@@ -281,14 +283,14 @@ const base64Decode = (str: string): string => {
 /**
  * 加密对象（兼容旧版）
  */
-export const encryptObject = (obj: any, key?: string): string => {
+export const encryptObject = (obj: any, key: string): string => {
   return encryptData(JSON.stringify(obj), key);
 };
 
 /**
  * 解密为对象（兼容旧版）
  */
-export const decryptObject = <T = any>(encryptedData: string, key?: string): T => {
+export const decryptObject = <T = any>(encryptedData: string, key: string): T => {
   const jsonString = decryptData(encryptedData, key);
   return JSON.parse(jsonString) as T;
 };

@@ -29,6 +29,10 @@ impl Database {
 
         // 启用 WAL 模式以提高并发性能
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+        // 设置 busy timeout 避免写锁冲突直接报错（5秒等待容忍）
+        conn.execute_batch("PRAGMA busy_timeout=5000;")?;
+        // 启用外键约束
+        conn.execute_batch("PRAGMA foreign_keys=ON;")?;
 
         Ok(Self { conn })
     }
@@ -40,7 +44,10 @@ impl Database {
     }
 
     /// 初始化数据库 Schema
+    /// 审计修复 #14: 迁移失败时打印警告并收集失败列表，不再静默吞掉所有错误
     pub fn initialize(&self) -> DbResult<()> {
+        let mut migration_errors: Vec<String> = Vec::new();
+        
         // 加载基础schema
         let schema = include_str!("../../src/db/schema.sql");
         self.conn.execute_batch(schema)?;
@@ -49,40 +56,64 @@ impl Database {
         let spu_sku_schema = include_str!("../../database/spu_sku_schema_sqlite.sql");
         self.conn.execute_batch(spu_sku_schema)?;
         
+        // 审计修复 #18: 迁移SQL位置统一说明 - 历史遗留分散在 src/db/ 和 database/ 下
+        // 新迁移统一放入 database/migrations/ 目录按编号排序
+        
         // 运行迁移：员工邀请与角色权限自动分配（PRD v4.3）
         let migration = include_str!("../../src/db/migrations/006_add_employee_invitation_fields.sql");
-        self.conn.execute_batch(migration).ok(); // 忽略错误（如果已经运行过）
+        if let Err(e) = self.conn.execute_batch(migration) {
+            eprintln!("[DB Migration WARNING] 006_add_employee_invitation_fields: {}", e);
+            migration_errors.push(format!("006: {}", e));
+        }
 
         // 运行迁移：财务管理 Agent 数据表（PRD v6.0）
         let finance_migration = include_str!("../../src/db/migrations/009_finance_agent_tables.sql");
-        self.conn.execute_batch(finance_migration).ok(); // 忽略错误（如果已经运行过）
+        if let Err(e) = self.conn.execute_batch(finance_migration) {
+            eprintln!("[DB Migration WARNING] 009_finance_agent_tables: {}", e);
+            migration_errors.push(format!("009: {}", e));
+        }
 
         // 运行迁移：Agent 市场数据表（PRD v6.0）
         let market_migration = include_str!("../../database/migrations/010_market_agents.sql");
-        self.conn.execute_batch(market_migration).ok();
+        if let Err(e) = self.conn.execute_batch(market_migration) {
+            eprintln!("[DB Migration WARNING] 010_market_agents: {}", e);
+            migration_errors.push(format!("010: {}", e));
+        }
 
         // 运行迁移：安装向导系统配置表（PRD v6.1）
-        self.conn.execute_batch(
+        if let Err(e) = self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS system_config (\
              key TEXT PRIMARY KEY,\
              value TEXT NOT NULL\
              );"
-        ).ok();
+        ) {
+            eprintln!("[DB Migration WARNING] system_config: {}", e);
+            migration_errors.push(format!("system_config: {}", e));
+        }
 
         // 运行迁移：CEO Agent 项目上下文协议表（PRD v6.2）
         let ceo_migration = include_str!("../../src/db/migrations/011_pcp_tables.sql");
-        self.conn.execute_batch(ceo_migration).ok();
+        if let Err(e) = self.conn.execute_batch(ceo_migration) {
+            eprintln!("[DB Migration WARNING] 011_pcp_tables: {}", e);
+            migration_errors.push(format!("011: {}", e));
+        }
 
         // 运行迁移：CEO Agent 决策确认与个性化学习表（PRD v6.3）
         let decision_migration = include_str!("../../src/db/migrations/012_ceo_decision_logs.sql");
-        self.conn.execute_batch(decision_migration).ok();
+        if let Err(e) = self.conn.execute_batch(decision_migration) {
+            eprintln!("[DB Migration WARNING] 012_ceo_decision_logs: {}", e);
+            migration_errors.push(format!("012: {}", e));
+        }
 
         // 运行迁移：NvwaX API 消耗记录表
         let nvwax_migration = include_str!("../../database/migrations/028_add_nvwax_usage_logs.sql");
-        self.conn.execute_batch(nvwax_migration).ok();
+        if let Err(e) = self.conn.execute_batch(nvwax_migration) {
+            eprintln!("[DB Migration WARNING] 028_nvwax_usage_logs: {}", e);
+            migration_errors.push(format!("028: {}", e));
+        }
 
         // 运行迁移：采购退货表
-        self.conn.execute_batch(
+        if let Err(e) = self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS purchase_returns (
                 id TEXT PRIMARY KEY,
                 pr_number TEXT UNIQUE NOT NULL,
@@ -110,10 +141,13 @@ impl Database {
                 reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-        ").ok();
+        ") {
+            eprintln!("[DB Migration WARNING] purchase_returns: {}", e);
+            migration_errors.push(format!("purchase_returns: {}", e));
+        }
 
         // 运行迁移：销售退货表
-        self.conn.execute_batch(
+        if let Err(e) = self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS sales_returns (
                 id TEXT PRIMARY KEY,
                 sr_number TEXT UNIQUE NOT NULL,
@@ -141,10 +175,13 @@ impl Database {
                 reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-        ").ok();
+        ") {
+            eprintln!("[DB Migration WARNING] sales_returns: {}", e);
+            migration_errors.push(format!("sales_returns: {}", e));
+        }
 
         // 运行迁移：付款交易表 + 对账规则表 + 对账单日志表（PRD v1.1）
-        self.conn.execute_batch(
+        if let Err(e) = self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS payment_transactions (
                 id TEXT PRIMARY KEY,
                 order_type TEXT NOT NULL CHECK(order_type IN ('purchase','sales','purchase_return','sales_return')),
@@ -190,7 +227,10 @@ impl Database {
                 status TEXT DEFAULT 'success',
                 error_message TEXT
             );
-        ").ok();
+        ") {
+            eprintln!("[DB Migration WARNING] payment/reconciliation: {}", e);
+            migration_errors.push(format!("payment/reconciliation: {}", e));
+        }
 
         // 自动安装内置 Agent
         let builtin_count: i64 = self.conn
@@ -355,6 +395,14 @@ impl Database {
                     params![id, name, manifest, now],
                 ).ok();
                 println!("Installed industry Agent: {}", name);
+            }
+        }
+        
+        // 审计修复 #14: 汇总迁移警告
+        if !migration_errors.is_empty() {
+            eprintln!("[DB Migration] {} migration(s) encountered errors (non-fatal):", migration_errors.len());
+            for err in &migration_errors {
+                eprintln!("  - {}", err);
             }
         }
         

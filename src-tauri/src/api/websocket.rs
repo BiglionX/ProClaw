@@ -222,7 +222,8 @@ async fn handle_websocket(
     let self_tx = outgoing_tx;
 
     // ---- Writer Task: 从 outgoing_rx 读取并写入 WebSocket ----
-    tokio::spawn(async move {
+    // 审计修复 R4: 收集 JoinHandle 防止任务泄漏
+    let writer_handle = tokio::spawn(async move {
         let mut sender = ws_sender;
         let mut rx = outgoing_rx;
         while let Some(msg) = rx.recv().await {
@@ -236,12 +237,14 @@ async fn handle_websocket(
     push_offline_messages(&state, &user_id);
 
     // ---- 通知上线 ----
-    let _ = self_tx.send(serde_json::json!({
+    if self_tx.send(serde_json::json!({
         "type": "connection_status",
         "status": "connected",
         "user_id": user_id,
         "timestamp": Utc::now().timestamp_millis()
-    }).to_string());
+    }).to_string()).is_err() {
+        eprintln!("[WS] Failed to send connected notification to {}", user_id);
+    }
 
     // ---- 主消息循环 ----
     while let Some(msg_result) = ws_receiver.next().await {
@@ -251,7 +254,9 @@ async fn handle_websocket(
 
                 // 心跳处理
                 if text_str.trim() == "ping" {
-                    let _ = self_tx.send("pong".to_string());
+                    if self_tx.send("pong".to_string()).is_err() {
+                        eprintln!("[WS] Failed to send pong to {}", user_id);
+                    }
                     continue;
                 }
 
@@ -260,18 +265,30 @@ async fn handle_websocket(
                     Ok(req) => {
                         match req.msg_type.as_str() {
                             "message" | "chat" => {
+                                // 审计修复 #9: 验证 to 字段非空，防止幽灵消息
+                                let to_user = req.to.as_deref().unwrap_or("");
+                                if to_user.is_empty() {
+                                    if self_tx.send(
+                                        serde_json::json!({"type": "error", "error": "Missing 'to' field for chat message"}).to_string()
+                                    ).is_err() {
+                                        eprintln!("[WS] Failed to send 'missing to' error to {}", user_id);
+                                    }
+                                    continue;
+                                }
                                 handle_chat_message(
                                     &state,
                                     &user_id,
-                                    req.to.as_deref().unwrap_or(""),
+                                    to_user,
                                     req.content.as_deref().unwrap_or(""),
                                     req.content_type.as_deref().unwrap_or("text"),
                                 ).await;
                             }
                             "heartbeat" => {
-                                let _ = self_tx.send(
+                                if self_tx.send(
                                     serde_json::json!({"type": "heartbeat", "status": "ok"}).to_string()
-                                );
+                                ).is_err() {
+                                    eprintln!("[WS] Failed to send heartbeat response to {}", user_id);
+                                }
                             }
                             "typing" => {
                                 if let Some(ref to) = req.to {
@@ -296,16 +313,20 @@ async fn handle_websocket(
                                 ).await;
                             }
                             _ => {
-                                let _ = self_tx.send(
+                                if self_tx.send(
                                     serde_json::json!({"type": "error", "error": format!("Unknown message type: {}", req.msg_type)}).to_string()
-                                );
+                                ).is_err() {
+                                    eprintln!("[WS] Failed to send unknown msg type error to {}", user_id);
+                                }
                             }
                         }
                     }
                     Err(e) => {
-                        let _ = self_tx.send(
+                        if self_tx.send(
                             serde_json::json!({"type": "error", "error": format!("Invalid JSON: {}", e)}).to_string()
-                        );
+                        ).is_err() {
+                            eprintln!("[WS] Failed to send JSON parse error to {}", user_id);
+                        }
                     }
                 }
             }
@@ -328,6 +349,8 @@ async fn handle_websocket(
 
     // ---- 清理 ----
     state.ws_manager.remove_connection(&user_id, &conn_id);
+    // 审计修复 R4: 中止 writer task，防止任务泄漏
+    writer_handle.abort();
     println!("[WS] User '{}' disconnected", user_id);
 }
 
@@ -362,27 +385,36 @@ async fn handle_chat_message(
 
         let is_offline = !state.ws_manager.is_online(to_user);
 
-        let _ = conn.execute(
+        // 审计修复 #12: 消息持久化失败至少记录错误，不再静默忽略
+        if let Err(e) = conn.execute(
             "INSERT INTO messages (id, from_user, to_user, content, content_type, is_offline, is_read, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
             rusqlite::params![msg_id, from_user, to_user, content, content_type, is_offline, now],
-        );
+        ) {
+            eprintln!("[WebSocket] Failed to persist message {}: {}", msg_id, e);
+        }
 
         // 如果接收方离线，记录到 offline_messages
         if is_offline && !to_user.is_empty() {
             let offline_id = Uuid::new_v4().to_string();
-            let _ = conn.execute(
+            if let Err(e) = conn.execute(
                 "INSERT INTO offline_messages (id, target_user, message_id, is_sent, retry_count, created_at)
                  VALUES (?1, ?2, ?3, 0, 0, datetime('now'))",
                 rusqlite::params![offline_id, to_user, msg_id],
-            );
+            ) {
+                eprintln!("[WebSocket] Failed to store offline message {}: {}", msg_id, e);
+            }
         }
 
         !is_offline
     }; // db lock released
 
     // ---- 路由消息 ----
-    let msg_json = serde_json::to_string(&message).unwrap_or_default();
+    let msg_json = serde_json::to_string(&message)
+        .unwrap_or_else(|e| {
+            eprintln!("[WebSocket] Failed to serialize outgoing message: {}", e);
+            String::from("{\"type\":\"error\",\"error\":\"serialization_failed\"}")
+        });
 
     if to_online {
         state.ws_manager.send_to_user(to_user, &msg_json);
@@ -454,10 +486,12 @@ fn push_offline_messages(state: &AppState, user_id: &str) {
 
         // 标记已发送
         if let Some(ref msg_id) = msg.id {
-            let _ = conn.execute(
+            if let Err(e) = conn.execute(
                 "UPDATE offline_messages SET is_sent = 1, last_retry_at = ?2 WHERE message_id = ?1",
                 rusqlite::params![msg_id, Utc::now().timestamp_millis()],
-            );
+            ) {
+                eprintln!("[WS] Failed to mark offline message {} as sent: {}", msg_id, e);
+            }
         }
     }
 
@@ -499,21 +533,25 @@ async fn handle_call_signaling(
             // 持久化通话记录
             if let Ok(db) = state.db.lock() {
                 let record_id = Uuid::new_v4().to_string();
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "INSERT INTO call_records (id, session_id, caller_id, callee_id, call_type, direction, status, started_at, created_at)
                      VALUES (?1, ?2, ?3, ?4, ?5, 'outgoing', 'ringing', ?6, datetime('now'))",
                     rusqlite::params![record_id, session_id, from_user, to_user, call_type, now],
-                );
+                ) {
+                    eprintln!("[Call] Failed to insert call record: {}", e);
+                }
             }
 
             // 检查对方是否在线
             if !state.ws_manager.is_online(to_user) {
                 // 对方不在线，更新记录并通知发起方
                 if let Ok(db) = state.db.lock() {
-                    let _ = db.connection().execute(
+                    if let Err(e) = db.connection().execute(
                         "UPDATE call_records SET status = 'missed', ended_at = ?1 WHERE session_id = ?2",
                         rusqlite::params![now, session_id],
-                    );
+                    ) {
+                        eprintln!("[Call] Failed to update missed call: {}", e);
+                    }
                 }
 
                 let offline_msg = serde_json::json!({
@@ -570,10 +608,12 @@ async fn handle_call_signaling(
 
             // 更新通话状态为已接听
             if let Ok(db) = state.db.lock() {
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "UPDATE call_records SET status = 'answered', started_at = ?1 WHERE session_id = ?2",
                     rusqlite::params![now, session_id],
-                );
+                ) {
+                    eprintln!("[Call] Failed to update answered call: {}", e);
+                }
             }
 
             // 通知其他设备：该通话已在某设备接听
@@ -625,10 +665,12 @@ async fn handle_call_signaling(
 
             // 更新通话记录
             if let Ok(db) = state.db.lock() {
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "UPDATE call_records SET status = 'ended', ended_at = ?1 WHERE session_id = ?2",
                     rusqlite::params![now, session_id],
-                );
+                ) {
+                    eprintln!("[Call] Failed to update ended call (hangup): {}", e);
+                }
             }
         }
 
@@ -646,10 +688,12 @@ async fn handle_call_signaling(
 
             // 更新通话记录
             if let Ok(db) = state.db.lock() {
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "UPDATE call_records SET status = 'rejected', ended_at = ?1 WHERE session_id = ?2",
                     rusqlite::params![now, session_id],
-                );
+                ) {
+                    eprintln!("[Call] Failed to update rejected call: {}", e);
+                }
             }
         }
 
@@ -667,10 +711,12 @@ async fn handle_call_signaling(
 
             // 更新通话记录
             if let Ok(db) = state.db.lock() {
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "UPDATE call_records SET status = 'busy', ended_at = ?1 WHERE session_id = ?2",
                     rusqlite::params![now, session_id],
-                );
+                ) {
+                    eprintln!("[Call] Failed to update busy call: {}", e);
+                }
             }
         }
 
@@ -680,13 +726,19 @@ async fn handle_call_signaling(
     }
 }
 
+
 /// 从 token 中提取 user_id（用于 HTTP 端点）
+/// **安全警告：调用者必须传入有效的 jwt_secret，严禁使用空/零密钥。**
 #[allow(dead_code)]
-pub fn extract_user_id_from_token(token: &str) -> Option<String> {
+pub fn extract_user_id_from_token(token: &str, jwt_secret: &[u8]) -> Option<String> {
     use crate::api::auth::Claims;
+    if jwt_secret.iter().all(|&b| b == 0) {
+        eprintln!("[Security] extract_user_id_from_token called with all-zero secret key - rejected for safety");
+        return None;
+    }
     jsonwebtoken::decode::<Claims>(
         token,
-        &jsonwebtoken::DecodingKey::from_secret(&[0u8; 32]),
+        &jsonwebtoken::DecodingKey::from_secret(jwt_secret),
         &jsonwebtoken::Validation::default(),
     )
     .ok()

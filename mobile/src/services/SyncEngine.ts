@@ -10,6 +10,21 @@ import type { ChangeLogEntry } from './ChangeLogManager';
 import { getPendingChanges, markSynced } from './ChangeLogManager';
 import { getLastSyncTime, updateLastSyncTime } from './SyncMetadataManager';
 
+// 审计 S11：允许的表名白名单，防止 SQL 注入
+// 审计 M3：此白名单需与 SchemaManager 创建的表手动保持同步
+// 新增表到 SchemaManager 时，务必同时添加到此 Set，否则同步引擎拒绝该表变更
+// 参考：SchemaManager.createV1Tables / migrateToV2
+// 审计 R2 修复：白名单已包含 chat_sessions/chat_messages（V2 迁移创建的表）
+const ALLOWED_TABLES = new Set([
+  'product_spu', 'product_sku', 'product_images', 'product_categories', 'brands',
+  'customers', 'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items',
+  'inventory_transactions', 'chat_sessions', 'chat_messages', 'plugin_registry',
+  'change_log', 'conflict_records', 'offline_queue', 'sync_metadata', 'device_info',
+  'product_attributes', 'product_spu_attributes',
+]);
+
+const isValidTableName = (name: string): boolean => ALLOWED_TABLES.has(name);
+
 // ============================================
 // 同步数据结构
 // ============================================
@@ -210,9 +225,23 @@ export const applyRemoteChanges = async (
   resolver: ConflictResolver = new ConflictResolver()
 ): Promise<ConflictRecord[]> => {
   const conflicts: ConflictRecord[] = [];
+  let failedCount = 0;
+
+  // 审计 C6：在事务中执行所有变更，防止部分应用导致数据不一致
+  try {
+    await db.execAsync('BEGIN TRANSACTION');
+  } catch {
+    // Web IDB 不支持事务命令，继续逐条执行
+  }
 
   for (const change of changes) {
     try {
+      // 审计 S11：校验表名是否在白名单中
+      if (!isValidTableName(change.table_name)) {
+        console.warn(`[SyncEngine] Rejected change for invalid table: ${change.table_name}`);
+        continue;
+      }
+
       // 根据操作类型应用
       switch (change.operation) {
         case 'delete':
@@ -277,8 +306,28 @@ export const applyRemoteChanges = async (
         }
       }
     } catch (error) {
+      failedCount++;
       console.warn(`[SyncEngine] Failed to apply change to ${change.table_name}#${change.row_id}:`, error);
     }
+  }
+
+  // 审计 R7 修复：若有变更失败则 ROLLBACK，保证事务原子性
+  if (failedCount > 0) {
+    try {
+      await db.execAsync('ROLLBACK');
+      console.warn(`[SyncEngine] Rolled back transaction due to ${failedCount} failed changes`);
+      // 审计 H3：回滚时返回空 conflicts，避免调用方基于已回滚的数据做后续处理
+      return [];
+    } catch {
+      // Web IDB 不支持事务命令，继续 COMMIT
+    }
+  }
+
+  // 审计 C6：提交事务
+  try {
+    await db.execAsync('COMMIT');
+  } catch {
+    // Web IDB 不支持事务命令，忽略
   }
 
   return conflicts;
@@ -309,16 +358,27 @@ const applyChangeToRow = async (
     if (change.new_value) {
       try {
         const newData = JSON.parse(change.new_value);
+        // 审计 D7：校验 new_value 必须是普通对象，过滤原型污染键
         if (newData && typeof newData === 'object' && !Array.isArray(newData)) {
-          const cols = Object.keys(newData);
-          const vals = Object.values(newData);
-          const placeholders = cols.map(() => '?').join(', ');
-          const colNames = cols.join(', ');
-          await db.runAsync(
-            `INSERT OR REPLACE INTO ${tableName} (${colNames}) VALUES (${placeholders})`,
-            vals
-          );
-          return;
+          const safeCols: string[] = [];
+          const safeVals: any[] = [];
+          for (const [key, value] of Object.entries(newData)) {
+            // 跳过 __proto__、constructor 等危险键
+            if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+            // 列名只允许字母数字下划线
+            if (!/^[a-zA-Z_]\w*$/.test(key)) continue;
+            safeCols.push(key);
+            safeVals.push(value);
+          }
+          if (safeCols.length > 0) {
+            const placeholders = safeCols.map(() => '?').join(', ');
+            const colNames = safeCols.join(', ');
+            await db.runAsync(
+              `INSERT OR REPLACE INTO ${tableName} (${colNames}) VALUES (${placeholders})`,
+              safeVals
+            );
+            return;
+          }
         }
       } catch {
         // JSON 解析失败，回退到简化插入
@@ -341,6 +401,9 @@ const applyChangeToRow = async (
         const values: any[] = [];
         for (const [key, value] of Object.entries(newData)) {
           if (key === 'id') continue; // 不更新主键
+          // 审计 D7：跳过危险键，校验列名格式
+          if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+          if (!/^[a-zA-Z_]\w*$/.test(key)) continue;
           setClauses.push(`${key} = ?`);
           values.push(value);
         }

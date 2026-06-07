@@ -83,10 +83,12 @@ pub fn create_cloud_store(
     ).map_err(|e| e.to_string())?;
 
     // 创建默认主题
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT INTO cloud_store_themes (store_id) VALUES (?1)",
         params![id],
-    );
+    ) {
+        eprintln!("[CloudStore] Failed to create default theme for {}: {}", id, e);
+    }
 
     Ok(serde_json::json!({
         "id": id,
@@ -232,19 +234,23 @@ pub fn sync_all_products_to_cloud(
 
     // 更新同步状态
     for (product_id, _, _, _, _) in &products {
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "UPDATE product_spu SET cloud_sync_status = 'synced', cloud_sync_time = ?1 WHERE id = ?2",
             params![now.to_string(), product_id],
-        );
+        ) {
+            eprintln!("[CloudSync] Failed to update sync status for {}: {}", product_id, e);
+        }
     }
 
     // 记录同步日志
     let log_id = Uuid::new_v4().to_string();
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT INTO cloud_sync_log (id, store_id, sync_type, status, message, created_at) 
          VALUES (?1, ?2, 'full', 'success', ?3, ?4)",
         params![log_id, store_id, format!("同步了 {} 个商品", sync_count), now.to_string()],
-    );
+    ) {
+        eprintln!("[CloudSync] Failed to insert sync log: {}", e);
+    }
 
     Ok(serde_json::json!({
         "message": "同步完成",
@@ -302,20 +308,24 @@ pub fn sync_incremental_products(
 
     // 更新同步状态
     for (product_id, _, _, _, _, _) in &products {
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "UPDATE product_spu SET cloud_sync_status = 'synced', cloud_sync_time = ?1 WHERE id = ?2",
             params![now.to_string(), product_id],
-        );
+        ) {
+            eprintln!("[CloudSync] Failed to update incremental sync for {}: {}", product_id, e);
+        }
     }
 
     // 记录同步日志
     if sync_count > 0 {
         let log_id = Uuid::new_v4().to_string();
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "INSERT INTO cloud_sync_log (id, store_id, sync_type, status, message, created_at) 
              VALUES (?1, ?2, 'incremental', 'success', ?3, ?4)",
             params![log_id, store_id, format!("增量同步了 {} 个商品", sync_count), now.to_string()],
-        );
+        ) {
+            eprintln!("[CloudSync] Failed to insert incremental sync log: {}", e);
+        }
     }
 
     Ok(serde_json::json!({
@@ -357,10 +367,12 @@ pub fn batch_toggle_products_visible(
 
     let count = product_ids.len();
     for product_id in product_ids {
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "UPDATE product_spu SET is_cloud_visible = ?1 WHERE id = ?2",
             params![visible, product_id],
-        );
+        ) {
+            eprintln!("[CloudSync] Failed to update visibility for {}: {}", product_id, e);
+        }
     }
 
     Ok(serde_json::json!({
@@ -1139,9 +1151,9 @@ pub fn get_coupons(
     let conn = db.connection();
 
     let offset = (page - 1) * page_size;
-    let status_clone = status.clone();
+    let status_ref = status.as_deref();
     
-    let (query, use_status_filter) = if status_clone.is_some() {
+    let (query, use_status_filter) = if status_ref.is_some() {
         (
             "SELECT id, code, discount_type, discount_value, min_amount, max_uses, used_count, start_time, end_time, status, created_at 
              FROM coupons 
@@ -1165,7 +1177,7 @@ pub fn get_coupons(
 
     let coupons: Vec<Value> = if use_status_filter {
         stmt.query_map(
-            params![store_id.clone(), status_clone.unwrap(), page_size, offset],
+            params![store_id.clone(), status_ref.unwrap(), page_size, offset],
             |row: &rusqlite::Row| {
                 Ok(serde_json::json!({
                     "id": row.get::<_, String>(0)?,

@@ -86,10 +86,12 @@ pub async fn create_approval(
     }
 
     // 更新订单状态为 submitted
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         &format!("UPDATE {} SET status = 'submitted', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", table),
         params![payload.target_id],
-    );
+    ) {
+        eprintln!("[Approvals] Failed to update {} status to submitted: {}", table, e);
+    }
 
     (StatusCode::CREATED, Json(serde_json::json!({
         "id": id,
@@ -250,18 +252,26 @@ async fn process_approval(
     };
 
     // 更新审批状态
-    let _ = tx.execute(
+    if let Err(e) = tx.execute(
         "UPDATE approvals SET status = ?1, approved_by = '', resolved_at = CURRENT_TIMESTAMP, \
          comments = CASE WHEN ?2 IS NOT NULL THEN ?2 ELSE comments END WHERE id = ?3",
         params![new_status, comments, approval_id],
-    );
+    ) {
+        let _ = tx.rollback();
+        return (StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update approval: {}", e)})));
+    }
 
     // 更新关联订单状态
     let table = if target_type == "purchase_order" { "purchase_orders" } else { "sales_orders" };
-    let _ = tx.execute(
+    if let Err(e) = tx.execute(
         &format!("UPDATE {} SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", table),
         params![order_new_status, target_id],
-    );
+    ) {
+        let _ = tx.rollback();
+        return (StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update order status: {}", e)})));
+    }
 
     if let Err(e) = tx.commit() {
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()})));

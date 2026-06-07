@@ -13,13 +13,20 @@ class WebSocketService {
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map();
   private isConnected: boolean = false;
   private isConnecting: boolean = false;
+  private isIntentionalDisconnect: boolean = false; // 审计 H5：区分主动/被动断开
+  private reconnectAttempts: number = 0; // 审计 E10：指数退避计数器
   private onStatusChange: ((connected: boolean) => void) | null = null;
 
   /** 连接到 WebSocket 服务器 */
   async connect(serverUrl: string, userId: string, token: string): Promise<void> {
-    this.url = serverUrl.replace(/^http/, 'ws') + '/ws/chat';
+    // 审计 D4：显式 HTTP→WS/HTTPS→WSS 映射
+    this.url = serverUrl
+      .replace(/^https:\/\//, 'wss://')
+      .replace(/^http:\/\//, 'ws://') + '/ws/chat';
     this.userId = userId;
     this.token = token;
+    this.isIntentionalDisconnect = false;
+    this.reconnectAttempts = 0;
 
     await this.doConnect();
   }
@@ -30,13 +37,15 @@ class WebSocketService {
     this.isConnecting = true;
 
     try {
-      const wsUrl = `${this.url}?user_id=${encodeURIComponent(this.userId)}&token=${encodeURIComponent(this.token)}`;
-      this.ws = new WebSocket(wsUrl);
+      // 审计 S7：Token 不再通过 URL 传递，改为连接后首条消息发送
+      this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
         console.log('[WS] Connected');
         this.isConnected = true;
         this.isConnecting = false;
+        // 通过首条消息发送认证信息（审计 S7）
+        this.ws!.send(JSON.stringify({ type: 'auth', user_id: this.userId, token: this.token }));
         this.startHeartbeat();
         this.onStatusChange?.(true);
       };
@@ -60,7 +69,10 @@ class WebSocketService {
         this.isConnecting = false;
         this.stopHeartbeat();
         this.onStatusChange?.(false);
-        this.scheduleReconnect();
+        // 审计 H5：主动断开不触发重连
+        if (!this.isIntentionalDisconnect) {
+          this.scheduleReconnect();
+        }
       };
 
       this.ws.onerror = (error) => {
@@ -74,12 +86,16 @@ class WebSocketService {
     }
   }
 
+  // 审计 E10：指数退避重连（基础 1s，最大 30s，抖动 ±25%）
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
+    const baseDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const jitter = baseDelay * (0.75 + Math.random() * 0.5);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
+      this.reconnectAttempts++;
       this.doConnect();
-    }, 5000);
+    }, jitter);
   }
 
   private startHeartbeat() {
@@ -157,6 +173,7 @@ class WebSocketService {
 
   /** 断开连接 */
   disconnect() {
+    this.isIntentionalDisconnect = true; // 审计 H5：标记为主动断开
     this.stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

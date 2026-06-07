@@ -262,11 +262,15 @@ fn generate_pdf(
         }
     }
 
-    // 保存到临时目录
+    // 保存到临时目录（R7 修复：净化 counterparty_name 防路径注入）
     let temp_dir = std::env::temp_dir();
+    let safe_name = counterparty_name
+        .replace('/', "_")
+        .replace('\\', "_")
+        .replace("..", "");
     let file_name = format!(
         "statement_{}_{}_{}.pdf",
-        counterparty_name.replace(' ', "_"),
+        safe_name.replace(' ', "_"),
         start_date,
         end_date
     );

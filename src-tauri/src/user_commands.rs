@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 /// 创建用户 (Tauri command)
+/// 审计修复 R6: 添加输入长度校验
 #[tauri::command]
 pub fn create_user_cmd(
     db: tauri::State<Mutex<Database>>,
@@ -23,6 +24,22 @@ pub fn create_user_cmd(
 
     if name.trim().is_empty() {
         return Err("Name is required".to_string());
+    }
+    if name.len() > 128 {
+        return Err("Name is too long (max 128 characters)".to_string());
+    }
+    if let Some(ref p) = phone {
+        if p.len() > 20 {
+            return Err("Phone number too long".to_string());
+        }
+    }
+    if let Some(ref e) = email {
+        if e.len() > 254 {
+            return Err("Email too long".to_string());
+        }
+        if !e.contains('@') || !e.contains('.') {
+            return Err("Invalid email format".to_string());
+        }
     }
 
     let id = Uuid::new_v4().to_string();
@@ -323,7 +340,9 @@ fn assign_user_role(conn: &rusqlite::Connection, user_id: &str, role_name: &str)
         |row| row.get(0),
     ).map_err(|_| format!("Role '{}' not found", role_name))?;
 
-    let _ = conn.execute("DELETE FROM user_roles WHERE user_id = ?1", params![user_id]);
+    if let Err(e) = conn.execute("DELETE FROM user_roles WHERE user_id = ?1", params![user_id]) {
+        eprintln!("[UserRoles] Failed to clear existing roles for {}: {}", user_id, e);
+    }
     conn.execute(
         "INSERT INTO user_roles (user_id, role_id) VALUES (?1, ?2)",
         params![user_id, role_id],

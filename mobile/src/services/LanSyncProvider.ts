@@ -32,8 +32,17 @@ export class LanSyncProvider implements ISyncProvider {
   private onStatusChange: ((status: PairingStatus) => void) | null = null;
   private onProgress: ((current: number, total: number) => void) | null = null;
   // receive_only 异步等待机制
-  private pendingPullResolve: ((data: SyncPackage | null) => void) | null = null;
-  private pendingPullTimer: ReturnType<typeof setTimeout> | null = null;
+  // 审计 C4：使用队列支持并发 pull 请求
+  private pendingPullQueue: Array<{
+    resolve: (data: SyncPackage | null) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }> = [];
+  // 审计 W20：push 确认等待队列（审计 C2：使用 Map 按 version 管理多个 pending ack，避免单槽覆盖）
+  private pendingPushAcks: Map<number, {
+    resolve: (success: boolean) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }> = new Map();
+  private pushAckSeq = 0;
 
   get pairingStatus(): PairingStatus {
     return this._pairingStatus;
@@ -78,6 +87,8 @@ export class LanSyncProvider implements ISyncProvider {
 
     try {
       // 建立 WebSocket 连接
+      // 审计 D6：局域网同步使用 ws://（无 TLS），仅在可信局域网中使用
+      // 在公共 Wi-Fi 环境下配对码和同步数据可被窃听，需后续支持 wss://
       const wsUrl = `ws://${device.ip}:${device.port}/proclaw/sync`;
 
       return await new Promise((resolve) => {
@@ -88,7 +99,11 @@ export class LanSyncProvider implements ISyncProvider {
           resolve(false);
         }, 5000);
 
-        ws.onopen = async () => {
+        // 审计 C4：在 onopen 之前获取 deviceId，避免 async onopen 时序缺口
+        let deviceIdCache: string = 'unknown';
+        getDeviceId(db).then((id) => { deviceIdCache = id; }).catch(() => { deviceIdCache = 'unknown'; });
+
+        ws.onopen = () => {
           clearTimeout(timeout);
           this.ws = ws;
 
@@ -96,12 +111,17 @@ export class LanSyncProvider implements ISyncProvider {
           ws.send(JSON.stringify({
             type: 'pair',
             pairingCode: pairingCode,
-            deviceId: await getDeviceId(db).catch(() => 'unknown'),
+            deviceId: deviceIdCache,
             deviceType: 'mobile',
           }));
         };
 
         ws.onmessage = (event) => {
+          // 审计 I3：检查 this.ws 是否已设置，防止在 onopen 完成前收到消息
+          if (!this.ws) {
+            console.debug('[LanSync] Message received before WS ready, ignoring');
+            return;
+          }
           try {
             const msg = JSON.parse(event.data);
             if (msg.type === 'pair_ack') {
@@ -124,8 +144,8 @@ export class LanSyncProvider implements ISyncProvider {
               }
             } else if (msg.type === 'sync_progress') {
               this.onProgress?.(msg.current, msg.total);
-            } else if (msg.type === 'sync_data' && this.pendingPullResolve) {
-              // 接收远程变更数据
+            } else if (msg.type === 'sync_data' && this.pendingPullQueue.length > 0) {
+              // 接收远程变更数据（审计 C4：从队列中取最早的 pending 请求）
               const changes = msg.changes ? deserializeChanges(msg.changes) : [];
               const syncPkg: SyncPackage = {
                 deviceId: msg.deviceId || '',
@@ -133,11 +153,28 @@ export class LanSyncProvider implements ISyncProvider {
                 timestamp: msg.timestamp || Date.now(),
                 changes,
               };
-              this.pendingPullResolve(syncPkg);
-              this.pendingPullResolve = null;
-              if (this.pendingPullTimer) {
-                clearTimeout(this.pendingPullTimer);
-                this.pendingPullTimer = null;
+              const pending = this.pendingPullQueue.shift()!;
+              clearTimeout(pending.timer);
+              pending.resolve(syncPkg);
+            } else if (msg.type === 'sync_push_ack') {
+              // 审计 W20/C2：收到 push 确认，按 seq 匹配，避免单槽覆盖
+              const ackSeq = msg.seq;
+              if (ackSeq !== undefined && this.pendingPushAcks.has(ackSeq)) {
+                const pending = this.pendingPushAcks.get(ackSeq)!;
+                this.pendingPushAcks.delete(ackSeq);
+                clearTimeout(pending.timer);
+                pending.resolve(msg.success !== false);
+                console.log(`[LanSync] Push acknowledged by remote (seq=${ackSeq})`);
+              } else {
+                // 按旧协议兼容：查找任意 pending ack
+                const firstEntry = this.pendingPushAcks.entries().next();
+                if (!firstEntry.done) {
+                  const [seq, pending] = firstEntry.value;
+                  this.pendingPushAcks.delete(seq);
+                  clearTimeout(pending.timer);
+                  pending.resolve(msg.success !== false);
+                  console.log(`[LanSync] Push acknowledged by remote (fallback seq=${seq})`);
+                }
               }
             }
           } catch {
@@ -185,17 +222,28 @@ export class LanSyncProvider implements ISyncProvider {
         const pendingChanges = await getPendingChanges(db);
         if (pendingChanges.length > 0) {
           const serialized = serializeChanges(pendingChanges);
+          // 审计 C2：发送 seq 让远端 ack 时可匹配（不依赖隐式单槽）
+          const pushSeq = this.pushAckSeq + 1;
           this.ws!.send(JSON.stringify({
             type: 'sync_push',
+            seq: pushSeq,
             changes: serialized,
             deviceId,
             timestamp: Date.now(),
           }));
 
-          // 等待确认后标记
-          await markSynced(db, pendingChanges.map(c => c.id));
-          result.applied += pendingChanges.length;
-          console.log(`[LanSync] Sent ${pendingChanges.length} changes`);
+          // 审计 W20/C2：等待远端 sync_push_ack 确认后再标记 synced
+          // 若未收到确认（服务器不支持 ack 或超时），则不标记 synced，下次重试
+          const ackReceived = await this.waitForPushAck(10000);
+          if (ackReceived) {
+            await markSynced(db, pendingChanges.map(c => c.id));
+            result.applied += pendingChanges.length;
+            console.log(`[LanSync] Sent ${pendingChanges.length} changes (acknowledged)`);
+          } else {
+            console.warn(`[LanSync] Push ack not received, ${pendingChanges.length} changes will be retried on next sync`);
+            result.errors.push('Push acknowledgment not received, changes will be retried');
+            // 不标记 synced，让下次同步重新推送（服务器应幂等处理）
+          }
         }
       }
 
@@ -223,17 +271,20 @@ export class LanSyncProvider implements ISyncProvider {
 
   /**
    * 请求远程变更并等待响应（支持超时）
+   * 审计 C4：使用队列支持并发请求
    */
   private pullRemoteChanges(deviceId: string, timeoutMs: number = 30000): Promise<SyncPackage | null> {
     return new Promise((resolve) => {
       // 设置超时
-      this.pendingPullTimer = setTimeout(() => {
-        this.pendingPullResolve = null;
+      const timer = setTimeout(() => {
+        // 从队列中移除此请求
+        const idx = this.pendingPullQueue.findIndex(p => p.resolve === resolve);
+        if (idx >= 0) this.pendingPullQueue.splice(idx, 1);
         console.warn('[LanSync] Pull timeout');
         resolve(null);
       }, timeoutMs);
 
-      this.pendingPullResolve = resolve;
+      this.pendingPullQueue.push({ resolve, timer });
 
       // 发送拉取请求
       this.ws!.send(JSON.stringify({
@@ -241,6 +292,26 @@ export class LanSyncProvider implements ISyncProvider {
         deviceId,
         timestamp: Date.now(),
       }));
+    });
+  }
+
+  /**
+   * 等待远端 push 确认（审计 W20/C2：使用 Map + seq 支持多个并发 pendings）
+   * @param timeoutMs 超时时间（毫秒）
+   * @returns 是否收到确认
+   */
+  private waitForPushAck(timeoutMs: number = 10000): Promise<boolean> {
+    const seq = ++this.pushAckSeq;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (this.pendingPushAcks.has(seq)) {
+          this.pendingPushAcks.delete(seq);
+        }
+        console.warn(`[LanSync] Push ack timeout (seq=${seq})`);
+        resolve(false);
+      }, timeoutMs);
+
+      this.pendingPushAcks.set(seq, { resolve, timer });
     });
   }
 
@@ -278,6 +349,18 @@ export class LanSyncProvider implements ISyncProvider {
       this.ws.close();
       this.ws = null;
     }
+    // 审计 W20/C2：断开时清理所有 pending push ack
+    for (const [, pending] of this.pendingPushAcks) {
+      clearTimeout(pending.timer);
+      pending.resolve(false);
+    }
+    this.pendingPushAcks.clear();
+    // 审计 W22：断开时清理 pending pull 队列，避免调用方挂起直到超时
+    for (const pending of this.pendingPullQueue) {
+      clearTimeout(pending.timer);
+      pending.resolve(null);
+    }
+    this.pendingPullQueue = [];
     this.currentDevice = null;
     this.db = null;
     this.setPairingStatus('idle');

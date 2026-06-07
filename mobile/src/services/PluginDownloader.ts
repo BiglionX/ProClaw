@@ -37,8 +37,23 @@ export interface ExtractedPlugin {
 
 const FLOWHUB_API_BASE = 'https://flowhub.proclaw.com/api/v1';
 
-// HMAC-SHA256 签名公钥（硬编码，实际应由签名服务器分发）
-const SIGNING_KEY = CryptoJS.enc.Hex.parse('50726f436c6177506c7567696e5369676e696e674b657932303234');
+// 签名验证公钥从安全配置加载（审计 S3：不再硬编码签名密钥）
+let _signingKey: CryptoJS.lib.WordArray | null = null;
+
+const getSigningKey = async (): Promise<CryptoJS.lib.WordArray | null> => {
+  if (_signingKey) return _signingKey;
+  try {
+    const { secureGet } = await import('./SecureConfig');
+    const hex = await secureGet('proclaw_plugin_signing_key');
+    if (hex) {
+      _signingKey = CryptoJS.enc.Hex.parse(hex);
+      return _signingKey;
+    }
+  } catch { /* 安全存储不可用 */ }
+  // 无签名密钥则无法验证
+  console.warn('[PluginDownloader] No signing key configured, signature verification will fail');
+  return null;
+};
 
 /**
  * 从 FlowHub 获取可用插件列表
@@ -64,7 +79,8 @@ export const fetchPluginDetail = async (
   pluginId: string
 ): Promise<FlowHubPluginInfo | null> => {
   try {
-    const response = await fetch(`${FLOWHUB_API_BASE}/plugins/${pluginId}`);
+    // 审计 V4 修复：编码 pluginId 防止路径遍历
+    const response = await fetch(`${FLOWHUB_API_BASE}/plugins/${encodeURIComponent(pluginId)}`);
     if (!response.ok) return null;
     return await response.json();
   } catch {
@@ -124,6 +140,13 @@ export const downloadAndInstall = async (
  */
 export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedPlugin | null> => {
   try {
+    // 审计 W4：防御 zip bomb，限制解压前数据大小为 50MB
+    const MAX_ZIP_SIZE = 50 * 1024 * 1024;
+    if (zipData.byteLength > MAX_ZIP_SIZE) {
+      console.warn(`[PluginDownloader] ZIP too large: ${zipData.byteLength} bytes, max ${MAX_ZIP_SIZE}`);
+      return null;
+    }
+
     const zip = await JSZip.loadAsync(zipData);
 
     // 读取 manifest.json
@@ -143,11 +166,23 @@ export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedP
     }
     const upSql = await upSqlFile.async('string');
 
+    // 审计 D2：验证 upSql 只包含安全的 DDL/DML 语句（禁止 DROP DATABASE、ATTACH 等）
+    const dangerousPatterns = /\b(DROP\s+DATABASE|ATTACH\s+DATABASE|DETACH\s+DATABASE|PRAGMA\s|VACUUM|REINDEX)\b/i;
+    if (dangerousPatterns.test(upSql)) {
+      console.warn('[PluginDownloader] up.sql contains dangerous SQL, rejecting plugin');
+      return null;
+    }
+
     // 读取 down.sql（可选）
     let downSql = '';
     const downSqlFile = zip.file('down.sql');
     if (downSqlFile) {
       downSql = await downSqlFile.async('string');
+      // 审计 W17：downSql 同样需校验危险 SQL，防止卸载时执行破坏性语句
+      if (dangerousPatterns.test(downSql)) {
+        console.warn('[PluginDownloader] down.sql contains dangerous SQL, rejecting plugin');
+        return null;
+      }
     }
 
     console.log(`[PluginDownloader] Extracted plugin: ${manifest.name} v${manifest.version}`);
@@ -161,6 +196,7 @@ export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedP
 /**
  * 校验插件签名（HMAC-SHA256）
  * 使用预共享密钥验证 ZIP 内容的完整性
+ * 审计 S4/S5：签名获取失败或无签名 URL 时拒绝插件
  */
 export const verifySignature = async (
   pluginInfo: FlowHubPluginInfo,
@@ -169,21 +205,32 @@ export const verifySignature = async (
   try {
     // 如果有签名 URL，下载并验证
     if (pluginInfo.signatureUrl) {
+      const signingKey = await getSigningKey();
+      if (!signingKey) {
+        console.error('[PluginDownloader] No signing key available, cannot verify signature');
+        return false;
+      }
+
       const sigResponse = await fetch(pluginInfo.signatureUrl);
       if (!sigResponse.ok) {
-        console.warn('[PluginDownloader] Failed to fetch signature, allowing unsigned');
-        return true; // 开发阶段允许无签名
+        console.error('[PluginDownloader] Failed to fetch signature, rejecting plugin');
+        return false; // 审计 S4：签名获取失败时拒绝
       }
       const signatureText = await sigResponse.text();
 
-      // 将 ArrayBuffer 转为 WordArray 用于 HMAC 计算
+      // 审计 R1 修复：将 ArrayBuffer 转为 WordArray，4 字节打包为一个 word
       const bytes = new Uint8Array(zipData);
       const words: number[] = [];
-      for (let i = 0; i < bytes.length; i++) {
-        words.push(bytes[i]);
+      for (let i = 0; i < bytes.length; i += 4) {
+        words.push(
+          (bytes[i] << 24) |
+          ((bytes[i + 1] ?? 0) << 16) |
+          ((bytes[i + 2] ?? 0) << 8) |
+          (bytes[i + 3] ?? 0)
+        );
       }
-      const wordArray = CryptoJS.lib.WordArray.create(words, words.length);
-      const computedSig = CryptoJS.HmacSHA256(wordArray, SIGNING_KEY).toString(CryptoJS.enc.Hex);
+      const wordArray = CryptoJS.lib.WordArray.create(words, bytes.length);
+      const computedSig = CryptoJS.HmacSHA256(wordArray, signingKey).toString(CryptoJS.enc.Hex);
 
       // 比较签名（constant-time 比较防止时序攻击）
       const expectedSig = signatureText.trim();
@@ -195,9 +242,9 @@ export const verifySignature = async (
       return diff === 0;
     }
 
-    // 无签名 URL，开发阶段允许通过
-    console.warn('[PluginDownloader] No signature URL, allowing unsigned (dev mode)');
-    return true;
+    // 审计 S5：无签名 URL 时拒绝插件
+    console.error('[PluginDownloader] No signature URL provided, rejecting unsigned plugin');
+    return false;
   } catch (error) {
     console.error('[PluginDownloader] Signature verification error:', error);
     return false;

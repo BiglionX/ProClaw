@@ -51,10 +51,12 @@ pub fn create_approval_cmd(
     ).map_err(|e| e.to_string())?;
 
     // 更新订单状态
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         &format!("UPDATE {} SET status = 'submitted', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", table),
         params![target_id],
-    );
+    ) {
+        eprintln!("[Approval] Failed to update {} status to submitted: {}", table, e);
+    }
 
     Ok(serde_json::json!({
         "id": id,
@@ -194,17 +196,23 @@ fn process_approval_tx(
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
-    let _ = tx.execute(
+    if let Err(e) = tx.execute(
         "UPDATE approvals SET status = ?1, approved_by = '', resolved_at = CURRENT_TIMESTAMP, \
          comments = CASE WHEN ?2 IS NOT NULL THEN ?2 ELSE comments END WHERE id = ?3",
         params![new_status, comments, approval_id],
-    );
+    ) {
+        let _ = tx.rollback();
+        return Err(format!("Failed to update approval: {}", e));
+    }
 
     let table = if target_type == "purchase_order" { "purchase_orders" } else { "sales_orders" };
-    let _ = tx.execute(
+    if let Err(e) = tx.execute(
         &format!("UPDATE {} SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", table),
         params![order_new_status, target_id],
-    );
+    ) {
+        let _ = tx.rollback();
+        return Err(format!("Failed to update order status: {}", e));
+    }
 
     tx.commit().map_err(|e| e.to_string())?;
 

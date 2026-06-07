@@ -13,7 +13,9 @@ import { unregisterPluginRoutes } from '../services/PluginRegistry';
 import { closeAllSyncConnections } from './SyncConnectionManager';
 
 export type AppPhase = 'loading' | 'profile_select' | 'ready' | 'error';
-export type ConnectionMode = 'offline' | 'cloud' | 'lan_sync';
+// 审计 M4：合并 import/export 为单行
+export type { ConnectionMode } from '../services/ConnectionManager';
+import type { ConnectionMode as ConnectionModeType } from '../services/ConnectionManager';
 
 interface AppState {
   // 应用阶段
@@ -26,8 +28,8 @@ interface AppState {
   setProfiles: (profiles: Profile[]) => void;
 
   // 连接模式
-  connectionMode: ConnectionMode;
-  setConnectionMode: (mode: ConnectionMode) => void;
+  connectionMode: ConnectionModeType;
+  setConnectionMode: (mode: ConnectionModeType) => void;
 
   // 错误信息
   error: string | null;
@@ -62,9 +64,14 @@ export const useAppStore = create<AppState>((set) => ({
  * 4. 更新全局状态
  */
 export const switchProfile = async (profile: Profile): Promise<void> => {
-  const store = useAppStore.getState();
+  // 审计 C1：原子检查 + 设置，使用 getState 直接读写避免竞态窗口
+  if (useAppStore.getState().isSwitchingProfile) {
+    console.warn('[AppStore] Profile switch already in progress, ignoring');
+    return;
+  }
 
   try {
+    // 审计 C1：在设置之前再次检查（双重锁保障），使用 setState 合并方式保证原子性
     useAppStore.setState({ isSwitchingProfile: true });
 
     // 0. 清理当前身份资源

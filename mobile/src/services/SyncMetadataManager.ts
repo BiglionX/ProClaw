@@ -18,12 +18,11 @@ const SYNC_TOKEN_KEY = 'sync_token';
  * 基于 platform + 随机数 + 时间戳
  */
 const generateHash = async (input: string): Promise<string> => {
-  // 简单哈希（非加密用途，仅用于生成稳定ID）
-  let hash = 0;
+  // 审计 R2-B1：修复无效的 hash & hash（恒等操作），改用 |0 强制 32 位整数
+  // 使用 DJB2 变体（简单非加密哈希，仅用于生成稳定设备ID）
+  let hash = 5381;
   for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0; // |0 强制 32 位有符号整数
   }
   return Math.abs(hash).toString(16).padStart(8, '0');
 };

@@ -3,13 +3,73 @@
 
 use axum::{
     extract::{State, Json, Path, Query},
-    http::StatusCode,
+    http::{StatusCode, HeaderMap},
     response::IntoResponse,
 };
 use serde::Deserialize;
 use rusqlite::params;
 use uuid::Uuid;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use crate::api::AppState;
+
+type HmacSha256 = Hmac<Sha256>;
+
+/// 验证 Webhook HMAC-SHA256 签名
+/// 签名格式: X-ProClaw-Signature: t=<unix_timestamp>,v1=<hex_hmac>
+/// HMAC 计算: HMAC-SHA256(timestamp + "." + json_body, api_key)
+fn verify_webhook_signature(payload_json: &str, signature_header: &str, api_key: &str) -> bool {
+    // 解析签名头: "t=1234567890,v1=abcdef..."
+    let parts: Vec<&str> = signature_header.split(',').collect();
+    let mut timestamp = None;
+    let mut sig = None;
+
+    for part in parts {
+        let part = part.trim();
+        if let Some(t) = part.strip_prefix("t=") {
+            timestamp = Some(t.to_string());
+        } else if let Some(s) = part.strip_prefix("v1=") {
+            sig = Some(s.to_string());
+        }
+    }
+
+    let (timestamp, expected_sig) = match (timestamp, sig) {
+        (Some(t), Some(s)) => (t, s),
+        _ => {
+            eprintln!("[Store] Webhook signature header malformed: missing t= or v1=");
+            return false;
+        }
+    };
+
+    // 可选：检查时间戳漂移 (允许 ±5 分钟)
+    if let Ok(ts) = timestamp.parse::<i64>() {
+        let now = chrono::Utc::now().timestamp();
+        if (now - ts).abs() > 300 {
+            eprintln!("[Store] Webhook timestamp expired: ts={}, now={}", ts, now);
+            return false;
+        }
+    }
+
+    // HMAC-SHA256(timestamp.body, api_key)
+    let mut mac = match HmacSha256::new_from_slice(api_key.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    mac.update(format!("{}.{}", timestamp, payload_json).as_bytes());
+    let computed = hex::encode(mac.finalize().into_bytes());
+
+    // 恒定时间比较防时序攻击
+    let computed_bytes = computed.as_bytes();
+    let expected_bytes = expected_sig.as_bytes();
+    if computed_bytes.len() != expected_bytes.len() {
+        return false;
+    }
+    computed_bytes
+        .iter()
+        .zip(expected_bytes.iter())
+        .fold(0, |acc, (a, b)| acc | (a ^ b))
+        == 0
+}
 
 // ========== 请求结构体 ==========
 
@@ -107,10 +167,12 @@ pub async fn create_cloud_store(
     ) {
         Ok(_) => {
             // 创建默认主题
-            let _ = conn.execute(
+            if let Err(e) = conn.execute(
                 "INSERT INTO cloud_store_themes (store_id) VALUES (?1)",
                 params![id],
-            );
+            ) {
+                eprintln!("[Store] Failed to create default theme for {}: {}", id, e);
+            }
             (StatusCode::OK, axum::Json(serde_json::json!({
                 "data": {"id": id, "subdomain": payload.subdomain, "api_key": api_key, "plan_type": plan_type}
             })))
@@ -264,9 +326,9 @@ pub async fn get_store_orders(
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
     params_vec.push(Box::new(store_id));
 
-    if query.status.is_some() {
+    if let Some(ref status) = query.status {
         sql.push_str(" AND status = ?");
-        params_vec.push(Box::new(query.status.unwrap()));
+        params_vec.push(Box::new(status.clone()));
     }
     sql.push_str(" ORDER BY created_at DESC LIMIT 200");
 
@@ -303,8 +365,10 @@ pub async fn get_store_orders(
 }
 
 /// 订单回调接收（云端 → 桌面端）
+/// 安全要求：必须验证 X-ProClaw-Signature HMAC 头，防止伪造订单
 pub async fn order_callback(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     let store_id = match payload.get("store_id").and_then(|v| v.as_str()) {
@@ -319,12 +383,32 @@ pub async fn order_callback(
     let conn = db.connection();
 
     // 获取 API Key 用于验证
-    let _api_key: String = match conn.query_row("SELECT api_key FROM cloud_stores WHERE id = ?1", params![store_id], |row| row.get(0)) {
+    let api_key: String = match conn.query_row("SELECT api_key FROM cloud_stores WHERE id = ?1", params![store_id], |row| row.get(0)) {
         Ok(k) => k,
         Err(_) => return (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"error": "Invalid store"}))),
     };
 
-    // TODO: 验证 HMAC 签名
+    // 验证 HMAC 签名（防伪造订单回调）
+    let signature_header = headers
+        .get("x-proclaw-signature")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if signature_header.is_empty() {
+        return (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({
+            "error": "Missing X-ProClaw-Signature header"
+        })));
+    }
+
+    // 将 payload 序列化为确定性 JSON 用于 HMAC 验证
+    let payload_json = serde_json::to_string(&payload).unwrap_or_default();
+
+    if !verify_webhook_signature(&payload_json, signature_header, &api_key) {
+        eprintln!("[Store] HMAC signature verification FAILED for store {}", store_id);
+        return (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({
+            "error": "Invalid HMAC signature"
+        })));
+    }
 
     // 处理订单
     let order_no = payload.get("order_no").and_then(|v| v.as_str()).unwrap_or("");

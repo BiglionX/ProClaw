@@ -15,7 +15,7 @@ import type { IDatabase } from './DatabaseFactory';
 // Schema 版本管理
 // ============================================
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 /**
@@ -61,6 +61,17 @@ export const applySchema = async (db: IDatabase): Promise<void> => {
 
   if (currentVersion < 1) {
     await createV1Tables(db);
+  }
+
+  if (currentVersion < 2) {
+    // 审计 H2：捕获 V2 迁移异常，防止数据库进入半迁移状态
+    try {
+      await migrateToV2(db);
+    } catch (migrationError) {
+      console.error('[SchemaManager] V2 migration failed, database may be in inconsistent state:', migrationError);
+      // 不更新 schema version，下次启动可重试迁移
+      throw new Error('V2 migration failed: ' + (migrationError instanceof Error ? migrationError.message : String(migrationError)));
+    }
   }
 
   await setSchemaVersion(db, SCHEMA_VERSION);
@@ -406,6 +417,100 @@ const createV1Tables = async (db: IDatabase): Promise<void> => {
   console.log('[SchemaManager] V1 business tables created');
 };
 
+// ============================================
+// V2 迁移 — 统一消息表体系（PRD v11.2）
+// 替换旧 messages 表为 chat_sessions + chat_messages
+// ============================================
+
+const migrateToV2 = async (db: IDatabase): Promise<void> => {
+  console.log('[SchemaManager] Migrating to V2: unified message tables');
+
+  // 1. 创建新消息表（含 sync_status 字段）
+  const newTables = [
+    `CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      session_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      target_name TEXT NOT NULL,
+      target_icon TEXT DEFAULT '',
+      last_message TEXT DEFAULT '',
+      last_message_time INTEGER DEFAULT (CAST(strftime('%s','now') AS INTEGER)),
+      unread_count INTEGER DEFAULT 0,
+      is_pinned INTEGER DEFAULT 0,
+      sync_status TEXT DEFAULT 'local',
+      created_at INTEGER DEFAULT (CAST(strftime('%s','now') AS INTEGER))
+    )`,
+    `CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      sender_type TEXT NOT NULL DEFAULT 'other',
+      content TEXT NOT NULL,
+      created_at INTEGER DEFAULT (CAST(strftime('%s','now') AS INTEGER)),
+      sync_status TEXT DEFAULT 'local'
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at)`,
+  ];
+
+  for (const query of newTables) {
+    await db.execAsync(query);
+  }
+
+  // 2. 尝试从旧 messages 表迁移数据（幂等：不存在则跳过）
+  try {
+    const oldRows = await db.getAllAsync(`SELECT * FROM messages ORDER BY created_at ASC`) as any[];
+    if (oldRows && oldRows.length > 0) {
+      console.log(`[SchemaManager] Migrating ${oldRows.length} rows from old messages table...`);
+      for (const row of oldRows) {
+        const senderId = row.sender_id || 'unknown';
+        const receiverId = row.receiver_id || 'unknown';
+        // 为每个 sender-receiver 对创建 session
+        const targetId = `${senderId}_${receiverId}`;
+        const sessionId = `session_${targetId}_migrated`;
+
+        // 确保 session 存在
+        await db.runAsync(
+          `INSERT OR IGNORE INTO chat_sessions (id, session_type, target_id, target_name, target_icon, created_at, last_message_time)
+           VALUES (?, 'personal', ?, ?, '', CAST(strftime('%s','now') AS INTEGER), ?)`,
+          [sessionId, targetId, receiverId, row.created_at || Math.floor(Date.now() / 1000)]
+        );
+
+        // 插入消息
+        const msgId = `msg_migrated_${row.id || Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const senderType = senderId === 'self' ? 'self' : 'other';
+        await db.runAsync(
+          `INSERT OR IGNORE INTO chat_messages (id, session_id, sender_type, content, created_at, sync_status)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [msgId, sessionId, senderType, row.content || '', row.created_at || Math.floor(Date.now() / 1000), 'local']
+        );
+      }
+
+      // 更新 session 的 last_message
+      await db.execAsync(
+        `UPDATE chat_sessions SET last_message = COALESCE(
+          (SELECT content FROM chat_messages WHERE chat_messages.session_id = chat_sessions.id ORDER BY created_at DESC LIMIT 1),
+          ''
+        )`
+      );
+      console.log('[SchemaManager] V2 migration complete');
+    }
+  } catch (e) {
+    console.warn('[SchemaManager] Old messages table not found or migration skipped:', e);
+    // 审计 H2：迁移失败时不删除旧表，防止数据永久丢失
+    console.error('[SchemaManager] Migration failed, keeping old messages table for data safety');
+    // 审计 W5：throw 而非 return，防止 applySchema 仍然更新 schema version 导致数据被孤立
+    throw new Error('V2 migration failed: ' + (e instanceof Error ? e.message : String(e)));
+  }
+
+  // 3. 删除旧 messages 表（仅在迁移成功后执行）
+  try {
+    await db.execAsync(`DROP TABLE IF EXISTS messages`);
+    console.log('[SchemaManager] Old messages table dropped');
+  } catch (e) {
+    console.warn('[SchemaManager] Failed to drop old messages table:', e);
+  }
+};
+
 /**
  * 删除身份数据库中的所有表（用于身份删除或重置）
  */
@@ -414,7 +519,7 @@ export const dropAllTables = async (db: IDatabase): Promise<void> => {
     'product_spu_attributes', 'product_attributes', 'product_images', 'product_sku',
     'product_spu', 'product_categories', 'brands', 'customers',
     'sales_order_items', 'sales_orders', 'purchase_order_items', 'purchase_orders',
-    'inventory_transactions', 'messages',
+    'inventory_transactions', 'chat_messages', 'chat_sessions', 'messages',
     'plugin_registry', 'change_log', 'conflict_records', 'offline_queue', 'sync_metadata', 'device_info',
   ];
 

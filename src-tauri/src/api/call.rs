@@ -171,7 +171,9 @@ pub async fn get_call_records(
     }
 
     sql.push_str(" ORDER BY cr.created_at DESC");
-    sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+    param_values.push(Box::new(limit));
+    param_values.push(Box::new(offset));
+    sql.push_str(&format!(" LIMIT ?{} OFFSET ?{}", param_values.len() - 1, param_values.len()));
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
 

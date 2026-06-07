@@ -562,18 +562,23 @@ pub fn get_fa_invoices(
     let offset = (page - 1) * page_size;
 
     let mut conditions = vec!["1=1".to_string()];
+    let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
     if let Some(ref it) = invoice_type {
-        conditions.push(format!("i.type = '{}'", it.replace('\'', "''")));
+        conditions.push(format!("i.type = ?{}", param_values.len() + 1));
+        param_values.push(Box::new(it.clone()));
     }
     if let Some(ref s) = status {
-        conditions.push(format!("i.status = '{}'", s.replace('\'', "''")));
+        conditions.push(format!("i.status = ?{}", param_values.len() + 1));
+        param_values.push(Box::new(s.clone()));
     }
     let where_sql = conditions.join(" AND ");
 
     let count_sql = format!("SELECT COUNT(*) FROM agent_finance_invoices i WHERE {}", where_sql);
-    let total: i64 = conn
-        .query_row(&count_sql, [], |row| row.get(0))
-        .map_err(|e| e.to_string())?;
+    let total: i64 = {
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+        conn.query_row(&count_sql, param_refs.as_slice(), |row| row.get(0))
+            .map_err(|e| e.to_string())?
+    };
 
     let data_sql = format!(
         "SELECT i.id, i.type, i.invoice_code, i.invoice_number, i.amount, i.tax_amount, i.tax_rate,
@@ -581,13 +586,21 @@ pub fn get_fa_invoices(
          FROM agent_finance_invoices i
          WHERE {}
          ORDER BY i.created_at DESC
-         LIMIT ?1 OFFSET ?2",
-        where_sql
+         LIMIT ?{} OFFSET ?{}",
+        where_sql,
+        param_values.len() + 1,
+        param_values.len() + 2
     );
+
+    let mut all_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    for p in param_values { all_params.push(p); }
+    all_params.push(Box::new(page_size));
+    all_params.push(Box::new(offset));
+    let final_refs: Vec<&dyn rusqlite::types::ToSql> = all_params.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
     let invoices: Vec<serde_json::Value> = stmt
-        .query_map(params![page_size, offset], |row| {
+        .query_map(final_refs.as_slice(), |row| {
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "type": row.get::<_, String>(1)?,

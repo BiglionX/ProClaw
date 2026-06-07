@@ -7,6 +7,7 @@ use axum::{
     extract::{State, Json, Path, ConnectInfo},
     http::StatusCode,
     response::IntoResponse,
+    Extension,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -20,7 +21,7 @@ use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
 use super::AppState;
-use super::auth::hash_password;
+use super::auth::{hash_password, Claims};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -37,31 +38,62 @@ lazy_static::lazy_static! {
 
 /// 检查 IP 限流（同一 IP 每分钟最多 5 次）
 /// 返回 true 表示允许请求，false 表示被限流
+/// 审计修复 #13: 每 50 次调用触发一次过期条目清理
+/// 审计修复 #9: 显式花括号限定锁作用域，避免清理时隐式重入
 fn check_ip_rate_limit(ip: &str) -> bool {
-    let mut map = IP_RATE_LIMIT.lock().unwrap();
-    let now = Instant::now();
-    let window = Duration::from_secs(60);
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static CALL_COUNT: AtomicU64 = AtomicU64::new(0);
+    
+    // 限流检查：锁作用域用花括号显式限定
+    let limited = {
+        let mut map = match IP_RATE_LIMIT.lock() {
+            Ok(m) => m,
+            Err(poisoned) => {
+                eprintln!("[RateLimit] IP_RATE_LIMIT Mutex poisoned, recovering");
+                IP_RATE_LIMIT.clear_poison();
+                poisoned.into_inner()
+            }
+        };
+        let now = Instant::now();
+        let window = Duration::from_secs(60);
 
-    let entry = map.entry(ip.to_string()).or_insert((0, now));
+        let entry = map.entry(ip.to_string()).or_insert((0, now));
 
-    // 如果窗口已过期，重置
-    if now.duration_since(entry.1) > window {
-        *entry = (1, now);
-        return true;
-    }
+        // 如果窗口已过期，重置
+        if now.duration_since(entry.1) > window {
+            *entry = (1, now);
+            return true;
+        }
 
-    // 在窗口内，检查次数
-    if entry.0 >= 5 {
-        false
-    } else {
-        entry.0 += 1;
-        true
-    }
+        // 在窗口内，检查次数
+        if entry.0 >= 5 {
+            let count = CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+            // lock 已释放（离开作用域），安全调用 cleanup
+            let need_cleanup = count % 50 == 0;
+            drop(map); // 显式释放锁
+            if need_cleanup {
+                cleanup_rate_limit_map();
+            }
+            return false;
+        } else {
+            entry.0 += 1;
+            true
+        }
+    };
+    
+    limited
 }
 
 /// 定期清理过期条目
 fn cleanup_rate_limit_map() {
-    let mut map = IP_RATE_LIMIT.lock().unwrap();
+    let mut map = match IP_RATE_LIMIT.lock() {
+        Ok(m) => m,
+        Err(poisoned) => {
+            eprintln!("[RateLimit] IP_RATE_LIMIT poisoned during cleanup, recovering");
+            IP_RATE_LIMIT.clear_poison();
+            poisoned.into_inner()
+        }
+    };
     let now = Instant::now();
     let window = Duration::from_secs(120); // 保留 2 分钟的窗口数据
     map.retain(|_, (_, start)| now.duration_since(*start) < window);
@@ -72,15 +104,42 @@ fn cleanup_rate_limit_map() {
 // ============================================================
 
 /// 获取邀请签名密钥
-fn get_invite_secret() -> Vec<u8> {
-    std::env::var("INVITE_SECRET_KEY")
-        .map(|s| s.into_bytes())
-        .unwrap_or_else(|_| b"ProClaw-Invite-Secret-Key-2026".to_vec())
+/// 审计修复 #5: 从环境变量或数据库读取随机密钥，杜绝硬编码回退
+fn get_invite_secret(db_conn: &rusqlite::Connection) -> Vec<u8> {
+    // 优先使用环境变量
+    if let Ok(key) = std::env::var("INVITE_SECRET_KEY") {
+        if !key.is_empty() {
+            return key.into_bytes();
+        }
+    }
+    // 从数据库读取
+    let stored: Option<String> = db_conn.query_row(
+        "SELECT value FROM system_config WHERE key = 'invite_secret_key'",
+        [],
+        |row| row.get(0),
+    ).ok();
+    if let Some(s) = stored {
+        if !s.is_empty() {
+            return s.into_bytes();
+        }
+    }
+    // 生成随机密钥并存储
+    let mut key = [0u8; 32];
+    use rand::RngCore;
+    rand::rngs::OsRng.fill_bytes(&mut key);
+    let key_hex = hex::encode(key);
+    if let Err(e) = db_conn.execute(
+        "INSERT OR REPLACE INTO system_config (key, value) VALUES ('invite_secret_key', ?1)",
+        rusqlite::params![key_hex],
+    ) {
+        eprintln!("[invitations] Failed to store invite secret key: {}", e);
+    }
+    key.to_vec()
 }
 
 /// 为邀请码生成 HMAC-SHA256 签名
-fn sign_invite_code(body: &str, inviter_id: &str, expires_at: i64) -> String {
-    let secret = get_invite_secret();
+fn sign_invite_code(body: &str, inviter_id: &str, expires_at: i64, conn: &rusqlite::Connection) -> String {
+    let secret = get_invite_secret(conn);
     let mut mac = HmacSha256::new_from_slice(&secret)
         .expect("HMAC can take key of any size");
 
@@ -89,15 +148,16 @@ fn sign_invite_code(body: &str, inviter_id: &str, expires_at: i64) -> String {
 
     let result = mac.finalize();
     let code_bytes = result.into_bytes();
-    hex::encode(&code_bytes[..8])
+    // 审计修复 #6: 使用 .get(..8) 防御性切片，底层 HMAC 变更也不 panic
+    code_bytes.get(..8).map(hex::encode).unwrap_or_default()
 }
 
 /// 验证邀请码签名
-fn verify_invite_signature(invite_code: &str, inviter_id: &str, expires_at: i64) -> bool {
+fn verify_invite_signature(invite_code: &str, inviter_id: &str, expires_at: i64, conn: &rusqlite::Connection) -> bool {
     if let Some(pos) = invite_code.rfind('.') {
         let body = &invite_code[..pos];
         let sig = &invite_code[pos+1..];
-        let expected = sign_invite_code(body, inviter_id, expires_at);
+        let expected = sign_invite_code(body, inviter_id, expires_at, conn);
         sig == expected
     } else {
         false
@@ -105,9 +165,9 @@ fn verify_invite_signature(invite_code: &str, inviter_id: &str, expires_at: i64)
 }
 
 /// 生成带签名的邀请码
-fn generate_signed_invite_code(inviter_id: &str, expires_at: i64) -> String {
+fn generate_signed_invite_code(inviter_id: &str, expires_at: i64, conn: &rusqlite::Connection) -> String {
     let body = Uuid::new_v4().to_string().replace('-', "");
-    let sig = sign_invite_code(&body, inviter_id, expires_at);
+    let sig = sign_invite_code(&body, inviter_id, expires_at, conn);
     format!("{}.{}", body, sig)
 }
 
@@ -175,10 +235,11 @@ pub struct AcceptEmployeeInvitationRequest {
 /// 创建员工邀请（需要认证 + 权限检查）
 /// POST /api/invitations/create_employee
 ///
-/// 注意：此函数从数据库查询当前用户（简化实现，正式环境应从 JWT Claims 获取）
+/// 审计修复 #4: 从 JWT Claims 获取当前用户 ID，杜绝越权创建邀请
 /// 权限检查通过 rbac_middleware 中间件完成
 pub async fn create_employee_invitation(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateEmployeeInvitationRequest>,
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
@@ -187,15 +248,7 @@ pub async fn create_employee_invitation(
     };
     let conn = db.connection();
 
-    // 从数据库查询当前用户（简化实现，正式环境应从 JWT Claims 获取）
-    let inviter_id = match conn.query_row(
-        "SELECT id FROM users WHERE is_active = 1 LIMIT 1",
-        [],
-        |row| row.get::<_, String>(0),
-    ) {
-        Ok(uid) => uid,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Unauthorized"}))),
-    };
+    let inviter_id = claims.sub;
 
     // 权限检查：只有老板可以创建员工邀请
     // 查询用户角色和权限
@@ -232,10 +285,14 @@ pub async fn create_employee_invitation(
     let expires_at = now + 7 * 24 * 60 * 60 * 1000;
 
     // 生成带 HMAC 签名的邀请码
-    let invite_code = generate_signed_invite_code(&inviter_id, expires_at);
+    let invite_code = generate_signed_invite_code(&inviter_id, expires_at, conn);
 
     // role_ids 存储为 JSON 数组字符串
-    let role_ids_json = serde_json::to_string(&payload.role_ids).unwrap_or_default();
+    let role_ids_json = serde_json::to_string(&payload.role_ids)
+        .unwrap_or_else(|e| {
+            eprintln!("[Invitation] Failed to serialize role_ids: {}", e);
+            String::from("[]")
+        });
 
     // 插入邀请记录（包含 invite_type='employee' 和 role_ids）
     if let Err(e) = conn.execute(
@@ -307,7 +364,7 @@ pub async fn accept_employee_invitation(
     let (inv_id, inviter_id, target_phone, status, expires_at, role_ids_json) = invitation;
 
     // 2. 验证 HMAC 签名（防伪造）
-    if !verify_invite_signature(&payload.invite_code, &inviter_id, expires_at) {
+    if !verify_invite_signature(&payload.invite_code, &inviter_id, expires_at, conn) {
         return (StatusCode::FORBIDDEN, Json(serde_json::json!({
             "error": "Invalid invitation signature"
         })));
@@ -321,7 +378,9 @@ pub async fn accept_employee_invitation(
     // 4. 检查是否过期
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
-        let _ = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]);
+        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]) {
+            eprintln!("[Invitation] Failed to mark invitation as expired: {}", e);
+        }
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invitation has expired"})));
     }
 
@@ -334,7 +393,11 @@ pub async fn accept_employee_invitation(
 
     // 6. 解析 role_ids
     let role_ids: Vec<i32> = match role_ids_json {
-        Some(ref json_str) => serde_json::from_str(json_str).unwrap_or_default(),
+        Some(ref json_str) => serde_json::from_str(json_str)
+            .unwrap_or_else(|e| {
+                eprintln!("[Invitation] Failed to parse role_ids: {}", e);
+                vec![]
+            }),
         None => vec![],
     };
 
@@ -354,10 +417,12 @@ pub async fn accept_employee_invitation(
         match existing {
             Ok(found_uid) => {
                 // 用户已存在，更新为 internal 类型
-                let _ = conn.execute(
+                if let Err(e) = conn.execute(
                     "UPDATE users SET user_type = 'internal', name = ?1, last_login_at = ?2 WHERE id = ?3",
                     params![payload.name, now_ms, found_uid],
-                );
+                ) {
+                    eprintln!("[Invitation] Failed to update existing user type: {}", e);
+                }
                 found_uid
             }
             Err(_) => {
@@ -391,29 +456,35 @@ pub async fn accept_employee_invitation(
 
     // 8. 分配角色（写入 user_roles 表）
     for &role_id in &role_ids {
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "INSERT OR IGNORE INTO user_roles (user_id, role_id, assigned_at) \
              VALUES (?1, ?2, CURRENT_TIMESTAMP)",
             params![new_user_id, role_id],
-        );
+        ) {
+            eprintln!("[Invitation] Failed to assign role {} to user {}: {}", role_id, new_user_id, e);
+        }
     }
 
     // 9. 建立双向联系人关系（colleague 类型）
     let now_ms_ts = Utc::now().timestamp_millis();
 
     // 邀请方 -> 新员工
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
         params![Uuid::new_v4().to_string(), inviter_id, new_user_id, now_ms_ts],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to create inviter contact: {}", e);
+    }
 
     // 新员工 -> 邀请方
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
         params![Uuid::new_v4().to_string(), new_user_id, inviter_id, now_ms_ts],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to create employee contact: {}", e);
+    }
 
     // 10. 生成系统消息（欢迎消息）
     let role_names: Vec<String> = role_ids.iter().filter_map(|&rid| {
@@ -426,17 +497,21 @@ pub async fn accept_employee_invitation(
     let message_id = Uuid::new_v4().to_string();
     let now_sec = Utc::now().timestamp();
 
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT INTO messages (id, from_user, to_user, content, content_type, is_offline, is_read, created_at) \
          VALUES (?1, ?2, ?3, ?4, 'text', 0, 0, ?5)",
         params![message_id, inviter_id, new_user_id, message_content, now_sec],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to insert welcome message: {}", e);
+    }
 
     // 11. 标记邀请码为已使用
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE invitations SET status = 'used', used_at = ?1, used_by = ?2 WHERE id = ?3",
         params![now_sec, new_user_id, inv_id],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to mark invitation as used: {}", e);
+    }
 
     // 12. 通过 WebSocket 推送通知给邀请方（老板）
     let notification = serde_json::json!({
@@ -448,7 +523,9 @@ pub async fn accept_employee_invitation(
         "timestamp": now_sec
     });
 
-    let _ = state.ws_manager.send_to_user(&inviter_id, &notification.to_string());
+    if !state.ws_manager.send_to_user(&inviter_id, &notification.to_string()) {
+        eprintln!("[Invitation] Failed to send WS notification to inviter {}", inviter_id);
+    }
 
     (StatusCode::OK, Json(serde_json::json!({
         "success": true,
@@ -463,9 +540,11 @@ pub async fn accept_employee_invitation(
 // ============================================================
 
 /// 创建邀请（需要认证 + 权限检查）
+/// 审计修复 #4: 从 JWT Claims 获取用户 ID
 /// 用户 ID 通过 rbac_middleware 注入到 request.extensions() 的 Claims 中获取
 pub async fn create_invitation(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Json(payload): Json<CreateInvitationRequest>,
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
@@ -479,15 +558,7 @@ pub async fn create_invitation(
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid invitation_type"})));
     }
 
-    // 从数据库查询当前用户（简化实现，正式环境应从 JWT Claims 获取）
-    let inviter_id = match conn.query_row(
-        "SELECT id FROM users WHERE is_active = 1 LIMIT 1",
-        [],
-        |row| row.get::<_, String>(0),
-    ) {
-        Ok(uid) => uid,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Unauthorized"}))),
-    };
+    let inviter_id = claims.sub;
 
     // 获取服务器 host 地址
     let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "localhost:8888".to_string());
@@ -499,7 +570,7 @@ pub async fn create_invitation(
     let expires_at = now + 7 * 24 * 60 * 60 * 1000;
 
     // 生成带 HMAC 签名的邀请码
-    let invite_code = generate_signed_invite_code(&inviter_id, expires_at);
+    let invite_code = generate_signed_invite_code(&inviter_id, expires_at, conn);
 
     // 插入邀请记录
     if let Err(e) = conn.execute(
@@ -570,7 +641,7 @@ pub async fn accept_invitation(
     let (inv_id, inviter_id, target_phone, inv_type, business_ref_id, status, expires_at) = invitation;
 
     // 2. 验证 HMAC 签名（防伪造）
-    if !verify_invite_signature(&payload.invite_code, &inviter_id, expires_at) {
+    if !verify_invite_signature(&payload.invite_code, &inviter_id, expires_at, conn) {
         return (StatusCode::FORBIDDEN, Json(serde_json::json!({
             "error": "Invalid invitation signature"
         })));
@@ -585,7 +656,9 @@ pub async fn accept_invitation(
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
         // 标记为过期
-        let _ = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]);
+        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]) {
+            eprintln!("[Invitation] Failed to mark external invitation expired: {}", e);
+        }
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invitation has expired"})));
     }
 
@@ -667,19 +740,23 @@ pub async fn accept_invitation(
     let contact_type = if inv_type == "order_share" { "supplier" } else { "customer" };
 
     // 邀请方 -> 被邀请方
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![Uuid::new_v4().to_string(), inviter_id, new_user_id, contact_type, now_ms],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to create inviter contact (external): {}", e);
+    }
 
     // 被邀请方 -> 邀请方（反向）
     let inviter_contact_type = if contact_type == "supplier" { "customer" } else { "supplier" };
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![Uuid::new_v4().to_string(), new_user_id, inviter_id, inviter_contact_type, now_ms],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to create invitee contact (external): {}", e);
+    }
 
     // 8. 生成系统消息
     let message_content = if inv_type == "order_share" {
@@ -692,17 +769,21 @@ pub async fn accept_invitation(
     let content_type = if inv_type == "order_share" { "order_card" } else { "text" };
 
     let now_sec = Utc::now().timestamp();
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT INTO messages (id, from_user, to_user, content, content_type, is_offline, is_read, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, ?6)",
         params![message_id, new_user_id, inviter_id, message_content, content_type, now_sec],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to insert external notification message: {}", e);
+    }
 
     // 9. 标记邀请码为已使用
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE invitations SET status = 'used', used_at = ?1, used_by = ?2 WHERE id = ?3",
         params![now_sec, new_user_id, inv_id],
-    );
+    ) {
+        eprintln!("[Invitation] Failed to mark external invitation as used: {}", e);
+    }
 
     // 10. 通过 WebSocket 推送通知给邀请方
     let notification = serde_json::json!({
@@ -714,7 +795,9 @@ pub async fn accept_invitation(
         "timestamp": now_sec
     });
 
-    let _ = state.ws_manager.send_to_user(&inviter_id, &notification.to_string());
+    if !state.ws_manager.send_to_user(&inviter_id, &notification.to_string()) {
+        eprintln!("[Invitation] Failed to send WS notification for external invitation to {}", inviter_id);
+    }
 
     (StatusCode::OK, Json(serde_json::json!({
         "success": true,
@@ -724,8 +807,10 @@ pub async fn accept_invitation(
 }
 
 /// 撤销邀请（需要认证）
+/// 审计修复 #4: 从 JWT Claims 获取用户 ID
 pub async fn revoke_invitation(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(code): Path<String>,
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
@@ -734,15 +819,7 @@ pub async fn revoke_invitation(
     };
     let conn = db.connection();
 
-    // 简化实现：从数据库查询当前用户
-    let inviter_id = match conn.query_row(
-        "SELECT id FROM users WHERE is_active = 1 LIMIT 1",
-        [],
-        |row| row.get::<_, String>(0),
-    ) {
-        Ok(uid) => uid,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Unauthorized"}))),
-    };
+    let inviter_id = claims.sub;
 
     let result = conn.execute(
         "UPDATE invitations SET status = 'revoked' \
@@ -758,8 +835,10 @@ pub async fn revoke_invitation(
 }
 
 /// 查询邀请记录（需要认证）
+/// 审计修复 #4: 从 JWT Claims 获取用户 ID
 pub async fn list_invitations(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     axum::extract::Query(query): axum::extract::Query<InvitationQuery>,
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
@@ -768,15 +847,7 @@ pub async fn list_invitations(
     };
     let conn = db.connection();
 
-    // 简化实现：从数据库查询当前用户
-    let inviter_id = match conn.query_row(
-        "SELECT id FROM users WHERE is_active = 1 LIMIT 1",
-        [],
-        |row| row.get::<_, String>(0),
-    ) {
-        Ok(uid) => uid,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Unauthorized"}))),
-    };
+    let inviter_id = claims.sub;
 
     let mut sql = String::from(
         "SELECT i.id, i.invite_code, i.inviter_id, u.name, i.target_phone, i.type, \

@@ -138,7 +138,7 @@ pub fn pcp_add_entry(
     let conn = db.connection();
     let id = Uuid::new_v4().to_string();
     let now = now_timestamp();
-    let created_by_val = entry.created_by.clone().unwrap_or_else(|| "boss".to_string());
+    let created_by_val = entry.created_by.unwrap_or_else(|| "boss".to_string());
 
     conn.execute(
         "INSERT INTO project_context (id, context_type, title, description, priority, status, created_at, updated_at, created_by, metadata)
@@ -165,7 +165,7 @@ pub fn pcp_add_entry(
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
-        created_by: created_by_val.clone(),
+        created_by: created_by_val,
         metadata: entry.metadata,
     })
 }

@@ -82,6 +82,7 @@ pub fn catering_get_pos_orders(
 }
 
 /// 结算 POS 订单
+/// 审计修复 R6: 添加金额负数防御
 #[tauri::command]
 pub fn catering_settle_pos_order(
     db: tauri::State<Mutex<Database>>,
@@ -89,6 +90,12 @@ pub fn catering_settle_pos_order(
     payment_method: String,
     amount: f64,
 ) -> Result<Value, String> {
+    if amount < 0.0 {
+        return Err("Amount cannot be negative".to_string());
+    }
+    if !amount.is_finite() {
+        return Err("Amount must be a finite number".to_string());
+    }
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let now = Utc::now().to_rfc3339();

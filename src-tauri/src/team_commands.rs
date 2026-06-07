@@ -56,12 +56,20 @@ fn now_iso() -> String {
 /// 从数据库行映射为 AiTeam
 fn map_row_to_aiteam(row: &rusqlite::Row) -> rusqlite::Result<AiTeam> {
     let tags_str: String = row.get::<_, String>("tags").unwrap_or_else(|_| "[]".into());
-    let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
+    let tags: Vec<String> = serde_json::from_str(&tags_str)
+        .unwrap_or_else(|e| {
+            eprintln!("[Team] Failed to parse tags JSON: {}", e);
+            vec![]
+        });
 
     let members_str: String = row
         .get::<_, String>("members_json")
         .unwrap_or_else(|_| "[]".into());
-    let members: Vec<TeamMember> = serde_json::from_str(&members_str).unwrap_or_default();
+    let members: Vec<TeamMember> = serde_json::from_str(&members_str)
+        .unwrap_or_else(|e| {
+            eprintln!("[Team] Failed to parse members JSON: {}", e);
+            vec![]
+        });
 
     let workflow_str: String = row
         .get::<_, String>("workflow_json")

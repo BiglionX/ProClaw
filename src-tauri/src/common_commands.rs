@@ -159,9 +159,15 @@ pub fn get_categories(db: tauri::State<Mutex<Database>>) -> Result<Vec<serde_jso
 // ==================== 文件上传命令 ====================
 
 /// 上传图片并返回 Base64 编码
+/// 审计修复 R6: 限制 base64 输入最大 10MB 防止炸弹攻击
 #[tauri::command]
 pub fn upload_image(file_data: String) -> Result<String, String> {
-    // file_data 已经是 base64 格式，直接返回
-    // 在实际应用中，这里可以添加图片验证、压缩等逻辑
+    const MAX_SIZE: usize = 10 * 1024 * 1024; // 10MB
+    if file_data.len() > MAX_SIZE {
+        return Err(format!(
+            "Image too large: {} bytes (max {} bytes / 10MB)",
+            file_data.len(), MAX_SIZE
+        ));
+    }
     Ok(file_data)
 }

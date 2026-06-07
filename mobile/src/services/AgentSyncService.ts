@@ -12,45 +12,63 @@ type SyncCallback = (type: string, data: any) => void;
 class AgentSyncService {
   private listeners: Map<string, Set<SyncCallback>> = new Map();
   private initialized = false;
+  // 审计 R2-L1：保存 WS 退订句柄，防止 listener 累积泄漏
+  private wsUnsubscribers: (() => void)[] = [];
 
   /** 初始化同步服务 */
   initialize(): void {
     if (this.initialized) return;
 
+    // 审计 R2-L1：重复初始化前清理旧监听器
+    this.wsUnsubscribers.forEach(fn => fn());
+    this.wsUnsubscribers = [];
+
     // 监听 Agent 状态变化消息
-    wsService.on('agent:state_changed', (_type: string, data: any) => {
-      this.handleStateChanged(data);
-      this.dispatch('agent:state_changed', data);
-    });
+    this.wsUnsubscribers.push(
+      wsService.on('agent:state_changed', (_type: string, data: any) => {
+        this.handleStateChanged(data);
+        this.dispatch('agent:state_changed', data);
+      }),
+    );
 
     // 监听 Agent 安装/卸载消息
-    wsService.on('agent:installed', (_type: string, data: any) => {
-      this.handleAgentInstalled(data);
-      this.dispatch('agent:installed', data);
-    });
+    this.wsUnsubscribers.push(
+      wsService.on('agent:installed', (_type: string, data: any) => {
+        this.handleAgentInstalled(data);
+        this.dispatch('agent:installed', data);
+      }),
+    );
 
-    wsService.on('agent:uninstalled', (_type: string, data: any) => {
-      this.handleAgentUninstalled(data);
-      this.dispatch('agent:uninstalled', data);
-    });
+    this.wsUnsubscribers.push(
+      wsService.on('agent:uninstalled', (_type: string, data: any) => {
+        this.handleAgentUninstalled(data);
+        this.dispatch('agent:uninstalled', data);
+      }),
+    );
 
     // 监听完整列表同步
-    wsService.on('agent:sync_response', (_type: string, data: any) => {
-      this.handleSyncResponse(data);
-      this.dispatch('agent:sync_response', data);
-    });
+    this.wsUnsubscribers.push(
+      wsService.on('agent:sync_response', (_type: string, data: any) => {
+        this.handleSyncResponse(data);
+        this.dispatch('agent:sync_response', data);
+      }),
+    );
 
     // 监听 RPC 响应
-    wsService.on('agent:rpc_response', (_type: string, data: any) => {
-      if (data) {
-        agentRuntimeBridge.handleRpcResponse(data);
-      }
-    });
+    this.wsUnsubscribers.push(
+      wsService.on('agent:rpc_response', (_type: string, data: any) => {
+        if (data) {
+          agentRuntimeBridge.handleRpcResponse(data);
+        }
+      }),
+    );
 
     // 连接恢复时自动请求同步
-    wsService.on('connected', () => {
-      this.requestSync();
-    });
+    this.wsUnsubscribers.push(
+      wsService.on('connected', () => {
+        this.requestSync();
+      }),
+    );
 
     this.initialized = true;
     console.log('[AgentSync] Service initialized');

@@ -1,7 +1,7 @@
 {
   "name": "@proclaw/desktop",
-  "version": "1.0.0-beta.2",
-  "description": "ProClaw - AI-Powered Business Operating System (Beta)",
+  "version": "1.0.0",
+  "description": "ProClaw - AI-Powered Business Operating System",
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {

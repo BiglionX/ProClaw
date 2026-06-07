@@ -27,7 +27,9 @@ pub struct FileUploadResponse {
 fn get_upload_dir() -> PathBuf {
     let db_path = crate::database::get_database_path();
     let upload_dir = db_path.parent().unwrap_or(std::path::Path::new(".")).join("uploads");
-    let _ = std::fs::create_dir_all(&upload_dir);
+    if let Err(e) = std::fs::create_dir_all(&upload_dir) {
+        eprintln!("[files] Failed to create upload dir {:?}: {}", upload_dir, e);
+    }
     upload_dir
 }
 
@@ -189,7 +191,9 @@ pub async fn upload_file(
         let db = match state.db.lock() {
             Ok(db) => db,
             Err(_) => {
-                let _ = std::fs::remove_file(&file_path);
+                if let Err(e) = std::fs::remove_file(&file_path) {
+                    eprintln!("[files] Failed to clean up file {:?}: {}", file_path, e);
+                }
                 return (StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({"error": "Database lock error"}))).into_response();
             }
@@ -209,7 +213,9 @@ pub async fn upload_file(
                 None::<String>,
             ],
         ) {
-            let _ = std::fs::remove_file(&file_path);
+            if let Err(e) = std::fs::remove_file(&file_path) {
+                eprintln!("[files] Failed to clean up file {:?}: {}", file_path, e);
+            }
             return (StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": format!("Database error: {}", e)}))).into_response();
         }
@@ -409,7 +415,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_upload_endpoint_exists() {
-        let cipher = Arc::new(Aes256GcmCipher::new(&[0u8; 32]));
+        let cipher = Arc::new(Aes256GcmCipher::new(&[0u8; 32]).expect("test key must be 32 bytes"));
         let ws_manager = Arc::new(WebSocketManager::new());
         let db = crate::database::Database::new(std::path::PathBuf::from(":memory:"))
             .unwrap();

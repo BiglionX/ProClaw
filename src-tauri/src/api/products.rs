@@ -65,7 +65,14 @@ pub async fn get_products(
     State(state): State<AppState>,
     Query(query): Query<ProductQuery>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().unwrap();
+    // 审计修复 #7: 避免 Mutex poison 传播 panic，改用 map_err 优雅处理
+    let db = match state.db.lock() {
+        Ok(db) => db,
+        Err(_) => return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Database lock error"}))
+        ),
+    };
     let conn = db.connection();
     
     // 构建查询
@@ -97,11 +104,15 @@ pub async fn get_products(
     
     sql.push_str(" ORDER BY created_at DESC");
     
-    // 分页
+    // 分页（R7 修复：参数化绑定）
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(20);
     let offset = (page - 1) * page_size;
-    sql.push_str(&format!(" LIMIT {} OFFSET {}", page_size, offset));
+    let idx_limit = params.len() + 1;
+    let idx_offset = params.len() + 2;
+    params.push(page_size.to_string());
+    params.push(offset.to_string());
+    sql.push_str(&format!(" LIMIT ?{} OFFSET ?{}", idx_limit, idx_offset));
     
     // 执行查询
     let mut stmt = match conn.prepare(&sql) {
@@ -154,7 +165,13 @@ pub async fn get_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().unwrap();
+    let db = match state.db.lock() {
+        Ok(db) => db,
+        Err(_) => return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Database lock error"}))
+        ),
+    };
     let conn = db.connection();
     
     let result = conn.query_row(
@@ -204,7 +221,13 @@ pub async fn create_product(
     State(state): State<AppState>,
     Json(payload): Json<ProductRequest>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().unwrap();
+    let db = match state.db.lock() {
+        Ok(db) => db,
+        Err(_) => return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Database lock error"}))
+        ),
+    };
     let conn = db.connection();
     
     // 验证SKU唯一性
@@ -275,7 +298,13 @@ pub async fn update_product(
     Path(id): Path<String>,
     Json(payload): Json<ProductRequest>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().unwrap();
+    let db = match state.db.lock() {
+        Ok(db) => db,
+        Err(_) => return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Database lock error"}))
+        ),
+    };
     let conn = db.connection();
     
     // 检查产品是否存在
@@ -342,7 +371,13 @@ pub async fn delete_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let db = state.db.lock().unwrap();
+    let db = match state.db.lock() {
+        Ok(db) => db,
+        Err(_) => return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "Database lock error"}))
+        ),
+    };
     let conn = db.connection();
     
     // 检查产品是否存在

@@ -447,8 +447,12 @@ pub fn download_agent_from_market(
 
     // 如果有校验和，验证包完整性
     if let Some(ref checksum) = expected_checksum {
-        // 将 market_url 视为本地 ZIP 路径（后续可改为 reqwest 下载）
+        // R7 修复：只允许访问预期目录内的 ZIP 文件
         let zip_path = Path::new(&market_url);
+        // 检查路径是否包含危险字符
+        if market_url.contains("..") {
+            return Err("Package path contains invalid traversal characters".to_string());
+        }
         if zip_path.exists() {
             let valid = crate::agent_security::verify_checksum(zip_path, checksum)
                 .map_err(|e| format!("Checksum verification error: {}", e))?;

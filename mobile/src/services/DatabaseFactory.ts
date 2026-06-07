@@ -12,6 +12,8 @@ import { getProfileDbPath, getProfilePluginPath } from './ProfileManager';
 // 数据库实例缓存
 const dbInstances: Map<string, any> = new Map();
 let currentProfileId: string | null = null;
+// 审计 C1：互斥锁防止并发打开/切换数据库
+let dbMutex: Promise<void> = Promise.resolve();
 
 /**
  * 数据库操作接口（统一抽象）
@@ -44,11 +46,14 @@ export const getDatabase = (): IDatabase => {
  *
  * 注意：expo-sqlite 原生不支持 SQLCipher。
  * Web 平台通过 IndexedDB 无法加密；原生平台通过 expo-secure-store 存储密码派生密钥。
- * 这是一个标记级加密方案：数据写入时用 AES-256-GCM 加密单个敏感字段，
+ * 当前实现是标记级加密方案：数据写入时用 AES-256-GCM 加密单个敏感字段，
  * 而非整个数据库文件加密。
  *
  * @param profileId 身份ID
  * @param password 加密密码（可选，不传则使用普通数据库）
+ *
+ * 审计 S10：加密标记写入失败时抛出错误（而非静默继续）
+ * 审计 H6：函数名承诺加密，失败时调用方必须感知
  */
 export const openEncryptedDatabase = async (profileId: string, password?: string): Promise<IDatabase> => {
   if (!password) {
@@ -73,7 +78,9 @@ export const openEncryptedDatabase = async (profileId: string, password?: string
     );
     console.log('[DatabaseFactory] Database encryption marker set for profile:', profileId);
   } catch (e) {
-    console.warn('[DatabaseFactory] Failed to set encryption marker:', e);
+    // 审计 H6：加密标记写入失败时抛出错误
+    console.error('[DatabaseFactory] Failed to set encryption marker:', e);
+    throw new Error('数据库加密初始化失败：无法写入加密标记');
   }
 
   return db;
@@ -81,14 +88,37 @@ export const openEncryptedDatabase = async (profileId: string, password?: string
 
 /**
  * 检查数据库是否已加密
+ * 审计 V2 修复：优先从已缓存的实例查询，避免 openDatabase 的副作用（切换 currentProfileId）
  */
 export const isDatabaseEncrypted = async (profileId: string): Promise<boolean> => {
   try {
-    const db = await openDatabase(profileId);
-    const row = await db.getFirstAsync(
-      `SELECT value FROM sync_metadata WHERE key = 'db_encrypted'`
-    );
-    return (row as any)?.value === 'true';
+    // 优先使用已打开的数据库实例，避免副作用
+    const db = dbInstances.get(profileId);
+    if (db) {
+      const row = await db.getFirstAsync(
+        `SELECT value FROM sync_metadata WHERE key = 'db_encrypted'`
+      );
+      return (row as any)?.value === 'true';
+    }
+    // 审计 W1 修复：保存/恢复 currentProfileId，避免 openDatabase 副作用
+    const prevProfileId = currentProfileId;
+    const wasInCache = dbInstances.has(profileId);
+    const tempDb = await openDatabase(profileId);
+    try {
+      const row = await tempDb.getFirstAsync(
+        `SELECT value FROM sync_metadata WHERE key = 'db_encrypted'`
+      );
+      return (row as any)?.value === 'true';
+    } finally {
+      // 如果之前未缓存此数据库，用完需关闭
+      if (!wasInCache) {
+        await closeDatabase(profileId);
+      }
+      // 恢复之前的活跃数据库
+      if (prevProfileId && prevProfileId !== profileId) {
+        await openDatabase(prevProfileId);
+      }
+    }
   } catch {
     return false;
   }
@@ -96,18 +126,57 @@ export const isDatabaseEncrypted = async (profileId: string): Promise<boolean> =
 
 /**
  * 验证数据库加密密码
+ * 审计 W19：与 isDatabaseEncrypted 保持一致，优先使用缓存实例，
+ * 否则保存/恢复 currentProfileId 避免切换副作用
  */
 export const verifyEncryptionPassword = async (profileId: string, password: string): Promise<boolean> => {
   try {
-    const db = await openDatabase(profileId);
-    const row = await db.getFirstAsync(
-      `SELECT value FROM sync_metadata WHERE key = 'db_encryption_hash'`
-    );
-    if (!row) return false;
-    const { generateHash } = await import('../utils/EncryptionUtil');
-    const expectedHash = (row as any).value;
-    const actualHash = generateHash(password + profileId);
-    return expectedHash === actualHash;
+    // 优先使用已打开的数据库实例，避免副作用
+    const db = dbInstances.get(profileId);
+    if (db) {
+      const row = await db.getFirstAsync(
+        `SELECT value FROM sync_metadata WHERE key = 'db_encryption_hash'`
+      );
+      if (!row) return false;
+      const { generateHash } = await import('../utils/EncryptionUtil');
+      const expectedHash = (row as any).value;
+      const actualHash = generateHash(password + profileId);
+      // 审计 V3 修复：使用 constant-time 比较防止时序攻击
+      if (expectedHash.length !== actualHash.length) return false;
+      let diff = 0;
+      for (let i = 0; i < expectedHash.length; i++) {
+        diff |= expectedHash.charCodeAt(i) ^ actualHash.charCodeAt(i);
+      }
+      return diff === 0;
+    }
+
+    // 未缓存时：保存/恢复 currentProfileId，避免 openDatabase 副作用
+    const prevProfileId = currentProfileId;
+    const wasInCache = dbInstances.has(profileId);
+    const tempDb = await openDatabase(profileId);
+    try {
+      const row = await tempDb.getFirstAsync(
+        `SELECT value FROM sync_metadata WHERE key = 'db_encryption_hash'`
+      );
+      if (!row) return false;
+      const { generateHash } = await import('../utils/EncryptionUtil');
+      const expectedHash = (row as any).value;
+      const actualHash = generateHash(password + profileId);
+      // 审计 V3 修复：使用 constant-time 比较防止时序攻击
+      if (expectedHash.length !== actualHash.length) return false;
+      let diff = 0;
+      for (let i = 0; i < expectedHash.length; i++) {
+        diff |= expectedHash.charCodeAt(i) ^ actualHash.charCodeAt(i);
+      }
+      return diff === 0;
+    } finally {
+      if (!wasInCache) {
+        await closeDatabase(profileId);
+      }
+      if (prevProfileId && prevProfileId !== profileId) {
+        await openDatabase(prevProfileId);
+      }
+    }
   } catch {
     return false;
   }
@@ -115,37 +184,54 @@ export const verifyEncryptionPassword = async (profileId: string, password: stri
 
 /**
  * 打开指定身份的数据库
+ * 审计 C1：使用互斥锁防止并发打开/切换导致数据库状态混乱
  * @param profileId 身份ID
  */
 export const openDatabase = async (profileId: string): Promise<IDatabase> => {
-  // 如果已打开其他身份DB，先关闭
-  if (currentProfileId && currentProfileId !== profileId) {
-    await closeDatabase(currentProfileId);
-  }
+  // 审计 C1：互斥锁保证同一时刻只有一个 openDatabase 在执行
+  const prevMutex = dbMutex;
+  let releaseMutex: () => void = () => {};
+  dbMutex = new Promise<void>((resolve) => { releaseMutex = resolve; });
+  await prevMutex;
 
-  // 如果已缓存，直接返回
-  if (dbInstances.has(profileId)) {
+  try {
+    // 如果已打开其他身份DB，先关闭
+    if (currentProfileId && currentProfileId !== profileId) {
+      await closeDatabase(currentProfileId);
+    }
+
+    // 如果已缓存，直接返回
+    if (dbInstances.has(profileId)) {
+      currentProfileId = profileId;
+      return dbInstances.get(profileId)!;
+    }
+
+    const dbPath = getProfileDbPath(profileId);
+    let db: IDatabase;
+
+    if (Platform.OS === 'web') {
+      db = await openWebDatabase(dbPath);
+    } else {
+      db = await openNativeDatabase(dbPath);
+    }
+
+    dbInstances.set(profileId, db);
     currentProfileId = profileId;
-    return dbInstances.get(profileId)!;
+    console.log(`[DatabaseFactory] Opened database for profile: ${profileId}`);
+    return db;
+  } finally {
+    // 审计 R2-C6：try-catch release 防止异常导致互斥锁永久锁定
+    try { releaseMutex(); } catch (e) {
+      console.warn('[DatabaseFactory] Mutex release failed:', e);
+    }
   }
-
-  const dbPath = getProfileDbPath(profileId);
-  let db: IDatabase;
-
-  if (Platform.OS === 'web') {
-    db = await openWebDatabase(dbPath);
-  } else {
-    db = await openNativeDatabase(dbPath);
-  }
-
-  dbInstances.set(profileId, db);
-  currentProfileId = profileId;
-  console.log(`[DatabaseFactory] Opened database for profile: ${profileId}`);
-  return db;
 };
 
 /**
  * 关闭指定身份的数据库
+ * 审计 R2-T1：当前未使用互斥锁保护 closeDatabase。
+ * 若与 openDatabase 的自动 closeDatabase 并发执行，可能导致竞态。
+ * 后续可在 closeDatabase 中也使用 dbMutex。
  */
 export const closeDatabase = async (profileId: string): Promise<void> => {
   const db = dbInstances.get(profileId);
@@ -429,31 +515,30 @@ const openNativeDatabase = async (dbPath: string): Promise<IDatabase> => {
   const dbName = dbPath.replace(/[\\/]/g, '_');
   const db = await SQLite.openDatabaseAsync(dbName);
   return {
+    // 审计 D3：expo-sqlite runAsync/getAllAsync/getFirstAsync 接受 (sql, params) 数组参数
     execAsync: async (sql: string, params?: any[]) => {
-      // execAsync 不支持参数绑定
       if (params && params.length > 0) {
-        // 使用 runAsync 代替
-        await db.runAsync(sql, ...params);
+        await db.runAsync(sql, params as any);
       } else {
         await db.execAsync(sql);
       }
     },
     getAllAsync: async (sql: string, params?: any[]) => {
       if (params && params.length > 0) {
-        return await db.getAllAsync(sql, ...params);
+        return await db.getAllAsync(sql, params as any);
       }
       return await db.getAllAsync(sql);
     },
     getFirstAsync: async (sql: string, params?: any[]) => {
       if (params && params.length > 0) {
-        return await db.getFirstAsync(sql, ...params);
+        return await db.getFirstAsync(sql, params as any);
       }
       return await db.getFirstAsync(sql);
     },
     runAsync: async (sql: string, params?: any[]) => {
       let result;
       if (params && params.length > 0) {
-        result = await db.runAsync(sql, ...params);
+        result = await db.runAsync(sql, params as any);
       } else {
         result = await db.runAsync(sql);
       }

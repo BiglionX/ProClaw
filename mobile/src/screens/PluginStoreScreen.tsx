@@ -5,7 +5,7 @@
  * 对应 PRD v11.0 第5.2节
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -66,16 +66,20 @@ const PluginStoreScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     loadPlugins();
   }, [loadPlugins]);
 
+  // 审计 R2-P2：将 loading ref 替代 loading state 在 deps 中，避免回调频繁重建
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+
   // 每当页面获得焦点时刷新已安装状态（从插件详情页返回后自动更新）
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
+      if (!loadingRef.current) {
         // 仅刷新已安装状态，不重新获取插件列表
         getInstalledPlugins(getDatabase()).catch(() => [] as InstalledPlugin[]).then(installed => {
           setInstalledIds(new Set(installed.map(p => p.id)));
         });
       }
-    }, [loading])
+    }, []) // 使用 ref 访问最新 loading 值，无需重建回调
   );
 
   const onRefresh = useCallback(() => {

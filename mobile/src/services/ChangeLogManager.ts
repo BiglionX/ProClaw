@@ -9,6 +9,8 @@
 import type { IDatabase } from './DatabaseFactory';
 
 // 需要追踪变更的业务表列表
+// 审计 I5：添加 chat_sessions、chat_messages、product_spu_attributes
+// 与 SchemaManager 创建的表及 SyncEngine ALLOWED_TABLES 保持一致
 const TRACKED_TABLES = [
   'product_spu',
   'product_sku',
@@ -22,6 +24,9 @@ const TRACKED_TABLES = [
   'purchase_order_items',
   'inventory_transactions',
   'product_attributes',
+  'product_spu_attributes',
+  'chat_sessions',
+  'chat_messages',
 ];
 
 /**
@@ -53,6 +58,12 @@ const TABLE_COLUMNS: Record<string, string[]> = {
     'reference_type', 'reference_id', 'notes', 'last_modified', 'sync_status', 'created_at'],
   product_attributes: ['id', 'name', 'type', 'options', 'is_required', 'sort_order',
     'last_modified', 'sync_status', 'created_at'],
+  product_spu_attributes: ['id', 'spu_id', 'attribute_id', 'value_text', 'value_number',
+    'value_boolean', 'created_at'],
+  chat_sessions: ['id', 'session_type', 'target_id', 'target_name', 'target_icon',
+    'last_message', 'last_message_time', 'unread_count', 'is_pinned',
+    'sync_status', 'created_at'],
+  chat_messages: ['id', 'session_id', 'sender_type', 'content', 'created_at', 'sync_status'],
 };
 
 /**
@@ -221,7 +232,10 @@ const parseSqlOperation = (sql: string, params?: any[]): SqlOperationInfo | null
       const whereMatch = trimmed.match(/WHERE\s+id\s*=\s*\?/i);
       if (whereMatch) {
         const beforeWhere = trimmed.substring(0, trimmed.indexOf('WHERE'));
-        const paramCountBeforeWhere = (beforeWhere.match(/\?/g) || []).length;
+      // 审计 M6：统计 WHERE 之前的 ? 占位符定位 id 参数索引
+      // 注意：若 SET 子句中含字符串字面量 '?'，此计数会偏差
+      // 使用传入的 params 数组顺序约定：id 始终是 WHERE 之后的第一个 ? 参数
+      const paramCountBeforeWhere = (beforeWhere.match(/\?/g) || []).length;
         idParamIndex = paramCountBeforeWhere;
         if (idParamIndex < params.length) {
           rowId = String(params[idParamIndex] || '');
@@ -385,7 +399,8 @@ export const markSynced = async (
 
   try {
     const placeholders = changeIds.map(() => '?').join(',');
-    await db.execAsync(
+    // 审计 H5：使用 runAsync 显式绑定参数，避免 execAsync 平台差异
+    await db.runAsync(
       `UPDATE change_log SET sync_status = 'synced' WHERE id IN (${placeholders})`,
       changeIds
     );

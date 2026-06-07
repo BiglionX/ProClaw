@@ -86,12 +86,14 @@ pub fn get_products(db: tauri::State<Mutex<Database>>, options: Option<serde_jso
 
     sql.push_str(" ORDER BY created_at DESC");
 
-    // 添加分页
+    // 添加分页（R7 修复：参数化绑定）
     if let Some(opts) = &options {
         if let Some(limit) = opts.get("limit").and_then(|v| v.as_u64()) {
-            sql.push_str(&format!(" LIMIT {}", limit));
+            params_vec.push(Box::new(limit as i64));
+            sql.push_str(&format!(" LIMIT ?{}", params_vec.len()));
             if let Some(offset) = opts.get("offset").and_then(|v| v.as_u64()) {
-                sql.push_str(&format!(" OFFSET {}", offset));
+                params_vec.push(Box::new(offset as i64));
+                sql.push_str(&format!(" OFFSET ?{}", params_vec.len()));
             }
         }
     }
@@ -509,12 +511,14 @@ pub fn get_product_spus(
 
     sql.push_str(" ORDER BY created_at DESC");
 
-    // 添加分页
+    // 添加分页（R7 修复：参数化绑定）
     if let Some(opts) = &options {
         if let Some(limit) = opts.get("limit").and_then(|v| v.as_u64()) {
-            sql.push_str(&format!(" LIMIT {}", limit));
+            params_vec.push(Box::new(limit as i64));
+            sql.push_str(&format!(" LIMIT ?{}", params_vec.len()));
             if let Some(offset) = opts.get("offset").and_then(|v| v.as_u64()) {
-                sql.push_str(&format!(" OFFSET {}", offset));
+                params_vec.push(Box::new(offset as i64));
+                sql.push_str(&format!(" OFFSET ?{}", params_vec.len()));
             }
         }
     }

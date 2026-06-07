@@ -272,7 +272,7 @@ pub async fn create_inventory_transaction(
         "UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
         params![stock_change, payload.product_id],
     ) {
-        let _ = tx.rollback();
+        if let Err(rb) = tx.rollback() { eprintln!("[inventory] rollback failed: {}", rb); }
         return (StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("Failed to update stock: {}", e)})));
     }

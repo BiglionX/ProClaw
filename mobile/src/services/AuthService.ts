@@ -1,51 +1,12 @@
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosInstance } from 'axios';
+import { secureGet, secureSet, secureDelete } from './SecureConfig'; // 审计 M1：统一安全存储实现
 
 const TOKEN_KEY = 'proclaw_auth_token';
 const REFRESH_TOKEN_KEY = 'proclaw_refresh_token';
 const SERVER_URL_KEY = 'proclaw_server_url';
 
 let apiClient: AxiosInstance | null = null;
-
-// Use AsyncStorage for web, SecureStore for native
-const secureGet = async (key: string): Promise<string | null> => {
-  if (Platform.OS === 'web') {
-    return await AsyncStorage.getItem(key);
-  }
-  try {
-    const SecureStore = await import('expo-secure-store');
-    return await SecureStore.getItemAsync(key);
-  } catch {
-    return null;
-  }
-};
-
-const secureSet = async (key: string, value: string): Promise<void> => {
-  if (Platform.OS === 'web') {
-    await AsyncStorage.setItem(key, value);
-    return;
-  }
-  try {
-    const SecureStore = await import('expo-secure-store');
-    await SecureStore.setItemAsync(key, value);
-  } catch {
-    console.warn('Failed to save secure item');
-  }
-};
-
-const secureDelete = async (key: string): Promise<void> => {
-  if (Platform.OS === 'web') {
-    await AsyncStorage.removeItem(key);
-    return;
-  }
-  try {
-    const SecureStore = await import('expo-secure-store');
-    await SecureStore.deleteItemAsync(key);
-  } catch {
-    console.warn('Failed to delete secure item');
-  }
-};
 
 export const saveToken = async (token: string): Promise<void> => {
   await secureSet(TOKEN_KEY, token);
@@ -83,7 +44,12 @@ export const getApiClient = async (): Promise<AxiosInstance> => {
     return apiClient;
   }
 
-  const baseURL = await loadServerUrl() || 'http://localhost:8888';
+  // 审计 S3：回退到 localhost:8888 仅在开发环境安全
+  // 生产环境 localhost 可能被恶意进程监听，用户应显式配置服务器地址
+  const baseURL = await loadServerUrl() || 'https://localhost:8888';
+  if (!await loadServerUrl()) {
+    console.warn('[AuthService] No server URL configured, using default localhost:8888 (insecure in production)');
+  }
   const token = await loadToken();
 
   apiClient = axios.create({
@@ -111,7 +77,10 @@ export const getApiClient = async (): Promise<AxiosInstance> => {
   apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
-      if (error.response?.status === 401) {
+      const originalRequest = error.config;
+      // 审计 H1：防止 token 刷新无限循环
+      if (error.response?.status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true;
         const refreshToken = await loadRefreshToken();
         if (refreshToken) {
           try {
@@ -125,8 +94,13 @@ export const getApiClient = async (): Promise<AxiosInstance> => {
             await saveToken(newToken);
             await saveRefreshToken(newRefreshToken);
             
-            error.config.headers.Authorization = `Bearer ${newToken}`;
-            return axios(error.config);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            // 审计 H1：添加 null 检查，防止并发 resetApiClient 导致崩溃
+            if (!apiClient) {
+              console.warn('[AuthService] apiClient was reset during token refresh');
+              return Promise.reject(error);
+            }
+            return apiClient.request(originalRequest);
           } catch (refreshError) {
             console.warn('Token refresh failed');
             await clearTokens();
@@ -149,7 +123,7 @@ export const pairDevice = async (
   pairingCode: string
 ): Promise<{ token: string; refresh_token: string; user: { name: string; roles?: string[] } }> => {
   try {
-    console.log('Pairing with server:', serverUrl, 'code:', pairingCode);
+    console.log('Pairing with server:', serverUrl); // 审计 S6：不输出配对码
     
     const response = await axios.post(
       `${serverUrl}/api/auth/pair`,
@@ -157,7 +131,7 @@ export const pairDevice = async (
       { timeout: 15000 }  // 15秒超时
     );
 
-    console.log('Pair response:', response.data);
+    console.log('Pair response: token received, user:', response.data?.user?.name || 'unknown');
 
     const { access_token, refresh_token } = response.data;
 
@@ -182,7 +156,9 @@ export const pairDevice = async (
     }
 
     console.log('Pairing successful, tokens saved, roles:', roles);
-    return { token: access_token, refresh_token, user: { name: '测试用户', roles } };
+    // 审计 S4：优先使用服务器返回的真实用户名，回退到 "测试用户"
+    const userName = response.data?.user?.name || '用户';
+    return { token: access_token, refresh_token, user: { name: userName, roles } };
   } catch (error: any) {
     console.error('Device pairing failed:', error);
     if (error.code === 'ECONNABORTED') {
@@ -219,16 +195,17 @@ export const clearRoles = async (): Promise<void> => {
   await secureDelete('proclaw_roles');
 };
 
-/** 演示模式：保存虚拟 token 跳过真实配对 */
+/** 演示模式：使用随机 token 跳过真实配对（审计 S8：不再使用可预测 token） */
 export const setDemoMode = async (): Promise<void> => {
-  await saveToken('demo_token_skip_auth');
-  await saveServerUrl('http://demo.local');
+  const randomToken = 'demo_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12);
+  await saveToken(randomToken);
+  await saveServerUrl('https://demo.local'); // 审计 S9：使用 HTTPS
   console.log('Demo mode activated');
 };
 
 export const isDemoMode = async (): Promise<boolean> => {
   const token = await loadToken();
-  return token === 'demo_token_skip_auth';
+  return token !== null && token.startsWith('demo_');
 };
 
 export default {

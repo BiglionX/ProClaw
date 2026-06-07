@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import { wsService } from './WebSocketService';
+import * as ChatService from './ChatService';
 
 // ==================== 类型定义 ====================
 
@@ -126,49 +127,76 @@ class AgentRuntimeBridge {
   private listeners: Map<string, Set<(agents: AgentInfo[]) => void>> = new Map();
   private rpcId = 0;
   private initialized = false;
+  // 审计 C2：初始化互斥锁，防止并发初始化
+  private initPromise: Promise<void> | null = null;
+  // 审计 W10：保存 WS 事件退订函数，防止重复初始化时监听器累积泄漏
+  private wsUnsubscribers: (() => void)[] = [];
 
   /** 初始化桥接 */
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    // 审计 C2：并发调用复用同一个 Promise
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this._doInitialize();
+    return this.initPromise;
+  }
 
-    // 监听 WebSocket 状态同步消息
-    this.setupWebSocketListeners();
+  private async _doInitialize(): Promise<void> {
+    try {
+      // 监听 WebSocket 状态同步消息
+      this.setupWebSocketListeners();
 
-    // 加载本地缓存的 Agent 列表
-    await this.syncAgents();
+      // 加载本地缓存的 Agent 列表
+      await this.syncAgents();
 
-    this.initialized = true;
+      this.initialized = true;
+    } catch (e) {
+      // 审计 W15：初始化失败时清空 initPromise，允许后续重试
+      this.initPromise = null;
+      throw e;
+    }
   }
 
   /** 监听 WebSocket 消息 */
+  // 审计 W10：退订旧监听器后再注册新监听器，防止重复初始化时监听器累积泄漏
   private setupWebSocketListeners(): void {
-    wsService.on('agent:state_changed', (_type: string, data: any) => {
-      const { agentId, enabled } = data || {};
-      if (agentId) {
-        const agent = this.agents.get(agentId);
+    // 先清理旧的监听器
+    this.wsUnsubscribers.forEach(fn => fn());
+    this.wsUnsubscribers = [];
+
+    this.wsUnsubscribers.push(
+      wsService.on('agent:state_changed', (_type: string, data: any) => {
+        const { agentId, enabled } = data || {};
+        if (agentId) {
+          const agent = this.agents.get(agentId);
+          if (agent) {
+            agent.enabled = enabled === true || enabled === 1;
+            this.agents.set(agentId, agent);
+            this.notifyListeners();
+          }
+        }
+      }),
+    );
+
+    this.wsUnsubscribers.push(
+      wsService.on('agent:installed', (_type: string, data: any) => {
+        const agent = data?.agent as AgentInfo | undefined;
         if (agent) {
-          agent.enabled = enabled === true || enabled === 1;
-          this.agents.set(agentId, agent);
+          this.agents.set(agent.id, agent);
           this.notifyListeners();
         }
-      }
-    });
+      }),
+    );
 
-    wsService.on('agent:installed', (_type: string, data: any) => {
-      const agent = data?.agent as AgentInfo | undefined;
-      if (agent) {
-        this.agents.set(agent.id, agent);
-        this.notifyListeners();
-      }
-    });
-
-    wsService.on('agent:uninstalled', (_type: string, data: any) => {
-      const { agentId } = data || {};
-      if (agentId) {
-        this.agents.delete(agentId);
-        this.notifyListeners();
-      }
-    });
+    this.wsUnsubscribers.push(
+      wsService.on('agent:uninstalled', (_type: string, data: any) => {
+        const { agentId } = data || {};
+        if (agentId) {
+          this.agents.delete(agentId);
+          this.notifyListeners();
+        }
+      }),
+    );
   }
 
   /** 同步 Agent 列表（从 WebSocket 或使用 mock） */
@@ -238,7 +266,13 @@ class AgentRuntimeBridge {
 
   /** 加载 Agent 视图配置 */
   loadAgentView(agent: AgentInfo): AgentViewConfig {
-    const assetsBaseUrl = `https://nvwa.proclaw.cc/agents/${agent.manifest.id}/${agent.version}/`;
+    // 审计 S12：校验 manifest.id 和 version 防止路径遍历
+    const safeId = encodeURIComponent(agent.manifest.id);
+    const safeVersion = encodeURIComponent(agent.manifest.version);
+    if (agent.manifest.id !== decodeURIComponent(safeId) || agent.manifest.version !== decodeURIComponent(safeVersion)) {
+      throw new Error(`Invalid agent ID or version: contains path traversal characters`);
+    }
+    const assetsBaseUrl = `https://nvwa.proclaw.cc/agents/${safeId}/${safeVersion}/`;
     return {
       agentId: agent.id,
       entryUrl: `${assetsBaseUrl}${agent.manifest.entry}`,
@@ -306,6 +340,23 @@ class AgentRuntimeBridge {
       case 'showNotification':
         console.log(`[AgentBridge] Notification: ${request.params?.[0]} - ${request.params?.[1]}`);
         return { success: true };
+      case 'sendMessage': {
+        // PRD v11.2: Agent WebView 内调用 proclaw.sendMessage(to, content) 的桥接
+        const [to, content] = (request.params || []) as [string?, string?];
+        if (!to || !content) {
+          throw new Error('sendMessage requires parameters: to (string), content (string)');
+        }
+        try {
+          const session = await ChatService.createOrGetSession(
+            to, to, 'personal', ''
+          );
+          const msg = await ChatService.sendMessage(session.id, content, 'other');
+          return { success: true, message: msg };
+        } catch (e: any) {
+          console.warn(`[AgentBridge] sendMessage failed:`, e?.message);
+          return { success: false, error: e?.message || 'Failed to send message' };
+        }
+      }
       default:
         console.warn(`[AgentBridge] Unhandled RPC: ${method} for agent ${agentId}`);
         return null;
@@ -352,6 +403,29 @@ class AgentRuntimeBridge {
     });
   }
 
+  // 审计 M2：提取工厂方法，消除 registerPluginAgents 与 installRecommendedAgents 的重复代码
+  private createPluginAgent(agentId: string, pluginName: string, extraDescription: string = ''): AgentInfo {
+    return {
+      id: agentId,
+      name: `${pluginName} - ${agentId}`,
+      version: '1.0.0',
+      manifest: {
+        id: agentId,
+        name: `${pluginName} - ${agentId}`,
+        version: '1.0.0',
+        entry: 'index.html',
+        permissions: ['read_user', 'show_notification'],
+        description: `由插件 "${pluginName}" 推荐的 AI 团队${extraDescription}`,
+        author: 'ProClaw Plugin',
+      },
+      enabled: true,
+      is_builtin: false,
+      installed_at: Date.now(),
+      last_updated: null,
+      permissions_granted: ['read_user', 'show_notification'],
+    };
+  }
+
   /**
    * 注册插件关联的 Agent（PRD 5.4）
    * 插件安装成功后调用，将插件声明的 recommendedAgents 注册到 Agent 列表
@@ -362,26 +436,7 @@ class AgentRuntimeBridge {
   registerPluginAgents(pluginId: string, pluginName: string, agentIds: string[]): void {
     for (const agentId of agentIds) {
       if (!this.agents.has(agentId)) {
-        const pluginAgent: AgentInfo = {
-          id: agentId,
-          name: `${pluginName} - ${agentId}`,
-          version: '1.0.0',
-          manifest: {
-            id: agentId,
-            name: `${pluginName} - ${agentId}`,
-            version: '1.0.0',
-            entry: 'index.html',
-            permissions: ['read_user', 'show_notification'],
-            description: `由插件 "${pluginName}" 推荐的 AI 团队`,
-            author: 'ProClaw Plugin',
-          },
-          enabled: true,
-          is_builtin: false,
-          installed_at: Date.now(),
-          last_updated: null,
-          permissions_granted: ['read_user', 'show_notification'],
-        };
-        this.agents.set(agentId, pluginAgent);
+        this.agents.set(agentId, this.createPluginAgent(agentId, pluginName));
         console.log(`[AgentBridge] Registered plugin agent: ${agentId} for plugin ${pluginName}`);
       }
     }
@@ -429,26 +484,7 @@ class AgentRuntimeBridge {
         continue;
       }
 
-      const pluginAgent: AgentInfo = {
-        id: agentId,
-        name: `${pluginName} - ${agentId}`,
-        version: '1.0.0',
-        manifest: {
-          id: agentId,
-          name: `${pluginName} - ${agentId}`,
-          version: '1.0.0',
-          entry: 'index.html',
-          permissions: ['read_user', 'show_notification'],
-          description: `由插件 "${pluginName}" 推荐的 AI 团队，提供智能辅助功能`,
-          author: 'ProClaw Plugin',
-        },
-        enabled: true,
-        is_builtin: false,
-        installed_at: Date.now(),
-        last_updated: null,
-        permissions_granted: ['read_user', 'show_notification'],
-      };
-      this.agents.set(agentId, pluginAgent);
+      this.agents.set(agentId, this.createPluginAgent(agentId, pluginName, '，提供智能辅助功能'));
       installed++;
     }
 

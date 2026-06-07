@@ -5,6 +5,7 @@ use aes_gcm::{
 use rand::RngCore;
 
 /// AES-256-GCM 加密器
+#[derive(Clone)]
 pub struct Aes256GcmCipher {
     key: Key<Aes256Gcm>,
 }
@@ -12,14 +13,17 @@ pub struct Aes256GcmCipher {
 #[allow(dead_code)]
 impl Aes256GcmCipher {
     /// 使用 32 字节密钥初始化
-    pub fn new(key: &[u8]) -> Self {
-        assert_eq!(key.len(), 32, "Key must be 32 bytes");
+    /// 审计修复 #7: 将 assert_eq! 改为 Result 以在 release 构建中仍有效
+    pub fn new(key: &[u8]) -> Result<Self, String> {
+        if key.len() != 32 {
+            return Err(format!("Key must be 32 bytes, got {}", key.len()));
+        }
         let key = Key::<Aes256Gcm>::from_slice(key);
-        Self { key: *key }
+        Ok(Self { key: *key })
     }
 
     /// 从密码派生密钥（使用 PBKDF2）
-    pub fn from_password(password: &str, salt: &[u8]) -> Self {
+    pub fn from_password(password: &str, salt: &[u8]) -> Result<Self, String> {
         use pbkdf2::pbkdf2_hmac;
         use sha2::Sha256;
 
@@ -113,7 +117,7 @@ mod tests {
     #[test]
     fn test_encrypt_decrypt() {
         let key = [0u8; 32]; // 全零密钥（仅用于测试）
-        let cipher = Aes256GcmCipher::new(&key);
+        let cipher = Aes256GcmCipher::new(&key).expect("create cipher");
 
         let plaintext = b"Hello, ProClaw! This is a test.";
         let encrypted = cipher.encrypt(plaintext).unwrap();
@@ -125,13 +129,20 @@ mod tests {
     #[test]
     fn test_encrypt_decrypt_string() {
         let key = [0u8; 32];
-        let cipher = Aes256GcmCipher::new(&key);
+        let cipher = Aes256GcmCipher::new(&key).expect("create cipher");
 
         let plaintext = "测试消息 123";
         let encrypted = cipher.encrypt_string(plaintext).unwrap();
         let decrypted = cipher.decrypt_string(&encrypted).unwrap();
 
         assert_eq!(plaintext, decrypted);
+    }
+
+    #[test]
+    fn test_new_rejects_invalid_key_length() {
+        let short_key = [0u8; 16];
+        let result = Aes256GcmCipher::new(&short_key);
+        assert!(result.is_err());
     }
 
     #[test]

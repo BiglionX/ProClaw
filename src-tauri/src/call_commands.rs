@@ -67,7 +67,8 @@ pub fn get_call_records_cmd(
     }
 
     sql.push_str(" ORDER BY cr.created_at DESC");
-    sql.push_str(&format!(" LIMIT {}", limit));
+    param_values.push(Box::new(limit));
+    sql.push_str(&format!(" LIMIT ?{}", param_values.len()));
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
 

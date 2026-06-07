@@ -66,7 +66,12 @@ pub async fn relay_send(
         Err(e) => return e,
     };
 
-    let content_str = serde_json::to_string(&req.content).unwrap_or_default();
+    // 审计修复 #4: 序列化失败时记录错误
+    let content_str = serde_json::to_string(&req.content)
+        .unwrap_or_else(|e| {
+            eprintln!("[Relay] Failed to serialize message content: {}", e);
+            String::from("{}")
+        });
 
     let result = db.connection().execute(
         "INSERT INTO relay_messages (id, receiver_id, message_type, content, priority, status, direction)
@@ -90,16 +95,22 @@ pub async fn relay_send(
                 "content": content_str,
                 "priority": req.priority.unwrap_or(0),
             });
-            let _ = db.connection().execute(
+            if let Err(e) = db.connection().execute(
                 "INSERT INTO offline_queue (id, table_name, record_id, operation, payload, priority, status)
                  VALUES (?1, 'relay_messages', ?2, 'INSERT', ?3, ?4, 'pending')",
                 rusqlite::params![
                     uuid::Uuid::new_v4().to_string(),
                     relay_id,
-                    serde_json::to_string(&payload).unwrap_or_default(),
+                    serde_json::to_string(&payload)
+                        .unwrap_or_else(|e| {
+                            eprintln!("[Relay] Failed to serialize offline payload: {}", e);
+                            String::from("{}")
+                        }),
                     req.priority.unwrap_or(0),
                 ],
-            );
+            ) {
+                eprintln!("[Relay] Failed to queue offline message: {}", e);
+            }
 
             (
                 StatusCode::OK,
@@ -150,10 +161,12 @@ pub async fn relay_get_messages(
             .collect();
 
         for id in &ids {
-            let _ = db.connection().execute(
+            if let Err(e) = db.connection().execute(
                 "UPDATE relay_messages SET status = 'delivered' WHERE id = ?1 AND direction = 'incoming'",
                 rusqlite::params![id],
-            );
+            ) {
+                eprintln!("[Relay] Failed to mark message {} as delivered: {}", id, e);
+            }
         }
     }
 
@@ -238,11 +251,13 @@ pub async fn sync_trigger(
     let _now = chrono::Utc::now().to_rfc3339();
 
     // 记录同步开始
-    let _ = db.connection().execute(
+    if let Err(e) = db.connection().execute(
         "INSERT INTO sync_log (id, sync_type, status, records_processed, records_failed, conflict_count)
          VALUES (?1, ?2, 'running', 0, 0, 0)",
         rusqlite::params![sync_id, sync_type],
-    );
+    ) {
+        eprintln!("[Sync] Failed to insert sync log: {}", e);
+    }
 
     // 获取待处理的操作
     let count: i32 = db.connection().query_row(
@@ -289,29 +304,35 @@ pub async fn sync_trigger(
 
         for (id, table_name, record_id, _operation, _payload, retry_count) in operations {
             // 标记为处理中
-            let _ = db.connection().execute(
+            if let Err(e) = db.connection().execute(
                 "UPDATE offline_queue SET status = 'processing' WHERE id = ?1",
                 rusqlite::params![id],
-            );
+            ) {
+                eprintln!("[Sync] Failed to mark queue entry {} as processing: {}", id, e);
+            }
 
             // 尝试同步（这里做实际 Supabase 调用需要外部服务，暂用简化处理）
             // 在实际使用中，CloudBackupService 会接管此逻辑
             let success = true; // 默认为成功（由外部定时任务实际同步）
 
             if success {
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "UPDATE offline_queue SET status = 'completed', processed_at = CURRENT_TIMESTAMP WHERE id = ?1",
                     rusqlite::params![id],
-                );
+                ) {
+                    eprintln!("[Sync] Failed to mark queue entry {} as completed: {}", id, e);
+                }
                 // 标记对应记录为已同步
                 mark_record_synced(db.connection(), &table_name, &record_id).ok();
                 processed += 1;
             } else {
                 let new_retry = retry_count + 1;
-                let _ = db.connection().execute(
+                if let Err(e) = db.connection().execute(
                     "UPDATE offline_queue SET status = 'pending', retry_count = ?1, error_message = 'Sync failed' WHERE id = ?2",
                     rusqlite::params![new_retry, id],
-                );
+                ) {
+                    eprintln!("[Sync] Failed to retry queue entry {}: {}", id, e);
+                }
                 failed += 1;
             }
         }
@@ -324,7 +345,7 @@ pub async fn sync_trigger(
     let conflicts = resolve_conflicts_local(db.connection()).unwrap_or(0);
 
     // 更新同步日志
-    let _ = db.connection().execute(
+    if let Err(e) = db.connection().execute(
         "UPDATE sync_log SET status = ?1, records_processed = ?2, records_failed = ?3, conflict_count = ?4, completed_at = CURRENT_TIMESTAMP WHERE id = ?5",
         rusqlite::params![
             if failed == 0 { "success" } else { "partial" },
@@ -333,7 +354,9 @@ pub async fn sync_trigger(
             conflicts,
             sync_id,
         ],
-    );
+    ) {
+        eprintln!("[Sync] Failed to update sync log: {}", e);
+    }
 
     (
         StatusCode::OK,
@@ -417,14 +440,24 @@ pub async fn sync_status(
     }
 
     // 最近同步日志
-    let mut stmt = conn.prepare(
+    let mut stmt = match conn.prepare(
         "SELECT id, sync_type, status, records_processed, records_failed, conflict_count, started_at, completed_at
          FROM sync_log
          ORDER BY started_at DESC
          LIMIT 10"
-    ).unwrap();
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[Relay] Failed to prepare sync log query: {}", e);
+            return (StatusCode::OK, Json(json!({
+                "queue": { "pending": pending, "processing": processing, "failed": failed },
+                "sync_status": table_stats,
+                "recent_sync_logs": []
+            })));
+        }
+    };
 
-    let recent_logs: Vec<Value> = stmt.query_map([], |row| {
+    let recent_logs: Vec<Value> = match stmt.query_map([], |row| {
         Ok(json!({
             "id": row.get::<_, String>(0)?,
             "sync_type": row.get::<_, String>(1)?,
@@ -435,9 +468,13 @@ pub async fn sync_status(
             "started_at": row.get::<_, Option<String>>(6)?,
             "completed_at": row.get::<_, Option<String>>(7)?,
         }))
-    }).unwrap()
-    .filter_map(|r| r.ok())
-    .collect();
+    }) {
+        Ok(iter) => iter.filter_map(|r| r.ok()).collect(),
+        Err(e) => {
+            eprintln!("[Relay] Failed to query sync logs: {}", e);
+            Vec::new()
+        }
+    };
 
     (
         StatusCode::OK,
@@ -500,7 +537,10 @@ fn row_to_value(row: &rusqlite::Row) -> rusqlite::Result<Value> {
         "id": row.get::<_, String>(0)?,
         "receiver_id": row.get::<_, String>(1)?,
         "message_type": row.get::<_, String>(2)?,
-        "content": serde_json::from_str::<Value>(&row.get::<_, String>(3)?).unwrap_or(Value::Null),
+        "content": serde_json::from_str::<Value>(&row.get::<_, String>(3)?).unwrap_or_else(|e| {
+            eprintln!("[Relay] Failed to parse relay message content: {}", e);
+            Value::Null
+        }),
         "priority": row.get::<_, i32>(4)?,
         "status": row.get::<_, String>(5)?,
         "direction": row.get::<_, String>(6)?,

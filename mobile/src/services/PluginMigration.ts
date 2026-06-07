@@ -199,14 +199,22 @@ export const rollbackPluginMigration = async (
     const statements = splitStatements(downSql);
     let appliedCount = 0;
 
-    for (const stmt of statements) {
-      try {
-        await db.execAsync(stmt);
-        appliedCount++;
-      } catch (error: any) {
-        console.error(`[PluginMigration] Rollback statement failed for ${pluginId}:`, stmt, error);
-        // 回滚中允许单个语句失败（表可能已被其他操作删除）
+    // 审计 E7：回滚使用事务包裹，确保原子性
+    try { await db.execAsync('BEGIN TRANSACTION'); } catch { /* Web IDB 不支持 */ }
+    try {
+      for (const stmt of statements) {
+        try {
+          await db.execAsync(stmt);
+          appliedCount++;
+        } catch (error: any) {
+          console.error(`[PluginMigration] Rollback statement failed for ${pluginId}:`, stmt, error);
+          // 回滚中允许单个语句失败（表可能已被其他操作删除）
+        }
       }
+      try { await db.execAsync('COMMIT'); } catch { /* Web IDB 不支持 */ }
+    } catch (txError) {
+      try { await db.execAsync('ROLLBACK'); } catch { /* Web IDB 不支持 */ }
+      throw txError;
     }
 
     // 删除迁移记录

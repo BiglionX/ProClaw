@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Platform, LogBox, View, Text, ActivityIndicator } from 'react-native';
+import { Platform, LogBox, View, Text, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -26,7 +26,6 @@ import ProductsScreen from './src/screens/ProductsScreen';
 import SupplyChainScreen from './src/screens/SupplyChainScreen';
 import SalesOrderScreen from './src/screens/SalesOrderScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
 import CallScreen from './src/screens/CallScreen';
 import CallHistoryScreen from './src/screens/CallHistoryScreen';
 import AgentsScreen from './src/screens/AgentsScreen';
@@ -37,114 +36,47 @@ import PluginScreen from './src/screens/PluginScreen';
 import LanSyncScreen from './src/screens/LanSyncScreen';
 import DataTransferScreen from './src/screens/DataTransferScreen';
 import BackupWalletScreen from './src/components/BackupWalletScreen';
-import ProfileSwitcher from './src/components/ProfileSwitcher';
 import IncomingCallModal from './src/components/IncomingCallModal';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { loadToken, getApiClient } from './src/services/AuthService';
-import { useAppStore, switchProfile } from './src/stores/AppStore';
+// 新页面
+import ContactsTab from './src/screens/ContactsTab';
+import MessagesTab from './src/screens/MessagesTab';
+import ProfileTab from './src/screens/ProfileTab';
+import ChatDetailScreen from './src/screens/ChatDetailScreen';
+import IdentityChatScreen from './src/screens/IdentityChatScreen';
+import OnboardingWizard from './src/screens/OnboardingWizard';
+import SettingsScreen from './src/screens/SettingsScreen';
+import AISettingsScreen from './src/screens/AISettingsScreen';
+import SupabaseConfigScreen from './src/screens/SupabaseConfigScreen';
+import FloatingSecretaryButton from './src/components/FloatingSecretaryButton';
+
+type MainTabParamList = {
+  ContactsTab: undefined;
+  MessagesTab: undefined;
+  ProfileTab: undefined;
+};
+
+
+import { useAppStore } from './src/stores/AppStore';
 import { listProfiles, getCurrentProfile, setCurrentProfile } from './src/services/ProfileManager';
-import { openDatabase } from './src/services/DatabaseFactory';
-import { applySchema } from './src/services/SchemaManager';
+import { openDatabase, getDatabase } from './src/services/DatabaseFactory';
 import { setupChangeLogTriggers } from './src/services/ChangeLogManager';
 import { initSyncMetadata, getOrCreateDeviceId } from './src/services/SyncMetadataManager';
 import { getInstalledPlugins, getDynamicRoutes, onRoutesChanged } from './src/services/PluginRegistry';
-
-const ROLES_KEY = '@proclaw_user_roles';
-
-async function loadRoles(): Promise<string[]> {
-  try {
-    const raw = await AsyncStorage.getItem(ROLES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-async function saveRoles(roles: string[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(ROLES_KEY, JSON.stringify(roles));
-  } catch {
-    // ignore storage errors
-  }
-}
+import { initAIConfig } from './src/config/ai';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
-const SupplyChainStack = createStackNavigator();
 
-// 角色 -> 可见 Tab 映射 (PRD v4.3)
-const ROLE_TAB_ACCESS: Record<string, string[]> = {
-  boss: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  finance: ['HomeTab', 'AgentsTab', 'SupplyChainTab', 'ProfileTab'],
-  purchase: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  warehouse: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  sales: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  customer: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-  supplier: ['HomeTab', 'AgentsTab', 'ProductsTab', 'SupplyChainTab', 'ProfileTab'],
-};
-
-/** 根据用户角色计算可见 Tab 列表 */
-function getVisibleTabs(roles: string[]): string[] {
-  if (roles.includes('boss')) {
-    return ROLE_TAB_ACCESS['boss'];
-  }
-  // 多个角色取并集
-  const visible = new Set<string>();
-  for (const role of roles) {
-    const tabs = ROLE_TAB_ACCESS[role] || [];
-    for (const t of tabs) visible.add(t);
-  }
-  return visible.size > 0 ? Array.from(visible) : ['HomeTab', 'ProfileTab'];
-}
-
-/** 供应链 Tab 内部 Stack：首页 + 客户 + 销售单 */
-function SupplyChainNavigator() {
+/** 主 Tab 导航：固定 3 个 Tab，右下角浮动小如按钮 */
+function MainTabs() {
   return (
-    <SupplyChainStack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#6366f1' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
-      }}
-    >
-      <SupplyChainStack.Screen
-        name="SupplyChainHome"
-        component={SupplyChainScreen}
-        options={{ title: '供应链' }}
-      />
-      <SupplyChainStack.Screen
-        name="Contacts"
-        component={ContactsScreen}
-        options={{ title: '联系人' }}
-      />
-      <SupplyChainStack.Screen
-        name="SalesOrder"
-        component={SalesOrderScreen}
-        options={{ title: '创建销售单' }}
-      />
-      <SupplyChainStack.Screen
-        name="CallHistory"
-        component={CallHistoryScreen}
-        options={{ title: '通话记录' }}
-      />
-    </SupplyChainStack.Navigator>
-  );
-}
-
-/** 主 Tab 导航 (动态渲染) */
-function MainTabs({ userRoles, onProfileSwitch }: { userRoles: string[]; onProfileSwitch: () => void }) {
-  const visibleTabs = getVisibleTabs(userRoles);
-
-  return (
-    <Tab.Navigator
+    <View style={{ flex: 1 }}>
+      <Tab.Navigator
       screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: '#6366f1' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: 'bold' },
-        headerRight: () => (
-          <ProfileSwitcher onPress={onProfileSwitch} />
-        ),
         tabBarActiveTintColor: '#6366f1',
         tabBarInactiveTintColor: '#999',
         tabBarStyle: {
@@ -157,11 +89,9 @@ function MainTabs({ userRoles, onProfileSwitch }: { userRoles: string[]; onProfi
         tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
         tabBarIcon: ({ color, size }) => {
           const icons: Record<string, string> = {
-            HomeTab: 'view-dashboard',
-            AgentsTab: 'puzzle',
-            ProductsTab: 'package-variant-closed',
-            SupplyChainTab: 'truck-delivery',
-            ProfileTab: 'account',
+            ContactsTab: 'account-multiple',
+            MessagesTab: 'chat-processing',
+            ProfileTab: 'account-circle',
           };
           return (
             <MaterialCommunityIcons
@@ -171,43 +101,43 @@ function MainTabs({ userRoles, onProfileSwitch }: { userRoles: string[]; onProfi
             />
           );
         },
-        // 动态隐藏 Tab
-        tabBarItemStyle: visibleTabs.includes(route.name) ? undefined : { display: 'none' },
       })}
     >
       <Tab.Screen
-        name="HomeTab"
-        component={HomeScreen}
-        options={{ title: '首页', tabBarLabel: '首页' }}
+        name="ContactsTab"
+        component={ContactsTab}
+        options={{ title: '联系人', tabBarLabel: '联系人' }}
       />
       <Tab.Screen
-        name="AgentsTab"
-        component={AgentsScreen}
-        options={{ title: 'Agent', tabBarLabel: 'Agent' }}
-      />
-      <Tab.Screen
-        name="ProductsTab"
-        component={ProductsScreen}
-        options={{ title: '商品', tabBarLabel: '商品' }}
-      />
-      <Tab.Screen
-        name="SupplyChainTab"
-        component={SupplyChainNavigator}
-        options={{ headerShown: false, title: '供应链', tabBarLabel: '供应链' }}
+        name="MessagesTab"
+        component={MessagesTab}
+        options={{ title: '消息', tabBarLabel: '消息' }}
       />
       <Tab.Screen
         name="ProfileTab"
-        component={ProfileScreen}
-        options={{ title: '我的', tabBarLabel: '我的' }}
+        component={ProfileTab}
+        options={({ navigation }) => ({
+          title: '我的',
+          tabBarLabel: '我的',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.getParent()?.navigate('Settings')}
+              style={{ marginRight: 16 }}
+            >
+              <MaterialCommunityIcons name="cog" size={24} color="#fff" />
+            </TouchableOpacity>
+          ),
+        })}
       />
     </Tab.Navigator>
+      <FloatingSecretaryButton />
+    </View>
   );
 }
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [initialRoute, setInitialRoute] = useState<'ProfileSelect' | 'Connection' | 'Main'>('ProfileSelect');
-  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [initialRoute, setInitialRoute] = useState<'Onboarding' | 'ProfileSelect' | 'Connection' | 'Main'>('Onboarding');
   const [showProfileSelect, setShowProfileSelect] = useState(false);
   const [dynamicRoutes, setDynamicRoutes] = useState(getDynamicRoutes());
 
@@ -231,8 +161,8 @@ export default function App() {
       useAppStore.getState().setProfiles(profiles);
 
       if (profiles.length === 0) {
-        // 没有身份，直接显示身份选择页
-        setInitialRoute('ProfileSelect');
+        // 没有身份，启动引导向导
+        setInitialRoute('Onboarding');
         setLoading(false);
         return;
       }
@@ -241,35 +171,20 @@ export default function App() {
       const lastProfile = await getCurrentProfile();
       const targetProfile = lastProfile || profiles[0];
 
-      // 3. 检查认证状态
-      const token = await loadToken();
-      if (token) {
-        console.log('[App] Found existing token, loading profile...');
-        const savedRoles = await loadRoles();
-        if (savedRoles.length > 0) {
-          setUserRoles(savedRoles);
-        }
+      // 3. 有身份直接进主界面（手机端已是独立产品，无需连接桌面端）
+      console.log('[App] Loading profile:', targetProfile.id, targetProfile.name);
 
-        // 尝试从服务器刷新角色（非阻塞）
-        try {
-          const api = await getApiClient();
-          const res = await api.get('/api/auth/me');
-          const userData = res.data?.data;
-          if (userData?.roles) {
-            const roles = userData.roles.map((r: any) => r.name);
-            setUserRoles(roles);
-            await saveRoles(roles);
-          }
-        } catch (e) {
-          console.warn('[App] Failed to refresh roles:', e);
-        }
-
-        // 打开身份数据库并应用 Schema
+      // 打开身份数据库并应用 Schema
+      try {
         await openDatabase(targetProfile.id);
         await setCurrentProfile(targetProfile.id);
 
+        // 审计 W12：初始加载时也需应用 Schema 迁移（与 switchProfile 保持一致）
+        const { applySchema } = await import('./src/services/SchemaManager');
+        const db = getDatabase();
+        await applySchema(db);
+
         // 初始化同步元数据
-        const db = (await import('./src/services/DatabaseFactory')).getDatabase();
         const deviceId = await getOrCreateDeviceId();
         await initSyncMetadata(db, deviceId);
 
@@ -289,55 +204,22 @@ export default function App() {
         } catch (e) {
           console.warn('[App] Failed to load plugins:', e);
         }
-
-        setInitialRoute('Main');
-      } else {
-        // 无 token，但已有身份 -> 显示连接页
-        setInitialRoute('Connection');
+      } catch (e) {
+        console.warn('[App] DB init error, proceeding anyway:', e);
       }
+
+      setInitialRoute('Main');
     } catch (error: any) {
       console.warn('[App] Init error:', error?.message);
       setInitialRoute('ProfileSelect');
     } finally {
+      // 异步初始化 AI 配置（不阻塞主流程）
+      initAIConfig().catch((e) => console.warn('[App] AI config init failed:', e));
       setLoading(false);
     }
   };
 
-  // 登录成功后回调
-  const handleLoginSuccess = async () => {
-    try {
-      const api = await getApiClient();
-      const res = await api.get('/api/auth/me');
-      const userData = res.data?.data;
-      if (userData?.roles) {
-        const roles = userData.roles.map((r: any) => r.name);
-        setUserRoles(roles);
-      }
-
-      // 登录成功后，加载默认身份
-      const profile = await getCurrentProfile();
-      if (profile) {
-        await openDatabase(profile.id);
-        await setCurrentProfile(profile.id);
-
-        // 初始化同步元数据和触发器
-        const db = (await import('./src/services/DatabaseFactory')).getDatabase();
-        const deviceId = await getOrCreateDeviceId();
-        await initSyncMetadata(db, deviceId);
-
-        try {
-          await setupChangeLogTriggers(db);
-        } catch (e) {
-          console.warn('[App] Failed to setup change log triggers:', e);
-        }
-      }
-      setInitialRoute('Main');
-    } catch (e) {
-      console.warn('[App] Failed to reload roles:', e);
-    }
-  };
-
-  // 身份切换按钮点击
+  // 身份切换
   const handleProfileSwitchPress = useCallback(() => {
     setShowProfileSelect(true);
   }, []);
@@ -349,7 +231,11 @@ export default function App() {
         <SafeAreaProvider>
           <PaperProvider theme={theme}>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9ff' }}>
-              <Text style={{ fontSize: 28, marginBottom: 16 }}>🦁</Text>
+              <Image
+                source={require('./assets/proclaw-logo.png')}
+                style={{ width: 64, height: 64, marginBottom: 16 }}
+                resizeMode="contain"
+              />
               <Text style={{ fontSize: 20, fontWeight: '600', color: '#6366f1' }}>ProClaw</Text>
               <ActivityIndicator size="small" color="#6366f1" style={{ marginTop: 16 }} />
             </View>
@@ -383,18 +269,20 @@ export default function App() {
             >
               <Stack.Screen name="Connection" component={ConnectionScreen} />
               <Stack.Screen
+                name="Onboarding"
+                component={OnboardingWizard}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
                 name="ProfileSelect"
                 component={ProfileSelectScreen}
                 options={{ title: '选择身份' }}
               />
               <Stack.Screen
                 name="Main"
+                component={MainTabs}
                 options={{ headerShown: false }}
-              >
-                {(props) => (
-                  <MainTabs {...props} userRoles={userRoles} onProfileSwitch={() => {}} />
-                )}
-              </Stack.Screen>
+              />
               <Stack.Screen
                 name="Call"
                 component={CallScreen}
@@ -436,6 +324,69 @@ export default function App() {
                 options={({ route }: any) => ({
                   title: route.params?.pluginTitle || '插件',
                 })}
+              />
+              {/* 业务页面路由（从原 Tab 剥离，通过 Stack 导航） */}
+              <Stack.Screen
+                name="Products"
+                component={ProductsScreen}
+                options={{ title: '商品' }}
+              />
+              <Stack.Screen
+                name="SupplyChain"
+                component={SupplyChainScreen}
+                options={{ title: '供应链' }}
+              />
+              <Stack.Screen
+                name="SalesOrder"
+                component={SalesOrderScreen}
+                options={{ title: '创建销售单' }}
+              />
+              <Stack.Screen
+                name="Contacts"
+                component={ContactsScreen}
+                options={{ title: '联系人' }}
+              />
+              <Stack.Screen
+                name="CallHistory"
+                component={CallHistoryScreen}
+                options={{ title: '通话记录' }}
+              />
+              <Stack.Screen
+                name="Agents"
+                component={AgentsScreen}
+                options={{ title: 'Agent' }}
+              />
+              <Stack.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{ title: '数据看板' }}
+              />
+              <Stack.Screen
+                name="ChatDetail"
+                component={ChatDetailScreen}
+                options={({ route }: any) => ({
+                  title: route.params?.targetName || '聊天',
+                })}
+              />
+              <Stack.Screen
+                name="IdentityManage"
+                component={IdentityChatScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{ title: '设置' }}
+              />
+              <Stack.Screen
+                name="AISettings"
+                component={AISettingsScreen}
+                options={{ title: 'AI 配置' }}
+              />
+              <Stack.Screen
+                name="SupabaseConfig"
+                component={SupabaseConfigScreen}
+                options={{ title: '云端同步配置' }}
               />
             </Stack.Navigator>
           </NavigationContainer>

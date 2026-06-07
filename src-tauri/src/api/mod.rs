@@ -7,6 +7,7 @@ use axum::{
     extract::Request,
     middleware::{self, Next},
     http::StatusCode,
+    http::HeaderValue,
     Json,
 };
 use tower_http::cors::{CorsLayer, Any};
@@ -241,7 +242,9 @@ pub async fn rbac_middleware(
         });
 
     // 解析 JWT 密钥
-    let secret = JWT_SECRET.get().cloned().unwrap_or_else(|| vec![0u8; 32]);
+    // 审计修复 #1: JWT_SECRET 未初始化时立即 panic（fail-fast），不再静默回退零密钥
+    let secret = JWT_SECRET.get().cloned()
+        .expect("JWT_SECRET not initialized — startup must call JWT_SECRET.set()");
 
     match token {
         Some(token) => {
@@ -259,7 +262,8 @@ pub async fn rbac_middleware(
                                 }).to_string()
                             ));
                             *resp.status_mut() = StatusCode::FORBIDDEN;
-                            resp.headers_mut().insert("content-type", "application/json".parse().unwrap());
+                            // 审计修复 #15: 使用 HeaderValue::from_static 避免 unwrap
+                            resp.headers_mut().insert("content-type", HeaderValue::from_static("application/json"));
                             return resp;
                         }
                     }
@@ -272,7 +276,7 @@ pub async fn rbac_middleware(
                         serde_json::json!({"error": "Invalid or expired token"}).to_string()
                     ));
                     *resp.status_mut() = StatusCode::UNAUTHORIZED;
-                    resp.headers_mut().insert("content-type", "application/json".parse().unwrap());
+                    resp.headers_mut().insert("content-type", HeaderValue::from_static("application/json"));
                     resp
                 }
             }
@@ -282,15 +286,16 @@ pub async fn rbac_middleware(
                 serde_json::json!({"error": "Missing Authorization header"}).to_string()
             ));
             *resp.status_mut() = StatusCode::UNAUTHORIZED;
-            resp.headers_mut().insert("content-type", "application/json".parse().unwrap());
+            resp.headers_mut().insert("content-type", HeaderValue::from_static("application/json"));
             resp
         }
     }
 }
 
 /// WebSocket 认证中间件（无 RBAC 检查，仅验证 token）
+/// 审计修复 #3: 实际验证 JWT token 而非仅检查存在性
 pub async fn auth_middleware_ws(
-    request: Request<Body>,
+    mut request: Request<Body>,
     next: Next,
 ) -> Response {
     let token = request
@@ -308,18 +313,33 @@ pub async fn auth_middleware_ws(
                 })
         });
 
+    let secret = JWT_SECRET.get().cloned()
+        .expect("JWT_SECRET not initialized — startup must call JWT_SECRET.set()");
+
     match token {
-        Some(_token) => {
-            // WebSocket 权限在 handler 中单独处理
-            // 这里仅做基本 token 存在性验证
-            next.run(request).await
+        Some(t) => {
+            match auth::verify_token(&t, &secret) {
+                Ok(claims) => {
+                    // 将 Claims 注入 request extensions 供 handler 使用
+                    request.extensions_mut().insert(claims);
+                    next.run(request).await
+                }
+                Err(_) => {
+                    let mut resp = Response::new(Body::from(
+                        serde_json::json!({"error": "Invalid or expired token"}).to_string()
+                    ));
+                    *resp.status_mut() = StatusCode::UNAUTHORIZED;
+                    resp.headers_mut().insert("content-type", HeaderValue::from_static("application/json"));
+                    resp
+                }
+            }
         }
         None => {
             let mut resp = Response::new(Body::from(
                 serde_json::json!({"error": "Missing Authorization header"}).to_string()
             ));
             *resp.status_mut() = StatusCode::UNAUTHORIZED;
-            resp.headers_mut().insert("content-type", "application/json".parse().unwrap());
+            resp.headers_mut().insert("content-type", HeaderValue::from_static("application/json"));
             resp
         }
     }

@@ -341,22 +341,34 @@ pub async fn update_sales_order(
             Json(serde_json::json!({"error": format!("Transaction error: {}", e)}))),
     };
 
-    let _ = tx.execute(
+    if let Err(e) = tx.execute(
         "UPDATE sales_orders SET customer_id = ?1, order_date = ?2, \
          expected_delivery_date = ?3, shipping_address = ?4, notes = ?5, updated_at = CURRENT_TIMESTAMP WHERE id = ?6",
         params![payload.customer_id, payload.order_date, payload.expected_delivery_date, payload.shipping_address, payload.notes, id],
-    );
+    ) {
+        let _ = tx.rollback();
+        return (StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update order: {}", e)})));
+    }
 
-    let _ = tx.execute("DELETE FROM sales_order_items WHERE sales_order_id = ?1", params![id]);
+    if let Err(e) = tx.execute("DELETE FROM sales_order_items WHERE sales_order_id = ?1", params![id]) {
+        let _ = tx.rollback();
+        return (StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to clear old items: {}", e)})));
+    }
 
     for item in &payload.items {
         let item_id = Uuid::new_v4().to_string();
         let total_price = item.quantity as f64 * item.unit_price;
-        let _ = tx.execute(
+        if let Err(e) = tx.execute(
             "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity, notes) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
             params![item_id, id, item.product_id, item.quantity, item.unit_price, total_price, item.notes],
-        );
+        ) {
+            let _ = tx.rollback();
+            return (StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to insert item: {}", e)})));
+        }
     }
 
     let total_amount: f64 = tx.query_row(
@@ -365,7 +377,11 @@ pub async fn update_sales_order(
         |row| row.get(0),
     ).unwrap_or(0.0);
 
-    let _ = tx.execute("UPDATE sales_orders SET total_amount = ?1 WHERE id = ?2", params![total_amount, id]);
+    if let Err(e) = tx.execute("UPDATE sales_orders SET total_amount = ?1 WHERE id = ?2", params![total_amount, id]) {
+        let _ = tx.rollback();
+        return (StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update total: {}", e)})));
+    }
 
     if let Err(e) = tx.commit() {
         return (StatusCode::INTERNAL_SERVER_ERROR,
@@ -467,11 +483,15 @@ pub async fn submit_sales_order(
         }
 
         let txn_id = Uuid::new_v4().to_string();
-        let _ = tx.execute(
+        if let Err(e) = tx.execute(
             "INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, \
              reference_no, reason, notes) VALUES (?1, ?2, 'outbound', ?3, ?4, 'sales_order', '销售出库')",
             params![txn_id, product_id, quantity, id],
-        );
+        ) {
+            let _ = tx.rollback();
+            return (StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to record inventory transaction: {}", e)})));
+        }
     }
 
     if let Err(e) = tx.execute(

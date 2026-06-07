@@ -33,7 +33,10 @@ export interface AcceptEmployeeInvitationResponse {
   roles?: string[];
 }
 
-const API_BASE_URL = 'http://localhost:8888';
+// 审计 R2-S7：移除硬编码 localhost API_BASE_URL。
+// acceptInvitation / acceptEmployeeInvitation 始终通过 host 参数接收服务器地址，
+// 调用方（InvitationHandlerScreen）负责从 AuthService.loadServerUrl() 获取。
+
 
 /**
  * 接受外部伙伴邀请

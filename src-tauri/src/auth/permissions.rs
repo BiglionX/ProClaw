@@ -77,7 +77,12 @@ pub fn has_any_permission(role_permissions: &[String], required: &[&str]) -> boo
 /// 从 JSON 权限字符串解析为 Vec
 #[allow(dead_code)]
 pub fn parse_permissions(json_perms: &str) -> Vec<String> {
-    serde_json::from_str::<Vec<String>>(json_perms).unwrap_or_default()
+    serde_json::from_str::<Vec<String>>(json_perms)
+        .unwrap_or_else(|e| {
+            eprintln!("[Permissions] Failed to parse permissions JSON: {} - raw: {}", e,
+                if json_perms.len() > 100 { &json_perms[..100] } else { json_perms });
+            vec![]
+        })
 }
 
 /// 获取角色对应的默认权限列表
@@ -177,8 +182,28 @@ pub fn required_permission_for_route(method: &str, path: &str) -> Option<&'stati
 
         // 邀请管理 (PRD v4.2)
         (_, p) if p == "/api/invitations/create" => Some(perm::CREATE_INVITATION),
+        (_, p) if p == "/api/invitations/create_employee" => Some(perm::CREATE_INVITATION),
         (_, p) if p == "/api/invitations" && method == "GET" => Some(perm::VIEW_INVITATIONS),
         (_, p) if p.contains("/api/invitations/") && p.contains("/revoke") => Some(perm::REVOKE_INVITATION),
+
+        // 审计修复 #19: 云商城 API 权限控制
+        (_, p) if p == "/api/cloud-store" && method == "POST" => Some(perm::MANAGE_FINANCE),
+        (_, p) if p.starts_with("/api/cloud-store") => match method {
+            "POST" | "PUT" | "DELETE" => Some(perm::MANAGE_FINANCE),
+            _ => Some(perm::VIEW_FINANCE),
+        },
+
+        // 订阅与计费 API 权限控制
+        (_, p) if p.starts_with("/api/subscriptions") => match method {
+            "POST" => Some(perm::MANAGE_FINANCE),
+            _ => Some(perm::VIEW_FINANCE),
+        },
+
+        // 通话记录 API 权限控制
+        (_, p) if p.starts_with("/api/call-records") => match method {
+            "POST" => Some(perm::CREATE_SALES_ORDER),
+            _ => Some(perm::VIEW_SALES),
+        },
 
         // AI / 文件 / 消息 / 设备 / 中继 — 内部用户均可
         _ => None,

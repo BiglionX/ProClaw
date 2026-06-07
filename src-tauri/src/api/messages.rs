@@ -278,11 +278,13 @@ pub async fn send_message(
     // 如果对方离线，写入离线消息队列
     if is_offline && !payload.to.is_empty() {
         let offline_id = Uuid::new_v4().to_string();
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "INSERT INTO offline_messages (id, target_user, message_id, is_sent, retry_count, created_at)
              VALUES (?1, ?2, ?3, 0, 0, datetime('now'))",
             rusqlite::params![offline_id, payload.to, msg_id],
-        );
+        ) {
+            eprintln!("[Messages] Failed to store offline message {}: {}", msg_id, e);
+        }
     }
 
     // conn and db are dropped implicitly when they go out of scope
@@ -342,10 +344,12 @@ pub async fn mark_message_read(
     };
 
     // 也更新 offline_messages 表
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE offline_messages SET is_sent = 1 WHERE message_id = ?1",
         rusqlite::params![msg_id],
-    );
+    ) {
+        eprintln!("[Messages] Failed to mark offline message as sent: {}", e);
+    }
 
     (
         StatusCode::OK,

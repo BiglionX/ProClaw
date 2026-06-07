@@ -378,7 +378,7 @@ pub fn submit_sales_order_cmd(db: tauri::State<Mutex<Database>>, order_id: Strin
             .map_err(|_| format!("Product {} not found", pid))?;
 
         if current < *qty {
-            let _ = tx.rollback();
+            if let Err(rb) = tx.rollback() { eprintln!("[sales] rollback failed: {}", rb); }
             return Err(format!("Insufficient stock for product {}. Current: {}, Required: {}", pid, current, qty));
         }
 

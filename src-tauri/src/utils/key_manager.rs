@@ -1,5 +1,6 @@
 // JWT 密钥管理
 // 生成、存储、加载 JWT 签名密钥，替代硬编码 [0u8; 32]
+// 审计修复 #1/#2/#22: 新增 derive_from_key 用于派生独立子密钥
 
 use rand::RngCore;
 use std::path::PathBuf;
@@ -10,6 +11,24 @@ pub struct KeyManager {
 }
 
 impl KeyManager {
+    /// 审计修复 #1/#2/#22: 从主密钥派生独立子密钥（HMAC-SHA256）
+    /// 不同用途使用不同 context/salt 确保密钥间无关联
+    pub fn derive_from_key(manager: &Self, context: &[u8]) -> [u8; 32] {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        type HmacSha256 = Hmac<Sha256>;
+        
+        let mut mac = HmacSha256::new_from_slice(&manager.key)
+            .expect("HMAC-SHA256 can take key of any size");
+        mac.update(context);
+        let result = mac.finalize();
+        let code_bytes = result.into_bytes();
+        
+        let mut derived = [0u8; 32];
+        derived.copy_from_slice(&code_bytes[..32]);
+        derived
+    }
+
     /// 从指定路径加载密钥，如果不存在则生成新密钥
     pub fn load_or_generate(key_path: &std::path::Path) -> Self {
         let key = if key_path.exists() {

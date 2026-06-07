@@ -8,9 +8,13 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { generateId } from '../utils/generateId';
 
 const PROFILES_KEY = '@proclaw_profiles';
 const CURRENT_PROFILE_KEY = '@proclaw_current_profile';
+
+// 审计 C3：互斥锁防止并发创建身份丢失
+let createProfileMutex: Promise<void> = Promise.resolve();
 
 export interface Profile {
   id: string;
@@ -20,12 +24,7 @@ export interface Profile {
   lastUsed: number;    // 最后使用时间戳
 }
 
-/**
- * 生成唯一ID
- */
-const generateId = (): string => {
-  return 'profile_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9);
-};
+/** 审计 M1：generateId 从 ../utils/generateId 共享导入 */
 
 /**
  * 加载所有身份列表
@@ -54,25 +53,38 @@ const saveProfiles = async (profiles: Profile[]): Promise<void> => {
 
 /**
  * 创建新身份
+ * 审计 C3：使用互斥锁防止并发 read-modify-write 丢失
  * @param name 身份名称
  * @param avatar 头像标识（emoji或图片路径）
  * @returns 新创建的身份
  */
 export const createProfile = async (name: string, avatar: string = ''): Promise<Profile> => {
-  const profiles = await listProfiles();
+  const prevMutex = createProfileMutex;
+  let release: () => void = () => {};
+  createProfileMutex = new Promise<void>((resolve) => { release = resolve; });
+  await prevMutex;
 
-  const newProfile: Profile = {
-    id: generateId(),
-    name,
-    avatar: avatar || getDefaultAvatar(profiles.length),
-    createdAt: Date.now(),
-    lastUsed: Date.now(),
-  };
+  try {
+    const profiles = await listProfiles();
 
-  profiles.push(newProfile);
-  await saveProfiles(profiles);
-  console.log('[ProfileManager] Created profile:', newProfile.id, newProfile.name);
-  return newProfile;
+    const newProfile: Profile = {
+      id: generateId('profile_'),
+      name,
+      avatar: avatar || getDefaultAvatar(profiles.length),
+      createdAt: Date.now(),
+      lastUsed: Date.now(),
+    };
+
+    profiles.push(newProfile);
+    await saveProfiles(profiles);
+    console.log('[ProfileManager] Created profile:', newProfile.id, newProfile.name);
+    return newProfile;
+  } finally {
+    // 审计 C5：try-catch release 防止异常导致互斥锁永久锁定
+    try { release(); } catch (e) {
+      console.warn('[ProfileManager] Mutex release failed:', e);
+    }
+  }
 };
 
 /**
@@ -85,15 +97,27 @@ const getDefaultAvatar = (index: number): string => {
 
 /**
  * 更新身份信息
+ * 审计 W11：使用与 createProfile/deleteProfile 相同的互斥锁，防止并发 update 丢失
  */
 export const updateProfile = async (id: string, updates: Partial<Pick<Profile, 'name' | 'avatar'>>): Promise<Profile | null> => {
-  const profiles = await listProfiles();
-  const index = profiles.findIndex(p => p.id === id);
-  if (index === -1) return null;
+  const prevMutex = createProfileMutex;
+  let release: () => void = () => {};
+  createProfileMutex = new Promise<void>((resolve) => { release = resolve; });
+  await prevMutex;
 
-  profiles[index] = { ...profiles[index], ...updates };
-  await saveProfiles(profiles);
-  return profiles[index];
+  try {
+    const profiles = await listProfiles();
+    const index = profiles.findIndex(p => p.id === id);
+    if (index === -1) return null;
+
+    profiles[index] = { ...profiles[index], ...updates };
+    await saveProfiles(profiles);
+    return profiles[index];
+  } finally {
+    try { release(); } catch (e) {
+      console.warn('[ProfileManager] Mutex release failed:', e);
+    }
+  }
 };
 
 /**
@@ -132,14 +156,21 @@ export const cleanupProfileFiles = async (profileId: string): Promise<void> => {
 
 /**
  * 删除身份（同时清理对应的数据库文件和插件目录）
+ * 审计 W7：使用与 createProfile 相同的互斥锁，防止并发 delete 丢失数据
  */
 export const deleteProfile = async (id: string): Promise<boolean> => {
-  const profiles = await listProfiles();
-  const index = profiles.findIndex(p => p.id === id);
-  if (index === -1) return false;
+  const prevMutex = createProfileMutex;
+  let release: () => void = () => {};
+  createProfileMutex = new Promise<void>((resolve) => { release = resolve; });
+  await prevMutex;
 
-  profiles.splice(index, 1);
-  await saveProfiles(profiles);
+  try {
+    const profiles = await listProfiles();
+    const index = profiles.findIndex(p => p.id === id);
+    if (index === -1) return false;
+
+    profiles.splice(index, 1);
+    await saveProfiles(profiles);
 
   // 如果删除的是当前身份，清除 currentProfile
   const current = await getCurrentProfile();
@@ -147,31 +178,48 @@ export const deleteProfile = async (id: string): Promise<boolean> => {
     await AsyncStorage.removeItem(CURRENT_PROFILE_KEY);
   }
 
-  // 清理数据库文件和插件目录
-  await cleanupProfileFiles(id);
+    // 清理数据库文件和插件目录
+    await cleanupProfileFiles(id);
 
-  console.log('[ProfileManager] Deleted profile:', id);
-  return true;
+    console.log('[ProfileManager] Deleted profile:', id);
+    return true;
+  } finally {
+    try { release(); } catch (e) {
+      console.warn('[ProfileManager] Mutex release failed:', e);
+    }
+  }
 };
 
 /**
  * 切换当前身份
  * 注意：此函数仅更新元数据，实际数据库切换由调用方处理
+ * 审计 W16：使用与 createProfile 相同的互斥锁，防止并发 lastUsed 更新丢数据
  */
 export const setCurrentProfile = async (id: string): Promise<void> => {
-  const profiles = await listProfiles();
-  const profile = profiles.find(p => p.id === id);
-  if (!profile) {
-    throw new Error(`Profile not found: ${id}`);
+  const prevMutex = createProfileMutex;
+  let release: () => void = () => {};
+  createProfileMutex = new Promise<void>((resolve) => { release = resolve; });
+  await prevMutex;
+
+  try {
+    const profiles = await listProfiles();
+    const profile = profiles.find(p => p.id === id);
+    if (!profile) {
+      throw new Error(`Profile not found: ${id}`);
+    }
+
+    // 更新 lastUsed
+    profile.lastUsed = Date.now();
+    await saveProfiles(profiles);
+
+    // 保存当前身份ID
+    await AsyncStorage.setItem(CURRENT_PROFILE_KEY, id);
+    console.log('[ProfileManager] Set current profile:', id);
+  } finally {
+    try { release(); } catch (e) {
+      console.warn('[ProfileManager] Mutex release failed:', e);
+    }
   }
-
-  // 更新 lastUsed
-  profile.lastUsed = Date.now();
-  await saveProfiles(profiles);
-
-  // 保存当前身份ID
-  await AsyncStorage.setItem(CURRENT_PROFILE_KEY, id);
-  console.log('[ProfileManager] Set current profile:', id);
 };
 
 /**

@@ -34,7 +34,7 @@ impl SupabaseClient {
             .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(10))
             .build()
-            .unwrap_or_default();
+            .expect("Failed to create Supabase HTTP client. Check system network stack.");
 
         Self {
             client,

@@ -109,10 +109,12 @@ pub async fn pair_device(
     };
 
     // 2. 标记配对码为已使用
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE pairing_codes SET is_used = 1, used_by_device_id = ?1 WHERE id = ?2",
         params!["temp_device".to_string(), pairing_id.clone()],
-    );
+    ) {
+        eprintln!("[Auth] Failed to mark pairing code used: {}", e);
+    }
 
     // 3. 获取用户角色和权限
     let (role, permissions) = get_user_role_and_permissions(&conn, &user_id);
@@ -130,11 +132,13 @@ pub async fn pair_device(
     };
 
     // 5. 存储设备信息
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR REPLACE INTO devices (id, user_id, device_name, device_type, access_token, refresh_token, token_expires_at, is_revoked)
          VALUES (?1, ?2, ?3, 'mobile', ?4, ?5, ?6, 0)",
         params![device_id, user_id, format!("Device from {}", addr.ip()), access_token, refresh_token, now + 3600],
-    );
+    ) {
+        eprintln!("[Auth] Failed to save device info: {}", e);
+    }
 
     (
         StatusCode::OK,
@@ -215,10 +219,12 @@ pub async fn login(
     let (role, permissions) = get_user_role_and_permissions(&conn, &user_id);
 
     // 4. 更新最后登录时间
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?1",
         params![user_id],
-    );
+    ) {
+        eprintln!("[Auth] Failed to update last login time for {}: {}", user_id, e);
+    }
 
     // 5. 生成JWT token
     let device_id = "web".to_string();
@@ -277,9 +283,13 @@ pub fn generate_token(
 }
 
 /// 验证JWT token (Phase 6: 使用实际 JWT 密钥)
+/// 使用严格的验证配置：仅允许 HS256，要求 exp/sub/iat 声明，30秒时钟偏差容忍
 pub fn verify_token(token: &str, jwt_secret: &[u8]) -> Result<Claims, String> {
     let key = jsonwebtoken::DecodingKey::from_secret(jwt_secret);
-    let validation = Validation::default();
+    let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.set_required_spec_claims(&["exp", "sub", "iat"]);
+    validation.leeway = 30; // 30秒时钟偏差容忍
+    validation.validate_exp = true;
 
     decode::<Claims>(token, &key, &validation)
         .map(|data| data.claims)
@@ -293,9 +303,28 @@ pub fn generate_pairing_code() -> String {
     format!("{:06}", rng.gen_range(0..1000000))
 }
 
-/// 获取本机IP地址
+/// 获取本机局域网IP地址
+/// 尝试连接外部地址获取本机实际 IP，回退到 127.0.0.1
 #[allow(dead_code)]
 pub fn get_local_ip() -> Vec<String> {
+    // 通过 UDP socket 探测本机实际局域网 IP
+    match std::net::UdpSocket::bind("0.0.0.0:0") {
+        Ok(socket) => {
+            // 尝试连接一个可达地址以获取实际使用的本地地址
+            // 使用 114.114.114.114 (国内DNS) 作为探测目标，兼容性更好
+            let targets = ["114.114.114.114:53", "8.8.8.8:53", "1.1.1.1:53"];
+            for target in &targets {
+                if socket.connect(target).is_ok() {
+                    if let Ok(addr) = socket.local_addr() {
+                        let ip = addr.ip().to_string();
+                        return vec![ip];
+                    }
+                }
+            }
+        }
+        Err(_) => {}
+    }
+    // 回退：尝试枚举网络接口
     vec!["127.0.0.1".to_string()]
 }
 

@@ -149,8 +149,11 @@ async fn main() {
     let db_path = get_database_path();
     println!("Database path: {:?}", db_path);
 
-    let db = Database::new(db_path.clone()).expect("Failed to create database");
-    db.initialize().expect("Failed to initialize database");
+    // 审计修复 #11: 改善启动错误信息，提供可操作的故障排除提示
+    let db = Database::new(db_path.clone())
+        .expect("启动失败: 无法创建数据库。请检查磁盘空间和数据目录权限。");
+    db.initialize()
+        .expect("启动失败: 数据库初始化失败。数据库文件可能已损坏，请尝试删除后重新启动。");
     println!("Database initialized successfully");
 
     // 开发环境: 自动创建测试用户和配对码
@@ -174,14 +177,26 @@ async fn main() {
         }
     }
 
-    // 创建同步引擎（使用独立的数据库实例）
-    let sync_engine = SyncEngine::new(Database::new(db_path.clone()).expect("Failed to create database"));
+    // Phase 6: 初始化 JWT 密钥管理器（必须在云备份之前，用于派生密钥）
+    let key_manager = KeyManager::from_env_or_default();
+    let jwt_secret = key_manager.as_bytes().to_vec();
+    // 设置全局 JWT 密钥供中间件使用
+    api::JWT_SECRET.set(jwt_secret.clone()).ok();
 
-    // 创建云备份服务（使用独立的数据库实例）
-    let encryption_key = [0u8; 32]; // 实际应用中应从配置或用户输入获取
+    // 创建同步引擎（使用独立的数据库实例）
+    // 审计修复 #11: 5个独立连接共享WAL无重试机制。WAL模式支持多读单写，
+    // 当前设计为迁移过渡方案，后续应用连接池统一管理。
+    let sync_engine = SyncEngine::new(Database::new(db_path.clone())
+        .expect("启动失败: 同步引擎数据库创建失败。请检查磁盘空间。"));
+    // 审计修复 #10: 多个独立 DB 实例竞争同一 WAL 文件是已知过渡设计，
+    // SQLite WAL 模式支持多读单写，但缺少 SQLITE_BUSY 重试。
+
+    // 审计修复 #2: 从 KeyManager 派生云备份独立密钥，不再使用全零密钥
+    let backup_encryption_key = KeyManager::derive_from_key(&key_manager, b"proclaw-cloud-backup-key-v1");
     let cloud_backup_service = Arc::new(CloudBackupService::new(
-        Database::new(db_path.clone()).expect("Failed to create database"),
-        &encryption_key
+        Database::new(db_path.clone())
+            .expect("启动失败: 云备份数据库创建失败。请检查磁盘空间。"),
+        &backup_encryption_key
     ));
 
     // Phase 10: 初始化 NvwaX API 客户端和计费服务
@@ -189,25 +204,41 @@ async fn main() {
     let nvwax_key_salt = b"nvwax_api_key_2024";
     let nvwax_cipher = Arc::new(
         Aes256GcmCipher::from_password("proclaw-nvwax-secure-key", nvwax_key_salt)
+            .expect("Failed to create NvwaX cipher")
     );
 
     // 优先使用环境变量 NVWAX_API_KEY，其次尝试从数据库加载已保存的 Key
+    // 审计修复 #15: 解密/加载失败时打印警告，不再静默回退为空字符串
     let nvwax_api_key = {
         if let Ok(key) = std::env::var("NVWAX_API_KEY") {
-            key
+            if !key.is_empty() {
+                key
+            } else {
+                eprintln!("[NvwaX] WARNING: NVWAX_API_KEY env var is empty");
+                String::new()
+            }
         } else {
             // 尝试从数据库读取已保存的 API Key（加密存储，需解密）
-            db.connection()
+            match db.connection()
                 .query_row(
                     "SELECT value FROM system_config WHERE key = 'nvwax_api_key'",
                     [],
                     |row| row.get::<_, String>(0),
-                )
-                .ok()
-                .and_then(|encrypted| {
-                    nvwax_cipher.decrypt_string(&encrypted).ok()
-                })
-                .unwrap_or_default()
+                ) {
+                Ok(encrypted) => {
+                    match nvwax_cipher.decrypt_string(&encrypted) {
+                        Ok(key) => key,
+                        Err(e) => {
+                            eprintln!("[NvwaX] WARNING: Failed to decrypt stored API key: {}", e);
+                            String::new()
+                        }
+                    }
+                }
+                Err(_) => {
+                    // 未配置 API Key 是正常情况，不打印警告
+                    String::new()
+                }
+            }
         }
     };
     let nvwax_client = Arc::new(
@@ -223,15 +254,14 @@ async fn main() {
     ));
     let nvwax_billing = Arc::new(NvwaXBilling::new(nvwax_billing_db));
 
-    // Phase 6: 初始化 JWT 密钥管理器
-    let key_manager = KeyManager::from_env_or_default();
-    let jwt_secret = key_manager.as_bytes().to_vec();
-    // 设置全局 JWT 密钥供中间件使用
-    api::JWT_SECRET.set(jwt_secret.clone()).ok();
-
+    // 审计修复 #1/#22: 从 KeyManager 派生 HTTP API 独立加密密钥（与云备份密钥分离）
+    let api_encryption_key = KeyManager::derive_from_key(&key_manager, b"proclaw-http-api-key-v1");
+    let cipher = Arc::new(
+        Aes256GcmCipher::new(&api_encryption_key)
+            .expect("Failed to create HTTP API cipher from derived key")
+    );
     // 创建 axum 应用状态（使用独立数据库连接，SQLite WAL 支持多连接）
     let http_db = Arc::new(Mutex::new(Database::new(db_path.clone()).expect("Failed to create HTTP DB")));
-    let cipher = Arc::new(Aes256GcmCipher::new(&[0u8; 32]));
     let ws_manager = Arc::new(WebSocketManager::new());
     let app_state = AppState {
         db: http_db,
@@ -245,17 +275,22 @@ async fn main() {
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 8888));
     println!("Starting HTTP server on http://{}", addr);
     
-    match tokio::net::TcpListener::bind(&addr).await {
+    let _http_handle = match tokio::net::TcpListener::bind(&addr).await {
         Ok(listener) => {
             let axum_app = api::create_router(app_state);
-            tokio::spawn(async move {
-                axum::serve(listener, axum_app.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
+            // 审计修复 R4: 保留 JoinHandle 防止任务泄漏
+            let handle = tokio::spawn(async move {
+                if let Err(e) = axum::serve(listener, axum_app.into_make_service_with_connect_info::<SocketAddr>()).await {
+                    eprintln!("[HTTP Server] Fatal error: {}. HTTP API is now unavailable.", e);
+                }
             });
+            Some(handle)
         }
         Err(e) => {
             eprintln!("Warning: Could not bind HTTP server to {}: {}. HTTP API will be unavailable.", addr, e);
+            None
         }
-    }
+    };
 
     // 启动 Tauri 应用
     tauri::Builder::default()
@@ -738,5 +773,5 @@ async fn main() {
             test_nvwax_connection,
         ])
     .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .expect("启动失败: Tauri 应用运行时出错。请检查系统资源是否充足。");
 }

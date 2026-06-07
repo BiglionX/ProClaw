@@ -12,6 +12,11 @@ import {
 import wsService from './WebSocketService';
 import { useCallStore, CallType } from '../stores/CallStore';
 
+// 审计 D5：Web 平台不支持 WebRTC，提前检测
+const isWebRTCSupported = (): boolean => {
+  return Platform.OS !== 'web' && typeof RTCPeerConnection === 'function';
+};
+
 class CallManager {
   private callTimeout: ReturnType<typeof setTimeout> | null = null;
   private durationTimer: ReturnType<typeof setInterval> | null = null;
@@ -48,6 +53,12 @@ class CallManager {
 
   /** 发起语音/视频通话 */
   async startCall(targetUserId: string, targetUserName: string, callType: CallType): Promise<boolean> {
+    // 审计 D5：Web 平台不支持 WebRTC
+    if (!isWebRTCSupported()) {
+      Alert.alert('提示', '当前平台不支持音视频通话');
+      return false;
+    }
+
     const store = useCallStore.getState();
 
     // 检查是否已在通话中
@@ -82,25 +93,44 @@ class CallManager {
       callType,
     });
 
-    // 创建 SDP Offer
-    const offer = await this.rtcPeer!.createOffer({});
-    await this.rtcPeer!.setLocalDescription(offer);
+    // 创建 SDP Offer（审计 H4：不使用非空断言，检查 rtcPeer 是否存在）
+    if (!this.rtcPeer) {
+      console.error('[Call] PeerConnection is null after creation');
+      this.cleanup();
+      store.endCall();
+      setTimeout(() => store.reset(), 500);
+      Alert.alert('错误', '无法创建通话连接');
+      return false;
+    }
 
-    // 通过 WebSocket 发送 call_offer
-    wsService.send('call_offer', {
-      sessionId,
-      callType,
-      callerId: userId,
-      calleeId: targetUserId,
-      offer: { sdp: offer.sdp, type: offer.type },
-    }, targetUserId);
+    // 审计 W6：createOffer/setLocalDescription 可能抛异常，需 try-catch 防止 PeerConnection 和状态泄漏
+    try {
+      const offer = await this.rtcPeer.createOffer({});
+      await this.rtcPeer.setLocalDescription(offer);
 
-    // 设置超时（30秒）
-    this.callTimeout = setTimeout(() => {
-      this.handleCallTimeout();
-    }, 30000);
+      // 通过 WebSocket 发送 call_offer
+      wsService.send('call_offer', {
+        sessionId,
+        callType,
+        callerId: userId,
+        calleeId: targetUserId,
+        offer: { sdp: offer.sdp, type: offer.type },
+      }, targetUserId);
 
-    return true;
+      // 设置超时（30秒）
+      this.callTimeout = setTimeout(() => {
+        this.handleCallTimeout();
+      }, 30000);
+
+      return true;
+    } catch (offerError) {
+      console.error('[Call] Failed to create SDP offer:', offerError);
+      this.cleanup();
+      store.endCall();
+      setTimeout(() => store.reset(), 500);
+      Alert.alert('错误', '无法创建通话邀请');
+      return false;
+    }
   }
 
   // ============================================================
@@ -128,19 +158,35 @@ class CallManager {
       return;
     }
 
-    // 创建 SDP Answer
-    const answer = await this.rtcPeer!.createAnswer();
-    await this.rtcPeer!.setLocalDescription(answer);
+    // 审计 R5 修复：添加 rtcPeer null 检查，与非空断言保持一致
+    if (!this.rtcPeer) {
+      console.error('[Call] PeerConnection is null after creation');
+      wsService.send('call_reject', { sessionId: call.sessionId }, call.callerId);
+      store.setIncomingCall(null);
+      this.cleanup();
+      return;
+    }
 
-    // 发送 call_answer
-    wsService.send('call_answer', {
-      sessionId: call.sessionId,
-      answer: { sdp: answer.sdp, type: answer.type },
-    }, call.callerId);
+    // 审计 W8：createAnswer/setLocalDescription 可能抛异常，需 try-catch 防止 PeerConnection 和状态泄漏
+    try {
+      const answer = await this.rtcPeer.createAnswer();
+      await this.rtcPeer.setLocalDescription(answer);
 
-    store.callConnected(call.sessionId);
-    store.setIncomingCall(null);
-    this.startDurationTimer();
+      // 发送 call_answer
+      wsService.send('call_answer', {
+        sessionId: call.sessionId,
+        answer: { sdp: answer.sdp, type: answer.type },
+      }, call.callerId);
+
+      store.callConnected(call.sessionId);
+      store.setIncomingCall(null);
+      this.startDurationTimer();
+    } catch (answerError) {
+      console.error('[Call] Failed to create SDP answer:', answerError);
+      wsService.send('call_reject', { sessionId: call.sessionId }, call.callerId);
+      store.setIncomingCall(null);
+      this.cleanup();
+    }
   }
 
   /** 拒绝来电 */
@@ -160,9 +206,11 @@ class CallManager {
     const store = useCallStore.getState();
     if (!store.sessionId) return;
 
+    // 审计 W18：安全获取 remoteUserId，避免与 endCall/reset 竞态时非空断言失败
+    const remoteUserId = store.remoteUserId;
     wsService.send('call_hangup', {
       sessionId: store.sessionId,
-    }, store.remoteUserId!);
+    }, remoteUserId || undefined);
 
     this.cleanup();
     store.endCall();
@@ -175,24 +223,28 @@ class CallManager {
 
   toggleMute() {
     const store = useCallStore.getState();
+    // 审计 S5：先翻转 track 状态再更新 store，避免状态与 UI 显示相反
+    const willBeMuted = !store.isMuted;
     if (this.localStream) {
       const audioTrack = this.localStream.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = store.isMuted;
+        audioTrack.enabled = !willBeMuted; // muted=true 时 track 应 disabled
       }
     }
-    store.setMuted(!store.isMuted);
+    store.setMuted(willBeMuted);
   }
 
   toggleCamera() {
     const store = useCallStore.getState();
+    // 审计 S5：同理，先决定新状态再操作 track
+    const willBeCameraOff = !store.isCameraOff;
     if (this.localStream) {
       const videoTrack = this.localStream.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = store.isCameraOff;
+        videoTrack.enabled = !willBeCameraOff; // cameraOff=true 时 track 应 disabled
       }
     }
-    store.setCameraOff(!store.isCameraOff);
+    store.setCameraOff(willBeCameraOff);
   }
 
   toggleSpeaker() {
@@ -333,7 +385,8 @@ class CallManager {
   // WebRTC 辅助
   // ============================================================
 
-  private pendingOffer: any = null;
+  // 审计 M6：明确类型定义
+  private pendingOffer: { sdp: string; type: string } | null = null;
 
   private async createPeerConnection(sessionId: string, callType: CallType, isCaller: boolean): Promise<void> {
     const config = {
@@ -371,11 +424,19 @@ class CallManager {
     });
 
     // 获取本地媒体（使用 react-native-webrtc 的 mediaDevices）
+    // 审计 W9：getUserMedia 失败时清理已创建的 PeerConnection，防止资源泄漏
     const constraints: any = {
       audio: true,
       video: callType === 'video',
     };
-    this.localStream = (await mediaDevices.getUserMedia(constraints)) as MediaStream;
+    try {
+      this.localStream = (await mediaDevices.getUserMedia(constraints)) as MediaStream;
+    } catch (mediaError) {
+      console.error('[Call] Failed to get user media:', mediaError);
+      this.rtcPeer.close();
+      this.rtcPeer = null;
+      throw mediaError;
+    }
     this.onStreamChange?.();
 
     this.localStream.getTracks().forEach((track: any) => {
@@ -392,7 +453,7 @@ class CallManager {
   }
 
   private generateSessionId(): string {
-    return `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `call_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private handleCallTimeout() {
@@ -464,7 +525,26 @@ class CallManager {
         return false;
       }
     }
-    // iOS permissions handled by Info.plist
+    // 审计 E3：iOS 上添加运行时权限检查（Info.plist 声明 + 运行时检查双重保障）
+    if (Platform.OS === 'ios') {
+      try {
+        // iOS 无 PermissionsAndroid，尝试通过 mediaDevices.getUserMedia 探测权限
+        const testStream = await mediaDevices.getUserMedia({
+          audio: true,
+          video: callType === 'video',
+        });
+        testStream.getTracks().forEach((t: any) => t.stop());
+        return true;
+      } catch (e: any) {
+        console.warn('[Call] iOS permission check failed:', e?.message);
+        Alert.alert(
+          '权限不足',
+          '请在系统设置中允许 ProClaw 访问麦克风' + (callType === 'video' ? '和摄像头' : '')
+        );
+        return false;
+      }
+    }
+    // 其他平台（非 Android, 非 iOS）默认通过
     return true;
   }
 }

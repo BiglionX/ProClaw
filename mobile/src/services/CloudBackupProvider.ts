@@ -67,6 +67,8 @@ export class CloudBackupProvider implements ISyncProvider {
       }
 
       this.db = db;
+      // 审计 I4：备份密码从安全存储加载后在内存中明文持有
+      // 密码生命周期：安全存储 → 内存 → CryptoJS.encrypt。应避免持久化缓存密码对象
       this.config = {
         backupPassword: persistedConfig.backupPassword,
         supabaseUrl: supabaseUrl || '',
@@ -131,7 +133,9 @@ export class CloudBackupProvider implements ISyncProvider {
 
         // 上传到 Supabase Storage
         const timestamp = package_.timestamp;
-        const path = `${STORAGE_BUCKET}/${userId}/${deviceId || 'unknown'}/${timestamp}.enc`;
+        // 审计 E2：deviceId 回退使用随机后缀，防止多设备共享 'unknown' 桶导致备份覆盖
+        const effectiveDeviceId = deviceId || `unknown_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+        const path = `${STORAGE_BUCKET}/${userId}/${effectiveDeviceId}/${timestamp}.enc`;
 
         const uploadResult = await this.uploadToStorage(path, encrypted);
 
@@ -289,6 +293,7 @@ export class CloudBackupProvider implements ISyncProvider {
 
   /**
    * 上传数据到 Supabase Storage
+   * 审计 H8：使用 apikey header + Bearer JWT 认证
    */
   private async uploadToStorage(path: string, content: string): Promise<boolean> {
     if (!this.config) return false;
@@ -299,6 +304,7 @@ export class CloudBackupProvider implements ISyncProvider {
         {
           method: 'PUT',
           headers: {
+            'apikey': this.config.supabaseKey,
             'Authorization': `Bearer ${this.config.supabaseKey}`,
             'Content-Type': 'application/octet-stream',
             'x-upsert': 'true',
@@ -315,6 +321,7 @@ export class CloudBackupProvider implements ISyncProvider {
 
   /**
    * 从 Supabase Storage 下载数据
+   * 审计 H8：使用 apikey header + Bearer JWT 认证
    */
   private async downloadFromStorage(path: string): Promise<string | null> {
     if (!this.config) return null;
@@ -324,6 +331,7 @@ export class CloudBackupProvider implements ISyncProvider {
         `${this.config.supabaseUrl}/storage/v1/object/${path}`,
         {
           headers: {
+            'apikey': this.config.supabaseKey,
             'Authorization': `Bearer ${this.config.supabaseKey}`,
           },
         }
@@ -343,6 +351,7 @@ export class CloudBackupProvider implements ISyncProvider {
 
   /**
    * 获取远程文件列表
+   * 审计 H8：使用 apikey header + Bearer JWT 认证
    */
   private async listRemoteFiles(
     userId: string,
@@ -357,6 +366,7 @@ export class CloudBackupProvider implements ISyncProvider {
         `${this.config.supabaseUrl}/storage/v1/object/list/${prefix}`,
         {
           headers: {
+            'apikey': this.config.supabaseKey,
             'Authorization': `Bearer ${this.config.supabaseKey}`,
           },
         }

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadServerUrl, getApiClient } from './AuthService';
 
+// 审计 M4：统一 ConnectionMode 类型定义，与 AppStore 保持一致
 export type ConnectionMode = 'direct' | 'cloud_relay' | 'lan' | 'offline' | 'checking';
 
 interface ConnectionStatus {
@@ -13,6 +13,20 @@ interface ConnectionStatus {
 
 let currentMode: ConnectionMode = 'offline';
 let connectionCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+// 审计 I2：同步状态到 AppStore 的回调，确保 ConnectionManager 和 AppStore 状态一致
+let appStoreSyncCallback: ((mode: ConnectionMode) => void) | null = null;
+
+export const onConnectionModeChange = (callback: (mode: ConnectionMode) => void): () => void => {
+  appStoreSyncCallback = callback;
+  return () => { appStoreSyncCallback = null; };
+};
+
+const notifyModeChange = (mode: ConnectionMode): void => {
+  if (appStoreSyncCallback) {
+    try { appStoreSyncCallback(mode); } catch {}
+  }
+};
 
 export const startConnectionMonitor = async (): Promise<void> => {
   await checkConnection();
@@ -39,6 +53,7 @@ export const checkConnection = async (): Promise<ConnectionStatus> => {
     
     if (!serverUrl) {
       currentMode = 'offline';
+      notifyModeChange('offline');
       return { mode: 'offline', isConnected: false };
     }
 
@@ -46,6 +61,7 @@ export const checkConnection = async (): Promise<ConnectionStatus> => {
     
     if (isDirectAvailable) {
       currentMode = 'direct';
+      notifyModeChange('direct');
       const latency = await measureLatency(serverUrl);
       return {
         mode: 'direct',
@@ -56,10 +72,12 @@ export const checkConnection = async (): Promise<ConnectionStatus> => {
     }
 
     currentMode = 'offline';
+    notifyModeChange('offline');
     return { mode: 'offline', isConnected: false };
   } catch (error) {
     console.warn('Connection check failed:', error);
     currentMode = 'offline';
+    notifyModeChange('offline');
     return { mode: 'offline', isConnected: false };
   }
 };
@@ -126,7 +144,8 @@ export const isLanSyncAvailable = async (): Promise<boolean> => {
     if (!localIp) return false;
 
     const subnet = localIp.substring(0, localIp.lastIndexOf('.') + 1);
-    const testIps = [1, 2, 100, 101, 254];
+    // 审计 E9：扩展 LAN 扫描范围（常见网关 + 高位段）
+    const testIps = [1, 2, 10, 20, 50, 100, 101, 102, 110, 150, 200, 254];
 
     const results = await Promise.all(
       testIps.map(async (last) => {
@@ -157,6 +176,8 @@ export default {
   stopConnectionMonitor,
   checkConnection,
   getConnectionMode,
+  setConnectionMode,
+  onConnectionModeChange,
   getLocalIPAddress,
   isLanSyncAvailable,
 };

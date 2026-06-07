@@ -204,7 +204,12 @@ pub async fn recognize_order(
             result.draft_id = draft_id.clone();
             result.provider_used = Some(provider.clone());
 
-            let items_json = serde_json::to_string(&result.items).unwrap_or_default();
+            // 审计修复 #4: 序列化失败时记录错误而非静默空字符串
+            let items_json = serde_json::to_string(&result.items)
+                .unwrap_or_else(|e| {
+                    eprintln!("[AI] Failed to serialize recognition items: {}", e);
+                    String::from("[]")
+                });
 
             // 保存到 order_drafts
             let db = match state.db.lock() {
@@ -216,7 +221,7 @@ pub async fn recognize_order(
             };
             let conn = db.connection();
 
-            let _ = conn.execute(
+            if let Err(e) = conn.execute(
                 "INSERT INTO order_drafts (id, sales_id, items_json, original_image_url, ai_raw_response, status, created_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, 'draft', ?6, ?7)",
                 rusqlite::params![
@@ -224,15 +229,20 @@ pub async fn recognize_order(
                     None::<String>,
                     items_json,
                     image_type,
-                    serde_json::to_string(&result).unwrap_or_default(),
+                    serde_json::to_string(&result).unwrap_or_else(|e| {
+                        eprintln!("[AI] Failed to serialize recognition result: {}", e);
+                        String::from("{}")
+                    }),
                     now_str,
                     now_str,
                 ],
-            );
+            ) {
+                eprintln!("[AI] Failed to save order draft {}: {}", draft_id, e);
+            }
 
             // 保存 AI 识别日志
             let image_size = image_bytes.len() as i32;
-            let _ = conn.execute(
+            if let Err(e) = conn.execute(
                 "INSERT INTO ai_recognition_logs (id, user_id, image_size, model_name, confidence, tokens_used, cost, status, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'success', ?8)",
                 rusqlite::params![
@@ -245,7 +255,9 @@ pub async fn recognize_order(
                     calculate_cost(result.tokens_used.unwrap_or(0), payload.model.as_deref().unwrap_or("gpt-4o")),
                     now_str,
                 ],
-            );
+            ) {
+                eprintln!("[AI] Failed to save recognition success log: {}", e);
+            }
 
             (
                 StatusCode::OK,
@@ -256,7 +268,7 @@ pub async fn recognize_order(
             // 记录失败日志
             if let Ok(db) = state.db.lock() {
                 let conn = db.connection();
-                let _ = conn.execute(
+                if let Err(e) = conn.execute(
                     "INSERT INTO ai_recognition_logs (id, user_id, image_size, model_name, confidence, tokens_used, cost, status, error_message, created_at)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'failed', ?8, ?9)",
                     rusqlite::params![
@@ -270,7 +282,9 @@ pub async fn recognize_order(
                         err_msg.clone(),
                         now.to_rfc3339(),
                     ],
-                );
+                ) {
+                    eprintln!("[AI] Failed to save recognition failure log: {}", e);
+                }
             }
 
             (
@@ -379,7 +393,17 @@ pub async fn validate_order_items(
                     |row| row.get(0),
                 ).unwrap_or(0);
 
-                let after_sale_stock = current_stock - item.quantity as i32;
+                // 审计修复 #5: 使用 f64→i64→i32 链式转换防止溢出
+                let sale_qty: i32 = {
+                    let qty_f64 = item.quantity;
+                    if qty_f64 < 0.0 || qty_f64 > i32::MAX as f64 {
+                        eprintln!("[AI] Quantity out of bounds for item '{}': {}", product_name, qty_f64);
+                        i32::MAX
+                    } else {
+                        qty_f64 as i32
+                    }
+                };
+                let after_sale_stock = current_stock - sale_qty;
                 if after_sale_stock < min_stock {
                     suggestions.push(format!(
                         "商品 '{}' 售后库存({})将低于最小库存({})，建议补货",
@@ -628,7 +652,7 @@ pub async fn submit_order_draft(
         match product_info {
             Ok((_, _, stock)) => {
                 if (stock as f64) < item.quantity {
-                    let _ = tx.rollback();
+                    if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
                     return (
                         StatusCode::BAD_REQUEST,
                         Json(json!({
@@ -638,7 +662,7 @@ pub async fn submit_order_draft(
                 }
             }
             Err(_) => {
-                let _ = tx.rollback();
+                if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
                 return (
                     StatusCode::BAD_REQUEST,
                     Json(json!({
@@ -655,7 +679,7 @@ pub async fn submit_order_draft(
          VALUES (?1, ?2, ?3, ?4, ?5, 'confirmed', ?6, ?7)",
         rusqlite::params![so_id, so_number, customer_id, now, total_amount, now, now],
     ) {
-        let _ = tx.rollback();
+        if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({"error": format!("Failed to create sales order: {}", e)})),
@@ -679,7 +703,7 @@ pub async fn submit_order_draft(
         ) {
             Ok(p) => p,
             Err(e) => {
-                let _ = tx.rollback();
+                if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({"error": format!("Product query failed: {}", e)})),
@@ -696,7 +720,7 @@ pub async fn submit_order_draft(
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![so_item_id, so_id, product_id, item.quantity as i32, item.unit_price, item.total_price, now, now],
         ) {
-            let _ = tx.rollback();
+            if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": format!("Failed to insert order item: {}", e)})),
@@ -708,7 +732,7 @@ pub async fn submit_order_draft(
             "UPDATE products SET current_stock = current_stock - ?1, updated_at = ?2 WHERE id = ?3",
             params![item.quantity as i32, now, product_id],
         ) {
-            let _ = tx.rollback();
+            if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": format!("Failed to deduct inventory: {}", e)})),
@@ -734,7 +758,7 @@ pub async fn submit_order_draft(
                 now,
             ],
         ) {
-            let _ = tx.rollback();
+            if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": format!("Failed to record inventory transaction: {}", e)})),
@@ -747,7 +771,7 @@ pub async fn submit_order_draft(
         "UPDATE order_drafts SET sales_id = ?2, status = 'submitted', updated_at = ?3 WHERE id = ?1",
         rusqlite::params![draft_id, so_id, now],
     ) {
-        let _ = tx.rollback();
+        if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({"error": format!("Failed to update draft: {}", e)})),

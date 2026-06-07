@@ -86,14 +86,7 @@ impl PluginLoader {
         plugin_id: &str,
         library_path: &Path,
     ) -> Result<Vec<PluginCommandDef>, String> {
-        // 检查是否已加载
-        {
-            let loaded = self.loaded_plugins.lock().map_err(|e| e.to_string())?;
-            if loaded.contains_key(plugin_id) {
-                return Err(format!("插件 '{}' 已加载", plugin_id));
-            }
-        }
-
+        // 审计修复 #12: 合并检查和加载到单个持锁区域，消除 TOCTOU 竞态
         // 安全检查：验证文件存在
         if !library_path.exists() {
             return Err(format!("动态库文件不存在：{}", library_path.display()));
@@ -114,7 +107,16 @@ impl PluginLoader {
             }
         }
 
+        {
+            let loaded = self.loaded_plugins.lock().map_err(|e| e.to_string())?;
+            if loaded.contains_key(plugin_id) {
+                return Err(format!("插件 '{}' 已加载", plugin_id));
+            }
+        }
+
         // 加载动态库
+        // 审计修复 #2: 加载动态库在宿主进程空间内执行任意代码，
+        // 属于插件架构固有风险。生产环境应增加代码签名验证。
         let library = unsafe {
             Library::new(library_path)
                 .map_err(|e| format!("加载动态库失败 ({}): {}", library_path.display(), e))?
@@ -148,18 +150,25 @@ impl PluginLoader {
 
         let commands = registry.commands.clone();
 
+        // 审计修复 #12: 在单个持锁区域内完成检查和插入，消除 TOCTOU
         // 注册到命令索引
         {
             let mut index = self.command_index.lock().map_err(|e| e.to_string())?;
+            let mut loaded = self.loaded_plugins.lock().map_err(|e| e.to_string())?;
+            
+            // 双重检查：确保加载期间没有并发加载同一插件
+            if loaded.contains_key(plugin_id) {
+                // 并发加载已抢占，释放本加载（Library drop 自动关闭）
+                return Err(format!("插件 '{}' 已在并发中加载（double-check）", plugin_id));
+            }
+            
             for cmd in &registry.commands {
                 let key = format!("{}:{}", plugin_id, cmd.name);
                 index.insert(key, (plugin_id.to_string(), cmd.clone()));
             }
-        }
+            drop(index); // 先释放 command_index 锁
 
-        // 存储加载的插件（保留 Library 引用防止卸载）
-        {
-            let mut loaded = self.loaded_plugins.lock().map_err(|e| e.to_string())?;
+            // 存储加载的插件（保留 Library 引用防止卸载）
             loaded.insert(
                 plugin_id.to_string(),
                 LoadedPlugin {

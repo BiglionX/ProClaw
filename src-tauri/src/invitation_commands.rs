@@ -27,7 +27,14 @@ lazy_static::lazy_static! {
 }
 
 fn check_rate_limit(key: &str, max_req: u32) -> bool {
-    let mut map = ACCEPT_RATE_LIMIT.lock().unwrap();
+    let mut map = match ACCEPT_RATE_LIMIT.lock() {
+        Ok(m) => m,
+        Err(poisoned) => {
+            eprintln!("[RateLimit] Tauri ACCEPT_RATE_LIMIT Mutex poisoned, recovering");
+            ACCEPT_RATE_LIMIT.clear_poison();
+            poisoned.into_inner()
+        }
+    };
     let now = Instant::now();
     let window = Duration::from_secs(60);
 
@@ -49,10 +56,14 @@ fn check_rate_limit(key: &str, max_req: u32) -> bool {
 // ============================================================
 
 /// 获取邀请签名密钥（从环境变量或生成固定密钥）
+/// 注意：此固定回退仅用于 Tauri 命令层本地开发环境
 fn get_invite_secret() -> Vec<u8> {
     std::env::var("INVITE_SECRET_KEY")
         .map(|s| s.into_bytes())
-        .unwrap_or_else(|_| b"ProClaw-Invite-Secret-Key-2026".to_vec())
+        .unwrap_or_else(|_| {
+            eprintln!("[Invitation] WARNING: INVITE_SECRET_KEY not set, using hardcoded fallback (insecure for production)");
+            b"ProClaw-Invite-Secret-Key-2026".to_vec()
+        })
 }
 
 /// 为邀请码生成 HMAC-SHA256 签名
@@ -249,7 +260,9 @@ pub fn accept_invitation_cmd(
     // 4. 检查是否过期
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
-        let _ = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]);
+        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]) {
+            eprintln!("[InvitationCmd] Failed to mark invitation expired: {}", e);
+        }
         return Err("Invitation has expired".to_string());
     }
 
@@ -313,17 +326,21 @@ pub fn accept_invitation_cmd(
 
     // 7. 建立双向联系人关系
     let contact_type = if inv_type == "order_share" { "supplier" } else { "customer" };
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![Uuid::new_v4().to_string(), inviter_id, new_user_id, contact_type, now_ms],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to create inviter contact: {}", e);
+    }
     let inviter_contact_type = if contact_type == "supplier" { "customer" } else { "supplier" };
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![Uuid::new_v4().to_string(), new_user_id, inviter_id, inviter_contact_type, now_ms],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to create invitee contact: {}", e);
+    }
 
     // 8. 生成系统消息
     let message_content = if inv_type == "order_share" {
@@ -333,17 +350,21 @@ pub fn accept_invitation_cmd(
     };
     let message_id = Uuid::new_v4().to_string();
     let now_sec = Utc::now().timestamp();
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT INTO messages (id, from_user, to_user, content, content_type, is_offline, is_read, created_at) \
          VALUES (?1, ?2, ?3, ?4, 'text', 0, 0, ?5)",
         params![message_id, new_user_id, inviter_id, message_content, now_sec],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to insert system message: {}", e);
+    }
 
     // 9. 标记邀请码为已使用
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE invitations SET status = 'used', used_at = ?1, used_by = ?2 WHERE id = ?3",
         params![now_sec, new_user_id, inv_id],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to mark invitation as used: {}", e);
+    }
 
     Ok(serde_json::json!({
         "success": true,
@@ -586,7 +607,9 @@ pub fn accept_employee_invitation_cmd(
     // 4. 检查是否过期
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
-        let _ = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", rusqlite::params![inv_id]);
+        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", rusqlite::params![inv_id]) {
+            eprintln!("[InvitationCmd] Failed to mark invite expired (internal): {}", e);
+        }
         return Err("Invitation has expired".to_string());
     }
 
@@ -619,10 +642,12 @@ pub fn accept_employee_invitation_cmd(
         match existing {
             Ok(found_uid) => {
                 // 用户已存在，更新为 internal 类型
-                let _ = conn.execute(
+                if let Err(e) = conn.execute(
                     "UPDATE users SET user_type = 'internal', name = ?1, last_login_at = ?2 WHERE id = ?3",
                     rusqlite::params![input.name, now_ms, found_uid],
-                );
+                ) {
+                    eprintln!("[InvitationCmd] Failed to update user to internal: {}", e);
+                }
                 found_uid
             }
             Err(_) => {
@@ -654,29 +679,35 @@ pub fn accept_employee_invitation_cmd(
 
     // 8. 分配角色（写入 user_roles 表）
     for &role_id in &role_ids {
-        let _ = conn.execute(
+        if let Err(e) = conn.execute(
             "INSERT OR IGNORE INTO user_roles (user_id, role_id, assigned_at) \
              VALUES (?1, ?2, CURRENT_TIMESTAMP)",
             rusqlite::params![new_user_id, role_id],
-        );
+        ) {
+            eprintln!("[InvitationCmd] Failed to assign role {} to {}: {}", role_id, new_user_id, e);
+        }
     }
 
     // 9. 建立双向联系人关系（colleague 类型）
     let now_ms_ts = Utc::now().timestamp_millis();
 
     // 邀请方 -> 新员工
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
         rusqlite::params![Uuid::new_v4().to_string(), inviter_id, new_user_id, now_ms_ts],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to create inviter colleague contact: {}", e);
+    }
 
     // 新员工 -> 邀请方
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
         rusqlite::params![Uuid::new_v4().to_string(), new_user_id, inviter_id, now_ms_ts],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to create employee colleague contact: {}", e);
+    }
 
     // 10. 生成系统消息（欢迎消息）
     let role_names: Vec<String> = role_ids.iter().filter_map(|&rid| {
@@ -689,17 +720,21 @@ pub fn accept_employee_invitation_cmd(
     let message_id = Uuid::new_v4().to_string();
     let now_sec = Utc::now().timestamp();
 
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "INSERT INTO messages (id, from_user, to_user, content, content_type, is_offline, is_read, created_at) \
          VALUES (?1, ?2, ?3, ?4, 'text', 0, 0, ?5)",
         rusqlite::params![message_id, inviter_id, new_user_id, message_content, now_sec],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to insert welcome message: {}", e);
+    }
 
     // 11. 标记邀请码为已使用
-    let _ = conn.execute(
+    if let Err(e) = conn.execute(
         "UPDATE invitations SET status = 'used', used_at = ?1, used_by = ?2 WHERE id = ?3",
         rusqlite::params![now_sec, new_user_id, inv_id],
-    );
+    ) {
+        eprintln!("[InvitationCmd] Failed to mark invite as used: {}", e);
+    }
 
     Ok(serde_json::json!({
         "success": true,
