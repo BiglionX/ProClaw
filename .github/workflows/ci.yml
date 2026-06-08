@@ -92,36 +92,40 @@ jobs:
   rust-test:
     name: Rust Unit Tests
     runs-on: ubuntu-latest
-    needs: [rust-clippy, frontend-build]
+    needs: rust-clippy
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-      - uses: actions/download-artifact@v4
+          workspaces: ./src-tauri
+      - uses: actions/setup-node@v4
         with:
-          name: frontend-dist
-          path: dist
+          node-version: 20
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+      - run: npm ci
+      - run: npm run build
       - run: cargo test --all-features -- --test-threads=1
         working-directory: src-tauri
 
   rust-build:
     name: Rust Release Build (Check)
     runs-on: ubuntu-latest
-    needs: [rust-test, frontend-build]
+    needs: rust-test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-      - uses: actions/download-artifact@v4
+          workspaces: ./src-tauri
+      - uses: actions/setup-node@v4
         with:
-          name: frontend-dist
-          path: dist
+          node-version: 20
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+      - run: npm ci
+      - run: npm run build
       - run: cargo check --release
         working-directory: src-tauri
 
@@ -130,7 +134,7 @@ jobs:
     name: Build Windows
     runs-on: windows-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [frontend-test, frontend-build, rust-test, rust-build]
+    needs: rust-build
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -142,10 +146,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
+      - run: npm run build
       - run: npm run tauri build
       - uses: actions/upload-artifact@v4
         with:
@@ -156,7 +157,7 @@ jobs:
     name: Build Linux
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [frontend-test, frontend-build, rust-test, rust-build]
+    needs: rust-build
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -169,10 +170,7 @@ jobs:
         with:
           workspaces: src-tauri
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
+      - run: npm run build
       - run: npm run tauri build
       - uses: actions/upload-artifact@v4
         with:
@@ -183,7 +181,7 @@ jobs:
     name: Build macOS
     runs-on: macos-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [frontend-test, frontend-build, rust-test, rust-build]
+    needs: rust-build
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -195,10 +193,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
+      - run: npm run build
       - run: npm run tauri build
       - uses: actions/upload-artifact@v4
         with:
