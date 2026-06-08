@@ -152,10 +152,10 @@ pub fn cv_create_pos_order(
         .as_array()
         .map(|arr| {
             arr.iter()
-                .filter_map(|i| {
+                .map(|i| {
                     let price = i["price"].as_f64().unwrap_or(0.0);
                     let qty = i["quantity"].as_f64().unwrap_or(1.0);
-                    Some(price * qty)
+                    price * qty
                 })
                 .sum()
         })

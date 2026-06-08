@@ -71,12 +71,12 @@ impl AgentSandbox {
 
     /// 获取 Agent 的 assets 目录（存放前端资源）
     pub fn get_agent_assets_dir(&self, agent_id: &str) -> PathBuf {
-        self.get_agent_dir(agent_id).join("assets")
+        self.get_agent_dir(agent_id).unwrap().join("assets")
     }
 
     /// 获取 Agent 的数据存储目录（存放运行时数据）
     pub fn get_agent_data_dir(&self, agent_id: &str) -> PathBuf {
-        self.get_agent_dir(agent_id).join("data")
+        self.get_agent_dir(agent_id).unwrap().join("data")
     }
 
     /// 确保 Agent 目录存在
@@ -88,7 +88,7 @@ impl AgentSandbox {
 
     /// 清理 Agent 的所有数据
     pub fn clean_agent_data(&self, agent_id: &str) -> Result<(), std::io::Error> {
-        let agent_dir = self.get_agent_dir(agent_id);
+        let agent_dir = self.get_agent_dir(agent_id).unwrap();
         if agent_dir.exists() {
             std::fs::remove_dir_all(&agent_dir)?;
         }
@@ -247,7 +247,7 @@ mod tests {
             .ensure_agent_dirs(agent_id)
             .expect("Should create dirs");
 
-        assert!(sandbox.get_agent_dir(agent_id).exists());
+        assert!(sandbox.get_agent_dir(agent_id).unwrap().exists());
         assert!(sandbox.get_agent_assets_dir(agent_id).exists());
         assert!(sandbox.get_agent_data_dir(agent_id).exists());
 

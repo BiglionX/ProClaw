@@ -1,10 +1,9 @@
-/// 类型定义单元测试
-/// 验证序列化/反序列化正确性
+//! 类型定义单元测试
+//! 验证序列化/反序列化正确性
 
 #[cfg(test)]
 mod tests {
     use crate::types::*;
-    use serde_json;
 
     #[test]
     fn test_product_serialization() {

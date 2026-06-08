@@ -5,7 +5,6 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 
 /// Agent 安全模块 - 签名验证和包完整性校验
-
 /// HMAC-SHA256 签名验证
 /// 验证 manifest JSON 的签名是否与预期的公钥匹配
 pub fn verify_manifest_signature(

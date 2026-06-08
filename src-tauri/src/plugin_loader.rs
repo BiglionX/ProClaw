@@ -319,7 +319,6 @@ pub fn get_loaded_backend_plugins() -> Result<Vec<LoadedPluginInfo>, String> {
 ///
 /// 注意：插件端的 Cargo.toml 需要引用 proclaw-desktop 的 plugin_loader 模块，
 /// 或独立定义相同结构的 PluginCommandRegistry 和 PluginCommandDef。
-
 #[cfg(test)]
 mod tests {
     use super::*;

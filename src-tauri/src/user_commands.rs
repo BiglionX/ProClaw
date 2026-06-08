@@ -61,7 +61,7 @@ pub fn create_user_cmd(
     ).map_err(|e| e.to_string())?;
 
     if let Some(ref role_name) = role {
-        assign_user_role(&conn, &id, role_name)?;
+        assign_user_role(conn, &id, role_name)?;
     }
 
     Ok(serde_json::json!({

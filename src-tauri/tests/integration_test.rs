@@ -410,7 +410,7 @@ fn test_pagination_bounds() {
 fn test_limit_offset_safety() {
     // 验证 LIMIT/OFFSET 使用参数化绑定而非字符串拼接
     // 正确方式：参数化
-    let sql = format!("SELECT * FROM products LIMIT ?1 OFFSET ?2");
+    let sql = "SELECT * FROM products LIMIT ?1 OFFSET ?2";
     assert!(sql.contains("?1"));
     assert!(sql.contains("?2"));
 

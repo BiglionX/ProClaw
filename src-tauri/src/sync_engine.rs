@@ -1,7 +1,6 @@
 use crate::database::Database;
 use crate::services::supabase_client::SupabaseClient;
 use rusqlite::params;
-use serde_json;
 use std::sync::Mutex;
 use uuid::Uuid;
 

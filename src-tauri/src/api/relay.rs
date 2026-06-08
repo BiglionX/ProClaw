@@ -624,8 +624,6 @@ fn row_to_value(row: &rusqlite::Row) -> rusqlite::Result<Value> {
 }
 
 /// 标记本地记录为已同步
-
-/// 标记本地记录为已同步
 fn mark_record_synced(
     conn: &rusqlite::Connection,
     table_name: &str,

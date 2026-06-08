@@ -88,6 +88,8 @@ md-5 = "0.10"
 # 插件动态加载
 libloading = "0.8"
 
+[lints.rust]
+
 [profile.dev]
 # 修复 LNK1140 PDB 超出限制错误
 incremental = false

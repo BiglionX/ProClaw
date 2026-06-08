@@ -8,19 +8,34 @@ use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
 
+/// 宠物档案可选参数
+#[derive(serde::Deserialize)]
+pub struct PetProfileOptions {
+    pub species: Option<String>,
+    pub breed: Option<String>,
+    pub gender: Option<String>,
+    pub birth_date: Option<String>,
+    pub weight: Option<f64>,
+    pub chip_no: Option<String>,
+}
+
 /// 创建宠物档案
 #[tauri::command]
 pub fn pet_create_profile(
     db: tauri::State<Mutex<Database>>,
     owner_id: String,
     name: String,
-    species: Option<String>,
-    breed: Option<String>,
-    gender: Option<String>,
-    birth_date: Option<String>,
-    weight: Option<f64>,
-    chip_no: Option<String>,
+    #[allow(dead_code)]
+    options: Option<PetProfileOptions>,
 ) -> Result<Value, String> {
+    let options = options.unwrap_or(PetProfileOptions {
+        species: None,
+        breed: None,
+        gender: None,
+        birth_date: None,
+        weight: None,
+        chip_no: None,
+    });
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let id = Uuid::new_v4().to_string();
@@ -29,7 +44,7 @@ pub fn pet_create_profile(
     conn.execute(
         "INSERT INTO pet_profiles (id, owner_id, name, species, breed, gender, birth_date, weight, chip_no, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
-        params![id, owner_id, name, species, breed, gender, birth_date, weight, chip_no, now],
+        params![id, owner_id, name, options.species, options.breed, options.gender, options.birth_date, options.weight, options.chip_no, now],
     ).map_err(|e| e.to_string())?;
 
     Ok(json!({ "id": id, "name": name, "message": "宠物档案已创建" }))

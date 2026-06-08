@@ -436,7 +436,7 @@ pub fn import_team(db: State<'_, Mutex<Database>>, team_json: String) -> Result<
         .map_err(|e| format!("查询失败: {}", e))?;
 
     let team = stmt
-        .query_row(params![id], |row| map_row_to_aiteam(row))
+        .query_row(params![id], map_row_to_aiteam)
         .map_err(|e| format!("读取数据失败: {}", e))?;
 
     Ok(team)
