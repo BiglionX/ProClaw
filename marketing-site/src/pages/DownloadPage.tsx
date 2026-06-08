@@ -97,12 +97,11 @@ const productCards = [
       '扫码盘点',
       '消息推送提醒',
     ],
-    cta: '即将推出',
-    ctaLink: '#',
-    platforms: 'Android / iOS',
+    cta: '免费下载 APK',
+    ctaLink: 'https://github.com/BigLionX/ProClaw/releases/latest',
+    platforms: 'Android 6.0+',
     highlighted: false,
     color: 'gray',
-    disabled: true,
   },
 ];
 
@@ -237,11 +236,9 @@ const DownloadPage: React.FC = () => {
               <div
                 key={card.id}
                 className={`rounded-2xl p-6 border-2 relative flex flex-col ${
-                  card.disabled
-                    ? 'border-gray-100 bg-gray-50 opacity-60'
-                    : card.highlighted
-                      ? 'border-black bg-white ring-4 ring-gray-100'
-                      : 'border-gray-200 bg-white hover:border-gray-400 hover:shadow-md transition-all'
+                  card.highlighted
+                    ? 'border-black bg-white ring-4 ring-gray-100'
+                    : 'border-gray-200 bg-white hover:border-gray-400 hover:shadow-md transition-all'
                 }`}
               >
                 {card.highlighted && (
@@ -277,11 +274,7 @@ const DownloadPage: React.FC = () => {
                 </ul>
 
                 {/* CTA */}
-                {card.disabled ? (
-                  <span className="block w-full text-center py-2.5 bg-gray-200 text-gray-500 text-sm font-medium rounded-lg cursor-not-allowed">
-                    {card.cta}
-                  </span>
-                ) : card.ctaLink.startsWith('http') ? (
+                {card.ctaLink.startsWith('http') ? (
                   <a
                     href={card.ctaLink}
                     target="_blank"
@@ -571,16 +564,16 @@ const DownloadPage: React.FC = () => {
                 </thead>
                 <tbody>
                   <tr className="border-b border-gray-100">
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw Plus (桌面端)</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">a5feadedb54ed6dfda4c8faa373dcdc6a56b234fa4b7b7428a602d9cd26a1dae</td>
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (桌面端)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">44550F0DAEC1F449E67F5B0ABFE95B50DA7FBD0C18AF13C65F3E24364F2D3050</td>
                   </tr>
                   <tr className="border-b border-gray-100">
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw Light (桌面端)</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">e4b4254ce027e3cf1678b67256ed5054b005c7f6b48bcdafde67434d7c65102b</td>
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (移动端 Android APK)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">C48D33A8819EF5BC554CD749AFDF1AB4AE96824FF0D125A79A00E4FC5792B9E4</td>
                   </tr>
                   <tr>
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">移动端 App</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">89e7083fcf0f754788d272c2105250d632ac791883efb37ef3d72b432ac2b4c2</td>
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (移动端 Android APK)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">C48D33A8819EF5BC554CD749AFDF1AB4AE96824FF0D125A79A00E4FC5792B9E4</td>
                   </tr>
                 </tbody>
               </table>
