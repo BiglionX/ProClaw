@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ProClaw Mobile",
-    "slug": "proclaw-mobile",
+    "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/proclaw-logo.png",
@@ -40,12 +40,12 @@
       "favicon": "./assets/proclaw-logo.png",
       "bundler": "metro"
     },
-    "plugins": [
-    ],
+    "plugins": [],
     "extra": {
       "eas": {
         "projectId": "09c592c9-01be-4eb0-bf85-25b804ea67e7"
       }
-    }
+    },
+    "owner": "biglionx"
   }
 }
