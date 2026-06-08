@@ -10,24 +10,25 @@ const KEY_LENGTH = 32; // 256 bits
 /**
  * 获取加密密钥
  * 从环境变量 ENCRYPTION_KEY 读取，要求为 64 字符 hex 字符串（32 字节）
- * 如未设置则返回开发用默认密钥（仅用于开发环境！）
+ * 生产环境必须设置此变量
  */
 function getEncryptionKey(): Buffer {
   const keyHex = process.env.ENCRYPTION_KEY;
-  if (keyHex) {
-    const key = Buffer.from(keyHex, 'hex');
-    if (key.length !== KEY_LENGTH) {
-      throw new Error(`ENCRYPTION_KEY 必须是 ${KEY_LENGTH * 2} 字符的 hex 字符串（当前 ${keyHex.length} 字符）`);
+  if (!keyHex) {
+    // 生产环境必须设置密钥
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('生产环境必须设置 ENCRYPTION_KEY 环境变量');
     }
-    return key;
+    // 开发环境：生成随机密钥而非固定密钥
+    console.warn('[安全警告] 使用随机生成的开发密钥，请设置 ENCRYPTION_KEY');
+    return crypto.randomBytes(KEY_LENGTH);
   }
 
-  // 开发环境默认密钥（32 个 0 填充）
-  if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
-    return Buffer.alloc(KEY_LENGTH, 0);
+  const key = Buffer.from(keyHex, 'hex');
+  if (key.length !== KEY_LENGTH) {
+    throw new Error(`ENCRYPTION_KEY 必须是 ${KEY_LENGTH * 2} 字符的 hex 字符串（当前 ${keyHex.length} 字符）`);
   }
-
-  throw new Error('生产环境必须设置 ENCRYPTION_KEY 环境变量');
+  return key;
 }
 
 /**

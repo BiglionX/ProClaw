@@ -107,12 +107,25 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
       const supabase = getSupabaseClient();
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        // 会话获取失败，记录错误但继续
+        console.error('获取会话失败:', sessionError);
+        set({
+          user: null,
+          session: null,
+          error: sessionError.message || '获取会话失败',
+          isLoading: false,
+        });
+        return;
+      }
 
       set({
         user: session?.user || null,
@@ -120,7 +133,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
       });
     } catch (error: unknown) {
+      console.error('检查认证状态失败:', error);
       set({
+        user: null,
+        session: null,
         error: getErrorMessage(error),
         isLoading: false,
       });

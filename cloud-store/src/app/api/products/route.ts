@@ -118,45 +118,86 @@ export async function POST(request: NextRequest) {
     const schema = getTenantSchema(session.user.id);
     const body = await request.json();
 
-    // 创建 SPU
+    // 使用 RPC 执行事务：创建 SPU 和 SKU（原子操作）
+    // 如果 RPC 不可用，降级到分离调用
     const { data: spu, error: spuError } = await supabase
-      .from(schemaTable(schema, 'products_spu'))
-      .insert({
-        spu_code: body.spu_code || `SPU-${Date.now().toString(36).toUpperCase()}`,
-        name: body.name,
-        subtitle: body.subtitle,
-        description: body.description,
-        category_id: body.category_id,
-        unit: body.unit || '件',
-        is_on_sale: body.is_on_sale !== false,
-        status: body.status || 'on_sale',
-        images: body.images || [],
-      })
-      .select()
-      .single();
+      .rpc('create_product_with_skus', {
+        p_spu: {
+          spu_code: body.spu_code || `SPU-${Date.now().toString(36).toUpperCase()}`,
+          name: body.name,
+          subtitle: body.subtitle,
+          description: body.description,
+          category_id: body.category_id,
+          unit: body.unit || '件',
+          is_on_sale: body.is_on_sale !== false,
+          status: body.status || 'on_sale',
+          images: body.images || [],
+        },
+        p_skus: body.skus?.map((sku: SkuInput, index: number) => ({
+          sku_code: sku.sku_code,
+          specifications: sku.specifications || {},
+          spec_text: sku.spec_text || Object.values(sku.specifications || {}).join('/'),
+          cost_price: sku.cost_price || 0,
+          sell_price: sku.sell_price || 0,
+          current_stock: sku.current_stock || 0,
+          min_stock: sku.min_stock || 0,
+          max_stock: sku.max_stock || 999999,
+          is_default: index === 0,
+        })) || [],
+      });
 
-    if (spuError) throw spuError;
+    // 降级方案：如果 RPC 不存在，使用分离调用
+    let createdSpu = spu;
+    if (spuError || !spu) {
+      if (spuError) {
+        console.warn('create_product_with_skus RPC 不可用，降级到分离调用');
+      }
 
-    // 创建 SKU（如果有）
-    if (body.skus && body.skus.length > 0) {
-      const skusToInsert = body.skus.map((sku: SkuInput, index: number) => ({
-        spu_id: spu.id,
-        sku_code: sku.sku_code || `SKU-${spu.spu_code}-${(index + 1).toString().padStart(2, '0')}`,
-        specifications: sku.specifications || {},
-        spec_text: sku.spec_text || Object.values(sku.specifications || {}).join('/'),
-        cost_price: sku.cost_price || 0,
-        sell_price: sku.sell_price || 0,
-        current_stock: sku.current_stock || 0,
-        min_stock: sku.min_stock || 0,
-        max_stock: sku.max_stock || 999999,
-        is_default: index === 0,
-      }));
+      // 创建 SPU
+      const { data: fallbackSpu, error: fallbackSpuError } = await supabase
+        .from(schemaTable(schema, 'products_spu'))
+        .insert({
+          spu_code: body.spu_code || `SPU-${Date.now().toString(36).toUpperCase()}`,
+          name: body.name,
+          subtitle: body.subtitle,
+          description: body.description,
+          category_id: body.category_id,
+          unit: body.unit || '件',
+          is_on_sale: body.is_on_sale !== false,
+          status: body.status || 'on_sale',
+          images: body.images || [],
+        })
+        .select()
+        .single();
 
-      const { error: skuError } = await supabase
-        .from(schemaTable(schema, 'products_sku'))
-        .insert(skusToInsert);
+      if (fallbackSpuError) throw fallbackSpuError;
+      createdSpu = fallbackSpu;
 
-      if (skuError) throw skuError;
+      // 创建 SKU（如果有）
+      if (body.skus && body.skus.length > 0) {
+        const skusToInsert = body.skus.map((sku: SkuInput, index: number) => ({
+          spu_id: createdSpu!.id,
+          sku_code: sku.sku_code || `SKU-${createdSpu!.spu_code}-${(index + 1).toString().padStart(2, '0')}`,
+          specifications: sku.specifications || {},
+          spec_text: sku.spec_text || Object.values(sku.specifications || {}).join('/'),
+          cost_price: sku.cost_price || 0,
+          sell_price: sku.sell_price || 0,
+          current_stock: sku.current_stock || 0,
+          min_stock: sku.min_stock || 0,
+          max_stock: sku.max_stock || 999999,
+          is_default: index === 0,
+        }));
+
+        const { error: skuError } = await supabase
+          .from(schemaTable(schema, 'products_sku'))
+          .insert(skusToInsert);
+
+        if (skuError) {
+          // SKU 创建失败，删除已创建的 SPU（回滚）
+          await supabase.from(schemaTable(schema, 'products_spu')).delete().eq('id', createdSpu!.id);
+          throw skuError;
+        }
+      }
     }
 
     // Token 扣费（创建商品消耗 1 token）
@@ -224,32 +265,29 @@ export async function PUT(request: NextRequest) {
 
     if (spuError) throw spuError;
 
-    // 如果有 SKU 更新，则先删除旧 SKU 再插入新 SKU
+    // 如果有 SKU 更新，使用 UPSERT 策略
     if (updateData.skus && Array.isArray(updateData.skus)) {
-      await supabase
-        .from(schemaTable(schema, 'products_sku'))
-        .delete()
-        .eq('spu_id', id);
+      // 使用 RPC 执行 UPSERT（原子操作）
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const { error: upsertError } = await (supabase as any)
+        .rpc('upsert_product_skus', {
+          p_spu_id: id,
+          p_skus: updateData.skus.map((sku: SkuInput, index: number) => ({
+            sku_code: sku.sku_code || null,
+            specifications: sku.specifications || {},
+            spec_text: sku.spec_text || Object.values(sku.specifications || {}).join('/'),
+            cost_price: sku.cost_price || 0,
+            sell_price: sku.sell_price || 0,
+            current_stock: sku.current_stock || 0,
+            min_stock: sku.min_stock || 0,
+            max_stock: sku.max_stock || 999999,
+            is_default: index === 0,
+          })),
+        });
 
-      if (updateData.skus.length > 0) {
-        const skusToInsert = updateData.skus.map((sku: SkuInput, index: number) => ({
-          spu_id: id,
-          sku_code: sku.sku_code || `SKU-${spu.spu_code}-${(index + 1).toString().padStart(2, '0')}`,
-          specifications: sku.specifications || {},
-          spec_text: sku.spec_text || Object.values(sku.specifications || {}).join('/'),
-          cost_price: sku.cost_price || 0,
-          sell_price: sku.sell_price || 0,
-          current_stock: sku.current_stock || 0,
-          min_stock: sku.min_stock || 0,
-          max_stock: sku.max_stock || 999999,
-          is_default: index === 0,
-        }));
-
-        const { error: skuError } = await supabase
-          .from(schemaTable(schema, 'products_sku'))
-          .insert(skusToInsert);
-
-        if (skuError) throw skuError;
+      if (upsertError) {
+        console.error('SKU UPSERT 失败:', upsertError);
+        throw upsertError;
       }
     }
 

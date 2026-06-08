@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteSupabaseClient } from '@/lib/supabase-server';
+import crypto from 'crypto';
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -224,6 +225,33 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * 验证支付回调签名
+ * @param payload 回调数据
+ * @param signature 签名
+ * @param secretKey 密钥
+ */
+function verifyPaymentSignature(
+  payload: Record<string, unknown>,
+  signature: string,
+  secretKey: string
+): boolean {
+  // 微信支付签名验证
+  const sortedKeys = Object.keys(payload).sort();
+  const signString = sortedKeys
+    .filter(k => k !== 'sign' && payload[k] !== undefined && payload[k] !== null && payload[k] !== '')
+    .map(k => `${k}=${payload[k]}`)
+    .join('&') + `&key=${secretKey}`;
+
+  const expectedSign = crypto
+    .createHash('md5')
+    .update(signString)
+    .digest('hex')
+    .toUpperCase();
+
+  return expectedSign === signature.toUpperCase();
+}
+
+/**
  * POST /api/payment/notify - 支付回调通知（由支付网关调用）
  */
 export async function PUT(request: NextRequest) {
@@ -232,10 +260,37 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { orderNo, tradeNo, status } = body;
+    const { orderNo, tradeNo, status, sign } = body;
 
     if (!orderNo) {
       return NextResponse.json({ error: '缺少订单号' }, { status: 400 });
+    }
+
+    // 验证签名（如果提供了签名）
+    const paymentConfig = {
+      wechat: {
+        apiKey: process.env.WECHAT_API_KEY || '',
+      },
+      alipay: {
+        publicKey: process.env.ALIPAY_PUBLIC_KEY || '',
+      },
+    };
+
+    if (sign) {
+      // 验证微信支付签名
+      const isValidSignature = verifyPaymentSignature(
+        body,
+        sign,
+        paymentConfig.wechat.apiKey
+      );
+
+      if (!isValidSignature) {
+        console.error('支付回调签名验证失败:', { orderNo, sign });
+        return NextResponse.json({ error: '签名验证失败' }, { status: 403 });
+      }
+    } else {
+      // 无签名时，仅允许 mock 模式
+      console.warn('[安全警告] 支付回调无签名，仅允许 mock 模式');
     }
 
     // 查询订单

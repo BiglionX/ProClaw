@@ -1,16 +1,17 @@
 // API Route: 商品同步 - Token 计费检查示例
 import { NextRequest, NextResponse } from 'next/server';
-import { tokenGuard, getUserIdFromRequest, tokenInsufficientResponse, unauthorizedResponse } from '@/lib/tokenGuard';
+import { tokenGuard, getUserIdFromSession, tokenInsufficientResponse, unauthorizedResponse } from '@/lib/tokenGuard';
 import { checkAndDeductToken } from '@/lib/tokenApi';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/sync
- * 同步商品到云商城，同步前检查并扣除 Token
+ * 同步商品到商城，同步前检查并扣除 Token
  */
 export async function POST(request: NextRequest) {
-  const userId = getUserIdFromRequest(request);
+  // 从认证会话获取用户 ID（安全方式）
+  const userId = await getUserIdFromSession(request);
   if (!userId) {
     return unauthorizedResponse();
   }

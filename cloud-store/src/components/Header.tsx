@@ -1,18 +1,38 @@
 // 顶部导航组件
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function Header() {
   const [cartCount, setCartCount] = useState(0);
 
-  // 客户端加载时获取购物车数量
-  if (typeof window !== 'undefined') {
-    const cart = localStorage.getItem('cart');
-    const count = cart ? JSON.parse(cart).reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) : 0;
-    if (count !== cartCount) setCartCount(count);
-  }
+  // 客户端加载时从 localStorage 获取购物车数量
+  useEffect(() => {
+    const updateCartCount = () => {
+      try {
+        const cart = localStorage.getItem('cart');
+        const count = cart ? JSON.parse(cart).reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) : 0;
+        setCartCount(count);
+      } catch {
+        // 忽略解析错误
+      }
+    };
+
+    // 初始加载
+    updateCartCount();
+
+    // 监听 storage 变化（其他标签页修改购物车时更新）
+    window.addEventListener('storage', updateCartCount);
+
+    // 监听自定义购物车更新事件
+    window.addEventListener('cartUpdated', updateCartCount);
+
+    return () => {
+      window.removeEventListener('storage', updateCartCount);
+      window.removeEventListener('cartUpdated', updateCartCount);
+    };
+  }, []);
 
   return (
     <header className="bg-white shadow-sm">

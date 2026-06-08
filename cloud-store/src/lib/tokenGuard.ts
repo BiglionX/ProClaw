@@ -2,6 +2,7 @@
 // 在商品同步、订单创建、主题生成等关键操作前检查并扣除 Token
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createRouteSupabaseClient } from '@/lib/supabase-server';
 import { getTokenBalance, getDebtStatus, checkDailyLimit } from '@/lib/tokenApi';
 
 const PT_COST = {
@@ -118,17 +119,35 @@ export async function tokenGuard(
 // ========== 中间件辅助函数 ==========
 
 /**
- * 从请求中提取用户 ID（从 header 或 cookie）
+ * 从认证会话中获取用户 ID（安全的获取方式）
+ * 优先从已验证的 session 获取，永不信任客户端 header
  */
-export function getUserIdFromRequest(request: NextRequest): string | null {
-  // 优先从 header 获取（由边缘中间件设置）
-  const headerUserId = request.headers.get('x-token-user-id');
-  if (headerUserId) return headerUserId;
+export async function getUserIdFromSession(
+  request: NextRequest
+): Promise<string | null> {
+  try {
+    const response = NextResponse.next();
+    const supabase = createRouteSupabaseClient(request, response);
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session?.user) {
+      return null;
+    }
+    return session.user.id;
+  } catch {
+    return null;
+  }
+}
 
-  // 其次从 cookie 获取
+/**
+ * 从请求中提取用户 ID（仅用于日志/调试）
+ * 注意：此函数返回的值不应直接用于授权决策
+ */
+export function getUserIdHintFromRequest(request: NextRequest): string | null {
+  // 仅从 cookie 获取提示信息（server-side cookie 相对安全）
   const cookieUserId = request.cookies.get('user_id')?.value;
-  if (cookieUserId) return cookieUserId;
-
+  if (cookieUserId && /^[a-zA-Z0-9-]{8,64}$/.test(cookieUserId)) {
+    return cookieUserId;
+  }
   return null;
 }
 
