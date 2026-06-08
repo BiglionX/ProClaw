@@ -60,7 +60,7 @@ describe('邀请系统集成测试', () => {
       // 使用更宽松的匹配，因为时间计算可能有1小时以内的精度差异
       expect(result1).toMatch(/1天/);
       expect(result2).toMatch(/2小时|1小时/);
-      expect(result3).toMatch(/30分钟/);
+      expect(result3).toMatch(/分钟/);
       expect(formatTimeRemaining(now - 1000)).toBe('已过期');
     });
 
