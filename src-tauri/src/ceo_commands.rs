@@ -89,9 +89,7 @@ fn parse_metadata(metadata: Option<&str>) -> String {
     metadata.unwrap_or("{}").to_string()
 }
 
-fn pcp_entry_from_row(
-    row: &rusqlite::Row,
-) -> rusqlite::Result<PcpEntry> {
+fn pcp_entry_from_row(row: &rusqlite::Row) -> rusqlite::Result<PcpEntry> {
     Ok(PcpEntry {
         id: row.get("id")?,
         context_type: row.get("context_type")?,
@@ -106,9 +104,7 @@ fn pcp_entry_from_row(
     })
 }
 
-fn ceo_task_from_row(
-    row: &rusqlite::Row,
-) -> rusqlite::Result<CeoTask> {
+fn ceo_task_from_row(row: &rusqlite::Row) -> rusqlite::Result<CeoTask> {
     Ok(CeoTask {
         id: row.get("id")?,
         task_id: row.get("task_id")?,
@@ -274,10 +270,7 @@ pub fn pcp_query_entries(
 
 /// 软删除 PCP 条目（设为 archived）
 #[tauri::command]
-pub fn pcp_delete_entry(
-    db: tauri::State<Mutex<Database>>,
-    id: String,
-) -> Result<(), String> {
+pub fn pcp_delete_entry(db: tauri::State<Mutex<Database>>, id: String) -> Result<(), String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let now = now_timestamp();
@@ -302,7 +295,16 @@ pub fn ceo_create_task(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let id = Uuid::new_v4().to_string();
-    let task_id = task.task_id.unwrap_or_else(|| format!("task_{}", Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown")));
+    let task_id = task.task_id.unwrap_or_else(|| {
+        format!(
+            "task_{}",
+            Uuid::new_v4()
+                .to_string()
+                .split('-')
+                .next()
+                .unwrap_or("unknown")
+        )
+    });
     let now = now_timestamp();
 
     conn.execute(
@@ -399,7 +401,10 @@ pub fn ceo_update_task_status(
 
     let valid_statuses = ["pending", "in_progress", "completed", "failed", "cancelled"];
     if !valid_statuses.contains(&status.as_str()) {
-        return Err(format!("Invalid status '{}'. Must be one of: {:?}", status, valid_statuses));
+        return Err(format!(
+            "Invalid status '{}'. Must be one of: {:?}",
+            status, valid_statuses
+        ));
     }
 
     if status == "completed" || status == "failed" {
@@ -421,9 +426,7 @@ pub fn ceo_update_task_status(
 
 /// 获取 CEO 任务统计数据
 #[tauri::command]
-pub fn ceo_get_task_stats(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<TaskStats, String> {
+pub fn ceo_get_task_stats(db: tauri::State<Mutex<Database>>) -> Result<TaskStats, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -432,23 +435,43 @@ pub fn ceo_get_task_stats(
         .map_err(|e| e.to_string())?;
 
     let pending: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_tasks WHERE status = 'pending'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_tasks WHERE status = 'pending'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let in_progress: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_tasks WHERE status = 'in_progress'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_tasks WHERE status = 'in_progress'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let completed: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_tasks WHERE status = 'completed'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_tasks WHERE status = 'completed'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let failed: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_tasks WHERE status = 'failed'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_tasks WHERE status = 'failed'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let cancelled: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_tasks WHERE status = 'cancelled'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_tasks WHERE status = 'cancelled'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     Ok(TaskStats {
@@ -520,9 +543,7 @@ pub struct CompanyConfigPackage {
     pub installed_agents: Vec<serde_json::Value>,
 }
 
-fn decision_log_from_row(
-    row: &rusqlite::Row,
-) -> rusqlite::Result<DecisionLogEntry> {
+fn decision_log_from_row(row: &rusqlite::Row) -> rusqlite::Result<DecisionLogEntry> {
     Ok(DecisionLogEntry {
         id: row.get("id")?,
         decision_type: row.get("decision_type")?,
@@ -661,34 +682,54 @@ pub fn ceo_query_decision_logs(
 
 /// 获取决策统计
 #[tauri::command]
-pub fn ceo_get_decision_stats(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<DecisionStats, String> {
+pub fn ceo_get_decision_stats(db: tauri::State<Mutex<Database>>) -> Result<DecisionStats, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let total: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_decision_logs", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM ceo_decision_logs", [], |row| {
+            row.get(0)
+        })
         .map_err(|e| e.to_string())?;
 
     let approved: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'approved'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'approved'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let rejected: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'rejected'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'rejected'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let edited: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'edited'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'edited'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let snoozed: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'snoozed'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'snoozed'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let pending: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision IS NULL", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision IS NULL",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
 
     let total_decided = approved + rejected + edited;
@@ -734,7 +775,10 @@ pub fn ceo_update_decision_log(
 
     let valid_decisions = ["approved", "rejected", "edited", "snoozed"];
     if !valid_decisions.contains(&boss_decision.as_str()) {
-        return Err(format!("Invalid decision '{}'. Must be one of: {:?}", boss_decision, valid_decisions));
+        return Err(format!(
+            "Invalid decision '{}'. Must be one of: {:?}",
+            boss_decision, valid_decisions
+        ));
     }
 
     conn.execute(
@@ -785,7 +829,12 @@ pub fn ceo_update_preference(
     let conn = db.connection();
     let now = now_timestamp();
 
-    let valid_keys = ["budget_sensitivity", "risk_tolerance", "auto_approve_threshold", "decision_style"];
+    let valid_keys = [
+        "budget_sensitivity",
+        "risk_tolerance",
+        "auto_approve_threshold",
+        "decision_style",
+    ];
     if !valid_keys.contains(&key.as_str()) {
         return Err(format!("Invalid preference key '{}'", key));
     }
@@ -821,20 +870,51 @@ pub fn ceo_export_company_config(
     let pcp_rows = stmt
         .query_map([], |row| {
             let mut map = serde_json::Map::new();
-            map.insert("id".to_string(), serde_json::Value::String(row.get::<_, String>(0)?));
-            map.insert("context_type".to_string(), serde_json::Value::String(row.get::<_, String>(1)?));
+            map.insert(
+                "id".to_string(),
+                serde_json::Value::String(row.get::<_, String>(0)?),
+            );
+            map.insert(
+                "context_type".to_string(),
+                serde_json::Value::String(row.get::<_, String>(1)?),
+            );
             let title: Option<String> = row.get(2)?;
-            map.insert("title".to_string(), serde_json::to_value(title).unwrap_or_default());
+            map.insert(
+                "title".to_string(),
+                serde_json::to_value(title).unwrap_or_default(),
+            );
             let desc: Option<String> = row.get(3)?;
-            map.insert("description".to_string(), serde_json::to_value(desc).unwrap_or_default());
-            map.insert("priority".to_string(), serde_json::to_value(row.get::<_, Option<i64>>(4)?).unwrap_or_default());
-            map.insert("status".to_string(), serde_json::Value::String(row.get::<_, String>(5)?));
-            map.insert("created_at".to_string(), serde_json::to_value(row.get::<_, i64>(6)?).unwrap_or_default());
+            map.insert(
+                "description".to_string(),
+                serde_json::to_value(desc).unwrap_or_default(),
+            );
+            map.insert(
+                "priority".to_string(),
+                serde_json::to_value(row.get::<_, Option<i64>>(4)?).unwrap_or_default(),
+            );
+            map.insert(
+                "status".to_string(),
+                serde_json::Value::String(row.get::<_, String>(5)?),
+            );
+            map.insert(
+                "created_at".to_string(),
+                serde_json::to_value(row.get::<_, i64>(6)?).unwrap_or_default(),
+            );
             let created_by: String = row.get(7)?;
             if should_anonymize {
-                map.insert("created_by".to_string(), serde_json::Value::String(if created_by == "boss" { "Boss".to_string() } else { "CEO_Agent".to_string() }));
+                map.insert(
+                    "created_by".to_string(),
+                    serde_json::Value::String(if created_by == "boss" {
+                        "Boss".to_string()
+                    } else {
+                        "CEO_Agent".to_string()
+                    }),
+                );
             } else {
-                map.insert("created_by".to_string(), serde_json::Value::String(created_by));
+                map.insert(
+                    "created_by".to_string(),
+                    serde_json::Value::String(created_by),
+                );
             }
             Ok(serde_json::Value::Object(map))
         })
@@ -853,13 +933,34 @@ pub fn ceo_export_company_config(
     let log_rows = log_stmt
         .query_map([], |row| {
             let mut map = serde_json::Map::new();
-            map.insert("id".to_string(), serde_json::Value::String(row.get::<_, String>(0)?));
-            map.insert("decision_type".to_string(), serde_json::Value::String(row.get::<_, String>(1)?));
-            map.insert("proposed_content".to_string(), serde_json::Value::String(row.get::<_, String>(2)?));
-            map.insert("boss_decision".to_string(), serde_json::to_value(row.get::<_, Option<String>>(3)?).unwrap_or_default());
-            map.insert("boss_feedback".to_string(), serde_json::to_value(row.get::<_, Option<String>>(4)?).unwrap_or_default());
-            map.insert("created_at".to_string(), serde_json::to_value(row.get::<_, i64>(5)?).unwrap_or_default());
-            map.insert("estimated_risk".to_string(), serde_json::to_value(row.get::<_, Option<String>>(6)?).unwrap_or_default());
+            map.insert(
+                "id".to_string(),
+                serde_json::Value::String(row.get::<_, String>(0)?),
+            );
+            map.insert(
+                "decision_type".to_string(),
+                serde_json::Value::String(row.get::<_, String>(1)?),
+            );
+            map.insert(
+                "proposed_content".to_string(),
+                serde_json::Value::String(row.get::<_, String>(2)?),
+            );
+            map.insert(
+                "boss_decision".to_string(),
+                serde_json::to_value(row.get::<_, Option<String>>(3)?).unwrap_or_default(),
+            );
+            map.insert(
+                "boss_feedback".to_string(),
+                serde_json::to_value(row.get::<_, Option<String>>(4)?).unwrap_or_default(),
+            );
+            map.insert(
+                "created_at".to_string(),
+                serde_json::to_value(row.get::<_, i64>(5)?).unwrap_or_default(),
+            );
+            map.insert(
+                "estimated_risk".to_string(),
+                serde_json::to_value(row.get::<_, Option<String>>(6)?).unwrap_or_default(),
+            );
             Ok(serde_json::Value::Object(map))
         })
         .map_err(|e| e.to_string())?;
@@ -891,15 +992,27 @@ pub fn ceo_export_company_config(
     let agent_rows = agent_stmt
         .query_map([], |row| {
             let mut map = serde_json::Map::new();
-            map.insert("id".to_string(), serde_json::Value::String(row.get::<_, String>(0)?));
+            map.insert(
+                "id".to_string(),
+                serde_json::Value::String(row.get::<_, String>(0)?),
+            );
             let name: String = row.get(1)?;
             if should_anonymize {
-                map.insert("name".to_string(), serde_json::Value::String(name.replace("Agent", "代理")));
+                map.insert(
+                    "name".to_string(),
+                    serde_json::Value::String(name.replace("Agent", "代理")),
+                );
             } else {
                 map.insert("name".to_string(), serde_json::Value::String(name));
             }
-            map.insert("version".to_string(), serde_json::Value::String(row.get::<_, String>(2)?));
-            map.insert("enabled".to_string(), serde_json::to_value(row.get::<_, bool>(3)?).unwrap_or_default());
+            map.insert(
+                "version".to_string(),
+                serde_json::Value::String(row.get::<_, String>(2)?),
+            );
+            map.insert(
+                "enabled".to_string(),
+                serde_json::to_value(row.get::<_, bool>(3)?).unwrap_or_default(),
+            );
             Ok(serde_json::Value::Object(map))
         })
         .map_err(|e| e.to_string())?;
@@ -932,11 +1045,17 @@ pub fn ceo_import_company_config(
     // 导入 PCP 条目（跳过已存在的）
     for entry in &config.pcp_entries {
         let id = entry.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        let context_type = entry.get("context_type").and_then(|v| v.as_str()).unwrap_or("goal");
+        let context_type = entry
+            .get("context_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("goal");
         let title = entry.get("title").and_then(|v| v.as_str());
         let description = entry.get("description").and_then(|v| v.as_str());
         let priority = entry.get("priority").and_then(|v| v.as_i64()).unwrap_or(3);
-        let status = entry.get("status").and_then(|v| v.as_str()).unwrap_or("active");
+        let status = entry
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("active");
 
         let result = conn.execute(
             "INSERT OR IGNORE INTO project_context (id, context_type, title, description, priority, status, created_at, updated_at, created_by)
@@ -957,7 +1076,11 @@ pub fn ceo_import_company_config(
         .ok();
     }
 
-    Ok(format!("成功导入 {} 条 PCP 条目和 {} 项偏好设置", import_count, config.preferences.len()))
+    Ok(format!(
+        "成功导入 {} 条 PCP 条目和 {} 项偏好设置",
+        import_count,
+        config.preferences.len()
+    ))
 }
 
 // ==================== 单元测试 ====================
@@ -1032,7 +1155,8 @@ mod tests {
              FROM project_context WHERE context_type = 'goal'"
         ).unwrap();
 
-        let results: Vec<PcpEntry> = stmt.query_map([], pcp_entry_from_row)
+        let results: Vec<PcpEntry> = stmt
+            .query_map([], pcp_entry_from_row)
             .unwrap()
             .filter_map(|r| r.ok())
             .collect();
@@ -1073,7 +1197,8 @@ mod tests {
         conn.execute(
             "UPDATE ceo_tasks SET status = 'completed', completed_at = ?1 WHERE task_id = ?2",
             params![now, task_id],
-        ).unwrap();
+        )
+        .unwrap();
 
         let updated: CeoTask = conn.query_row(
             "SELECT id, task_id, assigned_agent_id, type, description, expected_output, priority, status, result, created_at, deadline, completed_at, metadata
@@ -1103,8 +1228,16 @@ mod tests {
             ).unwrap();
         }
 
-        let total: i64 = conn.query_row("SELECT COUNT(*) FROM ceo_tasks", [], |row| row.get(0)).unwrap();
-        let pending: i64 = conn.query_row("SELECT COUNT(*) FROM ceo_tasks WHERE status = 'pending'", [], |row| row.get(0)).unwrap();
+        let total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ceo_tasks", [], |row| row.get(0))
+            .unwrap();
+        let pending: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM ceo_tasks WHERE status = 'pending'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
 
         assert_eq!(total, 5);
         assert_eq!(pending, 2);
@@ -1125,7 +1258,8 @@ mod tests {
             "action": "add_goal",
             "title": "Q4 海外市场拓展",
             "priority": 1
-        }).to_string();
+        })
+        .to_string();
 
         conn.execute(
             "INSERT INTO ceo_decision_logs (id, decision_type, proposed_content, boss_decision, boss_feedback, context_snapshot, estimated_risk, created_at, approved_at, metadata)
@@ -1171,15 +1305,25 @@ mod tests {
         }
 
         // 统计
-        let approved: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'approved'", [], |row| row.get(0)
-        ).unwrap();
-        let rejected: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'rejected'", [], |row| row.get(0)
-        ).unwrap();
-        let total: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM ceo_decision_logs", [], |row| row.get(0)
-        ).unwrap();
+        let approved: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'approved'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let rejected: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM ceo_decision_logs WHERE boss_decision = 'rejected'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ceo_decision_logs", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
 
         assert_eq!(total, 5);
         assert_eq!(approved, 2);
@@ -1197,9 +1341,9 @@ mod tests {
         let now = now_timestamp();
 
         // 默认偏好应已存在
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM ceo_preferences", [], |row| row.get(0)
-        ).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ceo_preferences", [], |row| row.get(0))
+            .unwrap();
         assert_eq!(count, 4);
 
         // 更新偏好
@@ -1208,9 +1352,13 @@ mod tests {
             params![now],
         ).unwrap();
 
-        let value: String = conn.query_row(
-            "SELECT value FROM ceo_preferences WHERE key = 'budget_sensitivity'", [], |row| row.get(0)
-        ).unwrap();
+        let value: String = conn
+            .query_row(
+                "SELECT value FROM ceo_preferences WHERE key = 'budget_sensitivity'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(value, "8");
     }
 
@@ -1236,14 +1384,22 @@ mod tests {
         ).unwrap();
 
         // 验证导出数据
-        let pcp_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM project_context WHERE id LIKE 'export_%'", [], |row| row.get(0)
-        ).unwrap();
+        let pcp_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_context WHERE id LIKE 'export_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert!(pcp_count > 0);
 
-        let log_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM ceo_decision_logs WHERE id LIKE 'export_%'", [], |row| row.get(0)
-        ).unwrap();
+        let log_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM ceo_decision_logs WHERE id LIKE 'export_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(log_count, 1);
     }
 }

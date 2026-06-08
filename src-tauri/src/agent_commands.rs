@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Mutex;
 
-
 // ==================== 内部函数（可测试） ====================
 
 fn get_agents_internal(db: &Mutex<Database>) -> Result<Vec<AgentInfo>, String> {
@@ -25,7 +24,8 @@ fn get_agents_internal(db: &Mutex<Database>) -> Result<Vec<AgentInfo>, String> {
 
     // 使用 Vec + HashMap 保持 SQL 排序顺序，同时按 ID 去重合并权限
     let mut agents: Vec<AgentInfo> = Vec::new();
-    let mut agent_index: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut agent_index: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     let rows = stmt
         .query_map([], |row| {
@@ -53,13 +53,32 @@ fn get_agents_internal(db: &Mutex<Database>) -> Result<Vec<AgentInfo>, String> {
                     homepage: None,
                 });
 
-            Ok((id, name, version, manifest, enabled, is_builtin, installed_at, last_updated, permission))
+            Ok((
+                id,
+                name,
+                version,
+                manifest,
+                enabled,
+                is_builtin,
+                installed_at,
+                last_updated,
+                permission,
+            ))
         })
         .map_err(|e| e.to_string())?;
 
     for row_result in rows {
-        let (id, name, version, manifest, enabled, is_builtin, installed_at, last_updated, permission) =
-            row_result.map_err(|e| e.to_string())?;
+        let (
+            id,
+            name,
+            version,
+            manifest,
+            enabled,
+            is_builtin,
+            installed_at,
+            last_updated,
+            permission,
+        ) = row_result.map_err(|e| e.to_string())?;
 
         if !agent_index.contains_key(&id) {
             agent_index.insert(id.clone(), agents.len());
@@ -126,11 +145,7 @@ fn install_agent_internal(
         conn.execute(
             "INSERT OR IGNORE INTO agent_permissions (id, agent_id, permission)
              VALUES (?1, ?2, ?3)",
-            params![
-                format!("perm_{}_{}", id, perm.replace(' ', "_")),
-                id,
-                perm
-            ],
+            params![format!("perm_{}_{}", id, perm.replace(' ', "_")), id, perm],
         )
         .ok();
     }
@@ -144,10 +159,10 @@ pub struct AgentManifest {
     pub id: String,
     pub name: String,
     pub version: String,
-    pub entry: String,                // 入口文件路径（如 index.html）
-    pub permissions: Vec<String>,     // 所需权限列表
+    pub entry: String,                     // 入口文件路径（如 index.html）
+    pub permissions: Vec<String>,          // 所需权限列表
     pub capabilities: Option<Vec<String>>, // Agent 能力列表（CEO Agent 任务分派用）
-    pub icon: Option<String>,         // 图标路径或 base64
+    pub icon: Option<String>,              // 图标路径或 base64
     pub description: Option<String>,
     pub author: Option<String>,
     pub homepage: Option<String>,
@@ -193,14 +208,20 @@ pub fn install_agent(
     manifest_json: String,
     data_dir: Option<String>,
 ) -> Result<String, String> {
-    install_agent_internal(&db.inner(), &name, &version, &manifest_json, data_dir.as_deref(), false, None, None)
+    install_agent_internal(
+        &db.inner(),
+        &name,
+        &version,
+        &manifest_json,
+        data_dir.as_deref(),
+        false,
+        None,
+        None,
+    )
 }
 
 #[tauri::command]
-pub fn uninstall_agent(
-    db: tauri::State<Mutex<Database>>,
-    agent_id: String,
-) -> Result<(), String> {
+pub fn uninstall_agent(db: tauri::State<Mutex<Database>>, agent_id: String) -> Result<(), String> {
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
     let conn = db_guard.connection();
     let is_builtin: bool = conn
@@ -213,8 +234,11 @@ pub fn uninstall_agent(
     if is_builtin {
         return Err("Cannot uninstall built-in agent".to_string());
     }
-    conn.execute("DELETE FROM agent_permissions WHERE agent_id = ?1", params![agent_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM agent_permissions WHERE agent_id = ?1",
+        params![agent_id],
+    )
+    .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM agents WHERE id = ?1", params![agent_id])
         .map_err(|e| format!("Failed to uninstall agent: {}", e))?;
     Ok(())
@@ -224,16 +248,15 @@ pub fn uninstall_agent(
 const MAX_CONCURRENT_AGENTS: i64 = 10;
 
 #[tauri::command]
-pub fn enable_agent(
-    db: tauri::State<Mutex<Database>>,
-    agent_id: String,
-) -> Result<(), String> {
+pub fn enable_agent(db: tauri::State<Mutex<Database>>, agent_id: String) -> Result<(), String> {
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
     let conn = db_guard.connection();
 
     // 检查当前已启用的 Agent 数量是否达到上限
     let enabled_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM agents WHERE enabled = 1", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM agents WHERE enabled = 1", [], |row| {
+            row.get(0)
+        })
         .map_err(|e| format!("Failed to count enabled agents: {}", e))?;
     if enabled_count >= MAX_CONCURRENT_AGENTS {
         return Err(format!(
@@ -242,27 +265,28 @@ pub fn enable_agent(
         ));
     }
 
-    conn.execute("UPDATE agents SET enabled = 1 WHERE id = ?1", params![agent_id])
-        .map_err(|e| format!("Failed to enable agent: {}", e))?;
+    conn.execute(
+        "UPDATE agents SET enabled = 1 WHERE id = ?1",
+        params![agent_id],
+    )
+    .map_err(|e| format!("Failed to enable agent: {}", e))?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn disable_agent(
-    db: tauri::State<Mutex<Database>>,
-    agent_id: String,
-) -> Result<(), String> {
+pub fn disable_agent(db: tauri::State<Mutex<Database>>, agent_id: String) -> Result<(), String> {
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
     let conn = db_guard.connection();
-    conn.execute("UPDATE agents SET enabled = 0 WHERE id = ?1", params![agent_id])
-        .map_err(|e| format!("Failed to disable agent: {}", e))?;
+    conn.execute(
+        "UPDATE agents SET enabled = 0 WHERE id = ?1",
+        params![agent_id],
+    )
+    .map_err(|e| format!("Failed to disable agent: {}", e))?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_installed_agents(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Vec<AgentInfo>, String> {
+pub fn get_installed_agents(db: tauri::State<Mutex<Database>>) -> Result<Vec<AgentInfo>, String> {
     get_agents_internal(db.inner())
 }
 
@@ -272,7 +296,10 @@ pub fn get_agent_detail(
     agent_id: String,
 ) -> Result<AgentInfo, String> {
     let agents = get_agents_internal(db.inner())?;
-    agents.into_iter().find(|a| a.id == agent_id).ok_or_else(|| "Agent not found".to_string())
+    agents
+        .into_iter()
+        .find(|a| a.id == agent_id)
+        .ok_or_else(|| "Agent not found".to_string())
 }
 
 #[tauri::command]
@@ -286,8 +313,8 @@ pub fn update_agent(
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
     let conn = db_guard.connection();
     let now = Utc::now().timestamp();
-    let _manifest: AgentManifest = serde_json::from_str(&new_manifest_json)
-        .map_err(|e| format!("Invalid manifest: {}", e))?;
+    let _manifest: AgentManifest =
+        serde_json::from_str(&new_manifest_json).map_err(|e| format!("Invalid manifest: {}", e))?;
     conn.execute(
         "UPDATE agents SET version = ?1, manifest = ?2, last_updated = ?3, data_dir = COALESCE(?4, data_dir) WHERE id = ?5",
         params![new_version, new_manifest_json, now, new_data_dir, agent_id],
@@ -306,7 +333,8 @@ pub fn get_agent_data_dir(
         "SELECT COALESCE(data_dir, '') FROM agents WHERE id = ?1",
         params![agent_id],
         |row| row.get(0),
-    ).map_err(|e| format!("Agent not found: {}", e))
+    )
+    .map_err(|e| format!("Agent not found: {}", e))
 }
 
 /// Agent 数据库查询（只允许读取以 agent_<agentId>_ 开头的表）
@@ -327,7 +355,10 @@ pub fn agent_db_query(
     let expected_prefix = format!("agent_{}_", agent_id);
     let sql_upper = sql.to_uppercase();
     if !sql_upper.contains(&expected_prefix.to_uppercase()) {
-        return Err(format!("Access denied: query must reference tables with prefix '{}'", expected_prefix));
+        return Err(format!(
+            "Access denied: query must reference tables with prefix '{}'",
+            expected_prefix
+        ));
     }
 
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
@@ -335,39 +366,50 @@ pub fn agent_db_query(
 
     // 解析参数
     let params: Vec<Box<dyn rusqlite::types::ToSql>> = if let Some(ref pj) = params_json {
-        let arr: Vec<serde_json::Value> = serde_json::from_str(pj)
-            .map_err(|e| format!("Invalid params JSON: {}", e))?;
-        arr.iter().map(|v| {
-            match v {
-                serde_json::Value::String(s) => Box::new(s.clone()) as Box<dyn rusqlite::types::ToSql>,
+        let arr: Vec<serde_json::Value> =
+            serde_json::from_str(pj).map_err(|e| format!("Invalid params JSON: {}", e))?;
+        arr.iter()
+            .map(|v| match v {
+                serde_json::Value::String(s) => {
+                    Box::new(s.clone()) as Box<dyn rusqlite::types::ToSql>
+                }
                 serde_json::Value::Number(n) => Box::new(n.as_f64().unwrap_or(0.0)),
                 serde_json::Value::Bool(b) => Box::new(*b),
                 serde_json::Value::Null => Box::new(rusqlite::types::Null),
                 _ => Box::new(v.to_string()),
-            }
-        }).collect()
+            })
+            .collect()
     } else {
         vec![]
     };
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
-    let mut stmt = conn.prepare(&sql)
+    let mut stmt = conn
+        .prepare(&sql)
         .map_err(|e| format!("Query preparation error: {}", e))?;
 
     let col_count = stmt.column_count();
     let column_names: Vec<String> = (0..col_count)
-        .map(|i| stmt.column_name(i).unwrap_or(&format!("col_{}", i)).to_string())
+        .map(|i| {
+            stmt.column_name(i)
+                .unwrap_or(&format!("col_{}", i))
+                .to_string()
+        })
         .collect();
 
     let rows: Vec<serde_json::Value> = stmt
         .query_map(param_refs.as_slice(), |row| {
             let mut map = serde_json::Map::new();
             for (i, name) in column_names.iter().enumerate() {
-                let val: serde_json::Value = row.get::<_, String>(i)
+                let val: serde_json::Value = row
+                    .get::<_, String>(i)
                     .map(serde_json::Value::String)
                     .or_else(|_| row.get::<_, f64>(i).map(serde_json::Value::from))
-                    .or_else(|_| row.get::<_, i64>(i).map(|v| serde_json::Value::Number(v.into())))
+                    .or_else(|_| {
+                        row.get::<_, i64>(i)
+                            .map(|v| serde_json::Value::Number(v.into()))
+                    })
                     .or_else(|_| row.get::<_, bool>(i).map(serde_json::Value::Bool))
                     .unwrap_or(serde_json::Value::Null);
                 map.insert(name.clone(), val);
@@ -401,31 +443,37 @@ pub fn agent_db_execute(
     let expected_prefix = format!("agent_{}_", agent_id);
     let sql_upper = sql.to_uppercase();
     if !sql_upper.contains(&expected_prefix.to_uppercase()) {
-        return Err(format!("Access denied: query must reference tables with prefix '{}'", expected_prefix));
+        return Err(format!(
+            "Access denied: query must reference tables with prefix '{}'",
+            expected_prefix
+        ));
     }
 
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
     let conn = db_guard.connection();
 
     let params: Vec<Box<dyn rusqlite::types::ToSql>> = if let Some(ref pj) = params_json {
-        let arr: Vec<serde_json::Value> = serde_json::from_str(pj)
-            .map_err(|e| format!("Invalid params JSON: {}", e))?;
-        arr.iter().map(|v| {
-            match v {
-                serde_json::Value::String(s) => Box::new(s.clone()) as Box<dyn rusqlite::types::ToSql>,
+        let arr: Vec<serde_json::Value> =
+            serde_json::from_str(pj).map_err(|e| format!("Invalid params JSON: {}", e))?;
+        arr.iter()
+            .map(|v| match v {
+                serde_json::Value::String(s) => {
+                    Box::new(s.clone()) as Box<dyn rusqlite::types::ToSql>
+                }
                 serde_json::Value::Number(n) => Box::new(n.as_f64().unwrap_or(0.0)),
                 serde_json::Value::Bool(b) => Box::new(*b),
                 serde_json::Value::Null => Box::new(rusqlite::types::Null),
                 _ => Box::new(v.to_string()),
-            }
-        }).collect()
+            })
+            .collect()
     } else {
         vec![]
     };
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
-    let affected = conn.execute(&sql, param_refs.as_slice())
+    let affected = conn
+        .execute(&sql, param_refs.as_slice())
         .map_err(|e| format!("Execute error: {}", e))?;
 
     Ok(affected as u64)
@@ -443,7 +491,10 @@ pub fn download_agent_from_market(
     signature_hex: Option<String>,
     secret_key_hex: Option<String>,
 ) -> Result<String, String> {
-    println!("[Market] Downloading agent {} from {}", agent_id, market_url);
+    println!(
+        "[Market] Downloading agent {} from {}",
+        agent_id, market_url
+    );
 
     // 如果有校验和，验证包完整性
     if let Some(ref checksum) = expected_checksum {
@@ -497,7 +548,8 @@ mod tests {
             "entry": "index.html",
             "permissions": ["read_user", "send_message"],
             "description": "A test agent"
-        }).to_string();
+        })
+        .to_string();
 
         let _agent_id = install_agent_internal(
             &db,
@@ -508,10 +560,10 @@ mod tests {
             false,
             None,
             None,
-        ).expect("Should install agent");
+        )
+        .expect("Should install agent");
 
-        let agents = get_agents_internal(&db)
-            .expect("Should list agents");
+        let agents = get_agents_internal(&db).expect("Should list agents");
 
         // 验证包含我们安装的 Agent（可能包含内置 Finance Agent）
         let test_agent = agents.iter().find(|a| a.name == "Test Agent").unwrap();
@@ -529,7 +581,8 @@ mod tests {
             "entry": "index.html",
             "permissions": ["read_user", "send_message", "show_notification"],
             "description": "A test agent with permissions"
-        }).to_string();
+        })
+        .to_string();
 
         let agent_id = install_agent_internal(
             &db,
@@ -540,16 +593,19 @@ mod tests {
             false,
             None,
             None,
-        ).expect("Should install agent");
+        )
+        .expect("Should install agent");
 
         // 验证权限已写入
         let db_guard = db.lock().unwrap();
         let conn = db_guard.connection();
-        let perm_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM agent_permissions WHERE agent_id = ?1",
-            params![agent_id],
-            |row| row.get(0),
-        ).unwrap();
+        let perm_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM agent_permissions WHERE agent_id = ?1",
+                params![agent_id],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(perm_count, 3, "Should have 3 permissions");
     }
 
@@ -562,7 +618,8 @@ mod tests {
             "version": "1.0.0",
             "entry": "index.html",
             "permissions": []
-        }).to_string();
+        })
+        .to_string();
 
         let agent_id = install_agent_internal(
             &db,
@@ -573,18 +630,21 @@ mod tests {
             false,
             None,
             None,
-        ).expect("Should install agent");
+        )
+        .expect("Should install agent");
 
         // 禁用
         {
             let db_guard = db.lock().unwrap();
             let conn = db_guard.connection();
-            conn.execute("UPDATE agents SET enabled = 0 WHERE id = ?1", params![agent_id])
-                .expect("Should disable");
+            conn.execute(
+                "UPDATE agents SET enabled = 0 WHERE id = ?1",
+                params![agent_id],
+            )
+            .expect("Should disable");
         }
 
-        let agents = get_agents_internal(&db)
-            .expect("Should list agents");
+        let agents = get_agents_internal(&db).expect("Should list agents");
         let agent = agents.iter().find(|a| a.id == agent_id).unwrap();
         assert!(!agent.enabled);
 
@@ -592,12 +652,14 @@ mod tests {
         {
             let db_guard = db.lock().unwrap();
             let conn = db_guard.connection();
-            conn.execute("UPDATE agents SET enabled = 1 WHERE id = ?1", params![agent_id])
-                .expect("Should enable");
+            conn.execute(
+                "UPDATE agents SET enabled = 1 WHERE id = ?1",
+                params![agent_id],
+            )
+            .expect("Should enable");
         }
 
-        let agents = get_agents_internal(&db)
-            .expect("Should list agents");
+        let agents = get_agents_internal(&db).expect("Should list agents");
         let agent = agents.iter().find(|a| a.id == agent_id).unwrap();
         assert!(agent.enabled);
     }
@@ -611,7 +673,8 @@ mod tests {
             "version": "1.0.0",
             "entry": "index.html",
             "permissions": []
-        }).to_string();
+        })
+        .to_string();
 
         let agent_id = install_agent_internal(
             &db,
@@ -622,7 +685,8 @@ mod tests {
             false,
             None,
             None,
-        ).expect("Should install agent");
+        )
+        .expect("Should install agent");
 
         // 卸载
         {
@@ -632,11 +696,16 @@ mod tests {
                 .expect("Should uninstall");
         }
 
-        let agents = get_agents_internal(&db)
-            .expect("Should list agents");
+        let agents = get_agents_internal(&db).expect("Should list agents");
         // 内置 Finance Agent 仍在，但测试 Agent 应被移除
-        assert!(!agents.iter().any(|a| a.id == agent_id), "Test agent should be removed");
-        assert!(agents.iter().any(|a| a.is_builtin), "Built-in agent should remain");
+        assert!(
+            !agents.iter().any(|a| a.id == agent_id),
+            "Test agent should be removed"
+        );
+        assert!(
+            agents.iter().any(|a| a.is_builtin),
+            "Built-in agent should remain"
+        );
     }
 
     #[test]
@@ -645,7 +714,10 @@ mod tests {
         // setup_test_db 已自动安装内置 Finance Agent
         // 测试内置 agent 的标志位正确
         let agents = get_agents_internal(&db).expect("Should list agents");
-        let builtin = agents.iter().find(|a| a.is_builtin).expect("Should have builtin agent");
+        let builtin = agents
+            .iter()
+            .find(|a| a.is_builtin)
+            .expect("Should have builtin agent");
         assert!(builtin.is_builtin);
         assert_eq!(builtin.name, "财务管理 Agent");
     }

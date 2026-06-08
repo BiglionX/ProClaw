@@ -12,7 +12,7 @@ pub struct BapRecord {
     pub id: String,
     pub profile_type: String,
     pub key: String,
-    pub value: String,  // JSON string
+    pub value: String, // JSON string
     pub confidence: f64,
     pub source: String,
     pub last_matched_at: Option<i64>,
@@ -24,7 +24,7 @@ pub struct BapRecord {
 pub struct BapRecordInput {
     pub profile_type: String,
     pub key: String,
-    pub value: String,  // JSON string
+    pub value: String, // JSON string
     pub confidence: Option<f64>,
     pub source: Option<String>,
 }
@@ -159,7 +159,10 @@ pub fn bap_upsert(
             .map_err(|e| e.to_string())?;
 
         let updated_record = stmt
-            .query_row(params![record.profile_type, record.key], bap_record_from_row)
+            .query_row(
+                params![record.profile_type, record.key],
+                bap_record_from_row,
+            )
             .map_err(|e| format!("Failed to fetch updated BAP record: {}", e))?;
 
         Ok(updated_record)
@@ -182,23 +185,22 @@ pub fn bap_delete_by_type(
         )
         .map_err(|e| format!("Failed to delete BAP records: {}", e))?;
 
-    Ok(BapDeleteResult { deleted: deleted as i64 })
+    Ok(BapDeleteResult {
+        deleted: deleted as i64,
+    })
 }
 
 /// 重置学习数据（清空所有 observed 来源的记录）
 #[tauri::command]
-pub fn bap_reset_learning(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<BapDeleteResult, String> {
+pub fn bap_reset_learning(db: tauri::State<Mutex<Database>>) -> Result<BapDeleteResult, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let deleted = conn
-        .execute(
-            "DELETE FROM secretary_bap WHERE source = 'observed'",
-            [],
-        )
+        .execute("DELETE FROM secretary_bap WHERE source = 'observed'", [])
         .map_err(|e| format!("Failed to reset BAP learning data: {}", e))?;
 
-    Ok(BapDeleteResult { deleted: deleted as i64 })
+    Ok(BapDeleteResult {
+        deleted: deleted as i64,
+    })
 }

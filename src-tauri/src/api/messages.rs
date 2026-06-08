@@ -1,16 +1,16 @@
 // 消息管理 HTTP API
 // Phase 3: 提供离线消息拉取、已读确认、历史查询等 REST 端点
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path, Query},
+    extract::{Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use super::AppState;
 use serde_json::json;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// 消息查询参数
 #[derive(Debug, Deserialize)]
@@ -40,7 +40,9 @@ pub struct SendMessageRequest {
     pub content_type: String,
 }
 
-fn default_content_type() -> String { "text".to_string() }
+fn default_content_type() -> String {
+    "text".to_string()
+}
 
 /// 标记已读请求
 #[derive(Debug, Deserialize)]
@@ -76,16 +78,19 @@ pub async fn get_messages(
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
-    let messages: Vec<MessageResponse> = if let Some(ref with_user) = params.with {
-        // 两个用户之间的对话（双向）
-        let mut stmt = match conn.prepare(
+    let messages: Vec<MessageResponse> =
+        if let Some(ref with_user) = params.with {
+            // 两个用户之间的对话（双向）
+            let mut stmt = match conn.prepare(
             "SELECT id, from_user, to_user, content, content_type, is_offline, is_read, created_at
              FROM messages
              WHERE ((from_user = ?1 AND to_user = ?2) OR (from_user = ?2 AND to_user = ?1))
@@ -100,31 +105,33 @@ pub async fn get_messages(
             ),
         };
 
-        let rows = match stmt.query_map(
-            rusqlite::params![params.user_id, with_user, before, limit],
-            |row| {
-                Ok(MessageResponse {
-                    id: row.get(0)?,
-                    from_user: row.get(1)?,
-                    to_user: row.get(2)?,
-                    content: row.get(3)?,
-                    content_type: row.get(4)?,
-                    is_offline: row.get(5)?,
-                    is_read: row.get(6)?,
-                    created_at: row.get(7)?,
-                })
-            },
-        ) {
-            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-            Err(e) => return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Query error: {}", e)})),
-            ),
-        };
-        rows
-    } else {
-        // 该用户的所有消息（收发双向）
-        let mut stmt = match conn.prepare(
+            let rows = match stmt.query_map(
+                rusqlite::params![params.user_id, with_user, before, limit],
+                |row| {
+                    Ok(MessageResponse {
+                        id: row.get(0)?,
+                        from_user: row.get(1)?,
+                        to_user: row.get(2)?,
+                        content: row.get(3)?,
+                        content_type: row.get(4)?,
+                        is_offline: row.get(5)?,
+                        is_read: row.get(6)?,
+                        created_at: row.get(7)?,
+                    })
+                },
+            ) {
+                Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+                Err(e) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error": format!("Query error: {}", e)})),
+                    )
+                }
+            };
+            rows
+        } else {
+            // 该用户的所有消息（收发双向）
+            let mut stmt = match conn.prepare(
             "SELECT id, from_user, to_user, content, content_type, is_offline, is_read, created_at
              FROM messages
              WHERE (from_user = ?1 OR to_user = ?1)
@@ -139,29 +146,29 @@ pub async fn get_messages(
             ),
         };
 
-        let rows = match stmt.query_map(
-            rusqlite::params![params.user_id, before, limit],
-            |row| {
-                Ok(MessageResponse {
-                    id: row.get(0)?,
-                    from_user: row.get(1)?,
-                    to_user: row.get(2)?,
-                    content: row.get(3)?,
-                    content_type: row.get(4)?,
-                    is_offline: row.get(5)?,
-                    is_read: row.get(6)?,
-                    created_at: row.get(7)?,
-                })
-            },
-        ) {
-            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-            Err(e) => return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Query error: {}", e)})),
-            ),
+            let rows =
+                match stmt.query_map(rusqlite::params![params.user_id, before, limit], |row| {
+                    Ok(MessageResponse {
+                        id: row.get(0)?,
+                        from_user: row.get(1)?,
+                        to_user: row.get(2)?,
+                        content: row.get(3)?,
+                        content_type: row.get(4)?,
+                        is_offline: row.get(5)?,
+                        is_read: row.get(6)?,
+                        created_at: row.get(7)?,
+                    })
+                }) {
+                    Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+                    Err(e) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({"error": format!("Query error: {}", e)})),
+                        )
+                    }
+                };
+            rows
         };
-        rows
-    };
 
     (StatusCode::OK, Json(json!({ "messages": messages })))
 }
@@ -174,10 +181,12 @@ pub async fn get_offline_messages(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -196,9 +205,8 @@ pub async fn get_offline_messages(
         ),
     };
 
-    let messages: Vec<MessageResponse> = match stmt.query_map(
-        rusqlite::params![params.user_id],
-        |row| {
+    let messages: Vec<MessageResponse> =
+        match stmt.query_map(rusqlite::params![params.user_id], |row| {
             Ok(MessageResponse {
                 id: row.get(0)?,
                 from_user: row.get(1)?,
@@ -209,14 +217,15 @@ pub async fn get_offline_messages(
                 is_read: row.get(6)?,
                 created_at: row.get(7)?,
             })
-        },
-    ) {
-        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Query error: {}", e)})),
-        ),
-    };
+        }) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": format!("Query error: {}", e)})),
+                )
+            }
+        };
 
     (
         StatusCode::OK,
@@ -224,7 +233,7 @@ pub async fn get_offline_messages(
             "messages": messages,
             "count": messages.len(),
             "user_id": params.user_id,
-        }))
+        })),
     )
 }
 
@@ -246,10 +255,12 @@ pub async fn send_message(
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -300,7 +311,9 @@ pub async fn send_message(
             "contentType": payload.content_type,
             "timestamp": now,
         });
-        state.ws_manager.send_to_user(&payload.to, &ws_msg.to_string());
+        state
+            .ws_manager
+            .send_to_user(&payload.to, &ws_msg.to_string());
     }
 
     (
@@ -309,7 +322,7 @@ pub async fn send_message(
             "id": msg_id,
             "status": "sent",
             "timestamp": now,
-        }))
+        })),
     )
 }
 
@@ -322,10 +335,12 @@ pub async fn mark_message_read(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -337,10 +352,12 @@ pub async fn mark_message_read(
         rusqlite::params![now, msg_id, params.user_id],
     ) {
         Ok(n) => n,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Update error: {}", e)})),
-        ),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Update error: {}", e)})),
+            )
+        }
     };
 
     // 也更新 offline_messages 表
@@ -356,6 +373,6 @@ pub async fn mark_message_read(
         Json(json!({
             "status": "ok",
             "affected": affected,
-        }))
+        })),
     )
 }

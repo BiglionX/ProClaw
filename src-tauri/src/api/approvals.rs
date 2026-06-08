@@ -1,14 +1,14 @@
 // 审批工作流 API (Phase 6)
 // 采购/销售订单审批、审批列表
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path, Query},
+    extract::{Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::Deserialize;
-use super::AppState;
 use rusqlite::params;
+use serde::Deserialize;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
@@ -36,30 +36,54 @@ pub async fn create_approval(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
     // 验证 target_type
     if !["purchase_order", "sales_order"].contains(&payload.target_type.as_str()) {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid target_type"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Invalid target_type"})),
+        );
     }
 
     // 验证订单存在且状态为 draft
-    let table = if payload.target_type == "purchase_order" { "purchase_orders" } else { "sales_orders" };
+    let table = if payload.target_type == "purchase_order" {
+        "purchase_orders"
+    } else {
+        "sales_orders"
+    };
 
     let status: String = match conn.query_row(
-        &format!("SELECT status FROM {} WHERE id = ?1 AND deleted_at IS NULL", table),
+        &format!(
+            "SELECT status FROM {} WHERE id = ?1 AND deleted_at IS NULL",
+            table
+        ),
         params![payload.target_id],
         |row| row.get(0),
     ) {
         Ok(s) => s,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Order not found"}))),
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Order not found"})),
+            )
+        }
     };
 
     if status != "draft" {
-        return (StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": format!("Order status '{}' cannot be submitted for approval", status)})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(
+                serde_json::json!({"error": format!("Order status '{}' cannot be submitted for approval", status)}),
+            ),
+        );
     }
 
     // 检查是否已有待审批请求
@@ -70,8 +94,10 @@ pub async fn create_approval(
     ).unwrap_or(false);
 
     if existing {
-        return (StatusCode::CONFLICT,
-            Json(serde_json::json!({"error": "A pending approval already exists for this order"})));
+        return (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"error": "A pending approval already exists for this order"})),
+        );
     }
 
     // 创建审批
@@ -80,24 +106,42 @@ pub async fn create_approval(
     if let Err(e) = conn.execute(
         "INSERT INTO approvals (id, target_type, target_id, requested_by, status, comments) \
          VALUES (?1, ?2, ?3, '', ?4, ?5)",
-        params![id, payload.target_type, payload.target_id, "pending", payload.comments],
+        params![
+            id,
+            payload.target_type,
+            payload.target_id,
+            "pending",
+            payload.comments
+        ],
     ) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        );
     }
 
     // 更新订单状态为 submitted
     if let Err(e) = conn.execute(
-        &format!("UPDATE {} SET status = 'submitted', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", table),
+        &format!(
+            "UPDATE {} SET status = 'submitted', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+            table
+        ),
         params![payload.target_id],
     ) {
-        eprintln!("[Approvals] Failed to update {} status to submitted: {}", table, e);
+        eprintln!(
+            "[Approvals] Failed to update {} status to submitted: {}",
+            table, e
+        );
     }
 
-    (StatusCode::CREATED, Json(serde_json::json!({
-        "id": id,
-        "message": "Approval request created",
-        "order_status": "submitted"
-    })))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::json!({
+            "id": id,
+            "message": "Approval request created",
+            "order_status": "submitted"
+        })),
+    )
 }
 
 /// 审批列表
@@ -107,7 +151,12 @@ pub async fn list_approvals(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -117,7 +166,7 @@ pub async fn list_approvals(
          u.name as requested_by_name \
          FROM approvals a \
          LEFT JOIN users u ON a.requested_by = u.id \
-         WHERE 1=1"
+         WHERE 1=1",
     );
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
@@ -134,11 +183,17 @@ pub async fn list_approvals(
 
     sql.push_str(" ORDER BY a.created_at DESC LIMIT 200");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -156,17 +211,25 @@ pub async fn list_approvals(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let approvals: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
 
     // 为每个审批附上关联订单摘要
-    let enriched: Vec<serde_json::Value> = approvals.into_iter().map(|mut a| {
-        let target_type = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
-        let target_id = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
+    let enriched: Vec<serde_json::Value> =
+        approvals
+            .into_iter()
+            .map(|mut a| {
+                let target_type = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
+                let target_id = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
 
-        let order_info = match target_type {
+                let order_info = match target_type {
             "purchase_order" => conn.query_row(
                 "SELECT po_number, total_amount, status FROM purchase_orders WHERE id = ?1",
                 params![target_id],
@@ -188,13 +251,17 @@ pub async fn list_approvals(
             _ => None,
         };
 
-        if let Some(order) = order_info {
-            a["order"] = order;
-        }
-        a
-    }).collect();
+                if let Some(order) = order_info {
+                    a["order"] = order;
+                }
+                a
+            })
+            .collect();
 
-    (StatusCode::OK, Json(serde_json::json!({ "data": enriched, "total": enriched.len() })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": enriched, "total": enriched.len() })),
+    )
 }
 
 /// 批准审批
@@ -224,7 +291,12 @@ async fn process_approval(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -235,12 +307,19 @@ async fn process_approval(
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     ) {
         Ok(d) => d,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Approval not found"}))),
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Approval not found"})),
+            )
+        }
     };
 
     if current_status != "pending" {
-        return (StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": format!("Approval already {}", current_status)})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": format!("Approval already {}", current_status)})),
+        );
     }
 
     let new_status = if approved { "approved" } else { "rejected" };
@@ -248,7 +327,12 @@ async fn process_approval(
 
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     // 更新审批状态
@@ -258,30 +342,47 @@ async fn process_approval(
         params![new_status, comments, approval_id],
     ) {
         let _ = tx.rollback();
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update approval: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update approval: {}", e)})),
+        );
     }
 
     // 更新关联订单状态
-    let table = if target_type == "purchase_order" { "purchase_orders" } else { "sales_orders" };
+    let table = if target_type == "purchase_order" {
+        "purchase_orders"
+    } else {
+        "sales_orders"
+    };
     if let Err(e) = tx.execute(
-        &format!("UPDATE {} SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", table),
+        &format!(
+            "UPDATE {} SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            table
+        ),
         params![order_new_status, target_id],
     ) {
         let _ = tx.rollback();
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update order status: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update order status: {}", e)})),
+        );
     }
 
     if let Err(e) = tx.commit() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        );
     }
 
     let action_word = if approved { "approved" } else { "rejected" };
-    (StatusCode::OK, Json(serde_json::json!({
-        "id": approval_id,
-        "status": new_status,
-        "order_status": order_new_status,
-        "message": format!("Approval {}", action_word),
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id": approval_id,
+            "status": new_status,
+            "order_status": order_new_status,
+            "message": format!("Approval {}", action_word),
+        })),
+    )
 }

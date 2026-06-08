@@ -4,15 +4,15 @@
 // v4.2.1: 添加 HMAC-SHA256 签名防伪 + 速率限制
 
 use crate::database::Database;
-use rusqlite::params;
-use std::sync::Mutex;
-use std::collections::HashMap;
-use std::time::{Instant, Duration};
-use uuid::Uuid;
 use chrono::Utc;
-use serde::Serialize;
 use hmac::{Hmac, Mac};
+use rusqlite::params;
+use serde::Serialize;
 use sha2::Sha256;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -71,8 +71,7 @@ fn get_invite_secret() -> Vec<u8> {
 /// 返回: 16 字符的 base64url 签名
 fn sign_invite_code(body: &str, inviter_id: &str, expires_at: i64) -> String {
     let secret = get_invite_secret();
-    let mut mac = HmacSha256::new_from_slice(&secret)
-        .expect("HMAC can take key of any size");
+    let mut mac = HmacSha256::new_from_slice(&secret).expect("HMAC can take key of any size");
 
     let payload = format!("{}|{}|{}", body, inviter_id, expires_at);
     mac.update(payload.as_bytes());
@@ -88,7 +87,7 @@ fn verify_invite_signature(invite_code: &str, inviter_id: &str, expires_at: i64)
     // invite_code 格式: {32位hex.uuid}.{16位hex.sig}
     if let Some(pos) = invite_code.rfind('.') {
         let body = &invite_code[..pos];
-        let sig = &invite_code[pos+1..];
+        let sig = &invite_code[pos + 1..];
         let expected = sign_invite_code(body, inviter_id, expires_at);
         sig == expected
     } else {
@@ -110,10 +109,10 @@ fn generate_signed_invite_code(inviter_id: &str, expires_at: i64) -> String {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateInvitationInput {
-    pub invitation_type: String,  // "order_share" | "price_update"
-    pub business_ref_id: String,  // 订单号或商品ID列表(JSON)
+    pub invitation_type: String, // "order_share" | "price_update"
+    pub business_ref_id: String, // 订单号或商品ID列表(JSON)
     pub target_phone: Option<String>,
-    pub inviter_id: String,  // 当前用户 ID（由前端从登录态获取）
+    pub inviter_id: String, // 当前用户 ID（由前端从登录态获取）
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -216,7 +215,10 @@ pub fn accept_invitation_cmd(
     input: AcceptInvitationInput,
 ) -> Result<serde_json::Value, String> {
     // 速率限制（用邀请码前缀作为 key）
-    let rate_key = format!("accept:{}", &input.invite_code.chars().take(16).collect::<String>());
+    let rate_key = format!(
+        "accept:{}",
+        &input.invite_code.chars().take(16).collect::<String>()
+    );
     if !check_rate_limit(&rate_key, 10) {
         return Err("Too many requests, please try again later".to_string());
     }
@@ -225,27 +227,30 @@ pub fn accept_invitation_cmd(
     let conn = db.connection();
 
     // 1. 查找邀请码
-    let invitation = conn.query_row(
-        "SELECT id, inviter_id, target_phone, type, business_ref_id, status, expires_at \
+    let invitation = conn
+        .query_row(
+            "SELECT id, inviter_id, target_phone, type, business_ref_id, status, expires_at \
          FROM invitations WHERE invite_code = ?1",
-        params![input.invite_code],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, i64>(6)?,
-            ))
-        },
-    ).map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => "Invitation not found".to_string(),
-        _ => e.to_string(),
-    })?;
+            params![input.invite_code],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, i64>(6)?,
+                ))
+            },
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => "Invitation not found".to_string(),
+            _ => e.to_string(),
+        })?;
 
-    let (inv_id, inviter_id, target_phone, inv_type, _business_ref_id, status, expires_at) = invitation;
+    let (inv_id, inviter_id, target_phone, inv_type, _business_ref_id, status, expires_at) =
+        invitation;
 
     // 2. 验证 HMAC 签名（防伪造）
     if !verify_invite_signature(&input.invite_code, &inviter_id, expires_at) {
@@ -260,7 +265,10 @@ pub fn accept_invitation_cmd(
     // 4. 检查是否过期
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
-        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]) {
+        if let Err(e) = conn.execute(
+            "UPDATE invitations SET status = 'expired' WHERE id = ?1",
+            params![inv_id],
+        ) {
             eprintln!("[InvitationCmd] Failed to mark invitation expired: {}", e);
         }
         return Err("Invitation has expired".to_string());
@@ -290,7 +298,11 @@ pub fn accept_invitation_cmd(
                 Err(_) => {
                     let uid = Uuid::new_v4().to_string();
                     let user_type = "external";
-                    let external_type = if inv_type == "order_share" { "supplier" } else { "customer" };
+                    let external_type = if inv_type == "order_share" {
+                        "supplier"
+                    } else {
+                        "customer"
+                    };
                     let password_hash = match &input.new_user_password {
                         Some(pwd) if !pwd.is_empty() => {
                             match crate::api::auth::hash_password(pwd) {
@@ -313,40 +325,71 @@ pub fn accept_invitation_cmd(
         None => {
             let uid = Uuid::new_v4().to_string();
             let user_type = "external";
-            let external_type = if inv_type == "order_share" { "supplier" } else { "customer" };
+            let external_type = if inv_type == "order_share" {
+                "supplier"
+            } else {
+                "customer"
+            };
             let now_sec = Utc::now().timestamp();
             conn.execute(
                 "INSERT INTO users (id, name, user_type, external_type, is_active, created_at) \
                  VALUES (?1, ?2, ?3, ?4, 1, ?5)",
                 params![uid, input.new_user_name, user_type, external_type, now_sec],
-            ).map_err(|e| e.to_string())?;
+            )
+            .map_err(|e| e.to_string())?;
             uid
         }
     };
 
     // 7. 建立双向联系人关系
-    let contact_type = if inv_type == "order_share" { "supplier" } else { "customer" };
+    let contact_type = if inv_type == "order_share" {
+        "supplier"
+    } else {
+        "customer"
+    };
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![Uuid::new_v4().to_string(), inviter_id, new_user_id, contact_type, now_ms],
+        params![
+            Uuid::new_v4().to_string(),
+            inviter_id,
+            new_user_id,
+            contact_type,
+            now_ms
+        ],
     ) {
         eprintln!("[InvitationCmd] Failed to create inviter contact: {}", e);
     }
-    let inviter_contact_type = if contact_type == "supplier" { "customer" } else { "supplier" };
+    let inviter_contact_type = if contact_type == "supplier" {
+        "customer"
+    } else {
+        "supplier"
+    };
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![Uuid::new_v4().to_string(), new_user_id, inviter_id, inviter_contact_type, now_ms],
+        params![
+            Uuid::new_v4().to_string(),
+            new_user_id,
+            inviter_id,
+            inviter_contact_type,
+            now_ms
+        ],
     ) {
         eprintln!("[InvitationCmd] Failed to create invitee contact: {}", e);
     }
 
     // 8. 生成系统消息
     let message_content = if inv_type == "order_share" {
-        format!("{} 通过邀请加入了 ProClaw，现已关联订单", input.new_user_name)
+        format!(
+            "{} 通过邀请加入了 ProClaw，现已关联订单",
+            input.new_user_name
+        )
     } else {
-        format!("{} 通过邀请加入了 ProClaw，可接收价格更新", input.new_user_name)
+        format!(
+            "{} 通过邀请加入了 ProClaw，可接收价格更新",
+            input.new_user_name
+        )
     };
     let message_id = Uuid::new_v4().to_string();
     let now_sec = Utc::now().timestamp();
@@ -382,11 +425,13 @@ pub fn revoke_invitation_cmd(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let result = conn.execute(
-        "UPDATE invitations SET status = 'revoked' \
+    let result = conn
+        .execute(
+            "UPDATE invitations SET status = 'revoked' \
          WHERE invite_code = ?1 AND inviter_id = ?2 AND status = 'active'",
-        params![input.invite_code, input.inviter_id],
-    ).map_err(|e| e.to_string())?;
+            params![input.invite_code, input.inviter_id],
+        )
+        .map_err(|e| e.to_string())?;
 
     if result == 0 {
         Err("Invitation not found or already used".to_string())
@@ -409,7 +454,7 @@ pub fn get_invitations_cmd(
          i.business_ref_id, i.status, i.expires_at, i.created_at, i.used_at, i.used_by \
          FROM invitations i \
          LEFT JOIN users u ON i.inviter_id = u.id \
-         WHERE i.inviter_id = ?1"
+         WHERE i.inviter_id = ?1",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -423,25 +468,28 @@ pub fn get_invitations_cmd(
 
     sql.push_str(" ORDER BY i.created_at DESC LIMIT 100");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(params_refs.as_slice(), |row| {
-        Ok(InvitationData {
-            id: row.get(0)?,
-            invite_code: row.get(1)?,
-            inviter_id: row.get(2)?,
-            inviter_name: row.get(3)?,
-            target_phone: row.get(4)?,
-            invitation_type: row.get(5)?,
-            business_ref_id: row.get(6)?,
-            status: row.get(7)?,
-            expires_at: row.get(8)?,
-            created_at: row.get(9)?,
-            used_at: row.get(10)?,
-            used_by: row.get(11)?,
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(InvitationData {
+                id: row.get(0)?,
+                invite_code: row.get(1)?,
+                inviter_id: row.get(2)?,
+                inviter_name: row.get(3)?,
+                target_phone: row.get(4)?,
+                invitation_type: row.get(5)?,
+                business_ref_id: row.get(6)?,
+                status: row.get(7)?,
+                expires_at: row.get(8)?,
+                created_at: row.get(9)?,
+                used_at: row.get(10)?,
+                used_by: row.get(11)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
     let invitations: Vec<InvitationData> = rows.filter_map(|r| r.ok()).collect();
     Ok(invitations)
@@ -453,9 +501,9 @@ pub fn get_invitations_cmd(
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CreateEmployeeInvitationInput {
-    pub role_ids: Vec<i32>,         // 如 [1, 3] 表示采购+销售
+    pub role_ids: Vec<i32>, // 如 [1, 3] 表示采购+销售
     pub target_phone: Option<String>,
-    pub inviter_id: String,      // 当前用户 ID
+    pub inviter_id: String, // 当前用户 ID
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -514,11 +562,13 @@ pub fn create_employee_invitation_cmd(
 
     // 验证 role_ids 是否都存在于 roles 表
     for &role_id in &input.role_ids {
-        let count: i32 = conn.query_row(
-            "SELECT COUNT(*) FROM roles WHERE id = ?1",
-            rusqlite::params![role_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM roles WHERE id = ?1",
+                rusqlite::params![role_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
         if count == 0 {
             return Err(format!("Invalid role_id: {}", role_id));
         }
@@ -547,7 +597,10 @@ pub fn create_employee_invitation_cmd(
     let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "localhost:8888".to_string());
 
     // 生成二维码数据（包含 type=employee 参数）
-    let qr_data = format!("proclaw://invite?code={}&host={}&type=employee", invite_code, host);
+    let qr_data = format!(
+        "proclaw://invite?code={}&host={}&type=employee",
+        invite_code, host
+    );
 
     Ok(serde_json::json!({
         "invite_code": invite_code,
@@ -564,7 +617,10 @@ pub fn accept_employee_invitation_cmd(
     input: AcceptEmployeeInvitationInput,
 ) -> Result<serde_json::Value, String> {
     // 速率限制（用邀请码前缀作为 key）
-    let rate_key = format!("accept_emp:{}", &input.invite_code.chars().take(16).collect::<String>());
+    let rate_key = format!(
+        "accept_emp:{}",
+        &input.invite_code.chars().take(16).collect::<String>()
+    );
     if !check_rate_limit(&rate_key, 10) {
         return Err("Too many requests, please try again later".to_string());
     }
@@ -573,24 +629,26 @@ pub fn accept_employee_invitation_cmd(
     let conn = db.connection();
 
     // 1. 查找邀请码
-    let invitation = conn.query_row(
-        "SELECT id, inviter_id, target_phone, status, expires_at, role_ids \
+    let invitation = conn
+        .query_row(
+            "SELECT id, inviter_id, target_phone, status, expires_at, role_ids \
          FROM invitations WHERE invite_code = ?1",
-        rusqlite::params![input.invite_code],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, i64>(4)?,
-                row.get::<_, Option<String>>(5)?,
-            ))
-        },
-    ).map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => "Invitation not found".to_string(),
-        _ => e.to_string(),
-    })?;
+            rusqlite::params![input.invite_code],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            },
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => "Invitation not found".to_string(),
+            _ => e.to_string(),
+        })?;
 
     let (inv_id, inviter_id, target_phone, status, expires_at, role_ids_json) = invitation;
 
@@ -607,8 +665,14 @@ pub fn accept_employee_invitation_cmd(
     // 4. 检查是否过期
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
-        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", rusqlite::params![inv_id]) {
-            eprintln!("[InvitationCmd] Failed to mark invite expired (internal): {}", e);
+        if let Err(e) = conn.execute(
+            "UPDATE invitations SET status = 'expired' WHERE id = ?1",
+            rusqlite::params![inv_id],
+        ) {
+            eprintln!(
+                "[InvitationCmd] Failed to mark invite expired (internal): {}",
+                e
+            );
         }
         return Err("Invitation has expired".to_string());
     }
@@ -657,12 +721,10 @@ pub fn accept_employee_invitation_cmd(
                 let now_sec = Utc::now().timestamp();
 
                 let password_hash = match &input.password {
-                    Some(pwd) if !pwd.is_empty() => {
-                        match crate::api::auth::hash_password(pwd) {
-                            Ok(h) => Some(h),
-                            Err(e) => return Err(e),
-                        }
-                    }
+                    Some(pwd) if !pwd.is_empty() => match crate::api::auth::hash_password(pwd) {
+                        Ok(h) => Some(h),
+                        Err(e) => return Err(e),
+                    },
                     _ => None,
                 };
 
@@ -684,7 +746,10 @@ pub fn accept_employee_invitation_cmd(
              VALUES (?1, ?2, CURRENT_TIMESTAMP)",
             rusqlite::params![new_user_id, role_id],
         ) {
-            eprintln!("[InvitationCmd] Failed to assign role {} to {}: {}", role_id, new_user_id, e);
+            eprintln!(
+                "[InvitationCmd] Failed to assign role {} to {}: {}",
+                role_id, new_user_id, e
+            );
         }
     }
 
@@ -695,24 +760,48 @@ pub fn accept_employee_invitation_cmd(
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
-        rusqlite::params![Uuid::new_v4().to_string(), inviter_id, new_user_id, now_ms_ts],
+        rusqlite::params![
+            Uuid::new_v4().to_string(),
+            inviter_id,
+            new_user_id,
+            now_ms_ts
+        ],
     ) {
-        eprintln!("[InvitationCmd] Failed to create inviter colleague contact: {}", e);
+        eprintln!(
+            "[InvitationCmd] Failed to create inviter colleague contact: {}",
+            e
+        );
     }
 
     // 新员工 -> 邀请方
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
-        rusqlite::params![Uuid::new_v4().to_string(), new_user_id, inviter_id, now_ms_ts],
+        rusqlite::params![
+            Uuid::new_v4().to_string(),
+            new_user_id,
+            inviter_id,
+            now_ms_ts
+        ],
     ) {
-        eprintln!("[InvitationCmd] Failed to create employee colleague contact: {}", e);
+        eprintln!(
+            "[InvitationCmd] Failed to create employee colleague contact: {}",
+            e
+        );
     }
 
     // 10. 生成系统消息（欢迎消息）
-    let role_names: Vec<String> = role_ids.iter().filter_map(|&rid| {
-        conn.query_row("SELECT name FROM roles WHERE id = ?1", rusqlite::params![rid], |row| row.get(0)).ok()
-    }).collect();
+    let role_names: Vec<String> = role_ids
+        .iter()
+        .filter_map(|&rid| {
+            conn.query_row(
+                "SELECT name FROM roles WHERE id = ?1",
+                rusqlite::params![rid],
+                |row| row.get(0),
+            )
+            .ok()
+        })
+        .collect();
 
     let role_names_str = role_names.join("、");
     let message_content = format!("欢迎加入团队！你已被授予 {} 角色。", role_names_str);

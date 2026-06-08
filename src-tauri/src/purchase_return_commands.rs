@@ -12,18 +12,27 @@ fn generate_pr_number() -> String {
 
 /// 创建采购退货单
 #[tauri::command]
-pub fn create_purchase_return(db: tauri::State<Mutex<Database>>, r#return: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn create_purchase_return(
+    db: tauri::State<Mutex<Database>>,
+    r#return: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let id = uuid::Uuid::new_v4().to_string();
-    let pr_number = r#return.get("pr_number")
+    let pr_number = r#return
+        .get("pr_number")
         .and_then(|v| v.as_str())
         .unwrap_or(&generate_pr_number())
         .to_string();
-    let purchase_order_id = r#return["purchase_order_id"].as_str().ok_or("Purchase order ID is required")?;
-    let supplier_id = r#return["supplier_id"].as_str().ok_or("Supplier ID is required")?;
-    let return_date = r#return.get("return_date")
+    let purchase_order_id = r#return["purchase_order_id"]
+        .as_str()
+        .ok_or("Purchase order ID is required")?;
+    let supplier_id = r#return["supplier_id"]
+        .as_str()
+        .ok_or("Supplier ID is required")?;
+    let return_date = r#return
+        .get("return_date")
         .and_then(|v| v.as_str())
         .unwrap_or("2024-01-01")
         .to_string();
@@ -54,7 +63,8 @@ pub fn create_purchase_return(db: tauri::State<Mutex<Database>>, r#return: serde
             ).map_err(|e| format!("获取原订单商品数量失败: {}", e))?;
             if quantity > orig_qty {
                 return Err(format!(
-                    "商品「{}」退货数量({})超过原订单数量({})", product_id, quantity, orig_qty
+                    "商品「{}」退货数量({})超过原订单数量({})",
+                    product_id, quantity, orig_qty
                 ));
             }
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
@@ -77,7 +87,8 @@ pub fn create_purchase_return(db: tauri::State<Mutex<Database>>, r#return: serde
     tx.execute(
         "UPDATE purchase_returns SET total_amount = ?1 WHERE id = ?2",
         params![total_amount, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
 
@@ -91,7 +102,10 @@ pub fn create_purchase_return(db: tauri::State<Mutex<Database>>, r#return: serde
 
 /// 获取采购退货单列表
 #[tauri::command]
-pub fn get_purchase_returns(db: tauri::State<Mutex<Database>>, options: Option<serde_json::Value>) -> Result<Vec<serde_json::Value>, String> {
+pub fn get_purchase_returns(
+    db: tauri::State<Mutex<Database>>,
+    options: Option<serde_json::Value>,
+) -> Result<Vec<serde_json::Value>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -104,7 +118,7 @@ pub fn get_purchase_returns(db: tauri::State<Mutex<Database>>, options: Option<s
          FROM purchase_returns pr
          LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.id
          LEFT JOIN suppliers s ON pr.supplier_id = s.id
-         WHERE pr.deleted_at IS NULL"
+         WHERE pr.deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -162,7 +176,10 @@ pub fn get_purchase_returns(db: tauri::State<Mutex<Database>>, options: Option<s
 
 /// 获取采购退货单详情(含明细)
 #[tauri::command]
-pub fn get_purchase_return_detail(db: tauri::State<Mutex<Database>>, return_id: String) -> Result<serde_json::Value, String> {
+pub fn get_purchase_return_detail(
+    db: tauri::State<Mutex<Database>>,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -188,12 +205,14 @@ pub fn get_purchase_return_detail(db: tauri::State<Mutex<Database>>, return_id: 
         })),
     ).map_err(|_| "Purchase return not found".to_string())?;
 
-    let mut stmt = conn.prepare(
-        "SELECT pri.id, pri.product_id, p.name as product_name, p.sku,
+    let mut stmt = conn
+        .prepare(
+            "SELECT pri.id, pri.product_id, p.name as product_name, p.sku,
                 pri.quantity, pri.unit_price, pri.total_price, pri.reason
          FROM purchase_return_items pri LEFT JOIN products p ON pri.product_id = p.id
-         WHERE pri.purchase_return_id = ?1 ORDER BY pri.id"
-    ).map_err(|e| e.to_string())?;
+         WHERE pri.purchase_return_id = ?1 ORDER BY pri.id",
+        )
+        .map_err(|e| e.to_string())?;
 
     let items: Vec<serde_json::Value> = stmt
         .query_map(params![return_id], |row| Ok(serde_json::json!({
@@ -209,15 +228,20 @@ pub fn get_purchase_return_detail(db: tauri::State<Mutex<Database>>, return_id: 
 
 /// 确认采购退货 → 扣减库存(outbound) + 记录库存交易
 #[tauri::command]
-pub fn confirm_purchase_return(db: tauri::State<Mutex<Database>>, return_id: String) -> Result<serde_json::Value, String> {
+pub fn confirm_purchase_return(
+    db: tauri::State<Mutex<Database>>,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_returns WHERE id = ?1 AND deleted_at IS NULL",
-        params![return_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase return not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_returns WHERE id = ?1 AND deleted_at IS NULL",
+            params![return_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase return not found".to_string())?;
 
     if status != "draft" {
         return Err(format!("Cannot confirm return with status '{}'", status));
@@ -230,23 +254,32 @@ pub fn confirm_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Str
         let mut stmt = tx.prepare(
             "SELECT product_id, quantity FROM purchase_return_items WHERE purchase_return_id = ?1"
         ).map_err(|e| e.to_string())?;
-        let rows = stmt.query_map(params![return_id], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
-        }).map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![return_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     };
 
     // 库存扣减（退货 = 退回给供应商，库存减少）
     for (pid, qty) in &items {
-        let current: i32 = tx.query_row(
-            "SELECT current_stock FROM products WHERE id = ?1 AND deleted_at IS NULL",
-            params![pid],
-            |row| row.get(0),
-        ).map_err(|_| format!("Product {} not found", pid))?;
+        let current: i32 = tx
+            .query_row(
+                "SELECT current_stock FROM products WHERE id = ?1 AND deleted_at IS NULL",
+                params![pid],
+                |row| row.get(0),
+            )
+            .map_err(|_| format!("Product {} not found", pid))?;
 
         if current < *qty {
-            if let Err(rb) = tx.rollback() { eprintln!("[purchase_return] rollback failed: {}", rb); }
-            return Err(format!("Insufficient stock for product {}. Current: {}, To return: {}", pid, current, qty));
+            if let Err(rb) = tx.rollback() {
+                eprintln!("[purchase_return] rollback failed: {}", rb);
+            }
+            return Err(format!(
+                "Insufficient stock for product {}. Current: {}, To return: {}",
+                pid, current, qty
+            ));
         }
 
         tx.execute(
@@ -267,17 +300,21 @@ pub fn confirm_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Str
     ).map_err(|e| e.to_string())?;
 
     // PRD v1.1: 退货确认时自动记录退款交易
-    let (total_amount, supplier_id): (f64, String) = tx.query_row(
-        "SELECT total_amount, supplier_id FROM purchase_returns WHERE id = ?1",
-        params![return_id],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    ).map_err(|e| e.to_string())?;
+    let (total_amount, supplier_id): (f64, String) = tx
+        .query_row(
+            "SELECT total_amount, supplier_id FROM purchase_returns WHERE id = ?1",
+            params![return_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
 
-    let supplier_name: Option<String> = tx.query_row(
-        "SELECT name FROM suppliers WHERE id = ?1",
-        params![supplier_id],
-        |row| row.get(0),
-    ).ok();
+    let supplier_name: Option<String> = tx
+        .query_row(
+            "SELECT name FROM suppliers WHERE id = ?1",
+            params![supplier_id],
+            |row| row.get(0),
+        )
+        .ok();
 
     let refund_id = uuid::Uuid::new_v4().to_string();
     tx.execute(
@@ -290,7 +327,8 @@ pub fn confirm_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Str
     tx.execute(
         "UPDATE purchase_returns SET refund_amount = ?1 WHERE id = ?2",
         params![total_amount, return_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
 
@@ -303,15 +341,20 @@ pub fn confirm_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Str
 
 /// 取消采购退货
 #[tauri::command]
-pub fn cancel_purchase_return(db: tauri::State<Mutex<Database>>, return_id: String) -> Result<serde_json::Value, String> {
+pub fn cancel_purchase_return(
+    db: tauri::State<Mutex<Database>>,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_returns WHERE id = ?1 AND deleted_at IS NULL",
-        params![return_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase return not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_returns WHERE id = ?1 AND deleted_at IS NULL",
+            params![return_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase return not found".to_string())?;
 
     if status != "draft" && status != "confirmed" {
         return Err(format!("Cannot cancel return with status '{}'", status));
@@ -322,20 +365,28 @@ pub fn cancel_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Stri
         params![return_id],
     ).map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({"id": return_id, "status": "cancelled", "message": "Purchase return cancelled"}))
+    Ok(
+        serde_json::json!({"id": return_id, "status": "cancelled", "message": "Purchase return cancelled"}),
+    )
 }
 
 /// 修改采购退货单（仅草稿状态）
 #[tauri::command]
-pub fn update_purchase_return(db: tauri::State<Mutex<Database>>, return_id: String, r#return: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn update_purchase_return(
+    db: tauri::State<Mutex<Database>>,
+    return_id: String,
+    r#return: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_returns WHERE id = ?1 AND deleted_at IS NULL",
-        params![return_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase return not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_returns WHERE id = ?1 AND deleted_at IS NULL",
+            params![return_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase return not found".to_string())?;
 
     if status != "draft" {
         return Err("Only draft returns can be updated".to_string());
@@ -354,7 +405,11 @@ pub fn update_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Stri
     ).map_err(|e| e.to_string())?;
 
     // 重建明细
-    tx.execute("DELETE FROM purchase_return_items WHERE purchase_return_id = ?1", params![return_id]).map_err(|e| e.to_string())?;
+    tx.execute(
+        "DELETE FROM purchase_return_items WHERE purchase_return_id = ?1",
+        params![return_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     if let Some(items) = r#return.get("items").and_then(|v| v.as_array()) {
         for item in items {
@@ -374,7 +429,11 @@ pub fn update_purchase_return(db: tauri::State<Mutex<Database>>, return_id: Stri
         |row| row.get(0),
     ).unwrap_or(0.0);
 
-    tx.execute("UPDATE purchase_returns SET total_amount = ?1 WHERE id = ?2", params![total, return_id]).map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE purchase_returns SET total_amount = ?1 WHERE id = ?2",
+        params![total, return_id],
+    )
+    .map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({"id": return_id, "message": "Purchase return updated"}))

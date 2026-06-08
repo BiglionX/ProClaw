@@ -116,7 +116,7 @@ pub fn get_inventory_transactions(
     let mut sql = String::from(
         "SELECT id, product_id, transaction_type, quantity, reference_no,
                 reason, performed_by, notes, created_at, sync_status
-         FROM inventory_transactions WHERE 1=1"
+         FROM inventory_transactions WHERE 1=1",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -228,13 +228,15 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
         .map_err(|e| e.to_string())?;
 
     // 低库存产品列表
-    let mut low_stock_stmt = conn.prepare(
-        "SELECT id, name, sku, current_stock, min_stock
+    let mut low_stock_stmt = conn
+        .prepare(
+            "SELECT id, name, sku, current_stock, min_stock
          FROM products
          WHERE deleted_at IS NULL AND current_stock < min_stock AND min_stock > 0
          ORDER BY (current_stock * 1.0 / min_stock) ASC
-         LIMIT 10"
-    ).map_err(|e| e.to_string())?;
+         LIMIT 10",
+        )
+        .map_err(|e| e.to_string())?;
 
     let low_stock_products: Vec<serde_json::Value> = low_stock_stmt
         .query_map([], |row| {

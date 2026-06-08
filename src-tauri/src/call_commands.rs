@@ -47,7 +47,8 @@ pub fn get_call_records_cmd(
     } else if !user_id.is_empty() {
         sql.push_str(&format!(
             " AND (cr.caller_id = ?{} OR cr.callee_id = ?{})",
-            param_idx, param_idx + 1
+            param_idx,
+            param_idx + 1
         ));
         param_values.push(Box::new(user_id.to_string()));
         param_values.push(Box::new(user_id.to_string()));
@@ -70,7 +71,8 @@ pub fn get_call_records_cmd(
     param_values.push(Box::new(limit));
     sql.push_str(&format!(" LIMIT ?{}", param_values.len()));
 
-    let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let records: Vec<serde_json::Value> = stmt
@@ -108,12 +110,30 @@ pub fn create_call_record_cmd(
     let conn = db.connection();
 
     let id = Uuid::new_v4().to_string();
-    let session_id = record.get("session_id").and_then(|v| v.as_str()).ok_or("缺少 session_id")?;
-    let caller_id = record.get("caller_id").and_then(|v| v.as_str()).ok_or("缺少 caller_id")?;
-    let callee_id = record.get("callee_id").and_then(|v| v.as_str()).ok_or("缺少 callee_id")?;
-    let call_type = record.get("call_type").and_then(|v| v.as_str()).unwrap_or("audio");
-    let direction = record.get("direction").and_then(|v| v.as_str()).unwrap_or("outgoing");
-    let status = record.get("status").and_then(|v| v.as_str()).unwrap_or("ringing");
+    let session_id = record
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .ok_or("缺少 session_id")?;
+    let caller_id = record
+        .get("caller_id")
+        .and_then(|v| v.as_str())
+        .ok_or("缺少 caller_id")?;
+    let callee_id = record
+        .get("callee_id")
+        .and_then(|v| v.as_str())
+        .ok_or("缺少 callee_id")?;
+    let call_type = record
+        .get("call_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("audio");
+    let direction = record
+        .get("direction")
+        .and_then(|v| v.as_str())
+        .unwrap_or("outgoing");
+    let status = record
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("ringing");
     let started_at = record.get("started_at").and_then(|v| v.as_i64());
 
     conn.execute(
@@ -139,7 +159,10 @@ pub fn update_call_record_cmd(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let session_id = params.get("session_id").and_then(|v| v.as_str()).ok_or("缺少 session_id")?;
+    let session_id = params
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .ok_or("缺少 session_id")?;
 
     let mut sets = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -177,8 +200,10 @@ pub fn update_call_record_cmd(
         idx
     );
 
-    let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
-    conn.execute(&sql, rusqlite::params_from_iter(param_refs)).map_err(|e| e.to_string())?;
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|p| p.as_ref()).collect();
+    conn.execute(&sql, rusqlite::params_from_iter(param_refs))
+        .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({ "success": true }))
 }

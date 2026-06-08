@@ -1,14 +1,14 @@
 // 销售订单管理 API 处理器
 // 提供销售订单 CRUD、提交（自动扣减库存）等 RESTful API
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path, Query},
+    extract::{Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::Deserialize;
-use super::AppState;
 use rusqlite::params;
+use serde::Deserialize;
 use uuid::Uuid;
 
 /// 销售订单创建请求
@@ -47,8 +47,12 @@ pub async fn get_sales_orders(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -59,7 +63,7 @@ pub async fn get_sales_orders(
          so.shipping_address, so.notes, so.created_by, so.created_at, so.updated_at \
          FROM sales_orders so \
          LEFT JOIN customers c ON so.customer_id = c.id \
-         WHERE so.deleted_at IS NULL"
+         WHERE so.deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -83,7 +87,10 @@ pub async fn get_sales_orders(
         if !search.is_empty() {
             let idx = params_vec.len() + 1;
             let idx2 = idx + 1;
-            sql.push_str(&format!(" AND (so.so_number LIKE ?{} OR c.name LIKE ?{})", idx, idx2));
+            sql.push_str(&format!(
+                " AND (so.so_number LIKE ?{} OR c.name LIKE ?{})",
+                idx, idx2
+            ));
             let pattern = format!("%{}%", search);
             params_vec.push(Box::new(pattern.clone()));
             params_vec.push(Box::new(pattern));
@@ -92,12 +99,17 @@ pub async fn get_sales_orders(
 
     sql.push_str(" ORDER BY so.created_at DESC LIMIT 200");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -120,12 +132,19 @@ pub async fn get_sales_orders(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
-    (StatusCode::OK, Json(serde_json::json!({ "data": result, "total": result.len() })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": result, "total": result.len() })),
+    )
 }
 
 /// 获取单个销售订单（含明细）
@@ -135,8 +154,12 @@ pub async fn get_sales_order(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -170,7 +193,12 @@ pub async fn get_sales_order(
         },
     ) {
         Ok(o) => o,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Sales order not found"}))),
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Sales order not found"})),
+            )
+        }
     };
 
     let mut stmt = match conn.prepare(
@@ -178,11 +206,15 @@ pub async fn get_sales_order(
          soi.quantity, soi.unit_price, soi.total_price, soi.shipped_quantity, soi.notes \
          FROM sales_order_items soi \
          LEFT JOIN products p ON soi.product_id = p.id \
-         WHERE soi.sales_order_id = ?1 ORDER BY soi.id"
+         WHERE soi.sales_order_id = ?1 ORDER BY soi.id",
     ) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params![id], |row| {
@@ -199,12 +231,19 @@ pub async fn get_sales_order(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let items: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
-    (StatusCode::OK, Json(serde_json::json!({ "order": order, "items": items })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "order": order, "items": items })),
+    )
 }
 
 /// 创建销售订单
@@ -214,8 +253,12 @@ pub async fn create_sales_order(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -224,23 +267,35 @@ pub async fn create_sales_order(
     let order_date = payload.order_date.as_deref().unwrap_or("");
 
     if payload.items.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Order must have at least one item"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Order must have at least one item"})),
+        );
     }
 
-    let customer_exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM customers WHERE id = ?1 AND deleted_at IS NULL)",
-        params![payload.customer_id],
-        |row| row.get(0),
-    ).unwrap_or(false);
+    let customer_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM customers WHERE id = ?1 AND deleted_at IS NULL)",
+            params![payload.customer_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
 
     if !customer_exists {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Customer not found"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Customer not found"})),
+        );
     }
 
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Transaction error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Transaction error: {}", e)})),
+            )
+        }
     };
 
     if let Err(e) = tx.execute(
@@ -249,13 +304,20 @@ pub async fn create_sales_order(
          shipping_address, notes, created_by) \
          VALUES (?1, ?2, ?3, ?4, ?5, 'draft', 0.0, 0.0, 'unpaid', ?6, ?7, ?8)",
         params![
-            id, so_number, payload.customer_id, order_date,
+            id,
+            so_number,
+            payload.customer_id,
+            order_date,
             payload.expected_delivery_date,
-            payload.shipping_address, payload.notes, payload.created_by,
+            payload.shipping_address,
+            payload.notes,
+            payload.created_by,
         ],
     ) {
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to create order: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to create order: {}", e)})),
+        );
     }
 
     for item in &payload.items {
@@ -266,11 +328,21 @@ pub async fn create_sales_order(
             "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, \
              unit_price, total_price, shipped_quantity, notes) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
-            params![item_id, id, item.product_id, item.quantity, item.unit_price, total_price, item.notes],
+            params![
+                item_id,
+                id,
+                item.product_id,
+                item.quantity,
+                item.unit_price,
+                total_price,
+                item.notes
+            ],
         ) {
             let _ = tx.rollback();
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to insert item: {}", e)})));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to insert item: {}", e)})),
+            );
         }
     }
 
@@ -282,8 +354,10 @@ pub async fn create_sales_order(
         Ok(t) => t,
         Err(e) => {
             let _ = tx.rollback();
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to calculate total: {}", e)})));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to calculate total: {}", e)})),
+            );
         }
     };
 
@@ -292,21 +366,28 @@ pub async fn create_sales_order(
         params![total_amount, id],
     ) {
         let _ = tx.rollback();
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update total: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update total: {}", e)})),
+        );
     }
 
     if let Err(e) = tx.commit() {
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Commit error: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Commit error: {}", e)})),
+        );
     }
 
-    (StatusCode::CREATED, Json(serde_json::json!({
-        "id": id,
-        "so_number": so_number,
-        "total_amount": total_amount,
-        "message": "Sales order created successfully"
-    })))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::json!({
+            "id": id,
+            "so_number": so_number,
+            "total_amount": total_amount,
+            "message": "Sales order created successfully"
+        })),
+    )
 }
 
 /// 更新销售订单
@@ -317,8 +398,12 @@ pub async fn update_sales_order(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -328,17 +413,29 @@ pub async fn update_sales_order(
         |row| row.get(0),
     ) {
         Ok(s) => s,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Sales order not found"}))),
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Sales order not found"})),
+            )
+        }
     };
 
     if status != "draft" {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Only draft orders can be updated"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Only draft orders can be updated"})),
+        );
     }
 
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Transaction error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Transaction error: {}", e)})),
+            )
+        }
     };
 
     if let Err(e) = tx.execute(
@@ -351,10 +448,15 @@ pub async fn update_sales_order(
             Json(serde_json::json!({"error": format!("Failed to update order: {}", e)})));
     }
 
-    if let Err(e) = tx.execute("DELETE FROM sales_order_items WHERE sales_order_id = ?1", params![id]) {
+    if let Err(e) = tx.execute(
+        "DELETE FROM sales_order_items WHERE sales_order_id = ?1",
+        params![id],
+    ) {
         let _ = tx.rollback();
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to clear old items: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to clear old items: {}", e)})),
+        );
     }
 
     for item in &payload.items {
@@ -377,22 +479,32 @@ pub async fn update_sales_order(
         |row| row.get(0),
     ).unwrap_or(0.0);
 
-    if let Err(e) = tx.execute("UPDATE sales_orders SET total_amount = ?1 WHERE id = ?2", params![total_amount, id]) {
+    if let Err(e) = tx.execute(
+        "UPDATE sales_orders SET total_amount = ?1 WHERE id = ?2",
+        params![total_amount, id],
+    ) {
         let _ = tx.rollback();
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update total: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update total: {}", e)})),
+        );
     }
 
     if let Err(e) = tx.commit() {
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Commit error: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Commit error: {}", e)})),
+        );
     }
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "id": id,
-        "total_amount": total_amount,
-        "message": "Sales order updated successfully"
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id": id,
+            "total_amount": total_amount,
+            "message": "Sales order updated successfully"
+        })),
+    )
 }
 
 /// 提交销售订单（确认 + 自动扣减库存）
@@ -402,8 +514,12 @@ pub async fn submit_sales_order(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -413,29 +529,44 @@ pub async fn submit_sales_order(
         |row| row.get(0),
     ) {
         Ok(s) => s,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Sales order not found"}))),
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Sales order not found"})),
+            )
+        }
     };
 
     if status != "draft" {
-        return (StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": format!("Cannot submit order with status '{}'", status)})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(
+                serde_json::json!({"error": format!("Cannot submit order with status '{}'", status)}),
+            ),
+        );
     }
 
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Transaction error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Transaction error: {}", e)})),
+            )
+        }
     };
 
     // 先在闭包中收集明细，避免借用 tx
     let items: Vec<(String, i32)> = {
-        let mut stmt = match tx.prepare(
-            "SELECT product_id, quantity FROM sales_order_items WHERE sales_order_id = ?1"
-        ) {
+        let mut stmt = match tx
+            .prepare("SELECT product_id, quantity FROM sales_order_items WHERE sales_order_id = ?1")
+        {
             Ok(s) => s,
             Err(e) => {
-                return (StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("Query error: {}", e)})));
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+                );
             }
         };
         let rows = match stmt.query_map(params![id], |row| {
@@ -443,8 +574,10 @@ pub async fn submit_sales_order(
         }) {
             Ok(r) => r,
             Err(e) => {
-                return (StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("Query error: {}", e)})));
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+                );
             }
         };
         rows.filter_map(|r| r.ok()).collect()
@@ -459,18 +592,22 @@ pub async fn submit_sales_order(
             Ok(s) => s,
             Err(_) => {
                 let _ = tx.rollback();
-                return (StatusCode::BAD_REQUEST,
-                    Json(serde_json::json!({"error": format!("Product {} not found", product_id)})));
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error": format!("Product {} not found", product_id)})),
+                );
             }
         };
 
         if current_stock < *quantity {
             let _ = tx.rollback();
-            return (StatusCode::BAD_REQUEST,
+            return (
+                StatusCode::BAD_REQUEST,
                 Json(serde_json::json!({
                     "error": format!("Insufficient stock for product {}. Current: {}, Required: {}",
                         product_id, current_stock, quantity)
-                })));
+                })),
+            );
         }
 
         if let Err(e) = tx.execute(
@@ -504,13 +641,18 @@ pub async fn submit_sales_order(
     }
 
     if let Err(e) = tx.commit() {
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Commit error: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Commit error: {}", e)})),
+        );
     }
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "id": id,
-        "status": "confirmed",
-        "message": "Sales order submitted successfully. Inventory deducted."
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "id": id,
+            "status": "confirmed",
+            "message": "Sales order submitted successfully. Inventory deducted."
+        })),
+    )
 }

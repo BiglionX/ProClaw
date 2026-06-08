@@ -1,14 +1,14 @@
 // 供应商管理 API 处理器
 // 提供供应商 CRUD 操作的 RESTful API
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path, Query},
+    extract::{Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::Deserialize;
-use super::AppState;
 use rusqlite::params;
+use serde::Deserialize;
 use uuid::Uuid;
 
 /// 供应商创建/更新请求
@@ -40,15 +40,19 @@ pub async fn get_suppliers(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
     let mut sql = String::from(
         "SELECT id, name, code, contact_person, phone, email, address, website, \
          payment_terms, tax_number, notes, is_active, created_at, updated_at \
-         FROM suppliers WHERE deleted_at IS NULL"
+         FROM suppliers WHERE deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -65,12 +69,17 @@ pub async fn get_suppliers(
 
     sql.push_str(" ORDER BY name ASC");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -92,12 +101,19 @@ pub async fn get_suppliers(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
-    (StatusCode::OK, Json(serde_json::json!({ "data": result, "total": result.len() })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": result, "total": result.len() })),
+    )
 }
 
 /// 获取单个供应商
@@ -107,8 +123,12 @@ pub async fn get_supplier(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -139,7 +159,10 @@ pub async fn get_supplier(
 
     match result {
         Ok(supplier) => (StatusCode::OK, Json(supplier)),
-        Err(_) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Supplier not found"}))),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Supplier not found"})),
+        ),
     }
 }
 
@@ -150,8 +173,12 @@ pub async fn create_supplier(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -165,19 +192,32 @@ pub async fn create_supplier(
          payment_terms, tax_number, notes, is_active) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
-            id, payload.name, code,
-            payload.contact_person, payload.phone, payload.email,
-            payload.address, payload.website, payload.payment_terms,
-            payload.tax_number, payload.notes, is_active,
+            id,
+            payload.name,
+            code,
+            payload.contact_person,
+            payload.phone,
+            payload.email,
+            payload.address,
+            payload.website,
+            payload.payment_terms,
+            payload.tax_number,
+            payload.notes,
+            is_active,
         ],
     ) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::json!({
-            "id": id,
-            "code": code,
-            "message": "Supplier created successfully"
-        }))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to create supplier: {}", e)}))),
+        Ok(_) => (
+            StatusCode::CREATED,
+            Json(serde_json::json!({
+                "id": id,
+                "code": code,
+                "message": "Supplier created successfully"
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to create supplier: {}", e)})),
+        ),
     }
 }
 
@@ -189,19 +229,28 @@ pub async fn update_supplier(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
-    let exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM suppliers WHERE id = ?1 AND deleted_at IS NULL)",
-        params![id],
-        |row| row.get(0),
-    ).unwrap_or(false);
+    let exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM suppliers WHERE id = ?1 AND deleted_at IS NULL)",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
 
     if !exists {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Supplier not found"})));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Supplier not found"})),
+        );
     }
 
     let mut sets: Vec<String> = Vec::new();
@@ -253,18 +302,27 @@ pub async fn update_supplier(
 
     sets.push("updated_at = CURRENT_TIMESTAMP".to_string());
 
-    let sql = format!("UPDATE suppliers SET {} WHERE id = ?{}", sets.join(", "), values.len() + 1);
+    let sql = format!(
+        "UPDATE suppliers SET {} WHERE id = ?{}",
+        sets.join(", "),
+        values.len() + 1
+    );
     values.push(Box::new(id.clone()));
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> = values.iter().map(|p| p.as_ref()).collect();
 
     match conn.execute(&sql, params_refs.as_slice()) {
-        Ok(_) => (StatusCode::OK, Json(serde_json::json!({
-            "id": id,
-            "message": "Supplier updated successfully"
-        }))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update supplier: {}", e)}))),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "id": id,
+                "message": "Supplier updated successfully"
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update supplier: {}", e)})),
+        ),
     }
 }
 
@@ -275,8 +333,12 @@ pub async fn delete_supplier(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 

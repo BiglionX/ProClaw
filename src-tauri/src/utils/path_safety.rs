@@ -1,7 +1,6 @@
 /// 路径安全工具：防止路径遍历（Path Traversal）攻击
 ///
 /// 用于净化来自用户/前端的路径参数，确保所有文件操作被限定在预期目录内。
-
 use std::path::{Path, PathBuf};
 
 /// 净化文件名/路径段，移除危险字符
@@ -44,7 +43,7 @@ pub fn sanitize_file_name(name: &str) -> Result<String, &'static str> {
 pub fn ensure_within_dir(base: &Path, target: &Path) -> Result<PathBuf, &'static str> {
     // 规范化 base 目录
     let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
-    
+
     // 构造完整目标路径并规范化
     let full_target = base.join(target);
     let canonical_target = match full_target.canonicalize() {
@@ -61,11 +60,11 @@ pub fn ensure_within_dir(base: &Path, target: &Path) -> Result<PathBuf, &'static
             return Ok(joined);
         }
     };
-    
+
     if !canonical_target.starts_with(&canonical_base) {
         return Err("路径穿越攻击：目标路径逃逸出基础目录");
     }
-    
+
     Ok(canonical_target)
 }
 
@@ -91,7 +90,10 @@ mod tests {
     #[test]
     fn test_sanitize_path_component() {
         assert_eq!(sanitize_path_component("normal_name"), "normal_name");
-        assert_eq!(sanitize_path_component("../../../etc/passwd"), "___etc_passwd");
+        assert_eq!(
+            sanitize_path_component("../../../etc/passwd"),
+            "___etc_passwd"
+        );
         assert_eq!(sanitize_path_component("foo\\..\\bar"), "foo__bar");
         assert_eq!(sanitize_path_component("test:file"), "test_file");
     }

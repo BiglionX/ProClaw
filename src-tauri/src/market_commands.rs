@@ -81,7 +81,10 @@ pub fn get_market_agents(
     if let Some(ref s) = search {
         if !s.is_empty() {
             let idx = query_params.len() + 1;
-            conditions.push(format!("(ma.name LIKE ?{} OR ma.description LIKE ?{})", idx, idx));
+            conditions.push(format!(
+                "(ma.name LIKE ?{} OR ma.description LIKE ?{})",
+                idx, idx
+            ));
             query_params.push(Box::new(format!("%{}%", s)));
         }
     }
@@ -95,7 +98,8 @@ pub fn get_market_agents(
          WHERE {}",
         where_sql
     );
-    let count_refs: Vec<&dyn rusqlite::types::ToSql> = query_params.iter().map(|p| p.as_ref()).collect();
+    let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+        query_params.iter().map(|p| p.as_ref()).collect();
     let total: i64 = conn
         .query_row(&count_sql, count_refs.as_slice(), |row| row.get(0))
         .map_err(|e| e.to_string())?;
@@ -122,14 +126,14 @@ pub fn get_market_agents(
     all_params.push(Box::new(page_size));
     all_params.push(Box::new(offset));
 
-    let all_refs: Vec<&dyn rusqlite::types::ToSql> = all_params.iter().map(|p| p.as_ref()).collect();
+    let all_refs: Vec<&dyn rusqlite::types::ToSql> =
+        all_params.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
     let agents: Vec<serde_json::Value> = stmt
         .query_map(all_refs.as_slice(), |row| {
             let perms_str: String = row.get::<_, String>(6)?;
-            let permissions: Vec<String> =
-                serde_json::from_str(&perms_str).unwrap_or_default();
+            let permissions: Vec<String> = serde_json::from_str(&perms_str).unwrap_or_default();
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "name": row.get::<_, String>(1)?,
@@ -178,11 +182,9 @@ pub fn get_market_agent_detail(
         params![agent_id],
         |row| {
             let perms_str: String = row.get::<_, String>(6)?;
-            let permissions: Vec<String> =
-                serde_json::from_str(&perms_str).unwrap_or_default();
+            let permissions: Vec<String> = serde_json::from_str(&perms_str).unwrap_or_default();
             let screens_str: String = row.get::<_, String>(12)?;
-            let screenshots: Vec<String> =
-                serde_json::from_str(&screens_str).unwrap_or_default();
+            let screenshots: Vec<String> = serde_json::from_str(&screens_str).unwrap_or_default();
 
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
@@ -219,9 +221,7 @@ pub fn get_market_categories(
     let conn = db_guard.connection();
 
     let mut stmt = conn
-        .prepare(
-            "SELECT id, name, icon FROM market_categories ORDER BY sort_order ASC",
-        )
+        .prepare("SELECT id, name, icon FROM market_categories ORDER BY sort_order ASC")
         .map_err(|e| e.to_string())?;
 
     let categories: Vec<serde_json::Value> = stmt
@@ -266,8 +266,7 @@ pub fn download_market_agent_package(
             let description: Option<String> = row.get(8)?;
             let author: Option<String> = row.get(9)?;
 
-            let permissions: Vec<String> =
-                serde_json::from_str(&perms_str).unwrap_or_default();
+            let permissions: Vec<String> = serde_json::from_str(&perms_str).unwrap_or_default();
 
             // 如果没有 manifest_json，则构建一个
             let manifest: serde_json::Value = if let Some(ref mj) = manifest_json {
@@ -326,7 +325,9 @@ mod tests {
         let conn = db_guard.connection();
 
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM market_categories", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM market_categories", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 4, "Should have 4 market categories");
     }
@@ -338,7 +339,11 @@ mod tests {
         let conn = db_guard.connection();
 
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM market_agents WHERE status = 'published'", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM market_agents WHERE status = 'published'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(count, 5, "Should have 5 market agents");
     }
@@ -349,16 +354,18 @@ mod tests {
         let db_guard = db.lock().unwrap();
         let conn = db_guard.connection();
 
-        let row = conn.query_row(
-            "SELECT name, permissions_json, price FROM market_agents WHERE id = 'ma_task'",
-            [],
-            |row| {
-                let name: String = row.get(0)?;
-                let perms: String = row.get(1)?;
-                let price: i64 = row.get(2)?;
-                Ok((name, perms, price))
-            },
-        ).unwrap();
+        let row = conn
+            .query_row(
+                "SELECT name, permissions_json, price FROM market_agents WHERE id = 'ma_task'",
+                [],
+                |row| {
+                    let name: String = row.get(0)?;
+                    let perms: String = row.get(1)?;
+                    let price: i64 = row.get(2)?;
+                    Ok((name, perms, price))
+                },
+            )
+            .unwrap();
 
         assert_eq!(row.0, "任务管理 Agent");
         assert!(row.1.contains("send_message"));

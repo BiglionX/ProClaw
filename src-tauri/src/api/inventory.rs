@@ -1,14 +1,14 @@
 // 库存管理 API 处理器
 // 提供库存查询、交易记录、库存统计等 RESTful API
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Query},
+    extract::{Json, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::{Deserialize};
-use super::AppState;
 use rusqlite::params;
+use serde::Deserialize;
 use uuid::Uuid;
 
 /// 库存交易创建请求
@@ -45,15 +45,19 @@ pub async fn get_inventory(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
     let mut sql = String::from(
         "SELECT id, sku, name, unit, cost_price, sell_price, current_stock, \
          min_stock, max_stock, image_url, barcode, is_active, created_at, updated_at \
-         FROM products WHERE deleted_at IS NULL"
+         FROM products WHERE deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -74,12 +78,17 @@ pub async fn get_inventory(
 
     sql.push_str(" ORDER BY name ASC LIMIT 500");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -109,12 +118,19 @@ pub async fn get_inventory(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
-    (StatusCode::OK, Json(serde_json::json!({ "data": result, "total": result.len() })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": result, "total": result.len() })),
+    )
 }
 
 /// 获取库存交易记录
@@ -124,15 +140,19 @@ pub async fn get_inventory_transactions(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
     let mut sql = String::from(
         "SELECT id, product_id, transaction_type, quantity, reference_no, \
          reason, performed_by, notes, created_at, sync_status \
-         FROM inventory_transactions WHERE 1=1"
+         FROM inventory_transactions WHERE 1=1",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -167,12 +187,17 @@ pub async fn get_inventory_transactions(
 
     sql.push_str(" ORDER BY created_at DESC LIMIT 200");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -190,12 +215,19 @@ pub async fn get_inventory_transactions(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
-    (StatusCode::OK, Json(serde_json::json!({ "data": result, "total": result.len() })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": result, "total": result.len() })),
+    )
 }
 
 /// 创建库存交易
@@ -205,38 +237,55 @@ pub async fn create_inventory_transaction(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
-    if !["inbound", "outbound", "adjustment", "transfer"].contains(&payload.transaction_type.as_str()) {
-        return (StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "Invalid transaction type"})));
+    if !["inbound", "outbound", "adjustment", "transfer"]
+        .contains(&payload.transaction_type.as_str())
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Invalid transaction type"})),
+        );
     }
 
-    let product_exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 AND deleted_at IS NULL)",
-        params![payload.product_id],
-        |row| row.get(0),
-    ).unwrap_or(false);
+    let product_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 AND deleted_at IS NULL)",
+            params![payload.product_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
 
     if !product_exists {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Product not found"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Product not found"})),
+        );
     }
 
     if payload.transaction_type == "outbound" {
-        let current_stock: i32 = conn.query_row(
-            "SELECT current_stock FROM products WHERE id = ?1",
-            params![payload.product_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let current_stock: i32 = conn
+            .query_row(
+                "SELECT current_stock FROM products WHERE id = ?1",
+                params![payload.product_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         if current_stock < payload.quantity {
-            return (StatusCode::BAD_REQUEST,
+            return (
+                StatusCode::BAD_REQUEST,
                 Json(serde_json::json!({
                     "error": format!("Insufficient stock. Current: {}, Requested: {}", current_stock, payload.quantity)
-                })));
+                })),
+            );
         }
     }
 
@@ -252,20 +301,31 @@ pub async fn create_inventory_transaction(
 
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Transaction error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Transaction error: {}", e)})),
+            )
+        }
     };
 
     if let Err(e) = tx.execute(
         "INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, \
          reference_no, reason, notes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
-            id, payload.product_id, payload.transaction_type, payload.quantity,
-            payload.reference_no, payload.reason, payload.notes,
+            id,
+            payload.product_id,
+            payload.transaction_type,
+            payload.quantity,
+            payload.reference_no,
+            payload.reason,
+            payload.notes,
         ],
     ) {
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to insert transaction: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to insert transaction: {}", e)})),
+        );
     }
 
     if let Err(e) = tx.execute(
@@ -278,50 +338,67 @@ pub async fn create_inventory_transaction(
     }
 
     if let Err(e) = tx.commit() {
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Commit error: {}", e)})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Commit error: {}", e)})),
+        );
     }
 
-    (StatusCode::CREATED, Json(serde_json::json!({
-        "id": id,
-        "product_id": payload.product_id,
-        "transaction_type": payload.transaction_type,
-        "quantity": payload.quantity,
-        "stock_change": stock_change,
-        "message": "Transaction created successfully"
-    })))
+    (
+        StatusCode::CREATED,
+        Json(serde_json::json!({
+            "id": id,
+            "product_id": payload.product_id,
+            "transaction_type": payload.transaction_type,
+            "quantity": payload.quantity,
+            "stock_change": stock_change,
+            "message": "Transaction created successfully"
+        })),
+    )
 }
 
 /// 获取库存统计
 #[allow(dead_code)]
-pub async fn get_inventory_stats(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn get_inventory_stats(State(state): State<AppState>) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
-    let total_products: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL", [], |row| row.get(0),
-    ).unwrap_or(0);
+    let total_products: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     let low_stock_count: i64 = conn.query_row(
         "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND current_stock < min_stock AND min_stock > 0",
         [], |row| row.get(0),
     ).unwrap_or(0);
 
-    let zero_stock_count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND current_stock = 0",
-        [], |row| row.get(0),
-    ).unwrap_or(0);
+    let zero_stock_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND current_stock = 0",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    let today_transactions: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM inventory_transactions WHERE DATE(created_at) = DATE('now')",
-        [], |row| row.get(0),
-    ).unwrap_or(0);
+    let today_transactions: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM inventory_transactions WHERE DATE(created_at) = DATE('now')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     let total_value: f64 = conn.query_row(
         "SELECT COALESCE(SUM(current_stock * cost_price), 0.0) FROM products WHERE deleted_at IS NULL",
@@ -331,18 +408,21 @@ pub async fn get_inventory_stats(
     let mut low_stmt = match conn.prepare(
         "SELECT id, name, sku, current_stock, min_stock \
          FROM products WHERE deleted_at IS NULL AND current_stock < min_stock AND min_stock > 0 \
-         ORDER BY CAST(current_stock AS REAL) / min_stock ASC LIMIT 10"
+         ORDER BY CAST(current_stock AS REAL) / min_stock ASC LIMIT 10",
     ) {
         Ok(s) => s,
         Err(_) => {
-            return (StatusCode::OK, Json(serde_json::json!({
-                "total_products": total_products,
-                "low_stock_count": low_stock_count,
-                "zero_stock_count": zero_stock_count,
-                "today_transactions": today_transactions,
-                "total_value": format!("{:.2}", total_value),
-                "low_stock_products": [],
-            })));
+            return (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "total_products": total_products,
+                    "low_stock_count": low_stock_count,
+                    "zero_stock_count": zero_stock_count,
+                    "today_transactions": today_transactions,
+                    "total_value": format!("{:.2}", total_value),
+                    "low_stock_products": [],
+                })),
+            );
         }
     };
 
@@ -357,25 +437,31 @@ pub async fn get_inventory_stats(
     }) {
         Ok(r) => r,
         Err(_) => {
-            return (StatusCode::OK, Json(serde_json::json!({
-                "total_products": total_products,
-                "low_stock_count": low_stock_count,
-                "zero_stock_count": zero_stock_count,
-                "today_transactions": today_transactions,
-                "total_value": format!("{:.2}", total_value),
-                "low_stock_products": [],
-            })));
+            return (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "total_products": total_products,
+                    "low_stock_count": low_stock_count,
+                    "zero_stock_count": zero_stock_count,
+                    "today_transactions": today_transactions,
+                    "total_value": format!("{:.2}", total_value),
+                    "low_stock_products": [],
+                })),
+            );
         }
     };
 
     let low_stock_products: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "total_products": total_products,
-        "low_stock_count": low_stock_count,
-        "zero_stock_count": zero_stock_count,
-        "today_transactions": today_transactions,
-        "total_value": format!("{:.2}", total_value),
-        "low_stock_products": low_stock_products,
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "total_products": total_products,
+            "low_stock_count": low_stock_count,
+            "zero_stock_count": zero_stock_count,
+            "today_transactions": today_transactions,
+            "total_value": format!("{:.2}", total_value),
+            "low_stock_products": low_stock_products,
+        })),
+    )
 }

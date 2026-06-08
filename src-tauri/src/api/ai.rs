@@ -2,17 +2,17 @@
 // 处理图片上传、OCR识别、订单草稿管理。
 // Phase 2: 真实 AI/OCR 集成，替换模拟数据
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path},
+    extract::{Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::{Deserialize, Serialize};
-use super::AppState;
-use serde_json::json;
 use chrono::Utc;
-use uuid::Uuid;
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use uuid::Uuid;
 
 // ============================================================
 // 数据结构
@@ -148,9 +148,16 @@ pub async fn recognize_order(
     State(state): State<AppState>,
     Json(payload): Json<RecognizeOrderRequest>,
 ) -> impl IntoResponse {
-    let provider = payload.provider.as_deref().unwrap_or("cloud").to_lowercase();
+    let provider = payload
+        .provider
+        .as_deref()
+        .unwrap_or("cloud")
+        .to_lowercase();
     let image_type = payload.image_type.as_deref().unwrap_or("jpg");
-    let user_id = payload.user_id.clone().unwrap_or_else(|| "system".to_string());
+    let user_id = payload
+        .user_id
+        .clone()
+        .unwrap_or_else(|| "system".to_string());
 
     // 解码 base64 图片为字节数据
     let image_bytes = match base64_decode(&payload.image_base64) {
@@ -189,7 +196,9 @@ pub async fn recognize_order(
         if api_key.is_empty() {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(json!({"error": "API key is required for cloud provider. Set DEEPSEEK_API_KEY env var or provide api_key in request."})),
+                Json(
+                    json!({"error": "API key is required for cloud provider. Set DEEPSEEK_API_KEY env var or provide api_key in request."}),
+                ),
             );
         }
 
@@ -205,19 +214,20 @@ pub async fn recognize_order(
             result.provider_used = Some(provider.clone());
 
             // 审计修复 #4: 序列化失败时记录错误而非静默空字符串
-            let items_json = serde_json::to_string(&result.items)
-                .unwrap_or_else(|e| {
-                    eprintln!("[AI] Failed to serialize recognition items: {}", e);
-                    String::from("[]")
-                });
+            let items_json = serde_json::to_string(&result.items).unwrap_or_else(|e| {
+                eprintln!("[AI] Failed to serialize recognition items: {}", e);
+                String::from("[]")
+            });
 
             // 保存到 order_drafts
             let db = match state.db.lock() {
                 Ok(db) => db,
-                Err(_) => return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": "Database lock error"})),
-                ),
+                Err(_) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error": "Database lock error"})),
+                    )
+                }
             };
             let conn = db.connection();
 
@@ -261,7 +271,10 @@ pub async fn recognize_order(
 
             (
                 StatusCode::OK,
-                Json(serde_json::to_value(result).unwrap_or(json!({"error": "Serialization failed"}))),
+                Json(
+                    serde_json::to_value(result)
+                        .unwrap_or(json!({"error": "Serialization failed"})),
+                ),
             )
         }
         Err(err_msg) => {
@@ -310,10 +323,12 @@ pub async fn validate_order_items(
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -327,19 +342,27 @@ pub async fn validate_order_items(
             params![item.product_name],
             |row| {
                 Ok((
-                    row.get::<_, String>(0)?,    // id
-                    row.get::<_, String>(1)?,     // name
-                    row.get::<_, String>(2)?,     // sku
-                    row.get::<_, i32>(3)?,        // current_stock
-                    row.get::<_, f64>(4)?,        // cost_price
-                    row.get::<_, f64>(5)?,        // sell_price
+                    row.get::<_, String>(0)?,         // id
+                    row.get::<_, String>(1)?,         // name
+                    row.get::<_, String>(2)?,         // sku
+                    row.get::<_, i32>(3)?,            // current_stock
+                    row.get::<_, f64>(4)?,            // cost_price
+                    row.get::<_, f64>(5)?,            // sell_price
                     row.get::<_, Option<String>>(6)?, // category_id
                 ))
             },
         );
 
         match product {
-            Ok((product_id, product_name, sku, current_stock, cost_price, sell_price, _category_id)) => {
+            Ok((
+                product_id,
+                product_name,
+                sku,
+                current_stock,
+                cost_price,
+                sell_price,
+                _category_id,
+            )) => {
                 // ---- 2. 库存充足性检查 ----
                 if (current_stock as f64) < item.quantity {
                     warnings.push(ValidationWarning {
@@ -349,8 +372,11 @@ pub async fn validate_order_items(
                             "商品 '{}' (SKU: {}) 库存不足: 需要 {:.0}, 当前库存 {}",
                             product_name, sku, item.quantity, current_stock
                         ),
-                        suggestion: Some(format!("建议可售数量: {}, 当前缺 {:.0}", current_stock,
-                            item.quantity - current_stock as f64)),
+                        suggestion: Some(format!(
+                            "建议可售数量: {}, 当前缺 {:.0}",
+                            current_stock,
+                            item.quantity - current_stock as f64
+                        )),
                     });
                 }
 
@@ -363,7 +389,10 @@ pub async fn validate_order_items(
                             "商品 '{}' 单价 {:.2} 低于成本价 {:.2}",
                             product_name, item.unit_price, cost_price
                         ),
-                        suggestion: Some(format!("建议售价不低于 {:.2} (成本价 +20%)", cost_price * 1.2)),
+                        suggestion: Some(format!(
+                            "建议售价不低于 {:.2} (成本价 +20%)",
+                            cost_price * 1.2
+                        )),
                     });
                 }
 
@@ -376,7 +405,10 @@ pub async fn validate_order_items(
                             warning_type: "price_unusual".to_string(),
                             message: format!(
                                 "商品 '{}' 单价 {:.2} 偏离标准售价 {:.2} ({:.0}%)",
-                                product_name, item.unit_price, sell_price, deviation * 100.0
+                                product_name,
+                                item.unit_price,
+                                sell_price,
+                                deviation * 100.0
                             ),
                             suggestion: Some(format!(
                                 "请确认价格 {:.2} 是否正确，标准售价为 {:.2}",
@@ -387,17 +419,22 @@ pub async fn validate_order_items(
                 }
 
                 // ---- 5. 若库存接近下限则建议补货 ----
-                let min_stock: i32 = conn.query_row(
-                    "SELECT COALESCE(min_stock, 0) FROM products WHERE id = ?1",
-                    params![product_id],
-                    |row| row.get(0),
-                ).unwrap_or(0);
+                let min_stock: i32 = conn
+                    .query_row(
+                        "SELECT COALESCE(min_stock, 0) FROM products WHERE id = ?1",
+                        params![product_id],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(0);
 
                 // 审计修复 #5: 使用 f64→i64→i32 链式转换防止溢出
                 let sale_qty: i32 = {
                     let qty_f64 = item.quantity;
                     if qty_f64 < 0.0 || qty_f64 > i32::MAX as f64 {
-                        eprintln!("[AI] Quantity out of bounds for item '{}': {}", product_name, qty_f64);
+                        eprintln!(
+                            "[AI] Quantity out of bounds for item '{}': {}",
+                            product_name, qty_f64
+                        );
                         i32::MAX
                     } else {
                         qty_f64 as i32
@@ -415,7 +452,9 @@ pub async fn validate_order_items(
                 if item.product_name != product_name && item.product_name == sku {
                     suggestions.push(format!(
                         "第{}项: SKU '{}' 已匹配为商品 '{}'",
-                        idx + 1, sku, product_name
+                        idx + 1,
+                        sku,
+                        product_name
                     ));
                 }
             }
@@ -478,10 +517,12 @@ pub async fn save_order_draft(
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -516,7 +557,7 @@ pub async fn save_order_draft(
 
     (
         StatusCode::OK,
-        Json(serde_json::to_value(response).unwrap_or(json!({"error": "Serialization failed"})))
+        Json(serde_json::to_value(response).unwrap_or(json!({"error": "Serialization failed"}))),
     )
 }
 
@@ -527,10 +568,12 @@ pub async fn get_order_draft(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -553,11 +596,11 @@ pub async fn get_order_draft(
     match result {
         Ok(draft) => (
             StatusCode::OK,
-            Json(serde_json::to_value(draft).unwrap_or(json!({"error": "Serialization failed"})))
+            Json(serde_json::to_value(draft).unwrap_or(json!({"error": "Serialization failed"}))),
         ),
         Err(_) => (
             StatusCode::NOT_FOUND,
-            Json(json!({"error": "Draft not found"}))
+            Json(json!({"error": "Draft not found"})),
         ),
     }
 }
@@ -570,10 +613,12 @@ pub async fn submit_order_draft(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "Database lock error"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -593,10 +638,12 @@ pub async fn submit_order_draft(
 
     let (draft_id, customer_id, items_json, draft_status) = match draft {
         Ok(d) => d,
-        Err(_) => return (
-            StatusCode::NOT_FOUND,
-            Json(json!({"error": "Draft not found"})),
-        ),
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Draft not found"})),
+            )
+        }
     };
 
     // 防止重复提交
@@ -610,23 +657,29 @@ pub async fn submit_order_draft(
     // 解析 items
     let items: Vec<OrderItem> = match serde_json::from_str::<Vec<OrderItem>>(&items_json) {
         Ok(items) if !items.is_empty() => items,
-        Ok(_) => return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "Draft has no items"})),
-        ),
-        Err(e) => return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": format!("Failed to parse items: {}", e)})),
-        ),
+        Ok(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Draft has no items"})),
+            )
+        }
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("Failed to parse items: {}", e)})),
+            )
+        }
     };
 
     // 开始事务
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Transaction error: {}", e)})),
-        ),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Transaction error: {}", e)})),
+            )
+        }
     };
 
     let so_id = Uuid::new_v4().to_string();
@@ -652,7 +705,9 @@ pub async fn submit_order_draft(
         match product_info {
             Ok((_, _, stock)) => {
                 if (stock as f64) < item.quantity {
-                    if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
+                    if let Err(rb) = tx.rollback() {
+                        eprintln!("[ai] rollback failed: {}", rb);
+                    }
                     return (
                         StatusCode::BAD_REQUEST,
                         Json(json!({
@@ -662,7 +717,9 @@ pub async fn submit_order_draft(
                 }
             }
             Err(_) => {
-                if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
+                if let Err(rb) = tx.rollback() {
+                    eprintln!("[ai] rollback failed: {}", rb);
+                }
                 return (
                     StatusCode::BAD_REQUEST,
                     Json(json!({
@@ -703,7 +760,9 @@ pub async fn submit_order_draft(
         ) {
             Ok(p) => p,
             Err(e) => {
-                if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
+                if let Err(rb) = tx.rollback() {
+                    eprintln!("[ai] rollback failed: {}", rb);
+                }
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({"error": format!("Product query failed: {}", e)})),
@@ -732,7 +791,9 @@ pub async fn submit_order_draft(
             "UPDATE products SET current_stock = current_stock - ?1, updated_at = ?2 WHERE id = ?3",
             params![item.quantity as i32, now, product_id],
         ) {
-            if let Err(rb) = tx.rollback() { eprintln!("[ai] rollback failed: {}", rb); }
+            if let Err(rb) = tx.rollback() {
+                eprintln!("[ai] rollback failed: {}", rb);
+            }
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": format!("Failed to deduct inventory: {}", e)})),
@@ -794,7 +855,7 @@ pub async fn submit_order_draft(
             "so_number": so_number,
             "total_amount": total_amount,
             "item_count": items.len()
-        }))
+        })),
     )
 }
 
@@ -829,8 +890,8 @@ async fn call_cloud_ai(
             {
                 "role": "system",
                 "content": "你是一个专业的订单识别助手。你的任务是从图片中提取订单/单据的商品信息。\
-请仔细查看图片，识别其中的文字内容。\
-返回纯JSON格式，不要添加任何解释文字或代码块标记。"
+    请仔细查看图片，识别其中的文字内容。\
+    返回纯JSON格式，不要添加任何解释文字或代码块标记。"
             },
             {
                 "role": "user",
@@ -838,14 +899,14 @@ async fn call_cloud_ai(
                     {
                         "type": "text",
                         "text": "请从这张订单/单据图片中识别所有商品项目。\
-对于每个商品，提取以下信息：\
-- product_name: 商品名称（保持原文） \
-- quantity: 数量（数字） \
-- unit_price: 单价（数字，元） \
-- total_price: 该项小计（quantity × unit_price） \
-\
-请严格按以下JSON格式返回结果。如果图片中没有找到任何商品，返回空的items数组：\
-{\"items\": [{\"product_name\": \"商品名\", \"quantity\": 数量, \"unit_price\": 单价, \"total_price\": 小计}]}"
+    对于每个商品，提取以下信息：\
+    - product_name: 商品名称（保持原文） \
+    - quantity: 数量（数字） \
+    - unit_price: 单价（数字，元） \
+    - total_price: 该项小计（quantity × unit_price） \
+    \
+    请严格按以下JSON格式返回结果。如果图片中没有找到任何商品，返回空的items数组：\
+    {\"items\": [{\"product_name\": \"商品名\", \"quantity\": 数量, \"unit_price\": 单价, \"total_price\": 小计}]}"
                     },
                     {
                         "type": "image_url",
@@ -877,14 +938,25 @@ async fn call_cloud_ai(
         .map_err(|e| format!("Failed to read response: {}", e))?;
 
     if !status.is_success() {
-        return Err(format!("API returned {}: {}", status.as_u16(), response_text));
+        return Err(format!(
+            "API returned {}: {}",
+            status.as_u16(),
+            response_text
+        ));
     }
 
     // 解析 DeepSeek 响应 (OpenAI 兼容格式)
-    let deepseek_resp: DeepSeekResponse = serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse AI response: {} - raw: {}", e,
-            if response_text.len() > 500 { format!("{}...", &response_text[..500]) } else { response_text.clone() }
-        ))?;
+    let deepseek_resp: DeepSeekResponse = serde_json::from_str(&response_text).map_err(|e| {
+        format!(
+            "Failed to parse AI response: {} - raw: {}",
+            e,
+            if response_text.len() > 500 {
+                format!("{}...", &response_text[..500])
+            } else {
+                response_text.clone()
+            }
+        )
+    })?;
 
     let content = deepseek_resp
         .choices
@@ -898,10 +970,7 @@ async fn call_cloud_ai(
     let items = extract_items_from_ai_response(&content)?;
 
     let total_amount: f64 = items.iter().map(|i| i.total_price).sum();
-    let tokens_used = deepseek_resp
-        .usage
-        .as_ref()
-        .and_then(|u| u.total_tokens);
+    let tokens_used = deepseek_resp.usage.as_ref().and_then(|u| u.total_tokens);
 
     Ok(RecognizeOrderResponse {
         draft_id: String::new(), // caller will fill
@@ -934,7 +1003,12 @@ async fn call_local_ocr(
         }))
         .send()
         .await
-        .map_err(|e| format!("OCR service request failed: {}. Is the PaddleOCR Docker container running?", e))?;
+        .map_err(|e| {
+            format!(
+                "OCR service request failed: {}. Is the PaddleOCR Docker container running?",
+                e
+            )
+        })?;
 
     let status = response.status();
     let response_text = response
@@ -943,16 +1017,25 @@ async fn call_local_ocr(
         .map_err(|e| format!("Failed to read OCR response: {}", e))?;
 
     if !status.is_success() {
-        return Err(format!("OCR service returned {}: {}", status.as_u16(), response_text));
+        return Err(format!(
+            "OCR service returned {}: {}",
+            status.as_u16(),
+            response_text
+        ));
     }
 
     // 解析 OCR 响应
-    let ocr_resp: OCRResponse = serde_json::from_str(&response_text)
-        .map_err(|e| format!("Failed to parse OCR response: {} - raw: {}", e, response_text))?;
+    let ocr_resp: OCRResponse = serde_json::from_str(&response_text).map_err(|e| {
+        format!(
+            "Failed to parse OCR response: {} - raw: {}",
+            e, response_text
+        )
+    })?;
 
     // 提取所有识别文本
     let full_text = if let Some(results) = &ocr_resp.results {
-        results.iter()
+        results
+            .iter()
             .map(|r| r.text.as_str())
             .collect::<Vec<_>>()
             .join("\n")
@@ -970,8 +1053,14 @@ async fn call_local_ocr(
     let items = parse_ocr_text_to_items(&full_text)?;
 
     if items.is_empty() {
-        return Err(format!("Could not identify any order items in OCR text. Extracted text: {}",
-            if full_text.len() > 300 { format!("{}...", &full_text[..300]) } else { full_text }));
+        return Err(format!(
+            "Could not identify any order items in OCR text. Extracted text: {}",
+            if full_text.len() > 300 {
+                format!("{}...", &full_text[..300])
+            } else {
+                full_text
+            }
+        ));
     }
 
     let total_amount: f64 = items.iter().map(|i| i.total_price).sum();
@@ -1042,8 +1131,14 @@ fn extract_items_from_ai_response(content: &str) -> Result<Vec<OrderItem>, Strin
         }
     }
 
-    Err(format!("Could not extract order items from AI response: {}",
-        if content.len() > 200 { format!("{}...", &content[..200]) } else { content.to_string() }))
+    Err(format!(
+        "Could not extract order items from AI response: {}",
+        if content.len() > 200 {
+            format!("{}...", &content[..200])
+        } else {
+            content.to_string()
+        }
+    ))
 }
 
 /// 提取 markdown 代码块
@@ -1119,12 +1214,17 @@ fn parse_ocr_text_to_items(text: &str) -> Result<Vec<OrderItem>, String> {
         ).map_err(|e| format!("Regex error: {}", e))?;
 
         if let Some(caps) = re.captures(line) {
-            let name = caps.get(1).map(|m| m.as_str().trim()).unwrap_or("").to_string();
+            let name = caps
+                .get(1)
+                .map(|m| m.as_str().trim())
+                .unwrap_or("")
+                .to_string();
             if name.is_empty() || name.len() > 50 {
                 continue;
             }
 
-            let quantity: f64 = caps.get(2)
+            let quantity: f64 = caps
+                .get(2)
                 .and_then(|m| m.as_str().parse().ok())
                 .unwrap_or(0.0);
             if quantity == 0.0 {
@@ -1132,10 +1232,8 @@ fn parse_ocr_text_to_items(text: &str) -> Result<Vec<OrderItem>, String> {
             }
 
             // 尝试提取单价和总价
-            let unit_price = caps.get(3)
-                .and_then(|m| m.as_str().parse::<f64>().ok());
-            let total_price_from_caps = caps.get(4)
-                .and_then(|m| m.as_str().parse::<f64>().ok());
+            let unit_price = caps.get(3).and_then(|m| m.as_str().parse::<f64>().ok());
+            let total_price_from_caps = caps.get(4).and_then(|m| m.as_str().parse::<f64>().ok());
 
             let (unit_price, total_price) = match (unit_price, total_price_from_caps) {
                 (Some(up), Some(tp)) => (up, tp),
@@ -1216,12 +1314,12 @@ fn detect_image_format(data: &[u8]) -> &'static str {
 fn calculate_cost(tokens: i32, model: &str) -> f64 {
     let tokens = tokens as f64;
     match model {
-        "deepseek-chat" => tokens * 0.00000021,        // ¥0.14/1M input + ¥0.28/1M output, approx average
-        "deepseek-reasoner" => tokens * 0.00000042,    // ¥0.14/1M input + ¥0.28/1M output, approx average
+        "deepseek-chat" => tokens * 0.00000021, // ¥0.14/1M input + ¥0.28/1M output, approx average
+        "deepseek-reasoner" => tokens * 0.00000042, // ¥0.14/1M input + ¥0.28/1M output, approx average
         "gpt-4o" => tokens * 0.000015,              // OpenAI 兼容模式（如果仍使用）
         "gpt-4-turbo" => tokens * 0.00003,
         "gpt-3.5-turbo" => tokens * 0.000002,
-        _ => tokens * 0.00000021,                    // default: DeepSeek Chat
+        _ => tokens * 0.00000021, // default: DeepSeek Chat
     }
 }
 

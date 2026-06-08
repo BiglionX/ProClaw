@@ -38,23 +38,25 @@ pub fn get_contacts(
     sql.push_str(" ORDER BY name ASC");
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(
-        rusqlite::params_from_iter(params_vec.iter().map(|p| p.as_ref())),
-        |row| {
-            let _user_type: String = row.get(2)?;
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "phone": row.get::<_, Option<String>>(2)?,
-                "email": row.get::<_, Option<String>>(3)?,
-                "contact_type": row.get::<_, String>(4)?, // user_type as contact_type
-                "external_type": row.get::<_, Option<String>>(5)?,
-                "is_active": row.get::<_, bool>(6)?,
-                "created_at": row.get::<_, String>(7)?,
-                "updated_at": row.get::<_, String>(8)?,
-            }))
-        },
-    ).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(
+            rusqlite::params_from_iter(params_vec.iter().map(|p| p.as_ref())),
+            |row| {
+                let _user_type: String = row.get(2)?;
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?,
+                    "name": row.get::<_, String>(1)?,
+                    "phone": row.get::<_, Option<String>>(2)?,
+                    "email": row.get::<_, Option<String>>(3)?,
+                    "contact_type": row.get::<_, String>(4)?, // user_type as contact_type
+                    "external_type": row.get::<_, Option<String>>(5)?,
+                    "is_active": row.get::<_, bool>(6)?,
+                    "created_at": row.get::<_, String>(7)?,
+                    "updated_at": row.get::<_, String>(8)?,
+                }))
+            },
+        )
+        .map_err(|e| e.to_string())?;
 
     for row in rows {
         if let Ok(val) = row {
@@ -82,22 +84,24 @@ pub fn get_contacts(
         vec![]
     };
 
-    let rows2 = stmt2.query_map(
-        rusqlite::params_from_iter(params_iter2.iter().map(|p| p.as_ref())),
-        |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "phone": row.get::<_, Option<String>>(2)?,
-                "email": row.get::<_, Option<String>>(3)?,
-                "contact_type": "team",
-                "external_type": row.get::<_, Option<String>>(5)?,
-                "is_active": row.get::<_, bool>(6)?,
-                "created_at": row.get::<_, String>(7)?,
-                "updated_at": row.get::<_, String>(8)?,
-            }))
-        },
-    ).map_err(|e| e.to_string())?;
+    let rows2 = stmt2
+        .query_map(
+            rusqlite::params_from_iter(params_iter2.iter().map(|p| p.as_ref())),
+            |row| {
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?,
+                    "name": row.get::<_, String>(1)?,
+                    "phone": row.get::<_, Option<String>>(2)?,
+                    "email": row.get::<_, Option<String>>(3)?,
+                    "contact_type": "team",
+                    "external_type": row.get::<_, Option<String>>(5)?,
+                    "is_active": row.get::<_, bool>(6)?,
+                    "created_at": row.get::<_, String>(7)?,
+                    "updated_at": row.get::<_, String>(8)?,
+                }))
+            },
+        )
+        .map_err(|e| e.to_string())?;
 
     for row in rows2 {
         if let Ok(val) = row {
@@ -121,14 +125,8 @@ pub fn get_messages(
         .get("from_user")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let to_user = params
-        .get("to_user")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let limit = params
-        .get("limit")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(50);
+    let to_user = params.get("to_user").and_then(|v| v.as_str()).unwrap_or("");
+    let limit = params.get("limit").and_then(|v| v.as_i64()).unwrap_or(50);
 
     let sql = "SELECT id, from_user, to_user, content, content_type, is_read, created_at
                FROM messages
@@ -294,21 +292,24 @@ pub fn get_recent_contacts(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![user_id, user_id, user_id, user_id, user_id], |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "phone": row.get::<_, Option<String>>(2)?,
-                "email": row.get::<_, Option<String>>(3)?,
-                "contact_type": row.get::<_, String>(4)?,
-                "external_type": row.get::<_, Option<String>>(5)?,
-                "last_message": row.get::<_, Option<String>>(6)?,
-                "last_message_time": row.get::<_, Option<i64>>(7)?,
-                "last_is_read": row.get::<_, Option<bool>>(8)?,
-                "last_from": row.get::<_, Option<String>>(9)?,
-                "unread_count": row.get::<_, i64>(10)?,
-            }))
-        })
+        .query_map(
+            params![user_id, user_id, user_id, user_id, user_id],
+            |row| {
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?,
+                    "name": row.get::<_, String>(1)?,
+                    "phone": row.get::<_, Option<String>>(2)?,
+                    "email": row.get::<_, Option<String>>(3)?,
+                    "contact_type": row.get::<_, String>(4)?,
+                    "external_type": row.get::<_, Option<String>>(5)?,
+                    "last_message": row.get::<_, Option<String>>(6)?,
+                    "last_message_time": row.get::<_, Option<i64>>(7)?,
+                    "last_is_read": row.get::<_, Option<bool>>(8)?,
+                    "last_from": row.get::<_, Option<String>>(9)?,
+                    "unread_count": row.get::<_, i64>(10)?,
+                }))
+            },
+        )
         .map_err(|e| e.to_string())?;
 
     let results: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
@@ -325,10 +326,22 @@ pub fn add_contact(
     let conn = db.connection();
 
     let id = Uuid::new_v4().to_string();
-    let name = contact.get("name").and_then(|v| v.as_str()).ok_or("缺少姓名")?;
-    let phone = contact.get("phone").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let email = contact.get("email").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let external_type = contact.get("external_type").and_then(|v| v.as_str()).unwrap_or("customer");
+    let name = contact
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or("缺少姓名")?;
+    let phone = contact
+        .get("phone")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let email = contact
+        .get("email")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let external_type = contact
+        .get("external_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("customer");
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(

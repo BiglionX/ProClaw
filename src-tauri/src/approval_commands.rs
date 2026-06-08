@@ -21,16 +21,28 @@ pub fn create_approval_cmd(
         return Err("Invalid target_type".to_string());
     }
 
-    let table = if target_type == "purchase_order" { "purchase_orders" } else { "sales_orders" };
+    let table = if target_type == "purchase_order" {
+        "purchase_orders"
+    } else {
+        "sales_orders"
+    };
 
-    let status: String = conn.query_row(
-        &format!("SELECT status FROM {} WHERE id = ?1 AND deleted_at IS NULL", table),
-        params![target_id],
-        |row| row.get(0),
-    ).map_err(|_| "Order not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            &format!(
+                "SELECT status FROM {} WHERE id = ?1 AND deleted_at IS NULL",
+                table
+            ),
+            params![target_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Order not found".to_string())?;
 
     if status != "draft" {
-        return Err(format!("Order status '{}' cannot be submitted for approval", status));
+        return Err(format!(
+            "Order status '{}' cannot be submitted for approval",
+            status
+        ));
     }
 
     // 检查是否已有待审批
@@ -52,10 +64,16 @@ pub fn create_approval_cmd(
 
     // 更新订单状态
     if let Err(e) = conn.execute(
-        &format!("UPDATE {} SET status = 'submitted', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", table),
+        &format!(
+            "UPDATE {} SET status = 'submitted', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+            table
+        ),
         params![target_id],
     ) {
-        eprintln!("[Approval] Failed to update {} status to submitted: {}", table, e);
+        eprintln!(
+            "[Approval] Failed to update {} status to submitted: {}",
+            table, e
+        );
     }
 
     Ok(serde_json::json!({
@@ -81,7 +99,7 @@ pub fn get_approvals_cmd(
          u.name as requested_by_name \
          FROM approvals a \
          LEFT JOIN users u ON a.requested_by = u.id \
-         WHERE 1=1"
+         WHERE 1=1",
     );
     let mut pv: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
@@ -98,29 +116,34 @@ pub fn get_approvals_cmd(
 
     let refs: Vec<&dyn rusqlite::types::ToSql> = pv.iter().map(|b| b.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(refs.as_slice(), |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, String>(0)?,
-            "target_type": row.get::<_, String>(1)?,
-            "target_id": row.get::<_, String>(2)?,
-            "requested_by": row.get::<_, String>(3)?,
-            "status": row.get::<_, String>(4)?,
-            "comments": row.get::<_, Option<String>>(5)?,
-            "created_at": row.get::<_, String>(6)?,
-            "resolved_at": row.get::<_, Option<String>>(7)?,
-            "approved_by": row.get::<_, Option<String>>(8)?,
-            "requested_by_name": row.get::<_, Option<String>>(9)?,
-        }))
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(refs.as_slice(), |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "target_type": row.get::<_, String>(1)?,
+                "target_id": row.get::<_, String>(2)?,
+                "requested_by": row.get::<_, String>(3)?,
+                "status": row.get::<_, String>(4)?,
+                "comments": row.get::<_, Option<String>>(5)?,
+                "created_at": row.get::<_, String>(6)?,
+                "resolved_at": row.get::<_, Option<String>>(7)?,
+                "approved_by": row.get::<_, Option<String>>(8)?,
+                "requested_by_name": row.get::<_, Option<String>>(9)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
 
     let approvals: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
 
     // 附上订单摘要
-    let enriched: Vec<serde_json::Value> = approvals.into_iter().map(|a| {
-        let tt = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
-        let tid = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
+    let enriched: Vec<serde_json::Value> =
+        approvals
+            .into_iter()
+            .map(|a| {
+                let tt = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
+                let tid = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
 
-        let order_info = match tt {
+                let order_info = match tt {
             "purchase_order" => conn.query_row(
                 "SELECT po_number, total_amount, status FROM purchase_orders WHERE id = ?1",
                 params![tid],
@@ -142,12 +165,13 @@ pub fn get_approvals_cmd(
             _ => None,
         };
 
-        let mut res = a.clone();
-        if let Some(order) = order_info {
-            res["order"] = order;
-        }
-        res
-    }).collect();
+                let mut res = a.clone();
+                if let Some(order) = order_info {
+                    res["order"] = order;
+                }
+                res
+            })
+            .collect();
 
     Ok(serde_json::json!({ "data": enriched, "total": enriched.len() }))
 }
@@ -181,11 +205,13 @@ fn process_approval_tx(
     let db = db_mutex.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let (target_type, target_id, current_status): (String, String, String) = conn.query_row(
-        "SELECT target_type, target_id, status FROM approvals WHERE id = ?1",
-        params![approval_id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-    ).map_err(|_| "Approval not found".to_string())?;
+    let (target_type, target_id, current_status): (String, String, String) = conn
+        .query_row(
+            "SELECT target_type, target_id, status FROM approvals WHERE id = ?1",
+            params![approval_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|_| "Approval not found".to_string())?;
 
     if current_status != "pending" {
         return Err(format!("Approval already {}", current_status));
@@ -205,9 +231,16 @@ fn process_approval_tx(
         return Err(format!("Failed to update approval: {}", e));
     }
 
-    let table = if target_type == "purchase_order" { "purchase_orders" } else { "sales_orders" };
+    let table = if target_type == "purchase_order" {
+        "purchase_orders"
+    } else {
+        "sales_orders"
+    };
     if let Err(e) = tx.execute(
-        &format!("UPDATE {} SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", table),
+        &format!(
+            "UPDATE {} SET status = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            table
+        ),
         params![order_new_status, target_id],
     ) {
         let _ = tx.rollback();
@@ -224,5 +257,3 @@ fn process_approval_tx(
         "message": format!("Approval {}", action_word),
     }))
 }
-
-

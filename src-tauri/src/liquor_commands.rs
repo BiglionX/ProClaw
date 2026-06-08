@@ -9,9 +9,7 @@ use uuid::Uuid;
 
 /// 获取赊账账户列表（含客户信息）
 #[tauri::command]
-pub fn lw_get_credit_accounts(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn lw_get_credit_accounts(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -26,20 +24,22 @@ pub fn lw_get_credit_accounts(
          ORDER BY ca.current_balance DESC"
     ).map_err(|e| e.to_string())?;
 
-    let accounts: Vec<Value> = stmt.query_map([], |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "customer_id": row.get::<_, String>(1)?,
-            "customer_name": row.get::<_, Option<String>>(2)?,
-            "contact_person": row.get::<_, Option<String>>(3)?,
-            "credit_limit": row.get::<_, f64>(4)?,
-            "current_balance": row.get::<_, f64>(5)?,
-            "last_settlement_at": row.get::<_, Option<String>>(6)?,
-            "pending_debit": row.get::<_, f64>(7)?,
-        }))
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
+    let accounts: Vec<Value> = stmt
+        .query_map([], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "customer_id": row.get::<_, String>(1)?,
+                "customer_name": row.get::<_, Option<String>>(2)?,
+                "contact_person": row.get::<_, Option<String>>(3)?,
+                "credit_limit": row.get::<_, f64>(4)?,
+                "current_balance": row.get::<_, f64>(5)?,
+                "last_settlement_at": row.get::<_, Option<String>>(6)?,
+                "pending_debit": row.get::<_, f64>(7)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(json!({ "accounts": accounts, "count": accounts.len() }))
 }
@@ -53,26 +53,30 @@ pub fn lw_get_credit_transactions(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let mut stmt = conn.prepare(
-        "SELECT id, credit_account_id, order_id, type, amount, notes, created_at
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, credit_account_id, order_id, type, amount, notes, created_at
          FROM lw_credit_transactions
          WHERE credit_account_id = ?1
-         ORDER BY created_at DESC LIMIT 100"
-    ).map_err(|e| e.to_string())?;
+         ORDER BY created_at DESC LIMIT 100",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let transactions: Vec<Value> = stmt.query_map(params![credit_account_id], |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "credit_account_id": row.get::<_, String>(1)?,
-            "order_id": row.get::<_, Option<String>>(2)?,
-            "type": row.get::<_, String>(3)?,
-            "amount": row.get::<_, f64>(4)?,
-            "notes": row.get::<_, Option<String>>(5)?,
-            "created_at": row.get::<_, String>(6)?,
-        }))
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
+    let transactions: Vec<Value> = stmt
+        .query_map(params![credit_account_id], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "credit_account_id": row.get::<_, String>(1)?,
+                "order_id": row.get::<_, Option<String>>(2)?,
+                "type": row.get::<_, String>(3)?,
+                "amount": row.get::<_, f64>(4)?,
+                "notes": row.get::<_, Option<String>>(5)?,
+                "created_at": row.get::<_, String>(6)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(json!({ "transactions": transactions, "count": transactions.len() }))
 }
@@ -94,8 +98,16 @@ pub fn lw_create_credit_transaction(
     conn.execute(
         "INSERT INTO lw_credit_transactions (id, credit_account_id, order_id, type, amount, notes)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![id, credit_account_id, order_id, transaction_type, amount, notes],
-    ).map_err(|e| e.to_string())?;
+        params![
+            id,
+            credit_account_id,
+            order_id,
+            transaction_type,
+            amount,
+            notes
+        ],
+    )
+    .map_err(|e| e.to_string())?;
 
     // Update balance
     let delta = match transaction_type.as_str() {
@@ -106,7 +118,8 @@ pub fn lw_create_credit_transaction(
     conn.execute(
         "UPDATE lw_credit_accounts SET current_balance = current_balance + ?1 WHERE id = ?2",
         params![delta, credit_account_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(json!({ "id": id, "message": "赊账交易已记录" }))
 }
@@ -123,63 +136,71 @@ pub fn lw_get_batches(
     let batches: Vec<Value>;
     if let Some(ref pid) = product_id {
         batches = {
-            let mut stmt = conn.prepare(
-                "SELECT b.id, b.batch_no, b.product_id, p.name as product_name,
+            let mut stmt = conn
+                .prepare(
+                    "SELECT b.id, b.batch_no, b.product_id, p.name as product_name,
                         b.production_date, b.expiry_date, b.purchase_quantity, b.remain_quantity,
                         b.supplier_id, s.name as supplier_name, b.created_at
                  FROM lw_batches b
                  LEFT JOIN products p ON b.product_id = p.id
                  LEFT JOIN suppliers s ON b.supplier_id = s.id
                  WHERE b.product_id = ?1
-                 ORDER BY b.created_at DESC"
-            ).map_err(|e| e.to_string())?;
-            let x = stmt.query_map(params![pid], |row| {
-                Ok(json!({
-                    "id": row.get::<_, String>(0)?,
-                    "batch_no": row.get::<_, String>(1)?,
-                    "product_id": row.get::<_, String>(2)?,
-                    "product_name": row.get::<_, Option<String>>(3)?,
-                    "production_date": row.get::<_, Option<String>>(4)?,
-                    "expiry_date": row.get::<_, Option<String>>(5)?,
-                    "purchase_quantity": row.get::<_, i32>(6)?,
-                    "remain_quantity": row.get::<_, i32>(7)?,
-                    "supplier_id": row.get::<_, Option<String>>(8)?,
-                    "supplier_name": row.get::<_, Option<String>>(9)?,
-                    "created_at": row.get::<_, String>(10)?,
-                }))
-            }).map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+                 ORDER BY b.created_at DESC",
+                )
+                .map_err(|e| e.to_string())?;
+            let x = stmt
+                .query_map(params![pid], |row| {
+                    Ok(json!({
+                        "id": row.get::<_, String>(0)?,
+                        "batch_no": row.get::<_, String>(1)?,
+                        "product_id": row.get::<_, String>(2)?,
+                        "product_name": row.get::<_, Option<String>>(3)?,
+                        "production_date": row.get::<_, Option<String>>(4)?,
+                        "expiry_date": row.get::<_, Option<String>>(5)?,
+                        "purchase_quantity": row.get::<_, i32>(6)?,
+                        "remain_quantity": row.get::<_, i32>(7)?,
+                        "supplier_id": row.get::<_, Option<String>>(8)?,
+                        "supplier_name": row.get::<_, Option<String>>(9)?,
+                        "created_at": row.get::<_, String>(10)?,
+                    }))
+                })
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
             x
         };
     } else {
         batches = {
-            let mut stmt = conn.prepare(
-                "SELECT b.id, b.batch_no, b.product_id, p.name as product_name,
+            let mut stmt = conn
+                .prepare(
+                    "SELECT b.id, b.batch_no, b.product_id, p.name as product_name,
                         b.production_date, b.expiry_date, b.purchase_quantity, b.remain_quantity,
                         b.supplier_id, s.name as supplier_name, b.created_at
                  FROM lw_batches b
                  LEFT JOIN products p ON b.product_id = p.id
                  LEFT JOIN suppliers s ON b.supplier_id = s.id
-                 ORDER BY b.created_at DESC LIMIT 100"
-            ).map_err(|e| e.to_string())?;
-            let x = stmt.query_map([], |row| {
-                Ok(json!({
-                    "id": row.get::<_, String>(0)?,
-                    "batch_no": row.get::<_, String>(1)?,
-                    "product_id": row.get::<_, String>(2)?,
-                    "product_name": row.get::<_, Option<String>>(3)?,
-                    "production_date": row.get::<_, Option<String>>(4)?,
-                    "expiry_date": row.get::<_, Option<String>>(5)?,
-                    "purchase_quantity": row.get::<_, i32>(6)?,
-                    "remain_quantity": row.get::<_, i32>(7)?,
-                    "supplier_id": row.get::<_, Option<String>>(8)?,
-                    "supplier_name": row.get::<_, Option<String>>(9)?,
-                    "created_at": row.get::<_, String>(10)?,
-                }))
-            }).map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+                 ORDER BY b.created_at DESC LIMIT 100",
+                )
+                .map_err(|e| e.to_string())?;
+            let x = stmt
+                .query_map([], |row| {
+                    Ok(json!({
+                        "id": row.get::<_, String>(0)?,
+                        "batch_no": row.get::<_, String>(1)?,
+                        "product_id": row.get::<_, String>(2)?,
+                        "product_name": row.get::<_, Option<String>>(3)?,
+                        "production_date": row.get::<_, Option<String>>(4)?,
+                        "expiry_date": row.get::<_, Option<String>>(5)?,
+                        "purchase_quantity": row.get::<_, i32>(6)?,
+                        "remain_quantity": row.get::<_, i32>(7)?,
+                        "supplier_id": row.get::<_, Option<String>>(8)?,
+                        "supplier_name": row.get::<_, Option<String>>(9)?,
+                        "created_at": row.get::<_, String>(10)?,
+                    }))
+                })
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
             x
         };
     }
@@ -220,23 +241,27 @@ pub fn lw_get_price_tiers(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let mut stmt = conn.prepare(
-        "SELECT id, product_id, tier_name, price, min_quantity, created_at
-         FROM lw_price_tiers WHERE product_id = ?1 ORDER BY min_quantity ASC"
-    ).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, product_id, tier_name, price, min_quantity, created_at
+         FROM lw_price_tiers WHERE product_id = ?1 ORDER BY min_quantity ASC",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let tiers: Vec<Value> = stmt.query_map(params![product_id], |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "product_id": row.get::<_, String>(1)?,
-            "tier_name": row.get::<_, String>(2)?,
-            "price": row.get::<_, f64>(3)?,
-            "min_quantity": row.get::<_, i32>(4)?,
-            "created_at": row.get::<_, String>(5)?,
-        }))
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
+    let tiers: Vec<Value> = stmt
+        .query_map(params![product_id], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "product_id": row.get::<_, String>(1)?,
+                "tier_name": row.get::<_, String>(2)?,
+                "price": row.get::<_, f64>(3)?,
+                "min_quantity": row.get::<_, i32>(4)?,
+                "created_at": row.get::<_, String>(5)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(json!({ "tiers": tiers, "count": tiers.len() }))
 }
@@ -259,7 +284,8 @@ pub fn lw_set_price_tier(
         "INSERT INTO lw_price_tiers (id, product_id, tier_name, price, min_quantity)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![id, product_id, tier_name, price, min_qty],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(json!({ "id": id, "message": "价格层级已设置" }))
 }

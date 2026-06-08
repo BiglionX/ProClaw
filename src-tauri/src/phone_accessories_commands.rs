@@ -7,9 +7,11 @@ use uuid::Uuid;
 
 #[tauri::command]
 pub fn pa_get_device_models(
-    db: tauri::State<Mutex<Database>>, brand: Option<String>,
+    db: tauri::State<Mutex<Database>>,
+    brand: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
     let models: Vec<Value>;
     if let Some(ref b) = brand {
         models = {
@@ -29,19 +31,29 @@ pub fn pa_get_device_models(
 
 #[tauri::command]
 pub fn pa_add_device_model(
-    db: tauri::State<Mutex<Database>>, brand: String, model_name: String, release_year: Option<i32>,
+    db: tauri::State<Mutex<Database>>,
+    brand: String,
+    model_name: String,
+    release_year: Option<i32>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection(); let id = Uuid::new_v4().to_string();
-    conn.execute("INSERT INTO pa_device_models (id, brand, model_name, release_year) VALUES (?1,?2,?3,?4)",
-        params![id, brand, model_name, release_year]).map_err(|e| e.to_string())?;
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let id = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO pa_device_models (id, brand, model_name, release_year) VALUES (?1,?2,?3,?4)",
+        params![id, brand, model_name, release_year],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "message": "机型已添加" }))
 }
 
 #[tauri::command]
 pub fn pa_get_quotations(
-    db: tauri::State<Mutex<Database>>, customer_id: Option<String>,
+    db: tauri::State<Mutex<Database>>,
+    customer_id: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
     let quotations: Vec<Value>;
     if let Some(ref cid) = customer_id {
         quotations = {
@@ -61,10 +73,27 @@ pub fn pa_get_quotations(
 
 #[tauri::command]
 pub fn pa_create_quotation(
-    db: tauri::State<Mutex<Database>>, customer_id: String, items: Value, valid_until: Option<String>,
+    db: tauri::State<Mutex<Database>>,
+    customer_id: String,
+    items: Value,
+    valid_until: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection(); let id = Uuid::new_v4().to_string();
-    let total: f64 = items.as_array().map(|arr| arr.iter().filter_map(|i| i["price"].as_f64().zip(i["quantity"].as_f64()).map(|(p,q)| p*q)).sum()).unwrap_or(0.0);
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let id = Uuid::new_v4().to_string();
+    let total: f64 = items
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|i| {
+                    i["price"]
+                        .as_f64()
+                        .zip(i["quantity"].as_f64())
+                        .map(|(p, q)| p * q)
+                })
+                .sum()
+        })
+        .unwrap_or(0.0);
     conn.execute("INSERT INTO pa_quotations (id, customer_id, items, total_amount, valid_until) VALUES (?1,?2,?3,?4,?5)",
         params![id, customer_id, items.to_string(), total, valid_until]).map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "total_amount": total, "message": "报价单已创建" }))
@@ -72,17 +101,33 @@ pub fn pa_create_quotation(
 
 #[tauri::command]
 pub fn pa_get_price_history(
-    db: tauri::State<Mutex<Database>>, product_id: String,
+    db: tauri::State<Mutex<Database>>,
+    product_id: String,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
-    let mut stmt = conn.prepare(
-        "SELECT soi.created_at, soi.unit_price as price, so.created_at as order_date
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let mut stmt = conn
+        .prepare(
+            "SELECT soi.created_at, soi.unit_price as price, so.created_at as order_date
          FROM sales_order_items soi JOIN sales_orders so ON soi.sales_order_id = so.id
-         WHERE soi.product_id = ?1 ORDER BY so.created_at DESC LIMIT 50"
-    ).map_err(|e| e.to_string())?;
-    let history: Vec<Value> = stmt.query_map(params![product_id], |row| {
-        Ok(json!({"date": row.get::<_,String>(2)?, "price": row.get::<_,f64>(1)?}))
-    }).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
-    let avg_price = if history.is_empty() { 0.0 } else { history.iter().filter_map(|h| h["price"].as_f64()).sum::<f64>() / history.len() as f64 };
+         WHERE soi.product_id = ?1 ORDER BY so.created_at DESC LIMIT 50",
+        )
+        .map_err(|e| e.to_string())?;
+    let history: Vec<Value> = stmt
+        .query_map(params![product_id], |row| {
+            Ok(json!({"date": row.get::<_,String>(2)?, "price": row.get::<_,f64>(1)?}))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    let avg_price = if history.is_empty() {
+        0.0
+    } else {
+        history
+            .iter()
+            .filter_map(|h| h["price"].as_f64())
+            .sum::<f64>()
+            / history.len() as f64
+    };
     Ok(json!({ "history": history, "average_price": avg_price, "count": history.len() }))
 }

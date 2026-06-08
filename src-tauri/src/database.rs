@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result, params};
+use rusqlite::{params, Connection, Result};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -47,27 +47,32 @@ impl Database {
     /// 审计修复 #14: 迁移失败时打印警告并收集失败列表，不再静默吞掉所有错误
     pub fn initialize(&self) -> DbResult<()> {
         let mut migration_errors: Vec<String> = Vec::new();
-        
+
         // 加载基础schema
         let schema = include_str!("../../src/db/schema.sql");
         self.conn.execute_batch(schema)?;
-        
+
         // 加载SPU-SKU电商架构schema (SQLite版本)
         let spu_sku_schema = include_str!("../../database/spu_sku_schema_sqlite.sql");
         self.conn.execute_batch(spu_sku_schema)?;
-        
+
         // 审计修复 #18: 迁移SQL位置统一说明 - 历史遗留分散在 src/db/ 和 database/ 下
         // 新迁移统一放入 database/migrations/ 目录按编号排序
-        
+
         // 运行迁移：员工邀请与角色权限自动分配（PRD v4.3）
-        let migration = include_str!("../../src/db/migrations/006_add_employee_invitation_fields.sql");
+        let migration =
+            include_str!("../../src/db/migrations/006_add_employee_invitation_fields.sql");
         if let Err(e) = self.conn.execute_batch(migration) {
-            eprintln!("[DB Migration WARNING] 006_add_employee_invitation_fields: {}", e);
+            eprintln!(
+                "[DB Migration WARNING] 006_add_employee_invitation_fields: {}",
+                e
+            );
             migration_errors.push(format!("006: {}", e));
         }
 
         // 运行迁移：财务管理 Agent 数据表（PRD v6.0）
-        let finance_migration = include_str!("../../src/db/migrations/009_finance_agent_tables.sql");
+        let finance_migration =
+            include_str!("../../src/db/migrations/009_finance_agent_tables.sql");
         if let Err(e) = self.conn.execute_batch(finance_migration) {
             eprintln!("[DB Migration WARNING] 009_finance_agent_tables: {}", e);
             migration_errors.push(format!("009: {}", e));
@@ -85,7 +90,7 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS system_config (\
              key TEXT PRIMARY KEY,\
              value TEXT NOT NULL\
-             );"
+             );",
         ) {
             eprintln!("[DB Migration WARNING] system_config: {}", e);
             migration_errors.push(format!("system_config: {}", e));
@@ -106,7 +111,8 @@ impl Database {
         }
 
         // 运行迁移：NvwaX API 消耗记录表
-        let nvwax_migration = include_str!("../../database/migrations/028_add_nvwax_usage_logs.sql");
+        let nvwax_migration =
+            include_str!("../../database/migrations/028_add_nvwax_usage_logs.sql");
         if let Err(e) = self.conn.execute_batch(nvwax_migration) {
             eprintln!("[DB Migration WARNING] 028_nvwax_usage_logs: {}", e);
             migration_errors.push(format!("028: {}", e));
@@ -233,7 +239,8 @@ impl Database {
         }
 
         // 自动安装内置 Agent
-        let builtin_count: i64 = self.conn
+        let builtin_count: i64 = self
+            .conn
             .query_row(
                 "SELECT COUNT(*) FROM agents WHERE is_builtin = 1",
                 [],
@@ -248,11 +255,46 @@ impl Database {
 
             // 预定义所有内置 Agent（含 capabilities 用于 CEO Agent 任务分派）
             let builtins = vec![
-                ("proclaw-finance-agent", "财务管理 Agent", vec!["read_user", "read_finance", "write_finance", "show_notification"], vec!["financial_report", "expense_analysis", "budget_management"], "内置财务管理 Agent - 记账、预算、报表、发票管理"),
-                ("proclaw-task-agent", "任务管理 Agent", vec!["read_user", "send_message", "show_notification"], vec!["task_management", "progress_tracking"], "看板式任务管理，支持任务分配、进度跟踪、优先级排序"),
-                ("proclaw-crm-agent", "客户关系 Agent", vec!["read_user", "read_contacts", "send_message"], vec!["contact_management", "communication_tracking"], "管理客户联系人、沟通记录、商机跟踪，支持标签分类"),
-                ("proclaw-docs-agent", "文档协作 Agent", vec!["read_user", "read_files", "write_files"], vec!["document_management", "file_collaboration"], "Markdown 编辑器，支持版本历史、文档分类归档"),
-                ("proclaw-hr-agent", "人事管理 Agent", vec!["read_user", "send_message", "show_notification"], vec!["hr_management", "attendance_tracking"], "员工信息管理、考勤记录、请假审批、工资单生成"),
+                (
+                    "proclaw-finance-agent",
+                    "财务管理 Agent",
+                    vec![
+                        "read_user",
+                        "read_finance",
+                        "write_finance",
+                        "show_notification",
+                    ],
+                    vec!["financial_report", "expense_analysis", "budget_management"],
+                    "内置财务管理 Agent - 记账、预算、报表、发票管理",
+                ),
+                (
+                    "proclaw-task-agent",
+                    "任务管理 Agent",
+                    vec!["read_user", "send_message", "show_notification"],
+                    vec!["task_management", "progress_tracking"],
+                    "看板式任务管理，支持任务分配、进度跟踪、优先级排序",
+                ),
+                (
+                    "proclaw-crm-agent",
+                    "客户关系 Agent",
+                    vec!["read_user", "read_contacts", "send_message"],
+                    vec!["contact_management", "communication_tracking"],
+                    "管理客户联系人、沟通记录、商机跟踪，支持标签分类",
+                ),
+                (
+                    "proclaw-docs-agent",
+                    "文档协作 Agent",
+                    vec!["read_user", "read_files", "write_files"],
+                    vec!["document_management", "file_collaboration"],
+                    "Markdown 编辑器，支持版本历史、文档分类归档",
+                ),
+                (
+                    "proclaw-hr-agent",
+                    "人事管理 Agent",
+                    vec!["read_user", "send_message", "show_notification"],
+                    vec!["hr_management", "attendance_tracking"],
+                    "员工信息管理、考勤记录、请假审批、工资单生成",
+                ),
             ];
 
             for (id, name, permissions, capabilities, description) in &builtins {
@@ -265,7 +307,8 @@ impl Database {
                     "author": "ProClaw 官方",
                     "permissions": permissions,
                     "capabilities": capabilities,
-                }).to_string();
+                })
+                .to_string();
                 self.conn.execute(
                     "INSERT INTO agents (id, name, version, manifest, enabled, is_builtin, installed_at)
                      VALUES (?1, ?2, '1.0.0', ?3, 1, 1, ?4)",
@@ -277,105 +320,323 @@ impl Database {
             // 预定义行业插件 Agent（餐饮/美业/宠物/Cloud）
             let industry_builtins = vec![
                 // === 餐饮行业 (Catering) ===
-                ("proclaw-catering-assistant", "餐饮服务助手",
-                 vec!["read_user", "read_orders", "send_message", "show_notification"],
-                 vec!["pos_order_management", "menu_recommendation", "table_status_query", "daily_summary", "member_lookup"],
-                 "智能餐饮助手 - POS 点餐、桌台管理、菜单推荐、营收统计"),
-                ("proclaw-catering-menu", "智能菜单顾问",
-                 vec!["read_user", "send_message"],
-                 vec!["dish_recommendation", "popular_dishes", "dietary_pairing", "special_diet"],
-                 "智能菜单顾问 - 菜品推荐、热销榜单、营养搭配、特殊饮食需求"),
-                ("proclaw-catering-kds", "后厨调度助手",
-                 vec!["read_orders", "show_notification", "send_message"],
-                 vec!["kds_order_monitor", "overdue_alert", "prep_time_estimate", "printer_integration"],
-                 "后厨调度助手 - 订单监控、超时预警、备餐预估、打印联动"),
+                (
+                    "proclaw-catering-assistant",
+                    "餐饮服务助手",
+                    vec![
+                        "read_user",
+                        "read_orders",
+                        "send_message",
+                        "show_notification",
+                    ],
+                    vec![
+                        "pos_order_management",
+                        "menu_recommendation",
+                        "table_status_query",
+                        "daily_summary",
+                        "member_lookup",
+                    ],
+                    "智能餐饮助手 - POS 点餐、桌台管理、菜单推荐、营收统计",
+                ),
+                (
+                    "proclaw-catering-menu",
+                    "智能菜单顾问",
+                    vec!["read_user", "send_message"],
+                    vec![
+                        "dish_recommendation",
+                        "popular_dishes",
+                        "dietary_pairing",
+                        "special_diet",
+                    ],
+                    "智能菜单顾问 - 菜品推荐、热销榜单、营养搭配、特殊饮食需求",
+                ),
+                (
+                    "proclaw-catering-kds",
+                    "后厨调度助手",
+                    vec!["read_orders", "show_notification", "send_message"],
+                    vec![
+                        "kds_order_monitor",
+                        "overdue_alert",
+                        "prep_time_estimate",
+                        "printer_integration",
+                    ],
+                    "后厨调度助手 - 订单监控、超时预警、备餐预估、打印联动",
+                ),
                 // === 美业行业 (Beauty) ===
-                ("proclaw-beauty-assistant", "美业服务顾问",
-                 vec!["read_user", "read_crm", "send_message", "show_notification"],
-                 vec!["appointment_management", "service_recommendation", "employee_schedule_query", "member_insight", "crm_engagement"],
-                 "美业服务顾问 - 预约管理、服务推荐、技师排班、客户洞察、沉睡唤醒"),
-                ("proclaw-beauty-scheduler", "智能排班助手",
-                 vec!["read_user", "read_finance", "send_message"],
-                 vec!["schedule_optimization", "peak_hour_prediction", "leave_management", "commission_calc"],
-                 "智能排班助手 - 排班优化、高峰预测、请假管理、提成计算"),
-                ("proclaw-beauty-marketing", "营销活动助手",
-                 vec!["read_crm", "send_message", "show_notification"],
-                 vec!["campaign_templates", "campaign_analytics", "wechat_template_push", "coupon_distribution"],
-                 "营销活动助手 - 沉睡唤醒、生日礼、充值满赠、优惠券发放"),
+                (
+                    "proclaw-beauty-assistant",
+                    "美业服务顾问",
+                    vec!["read_user", "read_crm", "send_message", "show_notification"],
+                    vec![
+                        "appointment_management",
+                        "service_recommendation",
+                        "employee_schedule_query",
+                        "member_insight",
+                        "crm_engagement",
+                    ],
+                    "美业服务顾问 - 预约管理、服务推荐、技师排班、客户洞察、沉睡唤醒",
+                ),
+                (
+                    "proclaw-beauty-scheduler",
+                    "智能排班助手",
+                    vec!["read_user", "read_finance", "send_message"],
+                    vec![
+                        "schedule_optimization",
+                        "peak_hour_prediction",
+                        "leave_management",
+                        "commission_calc",
+                    ],
+                    "智能排班助手 - 排班优化、高峰预测、请假管理、提成计算",
+                ),
+                (
+                    "proclaw-beauty-marketing",
+                    "营销活动助手",
+                    vec!["read_crm", "send_message", "show_notification"],
+                    vec![
+                        "campaign_templates",
+                        "campaign_analytics",
+                        "wechat_template_push",
+                        "coupon_distribution",
+                    ],
+                    "营销活动助手 - 沉睡唤醒、生日礼、充值满赠、优惠券发放",
+                ),
                 // === 宠物行业 (Pet) ===
-                ("proclaw-pet-assistant", "宠物养护顾问",
-                 vec!["read_user", "send_message", "show_notification"],
-                 vec!["pet_care_advice", "breed_query", "grooming_recommendation", "product_recommendation", "emergency_guide"],
-                 "宠物养护顾问 - 日常养护、品种查询、洗护推荐、商品推荐、紧急指南"),
-                ("proclaw-pet-boarding", "寄养管理助手",
-                 vec!["read_user", "send_message", "show_notification"],
-                 vec!["boarding_status_query", "daily_log_management", "checkout_calculation", "owner_communication", "availability_forecast"],
-                 "寄养管理助手 - 房间状态、每日日志、费用计算、主人沟通、需求预测"),
-                ("proclaw-pet-health", "健康管理助手",
-                 vec!["read_user", "send_message", "show_notification"],
-                 vec!["vaccine_reminder", "vaccine_schedule", "weight_tracking", "health_log", "medical_alert"],
-                 "健康管理助手 - 疫苗提醒、疫苗计划、体重跟踪、健康记录、异常预警"),
+                (
+                    "proclaw-pet-assistant",
+                    "宠物养护顾问",
+                    vec!["read_user", "send_message", "show_notification"],
+                    vec![
+                        "pet_care_advice",
+                        "breed_query",
+                        "grooming_recommendation",
+                        "product_recommendation",
+                        "emergency_guide",
+                    ],
+                    "宠物养护顾问 - 日常养护、品种查询、洗护推荐、商品推荐、紧急指南",
+                ),
+                (
+                    "proclaw-pet-boarding",
+                    "寄养管理助手",
+                    vec!["read_user", "send_message", "show_notification"],
+                    vec![
+                        "boarding_status_query",
+                        "daily_log_management",
+                        "checkout_calculation",
+                        "owner_communication",
+                        "availability_forecast",
+                    ],
+                    "寄养管理助手 - 房间状态、每日日志、费用计算、主人沟通、需求预测",
+                ),
+                (
+                    "proclaw-pet-health",
+                    "健康管理助手",
+                    vec!["read_user", "send_message", "show_notification"],
+                    vec![
+                        "vaccine_reminder",
+                        "vaccine_schedule",
+                        "weight_tracking",
+                        "health_log",
+                        "medical_alert",
+                    ],
+                    "健康管理助手 - 疫苗提醒、疫苗计划、体重跟踪、健康记录、异常预警",
+                ),
                 // === Cloud 平台 (Cloud) ===
-                ("proclaw-cloud-billing", "Token 计费助手",
-                 vec!["read_finance", "send_message", "show_notification"],
-                 vec!["token_balance_query", "plan_recommendation", "usage_analytics", "budget_alert", "invoice_query"],
-                 "Token 计费助手 - 余额查询、套餐推荐、消耗分析、预算预警、账单查询"),
-                ("proclaw-cloud-ops", "云平台运营助手",
-                 vec!["read_finance", "read_orders", "send_message"],
-                 vec!["store_analytics", "product_sync_status", "order_monitoring", "performance_report"],
-                 "云平台运营助手 - 商城分析、商品同步、订单监控、性能报告"),
-                ("proclaw-cloud-backup", "备份恢复助手",
-                 vec!["read_user", "send_message", "show_notification"],
-                 vec!["backup_status_query", "auto_backup_config", "restore_assistant", "backup_integrity_check", "disaster_recovery"],
-                 "备份恢复助手 - 备份查询、自动备份、恢复引导、完整性检查、灾难恢复"),
+                (
+                    "proclaw-cloud-billing",
+                    "Token 计费助手",
+                    vec!["read_finance", "send_message", "show_notification"],
+                    vec![
+                        "token_balance_query",
+                        "plan_recommendation",
+                        "usage_analytics",
+                        "budget_alert",
+                        "invoice_query",
+                    ],
+                    "Token 计费助手 - 余额查询、套餐推荐、消耗分析、预算预警、账单查询",
+                ),
+                (
+                    "proclaw-cloud-ops",
+                    "云平台运营助手",
+                    vec!["read_finance", "read_orders", "send_message"],
+                    vec![
+                        "store_analytics",
+                        "product_sync_status",
+                        "order_monitoring",
+                        "performance_report",
+                    ],
+                    "云平台运营助手 - 商城分析、商品同步、订单监控、性能报告",
+                ),
+                (
+                    "proclaw-cloud-backup",
+                    "备份恢复助手",
+                    vec!["read_user", "send_message", "show_notification"],
+                    vec![
+                        "backup_status_query",
+                        "auto_backup_config",
+                        "restore_assistant",
+                        "backup_integrity_check",
+                        "disaster_recovery",
+                    ],
+                    "备份恢复助手 - 备份查询、自动备份、恢复引导、完整性检查、灾难恢复",
+                ),
                 // === 便利店 (Convenience) ===
-                ("proclaw-cv-assistant", "便利店经营助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
-                 vec!["expiry_alert", "restock_suggestion", "daily_settlement", "pos_assistance"],
-                 "便利店经营助手 - 临期商品提醒、智能补货建议、日结汇总"),
+                (
+                    "proclaw-cv-assistant",
+                    "便利店经营助手",
+                    vec![
+                        "read_user",
+                        "read_orders",
+                        "read_inventory",
+                        "send_message",
+                        "show_notification",
+                    ],
+                    vec![
+                        "expiry_alert",
+                        "restock_suggestion",
+                        "daily_settlement",
+                        "pos_assistance",
+                    ],
+                    "便利店经营助手 - 临期商品提醒、智能补货建议、日结汇总",
+                ),
                 // === 酒水批发 (Liquor Wholesale) ===
-                ("proclaw-lw-assistant", "酒水批发助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
-                 vec!["batch_tracking", "credit_collection", "price_recommendation", "bundle_assembly"],
-                 "酒水批发助手 - 批次追踪、赊账催收、价格推荐、套装组合"),
+                (
+                    "proclaw-lw-assistant",
+                    "酒水批发助手",
+                    vec![
+                        "read_user",
+                        "read_orders",
+                        "read_inventory",
+                        "send_message",
+                        "show_notification",
+                    ],
+                    vec![
+                        "batch_tracking",
+                        "credit_collection",
+                        "price_recommendation",
+                        "bundle_assembly",
+                    ],
+                    "酒水批发助手 - 批次追踪、赊账催收、价格推荐、套装组合",
+                ),
                 // === 手机配件 (Phone Accessories) ===
-                ("proclaw-pa-assistant", "手机配件批发助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message"],
-                 vec!["sku_matrix_management", "quotation_assistance", "price_volatility_alert", "device_compatibility"],
-                 "手机配件批发助手 - SKU矩阵管理、报价辅助、价格波动预警、机型匹配"),
+                (
+                    "proclaw-pa-assistant",
+                    "手机配件批发助手",
+                    vec!["read_user", "read_orders", "read_inventory", "send_message"],
+                    vec![
+                        "sku_matrix_management",
+                        "quotation_assistance",
+                        "price_volatility_alert",
+                        "device_compatibility",
+                    ],
+                    "手机配件批发助手 - SKU矩阵管理、报价辅助、价格波动预警、机型匹配",
+                ),
                 // === 食材配送 (Fresh Food Delivery) ===
-                ("proclaw-ff-assistant", "食材配送助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
-                 vec!["recurring_order_management", "delivery_route_optimization", "freshness_alert", "weighing_pricing"],
-                 "食材配送助手 - 周期订单管理、配送路线优化、新鲜度预警、称重计价"),
-                ("proclaw-ff-router", "配送路线优化师",
-                 vec!["read_user", "read_orders", "send_message"],
-                 vec!["route_planning", "delivery_scheduling", "distance_calculation", "stop_optimization"],
-                 "配送路线优化师 - 智能路线规划、配送调度、距离计算、停靠点优化"),
+                (
+                    "proclaw-ff-assistant",
+                    "食材配送助手",
+                    vec![
+                        "read_user",
+                        "read_orders",
+                        "read_inventory",
+                        "send_message",
+                        "show_notification",
+                    ],
+                    vec![
+                        "recurring_order_management",
+                        "delivery_route_optimization",
+                        "freshness_alert",
+                        "weighing_pricing",
+                    ],
+                    "食材配送助手 - 周期订单管理、配送路线优化、新鲜度预警、称重计价",
+                ),
+                (
+                    "proclaw-ff-router",
+                    "配送路线优化师",
+                    vec!["read_user", "read_orders", "send_message"],
+                    vec![
+                        "route_planning",
+                        "delivery_scheduling",
+                        "distance_calculation",
+                        "stop_optimization",
+                    ],
+                    "配送路线优化师 - 智能路线规划、配送调度、距离计算、停靠点优化",
+                ),
                 // === 汽车配件 (Auto Parts) ===
-                ("proclaw-ap-assistant", "汽配查询助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message"],
-                 vec!["oe_number_query", "vin_decoder", "vehicle_model_match", "parts_recommendation"],
-                 "汽配查询助手 - OE号查询、VIN码车型识别、适配推荐、正品溯源"),
+                (
+                    "proclaw-ap-assistant",
+                    "汽配查询助手",
+                    vec!["read_user", "read_orders", "read_inventory", "send_message"],
+                    vec![
+                        "oe_number_query",
+                        "vin_decoder",
+                        "vehicle_model_match",
+                        "parts_recommendation",
+                    ],
+                    "汽配查询助手 - OE号查询、VIN码车型识别、适配推荐、正品溯源",
+                ),
                 // === 五金 (Hardware) ===
-                ("proclaw-hw-assistant", "五金经营助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
-                 vec!["spec_recommendation", "cutting_optimization", "credit_collection", "unit_conversion"],
-                 "五金经营助手 - 规格推荐、切割优化、挂账催收、单位转换"),
+                (
+                    "proclaw-hw-assistant",
+                    "五金经营助手",
+                    vec![
+                        "read_user",
+                        "read_orders",
+                        "read_inventory",
+                        "send_message",
+                        "show_notification",
+                    ],
+                    vec![
+                        "spec_recommendation",
+                        "cutting_optimization",
+                        "credit_collection",
+                        "unit_conversion",
+                    ],
+                    "五金经营助手 - 规格推荐、切割优化、挂账催收、单位转换",
+                ),
                 // === 装修材料 (Decoration Material) ===
-                ("proclaw-dm-assistant", "装修材料助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message"],
-                 vec!["project_accounting", "bom_recommendation", "color_batch_tracking", "site_delivery"],
-                 "装修材料助手 - 项目核算、材料清单推荐、色号追踪、工地配送"),
+                (
+                    "proclaw-dm-assistant",
+                    "装修材料助手",
+                    vec!["read_user", "read_orders", "read_inventory", "send_message"],
+                    vec![
+                        "project_accounting",
+                        "bom_recommendation",
+                        "color_batch_tracking",
+                        "site_delivery",
+                    ],
+                    "装修材料助手 - 项目核算、材料清单推荐、色号追踪、工地配送",
+                ),
                 // === 社区团购 (Community Group Buy) ===
-                ("proclaw-gb-assistant", "社区团购助手",
-                 vec!["read_user", "read_orders", "read_inventory", "send_message", "show_notification"],
-                 vec!["jielong_parsing", "product_recommendation", "pickup_reminder", "group_profit_calc"],
-                 "社区团购助手 - 接龙文本解析、选品推荐、到货催取、团长收益核算"),
-                ("proclaw-gb-parser", "接龙文本解析器",
-                 vec!["read_user", "send_message"],
-                 vec!["text_parsing", "order_extraction", "quantity_counting", "format_conversion"],
-                 "接龙文本解析器 - 微信群接龙智能解析、订单提取、数量统计、格式转换"),
+                (
+                    "proclaw-gb-assistant",
+                    "社区团购助手",
+                    vec![
+                        "read_user",
+                        "read_orders",
+                        "read_inventory",
+                        "send_message",
+                        "show_notification",
+                    ],
+                    vec![
+                        "jielong_parsing",
+                        "product_recommendation",
+                        "pickup_reminder",
+                        "group_profit_calc",
+                    ],
+                    "社区团购助手 - 接龙文本解析、选品推荐、到货催取、团长收益核算",
+                ),
+                (
+                    "proclaw-gb-parser",
+                    "接龙文本解析器",
+                    vec!["read_user", "send_message"],
+                    vec![
+                        "text_parsing",
+                        "order_extraction",
+                        "quantity_counting",
+                        "format_conversion",
+                    ],
+                    "接龙文本解析器 - 微信群接龙智能解析、订单提取、数量统计、格式转换",
+                ),
             ];
 
             for (id, name, permissions, capabilities, description) in &industry_builtins {
@@ -388,7 +649,8 @@ impl Database {
                     "author": "ProClaw 官方",
                     "permissions": permissions,
                     "capabilities": capabilities,
-                }).to_string();
+                })
+                .to_string();
                 self.conn.execute(
                     "INSERT INTO agents (id, name, version, manifest, enabled, is_builtin, installed_at)
                      VALUES (?1, ?2, '1.0.0', ?3, 1, 1, ?4)",
@@ -397,15 +659,18 @@ impl Database {
                 println!("Installed industry Agent: {}", name);
             }
         }
-        
+
         // 审计修复 #14: 汇总迁移警告
         if !migration_errors.is_empty() {
-            eprintln!("[DB Migration] {} migration(s) encountered errors (non-fatal):", migration_errors.len());
+            eprintln!(
+                "[DB Migration] {} migration(s) encountered errors (non-fatal):",
+                migration_errors.len()
+            );
             for err in &migration_errors {
                 eprintln!("  - {}", err);
             }
         }
-        
+
         Ok(())
     }
 
@@ -442,15 +707,18 @@ impl Database {
 
     /// 获取所有 system_config 键值对
     pub fn get_all_config(&self) -> std::collections::HashMap<String, String> {
-        let mut stmt = self.conn
+        let mut stmt = self
+            .conn
             .prepare("SELECT key, value FROM system_config")
             .unwrap();
         let mut map = std::collections::HashMap::new();
-        let rows = stmt.query_map([], |row| {
-            let key: String = row.get(0)?;
-            let value: String = row.get(1)?;
-            Ok((key, value))
-        }).ok();
+        let rows = stmt
+            .query_map([], |row| {
+                let key: String = row.get(0)?;
+                let value: String = row.get(1)?;
+                Ok((key, value))
+            })
+            .ok();
         if let Some(rows) = rows {
             for row in rows.flatten() {
                 map.insert(row.0, row.1);
@@ -507,11 +775,12 @@ mod tests {
         db.initialize().unwrap();
 
         // 验证表是否创建
-        let table_count: i64 = db.connection()
+        let table_count: i64 = db
+            .connection()
             .query_row(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type='table'",
                 [],
-                |row| row.get(0)
+                |row| row.get(0),
             )
             .unwrap();
 

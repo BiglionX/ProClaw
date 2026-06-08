@@ -6,11 +6,10 @@
 /// - 支持定期从 NvwaX 拉取对账数据
 ///
 /// PRD: ProClaw × NvwaX API 集成需求文档
-
 use crate::database::Database;
 use rusqlite::params;
-use std::sync::Mutex;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use super::nvwax_client::NvwaXClient;
 
@@ -61,7 +60,10 @@ impl NvwaXBilling {
 
     /// 获取用户 Token 摘要
     pub fn get_user_token_summary(&self, user_id: &str) -> Result<TokenSummary, String> {
-        let db = self.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+        let db = self
+            .db
+            .lock()
+            .map_err(|e| format!("DB lock error: {}", e))?;
         let free_quota = Self::get_free_monthly_quota();
 
         // 获取当月消耗
@@ -97,7 +99,11 @@ impl NvwaXBilling {
             )
             .unwrap_or(0);
 
-        let purchased = if purchased_tokens > 0 { purchased_tokens as u64 } else { 0 };
+        let purchased = if purchased_tokens > 0 {
+            purchased_tokens as u64
+        } else {
+            0
+        };
 
         // 余额 = 免费额度 + 购买额度 - 已消耗
         let balance = (free_quota + purchased).saturating_sub(monthly_consumed);
@@ -120,7 +126,10 @@ impl NvwaXBilling {
         model: Option<&str>,
         source: Option<&str>,
     ) -> Result<(), String> {
-        let db = self.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+        let db = self
+            .db
+            .lock()
+            .map_err(|e| format!("DB lock error: {}", e))?;
         let id = uuid::Uuid::new_v4().to_string();
         let metadata = serde_json::json!({
             "recorded_at": chrono::Utc::now().to_rfc3339(),
@@ -156,11 +165,7 @@ impl NvwaXBilling {
 
     /// 估算调用成本（基于模型和端点）
     /// 返回预估 Token 数（用于实时拦截）
-    pub fn estimate_call_cost(
-        &self,
-        _model: Option<&str>,
-        _endpoint: &str,
-    ) -> u64 {
+    pub fn estimate_call_cost(&self, _model: Option<&str>, _endpoint: &str) -> u64 {
         // 简单估算逻辑：
         // - 市场浏览类（GET 请求）：10 Token
         // - Agent 创建/更新：50 Token
@@ -181,7 +186,10 @@ impl NvwaXBilling {
             .await
             .map_err(|e| format!("Failed to fetch usage from NvwaX: {}", e))?;
 
-        let db = self.db.lock().map_err(|e| format!("DB lock error: {}", e))?;
+        let db = self
+            .db
+            .lock()
+            .map_err(|e| format!("DB lock error: {}", e))?;
 
         // 查询本地当月记录数
         let local_records: u32 = db
@@ -223,7 +231,11 @@ impl NvwaXBilling {
         Ok(SyncResult {
             local_records,
             nvwax_records: stats.calls,
-            matched: if discrepancies.is_empty() { local_records } else { 0 },
+            matched: if discrepancies.is_empty() {
+                local_records
+            } else {
+                0
+            },
             discrepancies,
         })
     }

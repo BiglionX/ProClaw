@@ -1,3 +1,4 @@
+use crate::utils::path_safety;
 /// ProClaw 行业插件管理器
 ///
 /// 负责：
@@ -11,7 +12,6 @@
 /// 存储路径：%APPDATA%/ProClaw/plugins/{plugin-id}/
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use crate::utils::path_safety;
 /// 插件数据模型定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginDataModels {
@@ -152,7 +152,8 @@ pub fn list_installed_plugins() -> Result<Vec<InstalledPlugin>, String> {
     }
 
     let mut plugins = Vec::new();
-    let entries = std::fs::read_dir(&plugins_dir).map_err(|e| format!("Failed to read plugins dir: {}", e))?;
+    let entries = std::fs::read_dir(&plugins_dir)
+        .map_err(|e| format!("Failed to read plugins dir: {}", e))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -191,7 +192,10 @@ pub fn get_plugin_manifest(plugin_id: String) -> Result<PluginManifest, String> 
     let manifest_path = plugin_dir.join("manifest.json");
 
     if !manifest_path.exists() {
-        return Err(format!("Plugin '{}' not found or manifest missing", plugin_id));
+        return Err(format!(
+            "Plugin '{}' not found or manifest missing",
+            plugin_id
+        ));
     }
 
     read_manifest_file(&manifest_path)
@@ -199,16 +203,20 @@ pub fn get_plugin_manifest(plugin_id: String) -> Result<PluginManifest, String> 
 
 /// 读取并解析 manifest.json 文件
 fn read_manifest_file(path: &Path) -> Result<PluginManifest, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read manifest: {}", e))?;
-    let manifest: PluginManifest = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse manifest: {}", e))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read manifest: {}", e))?;
+    let manifest: PluginManifest =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse manifest: {}", e))?;
     Ok(manifest)
 }
 
 /// 从远程 URL 下载插件包
 #[tauri::command]
-pub async fn download_plugin(plugin_id: String, version: String, url: String) -> Result<String, String> {
+pub async fn download_plugin(
+    plugin_id: String,
+    version: String,
+    url: String,
+) -> Result<String, String> {
     let plugins_dir = get_plugins_dir();
     std::fs::create_dir_all(&plugins_dir)
         .map_err(|e| format!("Failed to create plugins dir: {}", e))?;
@@ -221,10 +229,14 @@ pub async fn download_plugin(plugin_id: String, version: String, url: String) ->
         .map_err(|e| format!("Failed to download plugin: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Download failed with status: {}", response.status()));
+        return Err(format!(
+            "Download failed with status: {}",
+            response.status()
+        ));
     }
 
-    let bytes = response.bytes()
+    let bytes = response
+        .bytes()
         .await
         .map_err(|e| format!("Failed to read response: {}", e))?;
 
@@ -240,8 +252,8 @@ pub fn verify_plugin_package(package_path: String, expected_hash: String) -> Res
     use sha2::Digest;
 
     let path = Path::new(&package_path);
-    let content = std::fs::read(path)
-        .map_err(|e| format!("Failed to read plugin package: {}", e))?;
+    let content =
+        std::fs::read(path).map_err(|e| format!("Failed to read plugin package: {}", e))?;
 
     let mut hasher = sha2::Sha256::new();
     hasher.update(&content);
@@ -256,26 +268,33 @@ pub fn verify_plugin_package(package_path: String, expected_hash: String) -> Res
 /// `signature_hex`: 签名的十六进制字符串
 /// `public_key_hex`: Ed25519 公钥的十六进制字符串
 #[tauri::command]
-pub fn verify_plugin_signature(package_path: String, signature_hex: String, public_key_hex: String) -> Result<bool, String> {
+pub fn verify_plugin_signature(
+    package_path: String,
+    signature_hex: String,
+    public_key_hex: String,
+) -> Result<bool, String> {
     use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
     // 读取公钥
-    let public_key_bytes = hex::decode(&public_key_hex)
-        .map_err(|e| format!("Invalid public key hex: {}", e))?;
+    let public_key_bytes =
+        hex::decode(&public_key_hex).map_err(|e| format!("Invalid public key hex: {}", e))?;
     let verifying_key = VerifyingKey::from_bytes(
-        &public_key_bytes.try_into().map_err(|_| "Invalid public key length (expected 32 bytes)")?
-    ).map_err(|e| format!("Invalid Ed25519 public key: {}", e))?;
+        &public_key_bytes
+            .try_into()
+            .map_err(|_| "Invalid public key length (expected 32 bytes)")?,
+    )
+    .map_err(|e| format!("Invalid Ed25519 public key: {}", e))?;
 
     // 解析签名
-    let signature_bytes = hex::decode(&signature_hex)
-        .map_err(|e| format!("Invalid signature hex: {}", e))?;
+    let signature_bytes =
+        hex::decode(&signature_hex).map_err(|e| format!("Invalid signature hex: {}", e))?;
     let signature = Signature::from_slice(&signature_bytes)
         .map_err(|e| format!("Invalid Ed25519 signature: {}", e))?;
 
     // 读取包内容
     let path = Path::new(&package_path);
-    let content = std::fs::read(path)
-        .map_err(|e| format!("Failed to read plugin package: {}", e))?;
+    let content =
+        std::fs::read(path).map_err(|e| format!("Failed to read plugin package: {}", e))?;
 
     // 验证签名
     match verifying_key.verify(&content, &signature) {
@@ -302,23 +321,24 @@ pub fn install_plugin(package_path: String, plugin_id: String) -> Result<String,
         .map_err(|e| format!("Failed to create plugin dir: {}", e))?;
 
     // 解压 ZIP 包
-    let file = std::fs::File::open(package)
-        .map_err(|e| format!("Failed to open package: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| format!("Failed to read ZIP package: {}", e))?;
-    
+    let file =
+        std::fs::File::open(package).map_err(|e| format!("Failed to open package: {}", e))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("Failed to read ZIP package: {}", e))?;
+
     // 解压到目标目录（含 Zip Slip 防护）
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i)
+        let mut entry = archive
+            .by_index(i)
             .map_err(|e| format!("Failed to read ZIP entry {}: {}", i, e))?;
-        
+
         let entry_name = entry.mangled_name();
         let entry_path = entry_name.as_path();
-        
+
         // R7 审计修复：防 Zip Slip — ensure_within_dir 拒绝路径穿越
         let target_path = path_safety::ensure_within_dir(&target_dir, entry_path)
             .map_err(|e| format!("路径安全拒绝 (ZIP entry {}): {}", entry_name.display(), e))?;
-        
+
         if entry.is_dir() {
             std::fs::create_dir_all(&target_path).ok();
         } else {
@@ -385,10 +405,18 @@ pub fn verify_plugin_compatibility(manifest_json: String) -> Result<Compatibilit
     let mut issues = Vec::new();
 
     // 检查必填字段
-    if manifest.id.is_empty() { issues.push("插件 ID 不能为空".to_string()); }
-    if manifest.name.is_empty() { issues.push("插件名称不能为空".to_string()); }
-    if manifest.version.is_empty() { issues.push("版本号不能为空".to_string()); }
-    if !manifest.version.contains('.') { issues.push("版本号格式无效，应为 x.y.z 格式".to_string()); }
+    if manifest.id.is_empty() {
+        issues.push("插件 ID 不能为空".to_string());
+    }
+    if manifest.name.is_empty() {
+        issues.push("插件名称不能为空".to_string());
+    }
+    if manifest.version.is_empty() {
+        issues.push("版本号不能为空".to_string());
+    }
+    if !manifest.version.contains('.') {
+        issues.push("版本号格式无效，应为 x.y.z 格式".to_string());
+    }
 
     // 检查 assets 目录是否存在
     let assets_dir = get_plugin_dir(&manifest.id).join(&manifest.assets.path);
@@ -407,12 +435,18 @@ pub fn verify_plugin_compatibility(manifest_json: String) -> Result<Compatibilit
     if let Some(dm) = &manifest.data_models {
         for (i, table) in dm.tables.iter().enumerate() {
             if !table.trim().to_uppercase().starts_with("CREATE TABLE") {
-                issues.push(format!("dataModels.tables[{}] 不是有效的 CREATE TABLE 语句", i));
+                issues.push(format!(
+                    "dataModels.tables[{}] 不是有效的 CREATE TABLE 语句",
+                    i
+                ));
             }
         }
         for (i, migration) in dm.migrations.iter().enumerate() {
             if !migration.trim().to_uppercase().starts_with("ALTER TABLE") {
-                issues.push(format!("dataModels.migrations[{}] 不是有效的 ALTER TABLE 语句", i));
+                issues.push(format!(
+                    "dataModels.migrations[{}] 不是有效的 ALTER TABLE 语句",
+                    i
+                ));
             }
         }
     }
@@ -494,8 +528,8 @@ pub fn execute_plugin_migration(
     }
 
     // 读取 SQL 内容
-    let mut file = std::fs::File::open(&migration_path)
-        .map_err(|e| format!("无法读取迁移文件：{}", e))?;
+    let mut file =
+        std::fs::File::open(&migration_path).map_err(|e| format!("无法读取迁移文件：{}", e))?;
     let mut sql_content = String::new();
     file.read_to_string(&mut sql_content)
         .map_err(|e| format!("读取迁移文件失败：{}", e))?;
@@ -509,7 +543,7 @@ pub fn execute_plugin_migration(
     }
 
     // 计算 checksum 用于幂等性检查
-    use md5::{Md5, Digest};
+    use md5::{Digest, Md5};
     let checksum = format!("{:x}", Md5::digest(sql_content.as_bytes()));
     let migration_name = format!("{}/{}", plugin_id, migration_file);
 
@@ -527,8 +561,9 @@ pub fn execute_plugin_migration(
          checksum TEXT NOT NULL,\
          applied_at TEXT NOT NULL DEFAULT (datetime('now')),\
          success INTEGER NOT NULL DEFAULT 1\
-         );"
-    ).map_err(|e| format!("创建迁移追踪表失败：{}", e))?;
+         );",
+    )
+    .map_err(|e| format!("创建迁移追踪表失败：{}", e))?;
 
     // 检查是否已执行过（幂等性检查）
     let already_applied: bool = conn
@@ -578,7 +613,11 @@ pub fn execute_plugin_migration(
                 rusqlite::params![plugin_id, migration_name, direction, checksum],
             ).ok();
 
-            Err(format!("执行迁移失败：{} (SQL: {})", e, &sql_content[..sql_content.len().min(200)]))
+            Err(format!(
+                "执行迁移失败：{} (SQL: {})",
+                e,
+                &sql_content[..sql_content.len().min(200)]
+            ))
         }
     }
 }
@@ -602,8 +641,9 @@ pub fn get_plugin_migration_history(
          checksum TEXT NOT NULL,\
          applied_at TEXT NOT NULL DEFAULT (datetime('now')),\
          success INTEGER NOT NULL DEFAULT 1\
-         );"
-    ).ok();
+         );",
+    )
+    .ok();
 
     let mut stmt = conn
         .prepare(
@@ -663,7 +703,9 @@ pub fn plugin_db_query(
     let db = db.lock().map_err(|e| format!("数据库锁定失败：{}", e))?;
     let conn = db.connection();
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| format!("SQL 预处理失败：{}", e))?;
+    let mut stmt = conn
+        .prepare(&sql)
+        .map_err(|e| format!("SQL 预处理失败：{}", e))?;
 
     // 将 String 参数转换为 rusqlite 兼容的 &dyn ToSql
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params
@@ -707,23 +749,32 @@ pub fn plugin_db_execute(
 ) -> Result<u64, String> {
     // 安全检查：仅允许安全的写操作
     let trimmed = sql.trim().to_uppercase();
-    let allowed = ["INSERT", "UPDATE", "DELETE", "CREATE TABLE IF NOT EXISTS", "CREATE INDEX", "CREATE UNIQUE INDEX"];
+    let allowed = [
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "CREATE TABLE IF NOT EXISTS",
+        "CREATE INDEX",
+        "CREATE UNIQUE INDEX",
+    ];
     if !allowed.iter().any(|p| trimmed.starts_with(p)) {
-        return Err(format!(
-            "插件数据库写入仅允许：{}",
-            allowed.join(", ")
-        ));
+        return Err(format!("插件数据库写入仅允许：{}", allowed.join(", ")));
     }
     // 显式禁止破坏性操作
-    let forbidden_starts = ["DROP", "ALTER", "PRAGMA", "TRUNCATE", "ATTACH", "DETACH", "REINDEX", "VACUUM"];
+    let forbidden_starts = [
+        "DROP", "ALTER", "PRAGMA", "TRUNCATE", "ATTACH", "DETACH", "REINDEX", "VACUUM",
+    ];
     for forbidden in &forbidden_starts {
         if trimmed.starts_with(forbidden) {
             return Err(format!("禁止执行 {} 操作", forbidden));
         }
     }
     // 防止通过注释注入绕过
-    if trimmed.starts_with("CREATE") && !trimmed.starts_with("CREATE TABLE IF NOT EXISTS") 
-        && !trimmed.starts_with("CREATE INDEX") && !trimmed.starts_with("CREATE UNIQUE INDEX") {
+    if trimmed.starts_with("CREATE")
+        && !trimmed.starts_with("CREATE TABLE IF NOT EXISTS")
+        && !trimmed.starts_with("CREATE INDEX")
+        && !trimmed.starts_with("CREATE UNIQUE INDEX")
+    {
         return Err("CREATE 仅允许 CREATE TABLE IF NOT EXISTS 和 CREATE INDEX".to_string());
     }
     // 阻止多语句注入
@@ -842,8 +893,9 @@ fn ensure_plugin_enabled_table(conn: &rusqlite::Connection) -> Result<(), String
          plugin_id TEXT PRIMARY KEY,\
          enabled INTEGER NOT NULL DEFAULT 1,\
          updated_at TEXT NOT NULL DEFAULT (datetime('now'))\
-         );"
-    ).map_err(|e| format!("创建 plugin_enabled 表失败：{}", e))
+         );",
+    )
+    .map_err(|e| format!("创建 plugin_enabled 表失败：{}", e))
 }
 
 /// 启用插件
@@ -855,13 +907,14 @@ pub fn enable_plugin(
     let db = db.lock().map_err(|e| format!("数据库锁定失败：{}", e))?;
     let conn = db.connection();
     ensure_plugin_enabled_table(conn)?;
-    
+
     conn.execute(
         "INSERT OR REPLACE INTO plugin_enabled (plugin_id, enabled, updated_at) \
          VALUES (?1, 1, datetime('now'))",
         rusqlite::params![plugin_id],
-    ).map_err(|e| format!("启用插件失败：{}", e))?;
-    
+    )
+    .map_err(|e| format!("启用插件失败：{}", e))?;
+
     Ok(())
 }
 
@@ -874,13 +927,14 @@ pub fn disable_plugin(
     let db = db.lock().map_err(|e| format!("数据库锁定失败：{}", e))?;
     let conn = db.connection();
     ensure_plugin_enabled_table(conn)?;
-    
+
     conn.execute(
         "INSERT OR REPLACE INTO plugin_enabled (plugin_id, enabled, updated_at) \
          VALUES (?1, 0, datetime('now'))",
         rusqlite::params![plugin_id],
-    ).map_err(|e| format!("禁用插件失败：{}", e))?;
-    
+    )
+    .map_err(|e| format!("禁用插件失败：{}", e))?;
+
     Ok(())
 }
 
@@ -893,7 +947,7 @@ pub fn get_plugin_enabled_status(
     let db = db.lock().map_err(|e| format!("数据库锁定失败：{}", e))?;
     let conn = db.connection();
     ensure_plugin_enabled_table(conn)?;
-    
+
     let result = conn.query_row(
         "SELECT plugin_id, enabled, updated_at FROM plugin_enabled WHERE plugin_id = ?1",
         rusqlite::params![plugin_id],
@@ -903,9 +957,9 @@ pub fn get_plugin_enabled_status(
                 enabled: row.get::<_, i32>(1)? != 0,
                 updated_at: row.get(2)?,
             })
-        }
+        },
     );
-    
+
     match result {
         Ok(status) => Ok(status),
         Err(rusqlite::Error::QueryReturnedNoRows) => {
@@ -928,19 +982,21 @@ pub fn get_all_plugin_enabled_statuses(
     let db = db.lock().map_err(|e| format!("数据库锁定失败：{}", e))?;
     let conn = db.connection();
     ensure_plugin_enabled_table(conn)?;
-    
-    let mut stmt = conn.prepare(
-        "SELECT plugin_id, enabled, updated_at FROM plugin_enabled ORDER BY plugin_id"
-    ).map_err(|e| format!("查询插件状态失败：{}", e))?;
-    
-    let records = stmt.query_map([], |row| {
-        Ok(PluginEnabledStatus {
-            plugin_id: row.get(0)?,
-            enabled: row.get::<_, i32>(1)? != 0,
-            updated_at: row.get(2)?,
+
+    let mut stmt = conn
+        .prepare("SELECT plugin_id, enabled, updated_at FROM plugin_enabled ORDER BY plugin_id")
+        .map_err(|e| format!("查询插件状态失败：{}", e))?;
+
+    let records = stmt
+        .query_map([], |row| {
+            Ok(PluginEnabledStatus {
+                plugin_id: row.get(0)?,
+                enabled: row.get::<_, i32>(1)? != 0,
+                updated_at: row.get(2)?,
+            })
         })
-    }).map_err(|e| format!("读取插件状态失败：{}", e))?;
-    
+        .map_err(|e| format!("读取插件状态失败：{}", e))?;
+
     let mut result = Vec::new();
     for record in records.flatten() {
         result.push(record);
@@ -969,7 +1025,11 @@ pub async fn check_plugin_update(
     current_version: String,
     store_api_url: String,
 ) -> Result<PluginUpdateInfo, String> {
-    let url = format!("{}/api/plugins/{}/latest", store_api_url.trim_end_matches('/'), plugin_id);
+    let url = format!(
+        "{}/api/plugins/{}/latest",
+        store_api_url.trim_end_matches('/'),
+        plugin_id
+    );
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("检查更新失败（无法连接商店）: {}", e))?;
@@ -984,11 +1044,15 @@ pub async fn check_plugin_update(
             is_force_update: false,
         });
     }
-    let latest: serde_json::Value = response.json().await
+    let latest: serde_json::Value = response
+        .json()
+        .await
         .map_err(|e| format!("解析更新信息失败: {}", e))?;
-    let latest_version = latest.get("version")
+    let latest_version = latest
+        .get("version")
         .and_then(|v| v.as_str())
-        .unwrap_or("").to_string();
+        .unwrap_or("")
+        .to_string();
     if latest_version.is_empty() || latest_version == current_version {
         return Ok(PluginUpdateInfo {
             has_update: false,
@@ -1004,10 +1068,22 @@ pub async fn check_plugin_update(
         has_update: true,
         current_version,
         latest_version,
-        download_url: latest.get("package_url").and_then(|u| u.as_str()).map(|s| s.to_string()),
-        package_hash: latest.get("package_hash").and_then(|h| h.as_str()).map(|s| s.to_string()),
-        changelog: latest.get("changelog").and_then(|c| c.as_str()).map(|s| s.to_string()),
-        is_force_update: latest.get("is_force_update").and_then(|f| f.as_bool()).unwrap_or(false),
+        download_url: latest
+            .get("package_url")
+            .and_then(|u| u.as_str())
+            .map(|s| s.to_string()),
+        package_hash: latest
+            .get("package_hash")
+            .and_then(|h| h.as_str())
+            .map(|s| s.to_string()),
+        changelog: latest
+            .get("changelog")
+            .and_then(|c| c.as_str())
+            .map(|s| s.to_string()),
+        is_force_update: latest
+            .get("is_force_update")
+            .and_then(|f| f.as_bool())
+            .unwrap_or(false),
     })
 }
 
@@ -1026,29 +1102,42 @@ pub async fn apply_plugin_update(
     }
     // 1. 下载新版本包
     let download_path = plugins_dir.join(format!("{}-{}.proclaw-plugin", plugin_id, new_version));
-    let response = reqwest::get(&download_url).await.map_err(|e| format!("下载更新包失败: {}", e))?;
+    let response = reqwest::get(&download_url)
+        .await
+        .map_err(|e| format!("下载更新包失败: {}", e))?;
     if !response.status().is_success() {
         return Err(format!("下载失败，HTTP {}", response.status()));
     }
-    let bytes = response.bytes().await.map_err(|e| format!("读取下载内容失败: {}", e))?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("读取下载内容失败: {}", e))?;
     std::fs::write(&download_path, &bytes).map_err(|e| format!("保存更新包失败: {}", e))?;
     // 2. 解压到临时目录
     let temp_dir = plugins_dir.join(format!("{}-{}-tmp", plugin_id, new_version));
-    if temp_dir.exists() { std::fs::remove_dir_all(&temp_dir).ok(); }
+    if temp_dir.exists() {
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
     std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
     let file = std::fs::File::open(&download_path).map_err(|e| format!("打开更新包失败: {}", e))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("读取 ZIP 包失败: {}", e))?;
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
         let entry_name = entry.mangled_name();
         let entry_path = entry_name.as_path();
         // R7 修复：防 Zip Slip
         let target_path = path_safety::ensure_within_dir(&temp_dir, entry_path)
             .map_err(|e| format!("路径安全拒绝 (ZIP entry {}): {}", entry_name.display(), e))?;
-        if entry.is_dir() { std::fs::create_dir_all(&target_path).ok(); }
-        else {
-            if let Some(parent) = target_path.parent() { std::fs::create_dir_all(parent).ok(); }
-            let mut outfile = std::fs::File::create(&target_path).map_err(|e| format!("创建文件失败: {}", e))?;
+        if entry.is_dir() {
+            std::fs::create_dir_all(&target_path).ok();
+        } else {
+            if let Some(parent) = target_path.parent() {
+                std::fs::create_dir_all(parent).ok();
+            }
+            let mut outfile =
+                std::fs::File::create(&target_path).map_err(|e| format!("创建文件失败: {}", e))?;
             std::io::copy(&mut entry, &mut outfile).map_err(|e| format!("解压文件失败: {}", e))?;
         }
     }
@@ -1059,7 +1148,12 @@ pub async fn apply_plugin_update(
         let mut files: Vec<String> = std::fs::read_dir(&new_migrations)
             .map_err(|e| format!("读取迁移目录失败: {}", e))?
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "sql").unwrap_or(false))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "sql")
+                    .unwrap_or(false)
+            })
             .map(|e| e.file_name().to_string_lossy().to_string())
             .collect();
         files.sort();
@@ -1069,25 +1163,34 @@ pub async fn apply_plugin_update(
                     .map_err(|e| format!("读取迁移文件 {} 失败: {}", f, e))?;
                 if !sql.trim().is_empty() {
                     let db = db.lock().map_err(|e| format!("数据库锁定失败: {}", e))?;
-                    db.connection().execute_batch(&sql)
+                    db.connection()
+                        .execute_batch(&sql)
                         .map_err(|e| format!("执行迁移 {} 失败: {}", f, e))?;
                 }
             }
         }
     }
     // 4. 替换文件（保留 config 目录）
-    for entry in std::fs::read_dir(&plugin_dir).map_err(|e| format!("读取插件目录失败: {}", e))? {
+    for entry in std::fs::read_dir(&plugin_dir).map_err(|e| format!("读取插件目录失败: {}", e))?
+    {
         let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
         let path = entry.path();
-        if path.is_dir() && path.file_name().unwrap_or_default() == "config" { continue; }
-        if path.is_file() { std::fs::remove_file(&path).ok(); }
-        else { std::fs::remove_dir_all(&path).ok(); }
+        if path.is_dir() && path.file_name().unwrap_or_default() == "config" {
+            continue;
+        }
+        if path.is_file() {
+            std::fs::remove_file(&path).ok();
+        } else {
+            std::fs::remove_dir_all(&path).ok();
+        }
     }
-    for entry in std::fs::read_dir(&temp_dir).map_err(|e| format!("读取临时目录失败: {}", e))? {
+    for entry in std::fs::read_dir(&temp_dir).map_err(|e| format!("读取临时目录失败: {}", e))?
+    {
         let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
         let target = plugin_dir.join(entry.file_name());
         if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            copy_dir_contents(&entry.path(), &target).map_err(|e| format!("复制目录失败: {}", e))?;
+            copy_dir_contents(&entry.path(), &target)
+                .map_err(|e| format!("复制目录失败: {}", e))?;
         } else {
             std::fs::copy(entry.path(), &target).map_err(|e| format!("复制文件失败: {}", e))?;
         }
@@ -1100,7 +1203,9 @@ pub async fn apply_plugin_update(
 
 /// 递归复制目录内容的辅助函数
 fn copy_dir_contents(src: &Path, dst: &Path) -> std::io::Result<()> {
-    if !dst.exists() { std::fs::create_dir_all(dst)?; }
+    if !dst.exists() {
+        std::fs::create_dir_all(dst)?;
+    }
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
         let target = dst.join(entry.file_name());

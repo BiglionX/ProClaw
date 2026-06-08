@@ -1,18 +1,21 @@
 // ProClaw Cloud 云备份 Tauri 命令
 // 封装 CloudBackupService 暴露给前端
 
-use std::sync::Arc;
-use tauri::State;
-use std::sync::Mutex;
 use crate::database::Database;
 use crate::services::cloud_backup_service::CloudBackupService;
-use serde_json::{json, Value};
-use uuid::Uuid;
 use chrono::Utc;
+use serde_json::{json, Value};
+use std::sync::Arc;
+use std::sync::Mutex;
+use tauri::State;
+use uuid::Uuid;
 
 /// 获取备份历史
 #[tauri::command]
-pub fn get_backup_history_cmd(db: State<Mutex<Database>>, limit: Option<i64>) -> Result<Value, String> {
+pub fn get_backup_history_cmd(
+    db: State<Mutex<Database>>,
+    limit: Option<i64>,
+) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let limit = limit.unwrap_or(20);
@@ -24,18 +27,20 @@ pub fn get_backup_history_cmd(db: State<Mutex<Database>>, limit: Option<i64>) ->
          LIMIT ?"
     ).map_err(|e| format!("Failed to prepare query: {}", e))?;
 
-    let rows = stmt.query_map([limit], |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "user_id": row.get::<_, String>(1)?,
-            "status": row.get::<_, String>(2)?,
-            "started_at": row.get::<_, Option<String>>(3)?,
-            "completed_at": row.get::<_, Option<String>>(4)?,
-            "size_bytes": row.get::<_, Option<i64>>(5)?,
-            "table_count": row.get::<_, Option<i64>>(6)?,
-            "error_message": row.get::<_, Option<String>>(7)?,
-        }))
-    }).map_err(|e| format!("Query failed: {}", e))?;
+    let rows = stmt
+        .query_map([limit], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "user_id": row.get::<_, String>(1)?,
+                "status": row.get::<_, String>(2)?,
+                "started_at": row.get::<_, Option<String>>(3)?,
+                "completed_at": row.get::<_, Option<String>>(4)?,
+                "size_bytes": row.get::<_, Option<i64>>(5)?,
+                "table_count": row.get::<_, Option<i64>>(6)?,
+                "error_message": row.get::<_, Option<String>>(7)?,
+            }))
+        })
+        .map_err(|e| format!("Query failed: {}", e))?;
 
     let jobs: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
     Ok(json!({ "data": jobs }))
@@ -43,7 +48,9 @@ pub fn get_backup_history_cmd(db: State<Mutex<Database>>, limit: Option<i64>) ->
 
 /// 获取云备份状态
 #[tauri::command]
-pub fn get_backup_status_cmd(cloud_backup: State<Arc<CloudBackupService>>) -> Result<Value, String> {
+pub fn get_backup_status_cmd(
+    cloud_backup: State<Arc<CloudBackupService>>,
+) -> Result<Value, String> {
     Ok(json!({
         "available": cloud_backup.is_available(),
         "last_backup_at": Value::Null,
@@ -71,7 +78,7 @@ pub fn get_backup_config_cmd(db: State<Mutex<Database>>, user_id: String) -> Res
                 "retention_days": row.get::<_, i64>(5)?,
                 "updated_at": row.get::<_, Option<String>>(6)?,
             }))
-        }
+        },
     );
 
     match result {
@@ -159,11 +166,21 @@ pub fn set_auto_backup_schedule_cmd(
     let conn = db.connection();
     let now = Utc::now().to_rfc3339();
 
-    let affected = conn.execute(
-        "UPDATE cloud_backup_config SET auto_backup = ?, frequency = ?, backup_time = ?,
+    let affected = conn
+        .execute(
+            "UPDATE cloud_backup_config SET auto_backup = ?, frequency = ?, backup_time = ?,
          encrypt_backup = ?, retention_days = ?, updated_at = ? WHERE user_id = ?",
-        rusqlite::params![enabled, frequency, backup_time, encrypt_backup, retention_days, now, user_id],
-    ).map_err(|e| format!("Failed to update config: {}", e))?;
+            rusqlite::params![
+                enabled,
+                frequency,
+                backup_time,
+                encrypt_backup,
+                retention_days,
+                now,
+                user_id
+            ],
+        )
+        .map_err(|e| format!("Failed to update config: {}", e))?;
 
     if affected == 0 {
         // 插入新配置

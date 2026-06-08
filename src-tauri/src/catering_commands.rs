@@ -2,11 +2,11 @@
 // 需求文档：行业插件功能实现
 
 use crate::database::Database;
+use chrono::Utc;
 use rusqlite::params;
 use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// 创建 POS 点餐订单
 #[tauri::command]
@@ -20,7 +20,8 @@ pub fn catering_create_pos_order(
     let conn = db.connection();
     let id = Uuid::new_v4().to_string();
     let items_str = items.to_string();
-    let total_amount: f64 = items.as_array()
+    let total_amount: f64 = items
+        .as_array()
         .map(|arr| arr.iter().filter_map(|i| i["price"].as_f64()).sum())
         .unwrap_or(0.0);
     let now = Utc::now().to_rfc3339();
@@ -63,19 +64,22 @@ pub fn catering_get_pos_orders(
     sql.push_str(" ORDER BY created_at DESC LIMIT 50");
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let params_ref: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
-    let rows = stmt.query_map(params_ref.as_slice(), |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "table_id": row.get::<_, String>(1)?,
-            "items": row.get::<_, String>(2)?,
-            "total_amount": row.get::<_, f64>(3)?,
-            "payment_method": row.get::<_, Option<String>>(4)?,
-            "status": row.get::<_, String>(5)?,
-            "created_at": row.get::<_, String>(6)?,
-            "settled_at": row.get::<_, Option<String>>(7)?,
-        }))
-    }).map_err(|e| e.to_string())?;
+    let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|p| p.as_ref()).collect();
+    let rows = stmt
+        .query_map(params_ref.as_slice(), |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "table_id": row.get::<_, String>(1)?,
+                "items": row.get::<_, String>(2)?,
+                "total_amount": row.get::<_, f64>(3)?,
+                "payment_method": row.get::<_, Option<String>>(4)?,
+                "status": row.get::<_, String>(5)?,
+                "created_at": row.get::<_, String>(6)?,
+                "settled_at": row.get::<_, Option<String>>(7)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
 
     let orders: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
     Ok(json!({ "data": orders }))
@@ -125,11 +129,13 @@ pub fn catering_get_daily_summary(
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
 
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM pos_orders WHERE date(created_at) = ?1",
-        params![date],
-        |row| row.get(0),
-    ).map_err(|e| e.to_string())?;
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pos_orders WHERE date(created_at) = ?1",
+            params![date],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
 
     Ok(json!({ "date": date, "total_revenue": total, "order_count": count }))
 }
@@ -147,29 +153,33 @@ pub fn catering_get_kds_orders(
         let mut stmt = conn.prepare(
             "SELECT id, table_id, items, status, created_at FROM pos_orders WHERE status = ?1 ORDER BY created_at ASC"
         ).map_err(|e| e.to_string())?;
-        let rows = stmt.query_map(params![s], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "table_id": row.get::<_, String>(1)?,
-                "items": row.get::<_, String>(2)?,
-                "status": row.get::<_, String>(3)?,
-                "created_at": row.get::<_, String>(4)?,
-            }))
-        }).map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![s], |row| {
+                Ok(json!({
+                    "id": row.get::<_, String>(0)?,
+                    "table_id": row.get::<_, String>(1)?,
+                    "items": row.get::<_, String>(2)?,
+                    "status": row.get::<_, String>(3)?,
+                    "created_at": row.get::<_, String>(4)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, table_id, items, status, created_at FROM pos_orders WHERE status IN ('pending','preparing') ORDER BY created_at ASC"
         ).map_err(|e| e.to_string())?;
-        let rows = stmt.query_map([], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "table_id": row.get::<_, String>(1)?,
-                "items": row.get::<_, String>(2)?,
-                "status": row.get::<_, String>(3)?,
-                "created_at": row.get::<_, String>(4)?,
-            }))
-        }).map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(json!({
+                    "id": row.get::<_, String>(0)?,
+                    "table_id": row.get::<_, String>(1)?,
+                    "items": row.get::<_, String>(2)?,
+                    "status": row.get::<_, String>(3)?,
+                    "created_at": row.get::<_, String>(4)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     };
 
@@ -187,7 +197,8 @@ pub fn catering_mark_kds_item_done(
     conn.execute(
         "UPDATE pos_orders SET status = 'completed' WHERE id = ?1",
         params![order_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(json!({ "message": "菜品已标记完成", "order_id": order_id }))
 }

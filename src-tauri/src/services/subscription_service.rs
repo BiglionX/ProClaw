@@ -1,10 +1,10 @@
 // 订阅与计费服务 (Phase 7)
 // 套餐管理、用户订阅、Token 用量追踪、配额检查
 
+use crate::database::Database;
+use chrono::Utc;
 use rusqlite::params;
 use uuid::Uuid;
-use chrono::Utc;
-use crate::database::Database;
 
 /// Token 消耗定额（每操作类型）
 #[derive(Debug, Clone)]
@@ -85,16 +85,25 @@ pub fn get_plans(db: &Database) -> Result<Vec<Plan>, String> {
          FROM subscription_plans WHERE is_active = 1 ORDER BY sort_order"
     ).map_err(|e| e.to_string())?;
 
-    let plans = stmt.query_map([], |row| {
-        Ok(Plan {
-            id: row.get(0)?, plan_key: row.get(1)?, name: row.get(2)?,
-            description: row.get(3)?, monthly_price: row.get(4)?, yearly_price: row.get(5)?,
-            token_quota: row.get(6)?, max_devices: row.get(7)?, features: row.get(8)?,
-            is_active: row.get(9)?, sort_order: row.get(10)?,
+    let plans = stmt
+        .query_map([], |row| {
+            Ok(Plan {
+                id: row.get(0)?,
+                plan_key: row.get(1)?,
+                name: row.get(2)?,
+                description: row.get(3)?,
+                monthly_price: row.get(4)?,
+                yearly_price: row.get(5)?,
+                token_quota: row.get(6)?,
+                max_devices: row.get(7)?,
+                features: row.get(8)?,
+                is_active: row.get(9)?,
+                sort_order: row.get(10)?,
+            })
         })
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(plans)
 }
@@ -120,7 +129,10 @@ pub fn get_plan_by_key(db: &Database, plan_key: &str) -> Result<Option<Plan>, St
 
 // ========== 用户订阅 ==========
 
-pub fn get_user_subscription(db: &Database, user_id: &str) -> Result<Option<UserSubscription>, String> {
+pub fn get_user_subscription(
+    db: &Database,
+    user_id: &str,
+) -> Result<Option<UserSubscription>, String> {
     let conn = db.connection();
     conn.query_row(
         "SELECT us.id, us.user_id, us.plan_id, sp.name, sp.plan_key, sp.token_quota,
@@ -132,9 +144,14 @@ pub fn get_user_subscription(db: &Database, user_id: &str) -> Result<Option<User
         params![user_id],
         |row| {
             let sub = UserSubscription {
-                id: row.get(0)?, user_id: row.get(1)?, plan_id: row.get(2)?,
-                plan_name: row.get(3)?, plan_key: row.get(4)?, token_quota: row.get(5)?,
-                status: row.get(6)?, billing_cycle: row.get(7)?,
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                plan_id: row.get(2)?,
+                plan_name: row.get(3)?,
+                plan_key: row.get(4)?,
+                token_quota: row.get(5)?,
+                status: row.get(6)?,
+                billing_cycle: row.get(7)?,
                 started_at: row.get::<_, String>(8)?,
                 expires_at: row.get::<_, Option<String>>(9)?,
                 auto_renew: row.get(10)?,
@@ -142,13 +159,20 @@ pub fn get_user_subscription(db: &Database, user_id: &str) -> Result<Option<User
             };
             Ok(sub)
         },
-    ).map(Some).or_else(|e| match e {
+    )
+    .map(Some)
+    .or_else(|e| match e {
         rusqlite::Error::QueryReturnedNoRows => Ok(None),
         _ => Err(e.to_string()),
     })
 }
 
-pub fn subscribe_user(db: &Database, user_id: &str, plan_id: &str, billing_cycle: &str) -> Result<String, String> {
+pub fn subscribe_user(
+    db: &Database,
+    user_id: &str,
+    plan_id: &str,
+    billing_cycle: &str,
+) -> Result<String, String> {
     // 获取套餐信息
     let conn = db.connection();
     let plan = conn.query_row(
@@ -188,14 +212,27 @@ pub fn subscribe_user(db: &Database, user_id: &str, plan_id: &str, billing_cycle
     // users.plan_type 和 user_subscriptions.status 会不一致。
     // 理想情况下应使用 BEGIN TRANSACTION...COMMIT 包裹。
     // 更新用户 plan_type
-    conn.execute("UPDATE users SET plan_type = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-        params![plan.1, user_id]).map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE users SET plan_type = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+        params![plan.1, user_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     // 生成发票
     let amount = if billing_cycle == "yearly" {
-        conn.query_row("SELECT yearly_price FROM subscription_plans WHERE id = ?1", params![plan_id], |r| r.get::<_, f64>(0)).unwrap_or(0.0)
+        conn.query_row(
+            "SELECT yearly_price FROM subscription_plans WHERE id = ?1",
+            params![plan_id],
+            |r| r.get::<_, f64>(0),
+        )
+        .unwrap_or(0.0)
     } else {
-        conn.query_row("SELECT monthly_price FROM subscription_plans WHERE id = ?1", params![plan_id], |r| r.get::<_, f64>(0)).unwrap_or(0.0)
+        conn.query_row(
+            "SELECT monthly_price FROM subscription_plans WHERE id = ?1",
+            params![plan_id],
+            |r| r.get::<_, f64>(0),
+        )
+        .unwrap_or(0.0)
     };
 
     let invoice_id = Uuid::new_v4().to_string();
@@ -216,14 +253,23 @@ pub fn cancel_subscription(db: &Database, user_id: &str) -> Result<(), String> {
         "UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?1 AND status = 'active'",
         params![user_id],
     ).map_err(|e| e.to_string())?;
-    conn.execute("UPDATE users SET plan_type = 'free', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        params![user_id]).map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE users SET plan_type = 'free', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+        params![user_id],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 // ========== Token 用量追踪 ==========
 
-pub fn record_token_usage(db: &Database, user_id: &str, action_type: &str, resource_path: Option<&str>, ip: Option<&str>) -> Result<(), String> {
+pub fn record_token_usage(
+    db: &Database,
+    user_id: &str,
+    action_type: &str,
+    resource_path: Option<&str>,
+    ip: Option<&str>,
+) -> Result<(), String> {
     let tokens = TokenCost::for_action(action_type);
     let id = Uuid::new_v4().to_string();
     let conn = db.connection();
@@ -238,12 +284,14 @@ pub fn record_token_usage(db: &Database, user_id: &str, action_type: &str, resou
 /// 获取当月 Token 用量
 pub fn get_monthly_token_usage(db: &Database, user_id: &str) -> Result<i64, String> {
     let conn = db.connection();
-    let count: i64 = conn.query_row(
-        "SELECT COALESCE(SUM(tokens_consumed), 0) FROM token_usage_logs
+    let count: i64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(tokens_consumed), 0) FROM token_usage_logs
          WHERE user_id = ?1 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')",
-        params![user_id],
-        |row| row.get(0),
-    ).map_err(|e| e.to_string())?;
+            params![user_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
     Ok(count)
 }
 
@@ -252,28 +300,47 @@ pub fn get_token_usage_summary(db: &Database, user_id: &str) -> Result<TokenUsag
     let conn = db.connection();
 
     // 获取用户 plan_type 作为 fallback
-    let plan_type: String = conn.query_row(
-        "SELECT COALESCE(plan_type, 'free') FROM users WHERE id = ?1",
-        params![user_id], |row| row.get(0),
-    ).unwrap_or_else(|_| "free".to_string());
+    let plan_type: String = conn
+        .query_row(
+            "SELECT COALESCE(plan_type, 'free') FROM users WHERE id = ?1",
+            params![user_id],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|_| "free".to_string());
 
     let sub = get_user_subscription(db, user_id)?;
 
-    let plan_key = sub.as_ref().and_then(|s| s.plan_key.clone()).unwrap_or(plan_type);
+    let plan_key = sub
+        .as_ref()
+        .and_then(|s| s.plan_key.clone())
+        .unwrap_or(plan_type);
     // 审计修复 #16: 根据 plan_key 设置正确配额
-    let token_quota = sub.as_ref().and_then(|s| s.token_quota).unwrap_or_else(|| match plan_key.as_str() {
-        "free" => 1000,
-        "professional" => 100000,
-        "enterprise" => 1_000_000,
-        _ => 10000,
-    });
-    let plan_name = sub.as_ref().and_then(|s| s.plan_name.clone()).unwrap_or_else(|| plan_key.clone());
-    let sub_status = sub.as_ref().map(|s| s.status.clone()).unwrap_or_else(|| "active".to_string());
+    let token_quota =
+        sub.as_ref()
+            .and_then(|s| s.token_quota)
+            .unwrap_or_else(|| match plan_key.as_str() {
+                "free" => 1000,
+                "professional" => 100000,
+                "enterprise" => 1_000_000,
+                _ => 10000,
+            });
+    let plan_name = sub
+        .as_ref()
+        .and_then(|s| s.plan_name.clone())
+        .unwrap_or_else(|| plan_key.clone());
+    let sub_status = sub
+        .as_ref()
+        .map(|s| s.status.clone())
+        .unwrap_or_else(|| "active".to_string());
 
     let token_used = get_monthly_token_usage(db, user_id)?;
     // 审计修复 #10: 保留负数值以暴露超限使用，新增 is_over_limit
     let token_remaining = token_quota - token_used;
-    let usage_percent = if token_quota > 0 { (token_used as f64 / token_quota as f64) * 100.0 } else { 0.0 };
+    let usage_percent = if token_quota > 0 {
+        (token_used as f64 / token_quota as f64) * 100.0
+    } else {
+        0.0
+    };
     let is_over_limit = token_remaining < 0;
 
     Ok(TokenUsageSummary {
@@ -291,7 +358,13 @@ pub fn get_token_usage_summary(db: &Database, user_id: &str) -> Result<TokenUsag
 
 /// 检查配额是否充足（自动消耗 token）
 #[allow(dead_code)]
-pub fn check_and_consume(db: &Database, user_id: &str, action_type: &str, resource_path: &str, ip: Option<&str>) -> Result<bool, String> {
+pub fn check_and_consume(
+    db: &Database,
+    user_id: &str,
+    action_type: &str,
+    resource_path: &str,
+    ip: Option<&str>,
+) -> Result<bool, String> {
     let summary = get_token_usage_summary(db, user_id)?;
     let cost = TokenCost::for_action(action_type);
 
@@ -305,26 +378,35 @@ pub fn check_and_consume(db: &Database, user_id: &str, action_type: &str, resour
 }
 
 /// 获取 Token 用量明细
-pub fn get_token_usage_details(db: &Database, user_id: &str, limit: i64, offset: i64) -> Result<Vec<serde_json::Value>, String> {
+pub fn get_token_usage_details(
+    db: &Database,
+    user_id: &str,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<serde_json::Value>, String> {
     let conn = db.connection();
-    let mut stmt = conn.prepare(
-        "SELECT id, tokens_consumed, action_type, resource_path, ip_address, created_at
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, tokens_consumed, action_type, resource_path, ip_address, created_at
          FROM token_usage_logs WHERE user_id = ?1
-         ORDER BY created_at DESC LIMIT ?2 OFFSET ?3"
-    ).map_err(|e| e.to_string())?;
+         ORDER BY created_at DESC LIMIT ?2 OFFSET ?3",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let rows: Vec<serde_json::Value> = stmt.query_map(params![user_id, limit, offset], |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, String>(0)?,
-            "tokens_consumed": row.get::<_, i64>(1)?,
-            "action_type": row.get::<_, String>(2)?,
-            "resource_path": row.get::<_, Option<String>>(3)?,
-            "ip_address": row.get::<_, Option<String>>(4)?,
-            "created_at": row.get::<_, String>(5)?,
-        }))
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
+    let rows: Vec<serde_json::Value> = stmt
+        .query_map(params![user_id, limit, offset], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "tokens_consumed": row.get::<_, i64>(1)?,
+                "action_type": row.get::<_, String>(2)?,
+                "resource_path": row.get::<_, Option<String>>(3)?,
+                "ip_address": row.get::<_, Option<String>>(4)?,
+                "created_at": row.get::<_, String>(5)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(rows)
 }
@@ -337,21 +419,23 @@ pub fn get_invoices(db: &Database, user_id: &str) -> Result<Vec<serde_json::Valu
          FROM billing_invoices WHERE user_id = ?1 ORDER BY created_at DESC"
     ).map_err(|e| e.to_string())?;
 
-    let rows: Vec<serde_json::Value> = stmt.query_map(params![user_id], |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, String>(0)?,
-            "invoice_number": row.get::<_, String>(1)?,
-            "amount": row.get::<_, f64>(2)?,
-            "status": row.get::<_, String>(3)?,
-            "payment_method": row.get::<_, String>(4)?,
-            "billing_period_start": row.get::<_, Option<String>>(5)?,
-            "billing_period_end": row.get::<_, Option<String>>(6)?,
-            "paid_at": row.get::<_, Option<String>>(7)?,
-            "created_at": row.get::<_, String>(8)?,
-        }))
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
+    let rows: Vec<serde_json::Value> = stmt
+        .query_map(params![user_id], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "invoice_number": row.get::<_, String>(1)?,
+                "amount": row.get::<_, f64>(2)?,
+                "status": row.get::<_, String>(3)?,
+                "payment_method": row.get::<_, String>(4)?,
+                "billing_period_start": row.get::<_, Option<String>>(5)?,
+                "billing_period_end": row.get::<_, Option<String>>(6)?,
+                "paid_at": row.get::<_, Option<String>>(7)?,
+                "created_at": row.get::<_, String>(8)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(rows)
 }
@@ -394,29 +478,142 @@ pub struct TokenBalanceInfo {
 /// 获取 Token 默认定价规则
 pub fn get_token_pricing() -> Vec<TokenPricingRule> {
     vec![
-        TokenPricingRule { resource_type: "product_sync".into(), action_name: "商品同步".into(), description: Some("单个商品从桌面端同步到云端".into()), pt_cost: 50, unit: "per_item".into(), sort_order: 1 },
-        TokenPricingRule { resource_type: "ai_theme".into(), action_name: "AI主题生成".into(), description: Some("AI生成完整商城主题和样式".into()), pt_cost: 5000, unit: "per_request".into(), sort_order: 2 },
-        TokenPricingRule { resource_type: "ai_theme_tweak".into(), action_name: "AI主题微调".into(), description: Some("对已有主题的单项调整".into()), pt_cost: 1000, unit: "per_request".into(), sort_order: 3 },
-        TokenPricingRule { resource_type: "order_process".into(), action_name: "订单处理".into(), description: Some("每笔商城订单的创建和处理".into()), pt_cost: 10, unit: "per_item".into(), sort_order: 4 },
-        TokenPricingRule { resource_type: "api_write".into(), action_name: "API写操作".into(), description: Some("外部API写操作".into()), pt_cost: 5, unit: "per_request".into(), sort_order: 5 },
-        TokenPricingRule { resource_type: "api_read".into(), action_name: "API读操作".into(), description: Some("外部API查询操作".into()), pt_cost: 1, unit: "per_request".into(), sort_order: 6 },
-        TokenPricingRule { resource_type: "custom_domain".into(), action_name: "自定义域名".into(), description: Some("绑定自定义域名的月租".into()), pt_cost: 2000, unit: "per_month".into(), sort_order: 7 },
-        TokenPricingRule { resource_type: "ssl_cert".into(), action_name: "SSL证书".into(), description: Some("自动SSL证书管理".into()), pt_cost: 1000, unit: "per_month".into(), sort_order: 8 },
-        TokenPricingRule { resource_type: "cdn_storage".into(), action_name: "静态资源托管".into(), description: Some("商品图片等资源CDN托管".into()), pt_cost: 1, unit: "per_mb_month".into(), sort_order: 9 },
-        TokenPricingRule { resource_type: "realtime_sync".into(), action_name: "实时同步保活".into(), description: Some("桌面端实时同步通道".into()), pt_cost: 500, unit: "per_day".into(), sort_order: 10 },
-        TokenPricingRule { resource_type: "seo_report".into(), action_name: "SEO优化报告".into(), description: Some("AI生成SEO优化建议".into()), pt_cost: 3000, unit: "per_request".into(), sort_order: 11 },
-        TokenPricingRule { resource_type: "data_export".into(), action_name: "数据导出".into(), description: Some("导出商品/订单数据".into()), pt_cost: 100, unit: "per_request".into(), sort_order: 12 },
-        TokenPricingRule { resource_type: "product_hosting".into(), action_name: "商品数据托管".into(), description: Some("商品信息存储（按月底存量扣费）".into()), pt_cost: 2, unit: "per_item_month".into(), sort_order: 13 },
-        TokenPricingRule { resource_type: "image_storage".into(), action_name: "图片/CDN存储".into(), description: Some("商品图片存储和CDN分发".into()), pt_cost: 1, unit: "per_mb_month".into(), sort_order: 14 },
-        TokenPricingRule { resource_type: "order_retention".into(), action_name: "订单数据留存".into(), description: Some("订单历史数据归档存储".into()), pt_cost: 1, unit: "per_hundred_month".into(), sort_order: 15 },
-        TokenPricingRule { resource_type: "page_hosting".into(), action_name: "商城页面托管".into(), description: Some("商城基础页面托管".into()), pt_cost: 500, unit: "per_month".into(), sort_order: 16 },
+        TokenPricingRule {
+            resource_type: "product_sync".into(),
+            action_name: "商品同步".into(),
+            description: Some("单个商品从桌面端同步到云端".into()),
+            pt_cost: 50,
+            unit: "per_item".into(),
+            sort_order: 1,
+        },
+        TokenPricingRule {
+            resource_type: "ai_theme".into(),
+            action_name: "AI主题生成".into(),
+            description: Some("AI生成完整商城主题和样式".into()),
+            pt_cost: 5000,
+            unit: "per_request".into(),
+            sort_order: 2,
+        },
+        TokenPricingRule {
+            resource_type: "ai_theme_tweak".into(),
+            action_name: "AI主题微调".into(),
+            description: Some("对已有主题的单项调整".into()),
+            pt_cost: 1000,
+            unit: "per_request".into(),
+            sort_order: 3,
+        },
+        TokenPricingRule {
+            resource_type: "order_process".into(),
+            action_name: "订单处理".into(),
+            description: Some("每笔商城订单的创建和处理".into()),
+            pt_cost: 10,
+            unit: "per_item".into(),
+            sort_order: 4,
+        },
+        TokenPricingRule {
+            resource_type: "api_write".into(),
+            action_name: "API写操作".into(),
+            description: Some("外部API写操作".into()),
+            pt_cost: 5,
+            unit: "per_request".into(),
+            sort_order: 5,
+        },
+        TokenPricingRule {
+            resource_type: "api_read".into(),
+            action_name: "API读操作".into(),
+            description: Some("外部API查询操作".into()),
+            pt_cost: 1,
+            unit: "per_request".into(),
+            sort_order: 6,
+        },
+        TokenPricingRule {
+            resource_type: "custom_domain".into(),
+            action_name: "自定义域名".into(),
+            description: Some("绑定自定义域名的月租".into()),
+            pt_cost: 2000,
+            unit: "per_month".into(),
+            sort_order: 7,
+        },
+        TokenPricingRule {
+            resource_type: "ssl_cert".into(),
+            action_name: "SSL证书".into(),
+            description: Some("自动SSL证书管理".into()),
+            pt_cost: 1000,
+            unit: "per_month".into(),
+            sort_order: 8,
+        },
+        TokenPricingRule {
+            resource_type: "cdn_storage".into(),
+            action_name: "静态资源托管".into(),
+            description: Some("商品图片等资源CDN托管".into()),
+            pt_cost: 1,
+            unit: "per_mb_month".into(),
+            sort_order: 9,
+        },
+        TokenPricingRule {
+            resource_type: "realtime_sync".into(),
+            action_name: "实时同步保活".into(),
+            description: Some("桌面端实时同步通道".into()),
+            pt_cost: 500,
+            unit: "per_day".into(),
+            sort_order: 10,
+        },
+        TokenPricingRule {
+            resource_type: "seo_report".into(),
+            action_name: "SEO优化报告".into(),
+            description: Some("AI生成SEO优化建议".into()),
+            pt_cost: 3000,
+            unit: "per_request".into(),
+            sort_order: 11,
+        },
+        TokenPricingRule {
+            resource_type: "data_export".into(),
+            action_name: "数据导出".into(),
+            description: Some("导出商品/订单数据".into()),
+            pt_cost: 100,
+            unit: "per_request".into(),
+            sort_order: 12,
+        },
+        TokenPricingRule {
+            resource_type: "product_hosting".into(),
+            action_name: "商品数据托管".into(),
+            description: Some("商品信息存储（按月底存量扣费）".into()),
+            pt_cost: 2,
+            unit: "per_item_month".into(),
+            sort_order: 13,
+        },
+        TokenPricingRule {
+            resource_type: "image_storage".into(),
+            action_name: "图片/CDN存储".into(),
+            description: Some("商品图片存储和CDN分发".into()),
+            pt_cost: 1,
+            unit: "per_mb_month".into(),
+            sort_order: 14,
+        },
+        TokenPricingRule {
+            resource_type: "order_retention".into(),
+            action_name: "订单数据留存".into(),
+            description: Some("订单历史数据归档存储".into()),
+            pt_cost: 1,
+            unit: "per_hundred_month".into(),
+            sort_order: 15,
+        },
+        TokenPricingRule {
+            resource_type: "page_hosting".into(),
+            action_name: "商城页面托管".into(),
+            description: Some("商城基础页面托管".into()),
+            pt_cost: 500,
+            unit: "per_month".into(),
+            sort_order: 16,
+        },
     ]
 }
 
 /// 估算 Token 消耗
 pub fn estimate_token_cost(resource_type: &str, quantity: i64) -> i64 {
     let pricing = get_token_pricing();
-    pricing.iter()
+    pricing
+        .iter()
         .find(|r| r.resource_type == resource_type)
         .map(|r| r.pt_cost * quantity)
         .unwrap_or(0)
@@ -428,24 +625,28 @@ pub fn get_token_balance(db: &Database, user_id: &str) -> Result<TokenBalanceInf
     let conn = db.connection();
 
     // 获取本地 token_usage_logs 中的当日消耗
-    let today_used: i64 = conn.query_row(
-        "SELECT COALESCE(SUM(tokens_consumed), 0) FROM token_usage_logs
+    let today_used: i64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(tokens_consumed), 0) FROM token_usage_logs
          WHERE user_id = ?1 AND DATE(created_at) = DATE('now')",
-        params![user_id],
-        |row| row.get(0),
-    ).unwrap_or(0);
+            params![user_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     // 近30天日均消耗
-    let monthly_avg: f64 = conn.query_row(
-        "SELECT COALESCE(AVG(daily_total), 0) FROM (
+    let monthly_avg: f64 = conn
+        .query_row(
+            "SELECT COALESCE(AVG(daily_total), 0) FROM (
             SELECT SUM(tokens_consumed) as daily_total
             FROM token_usage_logs
             WHERE user_id = ?1 AND created_at >= DATE('now', '-30 days')
             GROUP BY DATE(created_at)
         )",
-        params![user_id],
-        |row| row.get(0),
-    ).unwrap_or(0.0);
+            params![user_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
     let daily_avg = monthly_avg.round() as i64;
     let estimated_days = if daily_avg > 0 { 30 } else { 30 };

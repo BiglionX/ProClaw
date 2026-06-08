@@ -108,7 +108,11 @@ pub fn create_fa_transaction(
     .map_err(|e| format!("Failed to create transaction: {}", e))?;
 
     // 更新账户余额
-    let balance_change = if transaction_type == "income" { amount } else { -amount };
+    let balance_change = if transaction_type == "income" {
+        amount
+    } else {
+        -amount
+    };
     conn.execute(
         "UPDATE agent_finance_accounts SET balance = balance + ?1 WHERE id = ?2",
         params![balance_change, account_id],
@@ -161,10 +165,14 @@ pub fn get_fa_transactions(
     }
 
     let where_sql = where_clauses.join(" AND ");
-    let param_refs: Vec<&dyn rusqlite::types::ToSql> = query_params.iter().map(|p| p.as_ref()).collect();
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+        query_params.iter().map(|p| p.as_ref()).collect();
 
     // 查询总数
-    let count_sql = format!("SELECT COUNT(*) FROM agent_finance_transactions t WHERE {}", where_sql);
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM agent_finance_transactions t WHERE {}",
+        where_sql
+    );
     let total: i64 = conn
         .query_row(&count_sql, param_refs.as_slice(), |row| row.get(0))
         .map_err(|e| e.to_string())?;
@@ -191,7 +199,8 @@ pub fn get_fa_transactions(
     all_params.push(Box::new(page_size));
     all_params.push(Box::new(offset));
 
-    let all_refs: Vec<&dyn rusqlite::types::ToSql> = all_params.iter().map(|p| p.as_ref()).collect();
+    let all_refs: Vec<&dyn rusqlite::types::ToSql> =
+        all_params.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
     let transactions: Vec<serde_json::Value> = stmt
@@ -311,7 +320,8 @@ pub fn get_fa_budgets(
         where_clause
     );
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = month_param.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        month_param.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
     let budgets: Vec<serde_json::Value> = stmt
@@ -573,9 +583,13 @@ pub fn get_fa_invoices(
     }
     let where_sql = conditions.join(" AND ");
 
-    let count_sql = format!("SELECT COUNT(*) FROM agent_finance_invoices i WHERE {}", where_sql);
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM agent_finance_invoices i WHERE {}",
+        where_sql
+    );
     let total: i64 = {
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            param_values.iter().map(|p| p.as_ref()).collect();
         conn.query_row(&count_sql, param_refs.as_slice(), |row| row.get(0))
             .map_err(|e| e.to_string())?
     };
@@ -593,10 +607,13 @@ pub fn get_fa_invoices(
     );
 
     let mut all_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    for p in param_values { all_params.push(p); }
+    for p in param_values {
+        all_params.push(p);
+    }
     all_params.push(Box::new(page_size));
     all_params.push(Box::new(offset));
-    let final_refs: Vec<&dyn rusqlite::types::ToSql> = all_params.iter().map(|p| p.as_ref()).collect();
+    let final_refs: Vec<&dyn rusqlite::types::ToSql> =
+        all_params.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| e.to_string())?;
     let invoices: Vec<serde_json::Value> = stmt

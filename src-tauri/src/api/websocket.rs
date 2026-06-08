@@ -1,19 +1,22 @@
 // WebSocket 聊天模块处理器
 // Phase 3: 实现实时消息通信、消息路由、持久化、离线消息推送
 
+use crate::api::AppState;
 use axum::{
-    extract::{ws::{WebSocket, WebSocketUpgrade, Message}, State, ConnectInfo, Query},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        ConnectInfo, Query, State,
+    },
     response::IntoResponse,
 };
+use chrono::Utc;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::collections::HashMap;
-use crate::api::AppState;
-use dashmap::DashMap;
 use tokio::sync::mpsc;
-use chrono::Utc;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
 
 // ============================================================
 // WebSocket 连接管理器
@@ -74,12 +77,19 @@ impl WebSocketManager {
     /// 检查用户是否在线
     pub fn is_online(&self, user_id: &str) -> bool {
         self.connections.contains_key(user_id)
-            && !self.connections.get(user_id).map(|v| v.is_empty()).unwrap_or(true)
+            && !self
+                .connections
+                .get(user_id)
+                .map(|v| v.is_empty())
+                .unwrap_or(true)
     }
 
     /// 获取所有在线用户
     pub fn get_online_users(&self) -> Vec<String> {
-        self.connections.iter().map(|entry| entry.key().clone()).collect()
+        self.connections
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect()
     }
 
     /// 广播消息给所有在线用户
@@ -112,8 +122,12 @@ pub struct ChatMessage {
     pub timestamp: i64,
 }
 
-fn default_msg_type() -> String { "message".to_string() }
-fn default_content_type() -> String { "text".to_string() }
+fn default_msg_type() -> String {
+    "message".to_string()
+}
+fn default_content_type() -> String {
+    "text".to_string()
+}
 
 /// 订单通知消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -196,7 +210,7 @@ async fn handle_websocket(
     user_id: Option<String>,
     _token: Option<String>,
 ) {
-    use futures_util::{StreamExt, SinkExt};
+    use futures_util::{SinkExt, StreamExt};
 
     // ---- 认证: 从 query 参数获取 user_id ----
     let user_id = match user_id {
@@ -216,7 +230,9 @@ async fn handle_websocket(
     let (outgoing_tx, outgoing_rx) = mpsc::unbounded_channel::<String>();
 
     // 将 sender 副本存入管理器，用于外部（其他用户）向此连接推送消息
-    state.ws_manager.add_connection(&user_id, &conn_id, outgoing_tx.clone());
+    state
+        .ws_manager
+        .add_connection(&user_id, &conn_id, outgoing_tx.clone());
 
     // 保留一个 sender 副本给主循环自己使用（pong, heartbeat, error 响应等）
     let self_tx = outgoing_tx;
@@ -237,12 +253,18 @@ async fn handle_websocket(
     push_offline_messages(&state, &user_id);
 
     // ---- 通知上线 ----
-    if self_tx.send(serde_json::json!({
-        "type": "connection_status",
-        "status": "connected",
-        "user_id": user_id,
-        "timestamp": Utc::now().timestamp_millis()
-    }).to_string()).is_err() {
+    if self_tx
+        .send(
+            serde_json::json!({
+                "type": "connection_status",
+                "status": "connected",
+                "user_id": user_id,
+                "timestamp": Utc::now().timestamp_millis()
+            })
+            .to_string(),
+        )
+        .is_err()
+    {
         eprintln!("[WS] Failed to send connected notification to {}", user_id);
     }
 
@@ -410,11 +432,10 @@ async fn handle_chat_message(
     }; // db lock released
 
     // ---- 路由消息 ----
-    let msg_json = serde_json::to_string(&message)
-        .unwrap_or_else(|e| {
-            eprintln!("[WebSocket] Failed to serialize outgoing message: {}", e);
-            String::from("{\"type\":\"error\",\"error\":\"serialization_failed\"}")
-        });
+    let msg_json = serde_json::to_string(&message).unwrap_or_else(|e| {
+        eprintln!("[WebSocket] Failed to serialize outgoing message: {}", e);
+        String::from("{\"type\":\"error\",\"error\":\"serialization_failed\"}")
+    });
 
     if to_online {
         state.ws_manager.send_to_user(to_user, &msg_json);
@@ -445,7 +466,7 @@ fn push_offline_messages(state: &AppState, user_id: &str) {
          INNER JOIN offline_messages om ON om.message_id = m.id
          WHERE om.target_user = ?1 AND om.is_sent = 0
          ORDER BY m.created_at ASC
-         LIMIT 50"
+         LIMIT 50",
     ) {
         Ok(stmt) => stmt,
         Err(e) => {
@@ -454,20 +475,17 @@ fn push_offline_messages(state: &AppState, user_id: &str) {
         }
     };
 
-    let messages: Vec<ChatMessage> = match stmt.query_map(
-        rusqlite::params![user_id],
-        |row| {
-            Ok(ChatMessage {
-                id: Some(row.get(0)?),
-                message_type: "message".to_string(),
-                from: row.get(1)?,
-                to: row.get(2)?,
-                content: row.get(3)?,
-                content_type: row.get(4)?,
-                timestamp: row.get(5)?,
-            })
-        },
-    ) {
+    let messages: Vec<ChatMessage> = match stmt.query_map(rusqlite::params![user_id], |row| {
+        Ok(ChatMessage {
+            id: Some(row.get(0)?),
+            message_type: "message".to_string(),
+            from: row.get(1)?,
+            to: row.get(2)?,
+            content: row.get(3)?,
+            content_type: row.get(4)?,
+            timestamp: row.get(5)?,
+        })
+    }) {
         Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
         Err(e) => {
             eprintln!("[WS] Failed to query offline messages: {}", e);
@@ -490,13 +508,20 @@ fn push_offline_messages(state: &AppState, user_id: &str) {
                 "UPDATE offline_messages SET is_sent = 1, last_retry_at = ?2 WHERE message_id = ?1",
                 rusqlite::params![msg_id, Utc::now().timestamp_millis()],
             ) {
-                eprintln!("[WS] Failed to mark offline message {} as sent: {}", msg_id, e);
+                eprintln!(
+                    "[WS] Failed to mark offline message {} as sent: {}",
+                    msg_id, e
+                );
             }
         }
     }
 
     if !messages.is_empty() {
-        println!("[WS] Pushed {} offline messages to user '{}'", messages.len(), user_id);
+        println!(
+            "[WS] Pushed {} offline messages to user '{}'",
+            messages.len(),
+            user_id
+        );
     }
 }
 
@@ -505,16 +530,13 @@ fn push_offline_messages(state: &AppState, user_id: &str) {
 // ============================================================
 
 /// 处理通话信令消息，路由到目标用户并记录通话状态
-async fn handle_call_signaling(
-    state: &AppState,
-    from_user: &str,
-    msg_type: &str,
-    req: &WsRequest,
-) {
+async fn handle_call_signaling(state: &AppState, from_user: &str, msg_type: &str, req: &WsRequest) {
     let now = Utc::now().timestamp_millis();
-    
+
     // 提取 payload 中的 session_id
-    let session_id = req.payload.as_ref()
+    let session_id = req
+        .payload
+        .as_ref()
         .and_then(|p| p.get("sessionId").or_else(|| p.get("session_id")))
         .and_then(|v| v.as_str())
         .unwrap_or("");
@@ -525,11 +547,13 @@ async fn handle_call_signaling(
     match msg_type {
         "call_offer" => {
             // 记录通话发起
-            let call_type = req.payload.as_ref()
+            let call_type = req
+                .payload
+                .as_ref()
                 .and_then(|p| p.get("callType").or_else(|| p.get("call_type")))
                 .and_then(|v| v.as_str())
                 .unwrap_or("audio");
-            
+
             // 持久化通话记录
             if let Ok(db) = state.db.lock() {
                 let record_id = Uuid::new_v4().to_string();
@@ -562,7 +586,9 @@ async fn handle_call_signaling(
                         "message": "对方不在线，无法接通"
                     }
                 });
-                state.ws_manager.send_to_user(from_user, &offline_msg.to_string());
+                state
+                    .ws_manager
+                    .send_to_user(from_user, &offline_msg.to_string());
                 return;
             }
 
@@ -578,7 +604,9 @@ async fn handle_call_signaling(
                     "timestamp": now,
                 }
             });
-            state.ws_manager.send_to_user(to_user, &offer_msg.to_string());
+            state
+                .ws_manager
+                .send_to_user(to_user, &offer_msg.to_string());
 
             // 确认消息给发起方
             let ack_msg = serde_json::json!({
@@ -591,7 +619,9 @@ async fn handle_call_signaling(
                     "timestamp": now,
                 }
             });
-            state.ws_manager.send_to_user(from_user, &ack_msg.to_string());
+            state
+                .ws_manager
+                .send_to_user(from_user, &ack_msg.to_string());
         }
 
         "call_answer" => {
@@ -604,7 +634,9 @@ async fn handle_call_signaling(
                     "timestamp": now,
                 }
             });
-            state.ws_manager.send_to_user(to_user, &answer_msg.to_string());
+            state
+                .ws_manager
+                .send_to_user(to_user, &answer_msg.to_string());
 
             // 更新通话状态为已接听
             if let Ok(db) = state.db.lock() {
@@ -634,7 +666,10 @@ async fn handle_call_signaling(
                 }
             }
             if !notified_devices.is_empty() {
-                println!("[Call] Notified other devices of {} about answered call {}", from_user, session_id);
+                println!(
+                    "[Call] Notified other devices of {} about answered call {}",
+                    from_user, session_id
+                );
             }
         }
 
@@ -661,7 +696,9 @@ async fn handle_call_signaling(
                     "timestamp": now,
                 }
             });
-            state.ws_manager.send_to_user(to_user, &hangup_msg.to_string());
+            state
+                .ws_manager
+                .send_to_user(to_user, &hangup_msg.to_string());
 
             // 更新通话记录
             if let Ok(db) = state.db.lock() {
@@ -684,7 +721,9 @@ async fn handle_call_signaling(
                     "timestamp": now,
                 }
             });
-            state.ws_manager.send_to_user(to_user, &reject_msg.to_string());
+            state
+                .ws_manager
+                .send_to_user(to_user, &reject_msg.to_string());
 
             // 更新通话记录
             if let Ok(db) = state.db.lock() {
@@ -707,7 +746,9 @@ async fn handle_call_signaling(
                     "timestamp": now,
                 }
             });
-            state.ws_manager.send_to_user(to_user, &busy_msg.to_string());
+            state
+                .ws_manager
+                .send_to_user(to_user, &busy_msg.to_string());
 
             // 更新通话记录
             if let Ok(db) = state.db.lock() {
@@ -725,7 +766,6 @@ async fn handle_call_signaling(
         }
     }
 }
-
 
 /// 从 token 中提取 user_id（用于 HTTP 端点）
 /// **安全警告：调用者必须传入有效的 jwt_secret，严禁使用空/零密钥。**

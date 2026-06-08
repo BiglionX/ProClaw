@@ -36,9 +36,14 @@ pub fn gb_get_groups(
 #[tauri::command]
 pub fn gb_create_group(
     db: tauri::State<Mutex<Database>>,
-    name: String, start_at: String, end_at: String, min_participants: Option<i32>,
+    name: String,
+    start_at: String,
+    end_at: String,
+    min_participants: Option<i32>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection(); let id = Uuid::new_v4().to_string();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let id = Uuid::new_v4().to_string();
     conn.execute("INSERT INTO gb_groups (id, name, start_at, end_at, min_participants) VALUES (?1,?2,?3,?4,?5)",
         params![id, name, start_at, end_at, min_participants.unwrap_or(1)]).map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "message": "团购已创建" }))
@@ -47,9 +52,11 @@ pub fn gb_create_group(
 #[tauri::command]
 pub fn gb_get_orders(
     db: tauri::State<Mutex<Database>>,
-    group_id: String, status: Option<String>,
+    group_id: String,
+    status: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
     let orders: Vec<Value>;
     if let Some(ref s) = status {
         orders = {
@@ -77,26 +84,45 @@ pub fn gb_parse_jielong_text(
     let mut items = Vec::new();
     for line in raw_text.lines() {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         // Remove leading numbers like "1." "2、" etc
-        let cleaned = line.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == '、' || c == ' ' || c == '）' || c == ')');
-        if cleaned.is_empty() { continue; }
+        let cleaned = line.trim_start_matches(|c: char| {
+            c.is_ascii_digit() || c == '.' || c == '、' || c == ' ' || c == '）' || c == ')'
+        });
+        if cleaned.is_empty() {
+            continue;
+        }
         // Try to extract quantity: "x2" "×3" "2份" "3件" "4个"
         let mut name = cleaned.to_string();
         let mut qty = 1;
         for pat in &["×", "x", "X"] {
             if let Some(pos) = name.rfind(pat) {
-                if let Ok(n) = name[pos+1..].trim().parse::<i32>() {
-                    qty = n; name = name[..pos].trim().to_string(); break;
+                if let Ok(n) = name[pos + 1..].trim().parse::<i32>() {
+                    qty = n;
+                    name = name[..pos].trim().to_string();
+                    break;
                 }
             }
         }
         if qty == 1 {
-            for (suffix, _) in &[("份",1),("件",1),("个",1),("箱",1),("包",1),("袋",1)] {
+            for (suffix, _) in &[
+                ("份", 1),
+                ("件", 1),
+                ("个", 1),
+                ("箱", 1),
+                ("包", 1),
+                ("袋", 1),
+            ] {
                 if let Some(pos) = name.rfind(suffix) {
                     let before = &name[..pos];
                     if let Some(last_num) = before.rsplit(|c: char| !c.is_ascii_digit()).next() {
-                        if let Ok(n) = last_num.parse::<i32>() { qty = n; name = before[..before.len()-last_num.len()].trim().to_string(); break; }
+                        if let Ok(n) = last_num.parse::<i32>() {
+                            qty = n;
+                            name = before[..before.len() - last_num.len()].trim().to_string();
+                            break;
+                        }
                     }
                 }
             }
@@ -109,16 +135,36 @@ pub fn gb_parse_jielong_text(
 #[tauri::command]
 pub fn gb_verify_pickup(
     db: tauri::State<Mutex<Database>>,
-    order_id: String, pickup_code: Option<String>,
+    order_id: String,
+    pickup_code: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
-    let existing = conn.query_row("SELECT id, pickup_code, status FROM gb_orders WHERE id = ?1", params![order_id], |row| {
-        Ok((row.get::<_,String>(0)?, row.get::<_,Option<String>>(1)?, row.get::<_,String>(2)?))
-    }).map_err(|e| e.to_string())?;
-    if existing.2 == "picked_up" { return Ok(json!({"verified": false, "message": "该订单已核销"})); }
-    if let Some(ref code) = pickup_code {
-        if existing.1.as_ref() != Some(code) { return Ok(json!({"verified": false, "message": "提货码不匹配"})); }
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let existing = conn
+        .query_row(
+            "SELECT id, pickup_code, status FROM gb_orders WHERE id = ?1",
+            params![order_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    if existing.2 == "picked_up" {
+        return Ok(json!({"verified": false, "message": "该订单已核销"}));
     }
-    conn.execute("UPDATE gb_orders SET status = 'picked_up' WHERE id = ?1", params![order_id]).map_err(|e| e.to_string())?;
+    if let Some(ref code) = pickup_code {
+        if existing.1.as_ref() != Some(code) {
+            return Ok(json!({"verified": false, "message": "提货码不匹配"}));
+        }
+    }
+    conn.execute(
+        "UPDATE gb_orders SET status = 'picked_up' WHERE id = ?1",
+        params![order_id],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(json!({"verified": true, "order_id": order_id, "message": "核销成功"}))
 }

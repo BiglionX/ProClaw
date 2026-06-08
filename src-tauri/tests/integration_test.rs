@@ -18,8 +18,7 @@ fn test_product_spu_serialization_roundtrip() {
     });
 
     let serialized = serde_json::to_string(&json).expect("序列化失败");
-    let deserialized: serde_json::Value =
-        serde_json::from_str(&serialized).expect("反序列化失败");
+    let deserialized: serde_json::Value = serde_json::from_str(&serialized).expect("反序列化失败");
 
     assert_eq!(deserialized["id"], "spu_001");
     assert_eq!(deserialized["price"], 99.9);
@@ -86,9 +85,7 @@ mod crypto_tests {
         let nonce_bytes = rand::thread_rng().gen::<[u8; 12]>();
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        let mut ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .expect("加密失败");
+        let mut ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).expect("加密失败");
 
         // 篡改密文
         if !ciphertext.is_empty() {
@@ -114,8 +111,13 @@ mod path_safety_tests {
             .collect()
     }
 
-    fn ensure_within_dir(base: &std::path::Path, target: &std::path::Path) -> Result<std::path::PathBuf, String> {
-        let canonical_base = base.canonicalize().map_err(|e| format!("Base path error: {}", e))?;
+    fn ensure_within_dir(
+        base: &std::path::Path,
+        target: &std::path::Path,
+    ) -> Result<std::path::PathBuf, String> {
+        let canonical_base = base
+            .canonicalize()
+            .map_err(|e| format!("Base path error: {}", e))?;
         let resolved = canonical_base.join(target);
         let canonical_target = resolved.canonicalize().unwrap_or(resolved.clone());
         if !canonical_target.starts_with(&canonical_base) {
@@ -126,8 +128,14 @@ mod path_safety_tests {
 
     #[test]
     fn test_sanitize_path_component_removes_traversal() {
-        assert_eq!(sanitize_path_component("../../../etc/passwd"), "......etcpasswd");
-        assert_eq!(sanitize_path_component("valid-plugin-id"), "valid-plugin-id");
+        assert_eq!(
+            sanitize_path_component("../../../etc/passwd"),
+            "......etcpasswd"
+        );
+        assert_eq!(
+            sanitize_path_component("valid-plugin-id"),
+            "valid-plugin-id"
+        );
         assert_eq!(sanitize_path_component("a\\b:c*d?"), "abcd");
         assert_eq!(sanitize_path_component(""), "");
     }
@@ -167,24 +175,21 @@ mod jwt_tests {
     #[test]
     fn test_hmac_sign_and_verify() {
         let secret = b"proclaw-test-secret-key";
-        let mut mac =
-            HmacSha256::new_from_slice(secret).expect("HMAC 密钥长度无限制");
+        let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC 密钥长度无限制");
 
         let message = "store_abc123.1712345678.{\"order_no\":\"SO-001\"}";
         mac.update(message.as_bytes());
         let signature = hex::encode(mac.finalize().into_bytes());
 
         // 验证相同消息产生相同签名
-        let mut mac2 =
-            HmacSha256::new_from_slice(secret).expect("HMAC 密钥长度无限制");
+        let mut mac2 = HmacSha256::new_from_slice(secret).expect("HMAC 密钥长度无限制");
         mac2.update(message.as_bytes());
         let signature2 = hex::encode(mac2.finalize().into_bytes());
 
         assert_eq!(signature, signature2);
 
         // 验证不同密钥产生不同签名
-        let mut mac3 =
-            HmacSha256::new_from_slice(b"wrong-secret").expect("HMAC 密钥长度无限制");
+        let mut mac3 = HmacSha256::new_from_slice(b"wrong-secret").expect("HMAC 密钥长度无限制");
         mac3.update(message.as_bytes());
         let signature3 = hex::encode(mac3.finalize().into_bytes());
 
@@ -198,14 +203,16 @@ mod jwt_tests {
         let sig3 = "abc123def457";
 
         // constant-time comparison
-        let eq = sig1.as_bytes()
+        let eq = sig1
+            .as_bytes()
             .iter()
             .zip(sig2.as_bytes().iter())
             .fold(0, |acc, (a, b)| acc | (a ^ b))
             == 0;
         assert!(eq, "identical signatures should match");
 
-        let ne = sig1.as_bytes()
+        let ne = sig1
+            .as_bytes()
             .iter()
             .zip(sig3.as_bytes().iter())
             .fold(0, |acc, (a, b)| acc | (a ^ b))
@@ -298,10 +305,8 @@ mod db_tests {
     fn test_sql_injection_parameterized() {
         let conn = rusqlite::Connection::open_in_memory().expect("无法打开内存数据库");
 
-        conn.execute_batch(
-            "CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL);",
-        )
-        .expect("无法创建表");
+        conn.execute_batch("CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL);")
+            .expect("无法创建表");
 
         conn.execute(
             "INSERT INTO users (id, name) VALUES (?1, ?2)",
@@ -332,10 +337,8 @@ mod db_tests {
     fn test_transaction_rollback() {
         let conn = rusqlite::Connection::open_in_memory().expect("无法打开内存数据库");
 
-        conn.execute_batch(
-            "CREATE TABLE accounts (id TEXT PRIMARY KEY, balance REAL NOT NULL);",
-        )
-        .expect("无法创建表");
+        conn.execute_batch("CREATE TABLE accounts (id TEXT PRIMARY KEY, balance REAL NOT NULL);")
+            .expect("无法创建表");
 
         conn.execute(
             "INSERT INTO accounts (id, balance) VALUES (?1, ?2)",

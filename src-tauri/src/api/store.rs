@@ -1,17 +1,17 @@
 // 云托管商城 API 处理器 (PRD v5.0)
 // 提供商城配置、商品同步、订单回调等 HTTP API
 
+use crate::api::AppState;
 use axum::{
-    extract::{State, Json, Path, Query},
-    http::{StatusCode, HeaderMap},
+    extract::{Json, Path, Query, State},
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use serde::Deserialize;
-use rusqlite::params;
-use uuid::Uuid;
 use hmac::{Hmac, Mac};
+use rusqlite::params;
+use serde::Deserialize;
 use sha2::Sha256;
-use crate::api::AppState;
+use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -95,12 +95,15 @@ pub struct StoreQuery {
 // ========== API Handlers ==========
 
 /// 获取商城（简化版，暂不认证）
-pub async fn get_cloud_store(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn get_cloud_store(State(state): State<AppState>) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -125,9 +128,18 @@ pub async fn get_cloud_store(
     );
 
     match result {
-        Ok(store) => (StatusCode::OK, axum::Json(serde_json::json!({"data": store}))),
-        Err(rusqlite::Error::QueryReturnedNoRows) => (StatusCode::OK, axum::Json(serde_json::json!({"data": null}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Ok(store) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"data": store})),
+        ),
+        Err(rusqlite::Error::QueryReturnedNoRows) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"data": null})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -137,24 +149,52 @@ pub async fn create_cloud_store(
     Json(payload): Json<CreateStoreRequest>,
 ) -> impl IntoResponse {
     // 验证子域名格式
-    if !payload.subdomain.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
-        return (StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({"error": "子域名只能包含小写字母、数字和连字符"})));
+    if !payload
+        .subdomain
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": "子域名只能包含小写字母、数字和连字符"})),
+        );
     }
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
     // 检查是否已开通
-    if conn.query_row("SELECT id FROM cloud_stores LIMIT 1", [], |_| Ok(())).is_ok() {
-        return (StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({"error": "您已开通云商城"})));
+    if conn
+        .query_row("SELECT id FROM cloud_stores LIMIT 1", [], |_| Ok(()))
+        .is_ok()
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": "您已开通云商城"})),
+        );
     }
 
     // 检查子域名是否被占用
-    if conn.query_row("SELECT id FROM cloud_stores WHERE subdomain = ?1", params![payload.subdomain], |_| Ok(())).is_ok() {
-        return (StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({"error": "子域名已被占用"})));
+    if conn
+        .query_row(
+            "SELECT id FROM cloud_stores WHERE subdomain = ?1",
+            params![payload.subdomain],
+            |_| Ok(()),
+        )
+        .is_ok()
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": "子域名已被占用"})),
+        );
     }
 
     let id = Uuid::new_v4().to_string();
@@ -189,31 +229,58 @@ pub async fn update_cloud_store(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
     let mut sets = Vec::new();
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
-    if let Some(ref v) = payload.custom_domain { sets.push("custom_domain = ?"); params_vec.push(Box::new(v.clone())); }
-    if let Some(ref v) = payload.status { sets.push("status = ?"); params_vec.push(Box::new(v.clone())); }
-    if let Some(ref v) = payload.plan_type { sets.push("plan_type = ?"); params_vec.push(Box::new(v.clone())); }
-    if let Some(ref v) = payload.expires_at { sets.push("expires_at = ?"); params_vec.push(Box::new(*v)); }
+    if let Some(ref v) = payload.custom_domain {
+        sets.push("custom_domain = ?");
+        params_vec.push(Box::new(v.clone()));
+    }
+    if let Some(ref v) = payload.status {
+        sets.push("status = ?");
+        params_vec.push(Box::new(v.clone()));
+    }
+    if let Some(ref v) = payload.plan_type {
+        sets.push("plan_type = ?");
+        params_vec.push(Box::new(v.clone()));
+    }
+    if let Some(ref v) = payload.expires_at {
+        sets.push("expires_at = ?");
+        params_vec.push(Box::new(*v));
+    }
 
     if sets.is_empty() {
-        return (StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({"error": "No fields to update"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({"error": "No fields to update"})),
+        );
     }
 
     sets.push("updated_at = (strftime('%s','now') * 1000)");
     params_vec.push(Box::new(id.clone()));
 
     let sql = format!("UPDATE cloud_stores SET {} WHERE id = ?", sets.join(", "));
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     match conn.execute(&sql, params_refs.as_slice()) {
-        Ok(_) => (StatusCode::OK, axum::Json(serde_json::json!({"message": "更新成功"}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Ok(_) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"message": "更新成功"})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -224,7 +291,12 @@ pub async fn reset_store_api_key(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
     let new_key = format!("pk_{}", Uuid::new_v4().simple());
@@ -242,7 +314,12 @@ pub async fn get_store_theme(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -276,16 +353,27 @@ pub async fn get_cloud_sync_logs(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
     let sql = "SELECT id, store_id, sync_type, status, message, items_synced, created_at 
-               FROM cloud_sync_log ORDER BY created_at DESC LIMIT 50".to_string();
-    
+               FROM cloud_sync_log ORDER BY created_at DESC LIMIT 50"
+        .to_string();
+
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let rows = stmt.query_map([], |row| {
@@ -303,9 +391,15 @@ pub async fn get_cloud_sync_logs(
     match rows {
         Ok(r) => {
             let logs: Vec<_> = r.filter_map(|x| x.ok()).collect();
-            (StatusCode::OK, axum::Json(serde_json::json!({"data": logs})))
+            (
+                StatusCode::OK,
+                axum::Json(serde_json::json!({"data": logs})),
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -317,7 +411,12 @@ pub async fn get_store_orders(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -332,11 +431,17 @@ pub async fn get_store_orders(
     }
     sql.push_str(" ORDER BY created_at DESC LIMIT 200");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let rows = stmt.query_map(params_refs.as_slice(), |row| {
@@ -358,9 +463,15 @@ pub async fn get_store_orders(
     match rows {
         Ok(r) => {
             let orders: Vec<_> = r.filter_map(|x| x.ok()).collect();
-            (StatusCode::OK, axum::Json(serde_json::json!({"data": orders})))
+            (
+                StatusCode::OK,
+                axum::Json(serde_json::json!({"data": orders})),
+            )
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -373,19 +484,38 @@ pub async fn order_callback(
 ) -> impl IntoResponse {
     let store_id = match payload.get("store_id").and_then(|v| v.as_str()) {
         Some(id) => id.to_string(),
-        None => return (StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({"error": "missing store_id"}))),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"error": "missing store_id"})),
+            )
+        }
     };
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
     // 获取 API Key 用于验证
-    let api_key: String = match conn.query_row("SELECT api_key FROM cloud_stores WHERE id = ?1", params![store_id], |row| row.get(0)) {
+    let api_key: String = match conn.query_row(
+        "SELECT api_key FROM cloud_stores WHERE id = ?1",
+        params![store_id],
+        |row| row.get(0),
+    ) {
         Ok(k) => k,
-        Err(_) => return (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({"error": "Invalid store"}))),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                axum::Json(serde_json::json!({"error": "Invalid store"})),
+            )
+        }
     };
 
     // 验证 HMAC 签名（防伪造订单回调）
@@ -395,24 +525,39 @@ pub async fn order_callback(
         .unwrap_or("");
 
     if signature_header.is_empty() {
-        return (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({
-            "error": "Missing X-ProClaw-Signature header"
-        })));
+        return (
+            StatusCode::UNAUTHORIZED,
+            axum::Json(serde_json::json!({
+                "error": "Missing X-ProClaw-Signature header"
+            })),
+        );
     }
 
     // 将 payload 序列化为确定性 JSON 用于 HMAC 验证
     let payload_json = serde_json::to_string(&payload).unwrap_or_default();
 
     if !verify_webhook_signature(&payload_json, signature_header, &api_key) {
-        eprintln!("[Store] HMAC signature verification FAILED for store {}", store_id);
-        return (StatusCode::UNAUTHORIZED, axum::Json(serde_json::json!({
-            "error": "Invalid HMAC signature"
-        })));
+        eprintln!(
+            "[Store] HMAC signature verification FAILED for store {}",
+            store_id
+        );
+        return (
+            StatusCode::UNAUTHORIZED,
+            axum::Json(serde_json::json!({
+                "error": "Invalid HMAC signature"
+            })),
+        );
     }
 
     // 处理订单
-    let order_no = payload.get("order_no").and_then(|v| v.as_str()).unwrap_or("");
-    let status = payload.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
+    let order_no = payload
+        .get("order_no")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let status = payload
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("pending");
 
     let result = conn.execute(
         "INSERT OR REPLACE INTO cloud_orders (id, store_id, order_no, customer_name, total_amount, status, payment_method, items, callback_status, created_at) 
@@ -430,8 +575,14 @@ pub async fn order_callback(
     );
 
     match result {
-        Ok(_) => (StatusCode::OK, axum::Json(serde_json::json!({"success": true}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Ok(_) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"success": true})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -443,12 +594,20 @@ pub async fn update_store_theme(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
     // 解析主题配置
-    let primary_color = payload.get("primary_color").and_then(|v| v.as_str()).unwrap_or("#4F46E5");
+    let primary_color = payload
+        .get("primary_color")
+        .and_then(|v| v.as_str())
+        .unwrap_or("#4F46E5");
     let secondary_color = payload.get("secondary_color").and_then(|v| v.as_str());
     let background_color = payload.get("background_color").and_then(|v| v.as_str());
     let font_family = payload.get("font_family").and_then(|v| v.as_str());
@@ -456,11 +615,14 @@ pub async fn update_store_theme(
     let custom_css = payload.get("custom_css").and_then(|v| v.as_str());
 
     // 检查是否存在主题记录
-    let exists = conn.query_row(
-        "SELECT COUNT(*) FROM cloud_store_themes WHERE store_id = ?1",
-        params![store_id],
-        |row| row.get::<_, i64>(0),
-    ).unwrap_or(0) > 0;
+    let exists = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cloud_store_themes WHERE store_id = ?1",
+            params![store_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
 
     let result = if exists {
         conn.execute(
@@ -469,7 +631,15 @@ pub async fn update_store_theme(
                  font_family = ?4, header_layout = ?5, custom_css = ?6,
                  updated_at = (strftime('%s','now') * 1000)
              WHERE store_id = ?7",
-            params![primary_color, secondary_color, background_color, font_family, header_layout, custom_css, store_id],
+            params![
+                primary_color,
+                secondary_color,
+                background_color,
+                font_family,
+                header_layout,
+                custom_css,
+                store_id
+            ],
         )
     } else {
         conn.execute(
@@ -481,8 +651,14 @@ pub async fn update_store_theme(
     };
 
     match result {
-        Ok(_) => (StatusCode::OK, axum::Json(serde_json::json!({"message": "主题更新成功"}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Ok(_) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"message": "主题更新成功"})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -495,11 +671,20 @@ pub async fn get_cloud_products(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
-    let page = query.status.as_ref().and_then(|s| s.parse::<i64>().ok()).unwrap_or(1);
+    let page = query
+        .status
+        .as_ref()
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(1);
     let page_size = 20;
     let offset = (page - 1) * page_size;
 
@@ -509,10 +694,15 @@ pub async fn get_cloud_products(
          FROM product_spu 
          WHERE is_cloud_visible = 1 
          ORDER BY created_at DESC 
-         LIMIT ?1 OFFSET ?2"
+         LIMIT ?1 OFFSET ?2",
     ) {
         Ok(stmt) => stmt,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let products_result = stmt.query_map(params![page_size, offset], |row| {
@@ -531,22 +721,32 @@ pub async fn get_cloud_products(
 
     let products: Vec<serde_json::Value> = match products_result {
         Ok(iter) => iter.filter_map(|r| r.ok()).collect(),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     // 获取总数
-    let total: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM product_spu WHERE is_cloud_visible = 1",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM product_spu WHERE is_cloud_visible = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    (StatusCode::OK, axum::Json(serde_json::json!({
-        "data": products,
-        "total": total,
-        "page": page,
-        "page_size": page_size
-    })))
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "data": products,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        })),
+    )
 }
 
 /// 获取云商城单个商品详情
@@ -556,7 +756,12 @@ pub async fn get_cloud_product(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -581,9 +786,18 @@ pub async fn get_cloud_product(
     );
 
     match result {
-        Ok(product) => (StatusCode::OK, axum::Json(serde_json::json!({"data": product}))),
-        Err(rusqlite::Error::QueryReturnedNoRows) => (StatusCode::NOT_FOUND, axum::Json(serde_json::json!({"error": "商品不存在或已下架"}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Ok(product) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"data": product})),
+        ),
+        Err(rusqlite::Error::QueryReturnedNoRows) => (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({"error": "商品不存在或已下架"})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -597,11 +811,17 @@ pub async fn update_order_status(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
-    let status = payload.get("status")
+    let status = payload
+        .get("status")
         .and_then(|v| v.as_str())
         .unwrap_or("paid");
 
@@ -611,8 +831,17 @@ pub async fn update_order_status(
     );
 
     match result {
-        Ok(count) if count > 0 => (StatusCode::OK, axum::Json(serde_json::json!({"message": "订单状态已更新", "status": status}))),
-        Ok(_) => (StatusCode::NOT_FOUND, axum::Json(serde_json::json!({"error": "订单不存在"}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": e.to_string()}))),
+        Ok(count) if count > 0 => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"message": "订单状态已更新", "status": status})),
+        ),
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({"error": "订单不存在"})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }

@@ -1,11 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod database;
-mod sync_engine;
 mod api;
-mod services;
-mod utils;
 mod auth;
+mod database;
+mod services;
+mod sync_engine;
+mod utils;
 
 // 模块化命令文件
 pub mod types;
@@ -19,53 +19,53 @@ pub mod store_commands;
 
 // 进销存版模块
 #[cfg(feature = "inventory")]
-pub mod inventory_commands;
-#[cfg(feature = "inventory")]
-pub mod purchase_commands;
-#[cfg(feature = "inventory")]
-pub mod sales_commands;
-#[cfg(feature = "inventory")]
-pub mod purchase_return_commands;
-#[cfg(feature = "inventory")]
-pub mod sales_return_commands;
-#[cfg(feature = "inventory")]
 pub mod finance_commands;
+#[cfg(feature = "inventory")]
+pub mod inventory_commands;
 #[cfg(feature = "inventory")]
 pub mod payment_commands;
 #[cfg(feature = "inventory")]
+pub mod purchase_commands;
+#[cfg(feature = "inventory")]
+pub mod purchase_return_commands;
+#[cfg(feature = "inventory")]
 pub mod reconciliation_commands;
+#[cfg(feature = "inventory")]
+pub mod sales_commands;
+#[cfg(feature = "inventory")]
+pub mod sales_return_commands;
 
-pub mod plugin_manager;
-pub mod plugin_loader;
-pub mod setup_commands;
+pub mod approval_commands;
+pub mod call_commands;
+pub mod ceo_commands;
 pub mod common_commands;
+pub mod invitation_commands;
+pub mod message_commands;
+pub mod plugin_loader;
+pub mod plugin_manager;
+pub mod setup_commands;
+pub mod subscription_commands;
 pub mod team_commands;
 pub mod user_commands;
-pub mod approval_commands;
-pub mod subscription_commands;
-pub mod message_commands;
-pub mod call_commands;
-pub mod invitation_commands;
-pub mod ceo_commands;
 
 // 云备份模块（Cloud 版）
-pub mod secretary_commands;
 pub mod cloud_backup_commands;
+pub mod secretary_commands;
 
 // 行业插件命令（Phase 4）
-pub mod catering_commands;
 pub mod beauty_commands;
+pub mod catering_commands;
 pub mod pet_commands;
 
 // 八大新行业插件命令
+pub mod auto_parts_commands;
+pub mod community_group_buy_commands;
 pub mod convenience_commands;
+pub mod decoration_material_commands;
+pub mod fresh_food_commands;
+pub mod hardware_commands;
 pub mod liquor_commands;
 pub mod phone_accessories_commands;
-pub mod fresh_food_commands;
-pub mod auto_parts_commands;
-pub mod hardware_commands;
-pub mod decoration_material_commands;
-pub mod community_group_buy_commands;
 
 // 虚拟公司版模块
 #[cfg(feature = "virtual_company")]
@@ -79,107 +79,107 @@ pub mod finance_agent_commands;
 #[cfg(feature = "virtual_company")]
 pub mod market_commands;
 
-use database::{Database, get_database_path};
-use sync_engine::*;
-use sync_engine::SyncEngine;
-use services::cloud_backup_service::CloudBackupService;
-use services::nvwax_client::NvwaXClient;
-use services::nvwax_billing::NvwaXBilling;
-use api::AppState;
 use api::websocket::WebSocketManager;
-use utils::crypto::Aes256GcmCipher;
-use utils::key_manager::KeyManager;
+use api::AppState;
+use database::{get_database_path, Database};
+use services::cloud_backup_service::CloudBackupService;
+use services::nvwax_billing::NvwaXBilling;
+use services::nvwax_client::NvwaXClient;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
+use sync_engine::SyncEngine;
+use sync_engine::*;
+use utils::crypto::Aes256GcmCipher;
+use utils::key_manager::KeyManager;
 
 // 重新导出所有命令
 pub mod commands;
-use commands::{ModuleRegistry, stats::CommandStatsCollector};
 use commands::core::CoreModule;
 use commands::product::ProductModule;
+use commands::{stats::CommandStatsCollector, ModuleRegistry};
 
 // 全局命令统计收集器
 lazy_static::lazy_static! {
     pub static ref COMMAND_STATS: CommandStatsCollector = CommandStatsCollector::new();
 }
-#[cfg(feature = "inventory")]
-use commands::inventory::InventoryModule;
 #[cfg(any(feature = "inventory", feature = "virtual_company"))]
 use commands::agent::AgentModule;
 #[cfg(any(feature = "inventory", feature = "virtual_company"))]
 use commands::cloud::CloudModule;
-use commands::plugin::PluginModule;
-use commands::industry_catering::IndustryCateringModule;
-use commands::industry_beauty::IndustryBeautyModule;
-use commands::industry_pet::IndustryPetModule;
-use commands::industry_convenience::IndustryConvenienceModule;
-use commands::industry_liquor::IndustryLiquorModule;
-use commands::industry_phone_accessories::IndustryPhoneAccessoriesModule;
-use commands::industry_fresh_food::IndustryFreshFoodModule;
 use commands::industry_auto_parts::IndustryAutoPartsModule;
-use commands::industry_hardware::IndustryHardwareModule;
-use commands::industry_decoration_material::IndustryDecorationMaterialModule;
+use commands::industry_beauty::IndustryBeautyModule;
+use commands::industry_catering::IndustryCateringModule;
 use commands::industry_community_group_buy::IndustryCommunityGroupBuyModule;
+use commands::industry_convenience::IndustryConvenienceModule;
+use commands::industry_decoration_material::IndustryDecorationMaterialModule;
+use commands::industry_fresh_food::IndustryFreshFoodModule;
+use commands::industry_hardware::IndustryHardwareModule;
+use commands::industry_liquor::IndustryLiquorModule;
+use commands::industry_pet::IndustryPetModule;
+use commands::industry_phone_accessories::IndustryPhoneAccessoriesModule;
+#[cfg(feature = "inventory")]
+use commands::inventory::InventoryModule;
+use commands::plugin::PluginModule;
 
 // 命令实现模块（用于 Tauri generate_handler! 宏）
-#[cfg(any(feature = "light", feature = "inventory"))]
-use product_commands::*;
-#[cfg(any(feature = "light", feature = "inventory"))]
-use store_commands::*;
+#[cfg(feature = "virtual_company")]
+use agent_commands::*;
+use approval_commands::*;
+use auto_parts_commands::*;
+use beauty_commands::*;
+use call_commands::*;
+use catering_commands::*;
+use ceo_commands::*;
+use cloud_backup_commands::*;
+use common_commands::*;
+use community_group_buy_commands::*;
+use convenience_commands::*;
+use decoration_material_commands::*;
+#[cfg(feature = "virtual_company")]
+use finance_agent_commands::*;
+#[cfg(feature = "inventory")]
+use finance_commands::*;
+use fresh_food_commands::*;
+use hardware_commands::*;
 #[cfg(feature = "inventory")]
 use inventory_commands::*;
+use invitation_commands::*;
+use liquor_commands::*;
+#[cfg(feature = "virtual_company")]
+use market_commands::*;
+use message_commands::*;
+#[cfg(feature = "inventory")]
+use payment_commands::*;
+use pet_commands::*;
+use phone_accessories_commands::*;
+use plugin_loader::*;
+use plugin_manager::*;
+#[cfg(any(feature = "light", feature = "inventory"))]
+use product_commands::*;
 #[cfg(feature = "inventory")]
 use purchase_commands::*;
 #[cfg(feature = "inventory")]
-use sales_commands::*;
-#[cfg(feature = "inventory")]
 use purchase_return_commands::*;
 #[cfg(feature = "inventory")]
-use sales_return_commands::*;
-#[cfg(feature = "inventory")]
-use finance_commands::*;
-#[cfg(feature = "inventory")]
-use payment_commands::*;
-#[cfg(feature = "inventory")]
 use reconciliation_commands::*;
-use plugin_manager::*;
-use plugin_loader::*;
+#[cfg(feature = "inventory")]
+use sales_commands::*;
+#[cfg(feature = "inventory")]
+use sales_return_commands::*;
+use secretary_commands::*;
+use services::nvwax_commands::*;
 use setup_commands::*;
-use common_commands::*;
+#[cfg(any(feature = "light", feature = "inventory"))]
+use store_commands::*;
+use subscription_commands::*;
 use team_commands::*;
 use user_commands::*;
-use approval_commands::*;
-use subscription_commands::*;
-use message_commands::*;
-use call_commands::*;
-use invitation_commands::*;
-use ceo_commands::*;
-use secretary_commands::*;
-use cloud_backup_commands::*;
-use catering_commands::*;
-use beauty_commands::*;
-use pet_commands::*;
-use convenience_commands::*;
-use liquor_commands::*;
-use phone_accessories_commands::*;
-use fresh_food_commands::*;
-use auto_parts_commands::*;
-use hardware_commands::*;
-use decoration_material_commands::*;
-use community_group_buy_commands::*;
-use services::nvwax_commands::*;
-#[cfg(feature = "virtual_company")]
-use agent_commands::*;
-#[cfg(feature = "virtual_company")]
-use finance_agent_commands::*;
-#[cfg(feature = "virtual_company")]
-use market_commands::*;
 
 /// 构建命令注册表
 fn build_command_registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
-    
+
     // 按优先级顺序注册模块
     registry.register(CoreModule);
     registry.register(ProductModule);
@@ -202,7 +202,7 @@ fn build_command_registry() -> ModuleRegistry {
     registry.register(IndustryHardwareModule);
     registry.register(IndustryDecorationMaterialModule);
     registry.register(IndustryCommunityGroupBuyModule);
-    
+
     registry
 }
 
@@ -212,27 +212,53 @@ fn print_registered_commands() {
     let registry = build_command_registry();
     let commands = registry.get_enabled_commands();
     println!("\n[ProClaw] Registered {} commands:", commands.len());
-    
+
     // 按模块分组显示
     let mut current_module = String::new();
     for cmd in &commands {
         // 简单按命令名前缀分组
-        let module = if cmd.name.starts_with("product") || cmd.name.starts_with("create_product") || cmd.name.starts_with("get_product") || cmd.name.starts_with("update_product") || cmd.name.starts_with("delete_product") || cmd.name.starts_with("get_brands") || cmd.name.starts_with("create_brand") || cmd.name.starts_with("get_categories") || cmd.name.starts_with("create_category") || cmd.name.starts_with("get_store") || cmd.name.starts_with("update_store") {
+        let module = if cmd.name.starts_with("product")
+            || cmd.name.starts_with("create_product")
+            || cmd.name.starts_with("get_product")
+            || cmd.name.starts_with("update_product")
+            || cmd.name.starts_with("delete_product")
+            || cmd.name.starts_with("get_brands")
+            || cmd.name.starts_with("create_brand")
+            || cmd.name.starts_with("get_categories")
+            || cmd.name.starts_with("create_category")
+            || cmd.name.starts_with("get_store")
+            || cmd.name.starts_with("update_store")
+        {
             "product"
-        } else if cmd.name.starts_with("inventory") || cmd.name.starts_with("get_sales_trend") || cmd.name.starts_with("get_product_analytics") {
+        } else if cmd.name.starts_with("inventory")
+            || cmd.name.starts_with("get_sales_trend")
+            || cmd.name.starts_with("get_product_analytics")
+        {
             "inventory"
-        } else if cmd.name.starts_with("purchase") || cmd.name.starts_with("get_suppliers") || cmd.name.starts_with("create_supplier") {
+        } else if cmd.name.starts_with("purchase")
+            || cmd.name.starts_with("get_suppliers")
+            || cmd.name.starts_with("create_supplier")
+        {
             "purchase"
-        } else if cmd.name.starts_with("sales") || cmd.name.starts_with("create_customer") || cmd.name.starts_with("get_customers") {
+        } else if cmd.name.starts_with("sales")
+            || cmd.name.starts_with("create_customer")
+            || cmd.name.starts_with("get_customers")
+        {
             "sales"
         } else if cmd.name.starts_with("ceo") || cmd.name.starts_with("pcp") {
             "ceo"
-        } else if cmd.name.starts_with("plugin") || cmd.name.starts_with("install") || cmd.name.starts_with("uninstall") || cmd.name.starts_with("enable") || cmd.name.starts_with("disable") || cmd.name.starts_with("list_") {
+        } else if cmd.name.starts_with("plugin")
+            || cmd.name.starts_with("install")
+            || cmd.name.starts_with("uninstall")
+            || cmd.name.starts_with("enable")
+            || cmd.name.starts_with("disable")
+            || cmd.name.starts_with("list_")
+        {
             "plugin"
         } else {
             "other"
         };
-        
+
         if module != current_module {
             println!("  [{}]", module);
             current_module = module.to_string();
@@ -257,7 +283,9 @@ async fn main() {
     // 开发环境: 自动创建测试用户和配对码
     {
         let conn = db.connection();
-        let user_count: i64 = conn.query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0)).unwrap_or(0);
+        let user_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0))
+            .unwrap_or(0);
         if user_count == 0 {
             conn.execute(
                 "INSERT INTO users (id, name, phone, user_type, plan_type) VALUES ('u_test001', '管理员', '13800138000', 'internal', 'professional')",
@@ -266,7 +294,8 @@ async fn main() {
             conn.execute(
                 "INSERT INTO user_roles (user_id, role_id) VALUES ('u_test001', 1)",
                 [],
-            ).ok();
+            )
+            .ok();
             conn.execute(
                 "INSERT INTO pairing_codes (id, code, created_by, expires_at) VALUES ('pc_001', '888888', 'u_test001', (SELECT CAST(strftime('%s', 'now') AS INTEGER) + 86400))",
                 [],
@@ -284,17 +313,18 @@ async fn main() {
     // 创建同步引擎（使用独立的数据库实例）
     // 审计修复 #11: 5个独立连接共享WAL无重试机制。WAL模式支持多读单写，
     // 当前设计为迁移过渡方案，后续应用连接池统一管理。
-    let sync_engine = SyncEngine::new(Database::new(db_path.clone())
-        .expect("启动失败: 同步引擎数据库创建失败。请检查磁盘空间。"));
+    let sync_engine = SyncEngine::new(
+        Database::new(db_path.clone()).expect("启动失败: 同步引擎数据库创建失败。请检查磁盘空间。"),
+    );
     // 审计修复 #10: 多个独立 DB 实例竞争同一 WAL 文件是已知过渡设计，
     // SQLite WAL 模式支持多读单写，但缺少 SQLITE_BUSY 重试。
 
     // 审计修复 #2: 从 KeyManager 派生云备份独立密钥，不再使用全零密钥
-    let backup_encryption_key = KeyManager::derive_from_key(&key_manager, b"proclaw-cloud-backup-key-v1");
+    let backup_encryption_key =
+        KeyManager::derive_from_key(&key_manager, b"proclaw-cloud-backup-key-v1");
     let cloud_backup_service = Arc::new(CloudBackupService::new(
-        Database::new(db_path.clone())
-            .expect("启动失败: 云备份数据库创建失败。请检查磁盘空间。"),
-        &backup_encryption_key
+        Database::new(db_path.clone()).expect("启动失败: 云备份数据库创建失败。请检查磁盘空间。"),
+        &backup_encryption_key,
     ));
 
     // Phase 10: 初始化 NvwaX API 客户端和计费服务
@@ -302,7 +332,7 @@ async fn main() {
     let nvwax_key_salt = b"nvwax_api_key_2024";
     let nvwax_cipher = Arc::new(
         Aes256GcmCipher::from_password("proclaw-nvwax-secure-key", nvwax_key_salt)
-            .expect("Failed to create NvwaX cipher")
+            .expect("Failed to create NvwaX cipher"),
     );
 
     // 优先使用环境变量 NVWAX_API_KEY，其次尝试从数据库加载已保存的 Key
@@ -317,21 +347,18 @@ async fn main() {
             }
         } else {
             // 尝试从数据库读取已保存的 API Key（加密存储，需解密）
-            match db.connection()
-                .query_row(
-                    "SELECT value FROM system_config WHERE key = 'nvwax_api_key'",
-                    [],
-                    |row| row.get::<_, String>(0),
-                ) {
-                Ok(encrypted) => {
-                    match nvwax_cipher.decrypt_string(&encrypted) {
-                        Ok(key) => key,
-                        Err(e) => {
-                            eprintln!("[NvwaX] WARNING: Failed to decrypt stored API key: {}", e);
-                            String::new()
-                        }
+            match db.connection().query_row(
+                "SELECT value FROM system_config WHERE key = 'nvwax_api_key'",
+                [],
+                |row| row.get::<_, String>(0),
+            ) {
+                Ok(encrypted) => match nvwax_cipher.decrypt_string(&encrypted) {
+                    Ok(key) => key,
+                    Err(e) => {
+                        eprintln!("[NvwaX] WARNING: Failed to decrypt stored API key: {}", e);
+                        String::new()
                     }
-                }
+                },
                 Err(_) => {
                     // 未配置 API Key 是正常情况，不打印警告
                     String::new()
@@ -339,16 +366,14 @@ async fn main() {
             }
         }
     };
-    let nvwax_client = Arc::new(
-        NvwaXClient::new(nvwax_api_key.clone())
-    );
+    let nvwax_client = Arc::new(NvwaXClient::new(nvwax_api_key.clone()));
 
     // 将主数据库包装在 Mutex 中以支持多线程访问
     // Tauri State 使用 Mutex<Database>（不包 Arc），HTTP 服务器使用 Arc<Mutex<Database>>
     let db = Mutex::new(db);
 
     let nvwax_billing_db = Arc::new(Mutex::new(
-        Database::new(db_path.clone()).expect("Failed to create billing DB")
+        Database::new(db_path.clone()).expect("Failed to create billing DB"),
     ));
     let nvwax_billing = Arc::new(NvwaXBilling::new(nvwax_billing_db));
 
@@ -356,10 +381,12 @@ async fn main() {
     let api_encryption_key = KeyManager::derive_from_key(&key_manager, b"proclaw-http-api-key-v1");
     let cipher = Arc::new(
         Aes256GcmCipher::new(&api_encryption_key)
-            .expect("Failed to create HTTP API cipher from derived key")
+            .expect("Failed to create HTTP API cipher from derived key"),
     );
     // 创建 axum 应用状态（使用独立数据库连接，SQLite WAL 支持多连接）
-    let http_db = Arc::new(Mutex::new(Database::new(db_path.clone()).expect("Failed to create HTTP DB")));
+    let http_db = Arc::new(Mutex::new(
+        Database::new(db_path.clone()).expect("Failed to create HTTP DB"),
+    ));
     let ws_manager = Arc::new(WebSocketManager::new());
     let app_state = AppState {
         db: http_db,
@@ -372,20 +399,31 @@ async fn main() {
     // 启动 HTTP 服务器（在后台运行）
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 8888));
     println!("Starting HTTP server on http://{}", addr);
-    
+
     let _http_handle = match tokio::net::TcpListener::bind(&addr).await {
         Ok(listener) => {
             let axum_app = api::create_router(app_state);
             // 审计修复 R4: 保留 JoinHandle 防止任务泄漏
             let handle = tokio::spawn(async move {
-                if let Err(e) = axum::serve(listener, axum_app.into_make_service_with_connect_info::<SocketAddr>()).await {
-                    eprintln!("[HTTP Server] Fatal error: {}. HTTP API is now unavailable.", e);
+                if let Err(e) = axum::serve(
+                    listener,
+                    axum_app.into_make_service_with_connect_info::<SocketAddr>(),
+                )
+                .await
+                {
+                    eprintln!(
+                        "[HTTP Server] Fatal error: {}. HTTP API is now unavailable.",
+                        e
+                    );
                 }
             });
             Some(handle)
         }
         Err(e) => {
-            eprintln!("Warning: Could not bind HTTP server to {}: {}. HTTP API will be unavailable.", addr, e);
+            eprintln!(
+                "Warning: Could not bind HTTP server to {}: {}. HTTP API will be unavailable.",
+                addr, e
+            );
             None
         }
     };
@@ -404,7 +442,7 @@ async fn main() {
         .manage(nvwax_cipher.clone())
         .setup(|app| {
             use tauri::Manager;
-            
+
             // 检查安装状态，决定显示哪个窗口
             let is_installed = match app.state::<Mutex<Database>>().lock() {
                 Ok(db) => db.is_installation_complete(),
@@ -636,7 +674,6 @@ async fn main() {
             accept_invitation_cmd,
             revoke_invitation_cmd,
             get_invitations_cmd,
-
             // 云托管商城 (PRD v5.0)
             get_cloud_store,
             create_cloud_store,
@@ -729,7 +766,6 @@ async fn main() {
             get_market_categories,
             #[cfg(feature = "virtual_company")]
             download_market_agent_package,
-
             // CEO Agent 主控官 (PRD v6.2)
             pcp_add_entry,
             pcp_update_entry,
@@ -739,7 +775,6 @@ async fn main() {
             ceo_get_tasks,
             ceo_update_task_status,
             ceo_get_task_stats,
-
             // CEO Agent 决策确认与个性化学习 (PRD v6.3)
             ceo_add_decision_log,
             ceo_query_decision_logs,
@@ -749,7 +784,6 @@ async fn main() {
             ceo_update_preference,
             ceo_export_company_config,
             ceo_import_company_config,
-
             // 安装向导 (PRD v6.1)
             check_installation_status,
             check_disk_space,
@@ -758,7 +792,6 @@ async fn main() {
             test_llamacpp_connection,
             get_default_data_path,
             complete_setup_and_switch,
-
             // 行业插件管理
             list_installed_plugins,
             get_plugin_manifest,
@@ -791,13 +824,11 @@ async fn main() {
             // 插件更新机制 (PRD v10.0)
             check_plugin_update,
             apply_plugin_update,
-
             // 商务秘书 Agent BAP (PRD v8.5)
             bap_get_all,
             bap_upsert,
             bap_delete_by_type,
             bap_reset_learning,
-
             // 云备份命令（Cloud 版）
             get_backup_history_cmd,
             get_backup_status_cmd,
@@ -805,7 +836,6 @@ async fn main() {
             trigger_cloud_backup_cmd,
             set_auto_backup_schedule_cmd,
             restore_from_backup_cmd,
-
             // 餐饮行业插件命令
             catering_create_pos_order,
             catering_get_pos_orders,
@@ -813,21 +843,18 @@ async fn main() {
             catering_get_daily_summary,
             catering_get_kds_orders,
             catering_mark_kds_item_done,
-
             // 美业行业插件命令
             beauty_create_appointment,
             beauty_get_appointments,
             beauty_update_appointment_status,
             beauty_get_employees,
             beauty_create_employee,
-
             // 宠物行业插件命令
             pet_create_profile,
             pet_get_profiles,
             pet_create_boarding,
             pet_get_boarding_records,
             pet_check_out_boarding,
-
             // 便利店行业插件命令
             cv_get_expiry_alerts,
             cv_get_daily_settlement,
@@ -835,7 +862,6 @@ async fn main() {
             cv_create_pos_order,
             cv_add_expiry_tracking,
             cv_get_expiry_tracking,
-
             // 酒水批发行业插件命令
             lw_get_credit_accounts,
             lw_get_credit_transactions,
@@ -844,27 +870,23 @@ async fn main() {
             lw_create_batch,
             lw_get_price_tiers,
             lw_set_price_tier,
-
             // 手机配件批发行业插件命令
             pa_get_device_models,
             pa_add_device_model,
             pa_get_quotations,
             pa_create_quotation,
             pa_get_price_history,
-
             // 食材配送行业插件命令
             ff_get_delivery_routes,
             ff_create_delivery_route,
             ff_get_recurring_templates,
             ff_get_freshness_alerts,
-
             // 汽车配件行业插件命令
             ap_search_by_oe,
             ap_get_vehicle_models,
             ap_add_vehicle_model,
             ap_get_part_categories,
             ap_add_oe_number,
-
             // 五金行业插件命令
             hw_get_spec_templates,
             hw_set_spec_template,
@@ -872,21 +894,18 @@ async fn main() {
             hw_get_credit_accounts,
             hw_get_unit_conversions,
             hw_add_unit_conversion,
-
             // 装修材料行业插件命令
             dm_get_projects,
             dm_create_project,
             dm_get_bom_templates,
             dm_create_bom_template,
             dm_get_project_materials,
-
             // 社区团购行业插件命令
             gb_get_groups,
             gb_create_group,
             gb_get_orders,
             gb_parse_jielong_text,
             gb_verify_pickup,
-
             // NvwaX API 集成命令
             nvwax_search_agents,
             nvwax_get_agent_detail,
@@ -926,6 +945,6 @@ async fn main() {
             clear_nvwax_api_key,
             test_nvwax_connection,
         ])
-    .run(tauri::generate_context!())
-    .expect("启动失败: Tauri 应用运行时出错。请检查系统资源是否充足。");
+        .run(tauri::generate_context!())
+        .expect("启动失败: Tauri 应用运行时出错。请检查系统资源是否充足。");
 }

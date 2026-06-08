@@ -1,3 +1,4 @@
+use directories::ProjectDirs;
 /// ProClaw 后端插件动态加载框架
 ///
 /// 负责从行业插件的动态库（.dll/.so/.dylib）中加载 `plugin_init` 函数，
@@ -7,13 +8,11 @@
 ///   1. 插件编译为动态库，导出 `plugin_init` 函数
 ///   2. ProClaw 启动时或安装插件时，调用 `PluginLoader::load_plugin_library`
 ///   3. 命令注册到全局命令表，由统一调度器调用
-
 use libloading::{Library, Symbol};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
-use directories::ProjectDirs;
 
 /// 插件命令的参数与返回值（JSON 格式互通）
 pub type PluginCommandFn = fn(args: &str) -> Result<String, String>;
@@ -170,13 +169,16 @@ impl PluginLoader {
         {
             let mut index = self.command_index.lock().map_err(|e| e.to_string())?;
             let mut loaded = self.loaded_plugins.lock().map_err(|e| e.to_string())?;
-            
+
             // 双重检查：确保加载期间没有并发加载同一插件
             if loaded.contains_key(plugin_id) {
                 // 并发加载已抢占，释放本加载（Library drop 自动关闭）
-                return Err(format!("插件 '{}' 已在并发中加载（double-check）", plugin_id));
+                return Err(format!(
+                    "插件 '{}' 已在并发中加载（double-check）",
+                    plugin_id
+                ));
             }
-            
+
             for cmd in &registry.commands {
                 let key = format!("{}:{}", plugin_id, cmd.name);
                 index.insert(key, (plugin_id.to_string(), cmd.clone()));
@@ -326,19 +328,17 @@ mod tests {
     fn test_plugin_registry_serde() {
         let registry = PluginCommandRegistry {
             plugin_id: "test-plugin".to_string(),
-            commands: vec![
-                PluginCommandDef {
-                    name: "print_ticket".to_string(),
-                    description: "打印小票".to_string(),
-                    param_schema: Some(serde_json::json!({
-                        "type": "object",
-                        "properties": {
-                            "order_id": {"type": "string"}
-                        }
-                    })),
-                    return_schema: None,
-                },
-            ],
+            commands: vec![PluginCommandDef {
+                name: "print_ticket".to_string(),
+                description: "打印小票".to_string(),
+                param_schema: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "order_id": {"type": "string"}
+                    }
+                })),
+                return_schema: None,
+            }],
         };
 
         let json = serde_json::to_string(&registry).unwrap();

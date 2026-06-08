@@ -1,11 +1,11 @@
+use crate::api::AppState;
+use crate::utils::crypto::Aes256GcmCipher;
 use axum::{
-    extract::{State, Request},
-    middleware::Next,
     body::Body,
+    extract::{Request, State},
+    middleware::Next,
     response::Response,
 };
-use crate::utils::crypto::Aes256GcmCipher;
-use crate::api::AppState;
 use std::convert::Infallible;
 
 /// 加密响应中间件
@@ -42,12 +42,16 @@ pub async fn decrypt_request(
 
 /// 加密 JSON 响应
 #[allow(dead_code)]
-pub fn encrypt_json_response(data: &serde_json::Value, cipher: &Aes256GcmCipher) -> Result<(String, String), String> {
+pub fn encrypt_json_response(
+    data: &serde_json::Value,
+    cipher: &Aes256GcmCipher,
+) -> Result<(String, String), String> {
     // 1. 序列化 JSON
     let plaintext = serde_json::to_string(data).map_err(|e| e.to_string())?;
 
     // 2. 加密
-    let encrypted = cipher.encrypt(plaintext.as_bytes())
+    let encrypted = cipher
+        .encrypt(plaintext.as_bytes())
         .map_err(|e| format!("Encryption failed: {}", e))?;
 
     // 3. 转成 hex 字符串
@@ -61,17 +65,21 @@ pub fn encrypt_json_response(data: &serde_json::Value, cipher: &Aes256GcmCipher)
 
 /// 解密 JSON 请求
 #[allow(dead_code)]
-pub fn decrypt_json_request(encrypted_hex: &str, cipher: &Aes256GcmCipher) -> Result<serde_json::Value, String> {
+pub fn decrypt_json_request(
+    encrypted_hex: &str,
+    cipher: &Aes256GcmCipher,
+) -> Result<serde_json::Value, String> {
     // 1. hex 解码
     let ciphertext = hex::decode(encrypted_hex).map_err(|e| e.to_string())?;
 
     // 2. 解密
-    let decrypted = cipher.decrypt(&ciphertext)
+    let decrypted = cipher
+        .decrypt(&ciphertext)
         .map_err(|e| format!("Decryption failed: {}", e))?;
 
     // 3. 解析 JSON
-    let data: serde_json::Value = serde_json::from_slice(&decrypted)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let data: serde_json::Value =
+        serde_json::from_slice(&decrypted).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
     Ok(data)
 }

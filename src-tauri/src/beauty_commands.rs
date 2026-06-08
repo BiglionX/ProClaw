@@ -2,11 +2,11 @@
 // 需求文档：行业插件功能实现
 
 use crate::database::Database;
+use chrono::Utc;
 use rusqlite::params;
 use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// 创建美业预约
 #[tauri::command]
@@ -58,20 +58,23 @@ pub fn beauty_get_appointments(
     sql.push_str(" ORDER BY start_at ASC");
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let params_ref: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
-    let rows = stmt.query_map(params_ref.as_slice(), |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "customer_id": row.get::<_, String>(1)?,
-            "service_ids": row.get::<_, String>(2)?,
-            "employee_id": row.get::<_, String>(3)?,
-            "start_at": row.get::<_, String>(4)?,
-            "duration": row.get::<_, i64>(5)?,
-            "status": row.get::<_, String>(6)?,
-            "notes": row.get::<_, Option<String>>(7)?,
-            "created_at": row.get::<_, String>(8)?,
-        }))
-    }).map_err(|e| e.to_string())?;
+    let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|p| p.as_ref()).collect();
+    let rows = stmt
+        .query_map(params_ref.as_slice(), |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "customer_id": row.get::<_, String>(1)?,
+                "service_ids": row.get::<_, String>(2)?,
+                "employee_id": row.get::<_, String>(3)?,
+                "start_at": row.get::<_, String>(4)?,
+                "duration": row.get::<_, i64>(5)?,
+                "status": row.get::<_, String>(6)?,
+                "notes": row.get::<_, Option<String>>(7)?,
+                "created_at": row.get::<_, String>(8)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
 
     let appointments: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
     Ok(json!({ "data": appointments }))
@@ -91,16 +94,15 @@ pub fn beauty_update_appointment_status(
     conn.execute(
         "UPDATE beauty_appointments SET status = ?1, updated_at = ?2 WHERE id = ?3",
         params![status, now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(json!({ "message": "预约状态已更新", "status": status }))
 }
 
 /// 获取美业员工列表
 #[tauri::command]
-pub fn beauty_get_employees(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn beauty_get_employees(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -108,18 +110,20 @@ pub fn beauty_get_employees(
         "SELECT id, name, phone, hire_date, service_ids, commission_rate, is_active, created_at FROM beauty_employees ORDER BY name"
     ).map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "name": row.get::<_, String>(1)?,
-            "phone": row.get::<_, Option<String>>(2)?,
-            "hire_date": row.get::<_, Option<String>>(3)?,
-            "service_ids": row.get::<_, String>(4)?,
-            "commission_rate": row.get::<_, f64>(5)?,
-            "is_active": row.get::<_, bool>(6)?,
-            "created_at": row.get::<_, String>(7)?,
-        }))
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "phone": row.get::<_, Option<String>>(2)?,
+                "hire_date": row.get::<_, Option<String>>(3)?,
+                "service_ids": row.get::<_, String>(4)?,
+                "commission_rate": row.get::<_, f64>(5)?,
+                "is_active": row.get::<_, bool>(6)?,
+                "created_at": row.get::<_, String>(7)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
 
     let employees: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
     Ok(json!({ "data": employees }))

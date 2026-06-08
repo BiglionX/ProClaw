@@ -39,12 +39,12 @@ pub struct AgentPackageManifest {
     pub id: String,
     pub name: String,
     pub version: String,
-    pub entry: String,              // HTML 入口文件名
+    pub entry: String, // HTML 入口文件名
     pub permissions: Vec<String>,
-    pub icon: Option<String>,       // 图标文件名
+    pub icon: Option<String>, // 图标文件名
     pub description: Option<String>,
     pub author: Option<String>,
-    pub checksum: Option<String>,   // 包完整性校验
+    pub checksum: Option<String>, // 包完整性校验
 }
 
 /// Agent 沙箱 - 管理 Agent 的隔离目录和资源
@@ -63,7 +63,7 @@ impl AgentSandbox {
         let sanitized = crate::utils::path_safety::sanitize_path_component(agent_id);
         if sanitized.contains("..") || sanitized.starts_with('/') || sanitized.starts_with('\\') {
             return Err(AgentPackageError::InvalidAgentId(
-                "Agent ID contains path traversal characters".to_string()
+                "Agent ID contains path traversal characters".to_string(),
             ));
         }
         Ok(self.base_data_dir.join("agents").join(&sanitized))
@@ -96,7 +96,10 @@ impl AgentSandbox {
     }
 
     /// 验证 agent 包的基本结构
-    pub fn validate_package(package_dir: &Path, manifest: &AgentPackageManifest) -> Result<(), AgentPackageError> {
+    pub fn validate_package(
+        package_dir: &Path,
+        manifest: &AgentPackageManifest,
+    ) -> Result<(), AgentPackageError> {
         // 检查入口文件是否存在
         let entry_path = package_dir.join(&manifest.entry);
         if !entry_path.exists() {
@@ -165,17 +168,15 @@ impl AgentSandbox {
 }
 
 /// 使用 zip crate 解压 ZIP 文件
-pub fn extract_zip_package(
-    zip_path: &Path,
-    target_dir: &Path,
-) -> Result<(), AgentPackageError> {
+pub fn extract_zip_package(zip_path: &Path, target_dir: &Path) -> Result<(), AgentPackageError> {
     let file = File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| AgentPackageError::InvalidManifest(format!("Invalid ZIP file: {}", e)))?;
 
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i)
-            .map_err(|e| AgentPackageError::InvalidManifest(format!("Error reading ZIP entry: {}", e)))?;
+        let mut entry = archive.by_index(i).map_err(|e| {
+            AgentPackageError::InvalidManifest(format!("Error reading ZIP entry: {}", e))
+        })?;
 
         let entry_name = entry.name().to_string();
 
@@ -242,7 +243,9 @@ mod tests {
         let sandbox = AgentSandbox::new(temp_dir.clone());
 
         let agent_id = "test-agent-001";
-        sandbox.ensure_agent_dirs(agent_id).expect("Should create dirs");
+        sandbox
+            .ensure_agent_dirs(agent_id)
+            .expect("Should create dirs");
 
         assert!(sandbox.get_agent_dir(agent_id).exists());
         assert!(sandbox.get_agent_assets_dir(agent_id).exists());
@@ -300,7 +303,8 @@ mod tests {
         let mut zip_writer = zip::ZipWriter::new(zip_file);
 
         // 添加入口文件
-        let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options =
+            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
         zip_writer.start_file("index.html", options).unwrap();
         zip_writer.write_all(b"<html>Test Agent</html>").unwrap();
 
@@ -311,11 +315,19 @@ mod tests {
         zip_writer.finish().unwrap();
 
         // 解压
-        sandbox.extract_package(agent_id, &zip_path).expect("Should extract zip");
+        sandbox
+            .extract_package(agent_id, &zip_path)
+            .expect("Should extract zip");
 
         let assets_dir = sandbox.get_agent_assets_dir(agent_id);
-        assert!(assets_dir.join("index.html").exists(), "Entry file should exist");
-        assert!(assets_dir.join("icon.png").exists(), "Icon file should exist");
+        assert!(
+            assets_dir.join("index.html").exists(),
+            "Entry file should exist"
+        );
+        assert!(
+            assets_dir.join("icon.png").exists(),
+            "Icon file should exist"
+        );
 
         // 验证内容
         let content = std::fs::read_to_string(assets_dir.join("index.html")).unwrap();

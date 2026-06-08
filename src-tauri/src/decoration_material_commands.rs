@@ -7,9 +7,11 @@ use uuid::Uuid;
 
 #[tauri::command]
 pub fn dm_get_projects(
-    db: tauri::State<Mutex<Database>>, status: Option<String>,
+    db: tauri::State<Mutex<Database>>,
+    status: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
     let projects: Vec<Value>;
     if let Some(ref s) = status {
         projects = {
@@ -35,9 +37,16 @@ pub fn dm_get_projects(
 
 #[tauri::command]
 pub fn dm_create_project(
-    db: tauri::State<Mutex<Database>>, name: String, customer_id: Option<String>, address: Option<String>, budget: Option<f64>, start_date: Option<String>,
+    db: tauri::State<Mutex<Database>>,
+    name: String,
+    customer_id: Option<String>,
+    address: Option<String>,
+    budget: Option<f64>,
+    start_date: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection(); let id = Uuid::new_v4().to_string();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let id = Uuid::new_v4().to_string();
     conn.execute("INSERT INTO dm_projects (id, name, customer_id, address, budget, start_date) VALUES (?1,?2,?3,?4,?5,?6)",
         params![id, name, customer_id, address, budget, start_date]).map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "message": "项目已创建" }))
@@ -45,9 +54,11 @@ pub fn dm_create_project(
 
 #[tauri::command]
 pub fn dm_get_bom_templates(
-    db: tauri::State<Mutex<Database>>, room_type: Option<String>,
+    db: tauri::State<Mutex<Database>>,
+    room_type: Option<String>,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
     let templates: Vec<Value>;
     if let Some(ref rt) = room_type {
         templates = {
@@ -67,19 +78,29 @@ pub fn dm_get_bom_templates(
 
 #[tauri::command]
 pub fn dm_create_bom_template(
-    db: tauri::State<Mutex<Database>>, name: String, room_type: Option<String>, items: Value,
+    db: tauri::State<Mutex<Database>>,
+    name: String,
+    room_type: Option<String>,
+    items: Value,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection(); let id = Uuid::new_v4().to_string();
-    conn.execute("INSERT INTO dm_material_bom_templates (id, name, room_type, items) VALUES (?1,?2,?3,?4)",
-        params![id, name, room_type, items.to_string()]).map_err(|e| e.to_string())?;
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let id = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO dm_material_bom_templates (id, name, room_type, items) VALUES (?1,?2,?3,?4)",
+        params![id, name, room_type, items.to_string()],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "message": "BOM模板已创建" }))
 }
 
 #[tauri::command]
 pub fn dm_get_project_materials(
-    db: tauri::State<Mutex<Database>>, project_id: String,
+    db: tauri::State<Mutex<Database>>,
+    project_id: String,
 ) -> Result<Value, String> {
-    let db = db.lock().map_err(|e| e.to_string())?; let conn = db.connection();
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
     let mut stmt = conn.prepare(
         "SELECT m.id, m.project_id, m.product_id, p.name as product_name, m.quantity, m.batch_no, m.color_no, m.signed_by, m.signed_at, m.created_at
          FROM dm_project_material_outs m LEFT JOIN products p ON m.product_id = p.id WHERE m.project_id = ?1 ORDER BY m.created_at DESC LIMIT 200"

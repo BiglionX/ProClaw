@@ -47,7 +47,12 @@ fn now_iso() -> String {
             }
             format!(
                 "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-                y, m, remaining + 1, hours, minutes, seconds
+                y,
+                m,
+                remaining + 1,
+                hours,
+                minutes,
+                seconds
             )
         })
         .unwrap_or_else(|_| "2026-01-01T00:00:00".to_string())
@@ -56,36 +61,30 @@ fn now_iso() -> String {
 /// 从数据库行映射为 AiTeam
 fn map_row_to_aiteam(row: &rusqlite::Row) -> rusqlite::Result<AiTeam> {
     let tags_str: String = row.get::<_, String>("tags").unwrap_or_else(|_| "[]".into());
-    let tags: Vec<String> = serde_json::from_str(&tags_str)
-        .unwrap_or_else(|e| {
-            eprintln!("[Team] Failed to parse tags JSON: {}", e);
-            vec![]
-        });
+    let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_else(|e| {
+        eprintln!("[Team] Failed to parse tags JSON: {}", e);
+        vec![]
+    });
 
     let members_str: String = row
         .get::<_, String>("members_json")
         .unwrap_or_else(|_| "[]".into());
-    let members: Vec<TeamMember> = serde_json::from_str(&members_str)
-        .unwrap_or_else(|e| {
-            eprintln!("[Team] Failed to parse members JSON: {}", e);
-            vec![]
-        });
+    let members: Vec<TeamMember> = serde_json::from_str(&members_str).unwrap_or_else(|e| {
+        eprintln!("[Team] Failed to parse members JSON: {}", e);
+        vec![]
+    });
 
     let workflow_str: String = row
         .get::<_, String>("workflow_json")
         .unwrap_or_else(|_| "{}".into());
-    let workflow: serde_json::Value =
-        serde_json::from_str(&workflow_str).unwrap_or(serde_json::Value::Object(
-            serde_json::Map::new(),
-        ));
+    let workflow: serde_json::Value = serde_json::from_str(&workflow_str)
+        .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
     let triggers_str: String = row
         .get::<_, String>("triggers_json")
         .unwrap_or_else(|_| "{}".into());
-    let triggers: serde_json::Value =
-        serde_json::from_str(&triggers_str).unwrap_or(serde_json::Value::Object(
-            serde_json::Map::new(),
-        ));
+    let triggers: serde_json::Value = serde_json::from_str(&triggers_str)
+        .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
     Ok(AiTeam {
         id: row.get("id")?,
@@ -117,8 +116,7 @@ pub fn create_team(
     let id = Uuid::new_v4().to_string();
     let now = now_iso();
     let tags_json = serde_json::to_string(&payload.tags).unwrap_or_else(|_| "[]".into());
-    let members_json =
-        serde_json::to_string(&payload.members).unwrap_or_else(|_| "[]".into());
+    let members_json = serde_json::to_string(&payload.members).unwrap_or_else(|_| "[]".into());
     let workflow_json = serde_json::to_string(
         &payload
             .workflow
@@ -193,10 +191,7 @@ pub fn get_teams(db: State<'_, Mutex<Database>>) -> Result<Vec<AiTeam>, String> 
 // 获取单个 AiTeam
 // ============================================================
 #[tauri::command]
-pub fn get_team_by_id(
-    db: State<'_, Mutex<Database>>,
-    id: String,
-) -> Result<AiTeam, String> {
+pub fn get_team_by_id(db: State<'_, Mutex<Database>>, id: String) -> Result<AiTeam, String> {
     let conn = db.lock().map_err(|e| format!("数据库锁定失败: {}", e))?;
     let conn = conn.connection();
 
@@ -349,10 +344,7 @@ pub fn delete_team(db: State<'_, Mutex<Database>>, id: String) -> Result<(), Str
 // 导入 AiTeam (从 JSON 文件)
 // ============================================================
 #[tauri::command]
-pub fn import_team(
-    db: State<'_, Mutex<Database>>,
-    team_json: String,
-) -> Result<AiTeam, String> {
+pub fn import_team(db: State<'_, Mutex<Database>>, team_json: String) -> Result<AiTeam, String> {
     let payload: ImportTeamPayload =
         serde_json::from_str(&team_json).map_err(|e| format!("JSON解析失败: {}", e))?;
 

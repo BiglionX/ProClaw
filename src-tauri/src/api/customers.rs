@@ -1,14 +1,14 @@
 // 客户管理 API 处理器
 // 提供客户 CRUD 操作的 RESTful API
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path, Query},
+    extract::{Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::Deserialize;
-use super::AppState;
 use rusqlite::params;
+use serde::Deserialize;
 use uuid::Uuid;
 
 /// 客户创建/更新请求
@@ -41,15 +41,19 @@ pub async fn get_customers(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
     let mut sql = String::from(
         "SELECT id, name, code, contact_person, phone, email, address, website, \
          customer_type, tax_number, credit_limit, notes, is_active, created_at, updated_at \
-         FROM customers WHERE deleted_at IS NULL"
+         FROM customers WHERE deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -66,12 +70,17 @@ pub async fn get_customers(
 
     sql.push_str(" ORDER BY name ASC");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -94,12 +103,19 @@ pub async fn get_customers(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Query error: {}", e)}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+            )
+        }
     };
 
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
-    (StatusCode::OK, Json(serde_json::json!({ "data": result, "total": result.len() })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": result, "total": result.len() })),
+    )
 }
 
 /// 获取单个客户
@@ -109,8 +125,12 @@ pub async fn get_customer(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -142,7 +162,10 @@ pub async fn get_customer(
 
     match result {
         Ok(customer) => (StatusCode::OK, Json(customer)),
-        Err(_) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Customer not found"}))),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Customer not found"})),
+        ),
     }
 }
 
@@ -153,8 +176,12 @@ pub async fn create_customer(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -170,19 +197,33 @@ pub async fn create_customer(
          customer_type, tax_number, credit_limit, notes, is_active) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
-            id, payload.name, code,
-            payload.contact_person, payload.phone, payload.email,
-            payload.address, payload.website, customer_type,
-            payload.tax_number, credit_limit, payload.notes, is_active,
+            id,
+            payload.name,
+            code,
+            payload.contact_person,
+            payload.phone,
+            payload.email,
+            payload.address,
+            payload.website,
+            customer_type,
+            payload.tax_number,
+            credit_limit,
+            payload.notes,
+            is_active,
         ],
     ) {
-        Ok(_) => (StatusCode::CREATED, Json(serde_json::json!({
-            "id": id,
-            "code": code,
-            "message": "Customer created successfully"
-        }))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to create customer: {}", e)}))),
+        Ok(_) => (
+            StatusCode::CREATED,
+            Json(serde_json::json!({
+                "id": id,
+                "code": code,
+                "message": "Customer created successfully"
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to create customer: {}", e)})),
+        ),
     }
 }
 
@@ -194,19 +235,28 @@ pub async fn update_customer(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 
-    let exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM customers WHERE id = ?1 AND deleted_at IS NULL)",
-        params![id],
-        |row| row.get(0),
-    ).unwrap_or(false);
+    let exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM customers WHERE id = ?1 AND deleted_at IS NULL)",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
 
     if !exists {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Customer not found"})));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Customer not found"})),
+        );
     }
 
     let mut sets: Vec<String> = Vec::new();
@@ -262,18 +312,27 @@ pub async fn update_customer(
 
     sets.push("updated_at = CURRENT_TIMESTAMP".to_string());
 
-    let sql = format!("UPDATE customers SET {} WHERE id = ?{}", sets.join(", "), values.len() + 1);
+    let sql = format!(
+        "UPDATE customers SET {} WHERE id = ?{}",
+        sets.join(", "),
+        values.len() + 1
+    );
     values.push(Box::new(id.clone()));
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> = values.iter().map(|p| p.as_ref()).collect();
 
     match conn.execute(&sql, params_refs.as_slice()) {
-        Ok(_) => (StatusCode::OK, Json(serde_json::json!({
-            "id": id,
-            "message": "Customer updated successfully"
-        }))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update customer: {}", e)}))),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "id": id,
+                "message": "Customer updated successfully"
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update customer: {}", e)})),
+        ),
     }
 }
 
@@ -284,8 +343,12 @@ pub async fn delete_customer(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
 

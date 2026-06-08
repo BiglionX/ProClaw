@@ -7,7 +7,10 @@ use uuid::Uuid;
 
 /// 创建品牌
 #[tauri::command]
-pub fn create_brand(db: tauri::State<Mutex<Database>>, brand: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn create_brand(
+    db: tauri::State<Mutex<Database>>,
+    brand: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -15,7 +18,8 @@ pub fn create_brand(db: tauri::State<Mutex<Database>>, brand: serde_json::Value)
     let name = brand["name"].as_str().ok_or("Brand name is required")?;
 
     // 生成 slug
-    let slug = name.to_lowercase()
+    let slug = name
+        .to_lowercase()
         .replace(" ", "-")
         .replace(|c: char| !c.is_alphanumeric() && c != '-', "");
 
@@ -44,7 +48,10 @@ pub fn create_brand(db: tauri::State<Mutex<Database>>, brand: serde_json::Value)
 
 /// 获取品牌列表
 #[tauri::command]
-pub fn get_brands(db: tauri::State<Mutex<Database>>, options: Option<serde_json::Value>) -> Result<Vec<serde_json::Value>, String> {
+pub fn get_brands(
+    db: tauri::State<Mutex<Database>>,
+    options: Option<serde_json::Value>,
+) -> Result<Vec<serde_json::Value>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -99,12 +106,17 @@ fn row_to_brand_json(row: &rusqlite::Row) -> rusqlite::Result<serde_json::Value>
 
 /// 创建分类
 #[tauri::command]
-pub fn create_category(db: tauri::State<Mutex<Database>>, category: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn create_category(
+    db: tauri::State<Mutex<Database>>,
+    category: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let id = Uuid::new_v4().to_string();
-    let name = category["name"].as_str().ok_or("Category name is required")?;
+    let name = category["name"]
+        .as_str()
+        .ok_or("Category name is required")?;
 
     conn.execute(
         "INSERT INTO product_categories (id, name, description, parent_id, sort_order, is_active, sync_status)
@@ -132,26 +144,30 @@ pub fn get_categories(db: tauri::State<Mutex<Database>>) -> Result<Vec<serde_jso
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let mut stmt = conn.prepare(
-        "SELECT id, name, description, parent_id, sort_order, is_active,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, description, parent_id, sort_order, is_active,
                 created_at, updated_at
-         FROM product_categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC"
-    ).map_err(|e| e.to_string())?;
+         FROM product_categories WHERE deleted_at IS NULL ORDER BY sort_order ASC, name ASC",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let categories: Vec<serde_json::Value> = stmt.query_map([], |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, String>(0)?,
-            "name": row.get::<_, String>(1)?,
-            "description": row.get::<_, Option<String>>(2)?,
-            "parent_id": row.get::<_, Option<String>>(3)?,
-            "sort_order": row.get::<_, i32>(4)?,
-            "is_active": row.get::<_, bool>(5)?,
-            "created_at": row.get::<_, String>(6)?,
-            "updated_at": row.get::<_, String>(7)?,
-        }))
-    }).map_err(|e| e.to_string())?
-    .filter_map(|r| r.ok())
-    .collect();
+    let categories: Vec<serde_json::Value> = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "description": row.get::<_, Option<String>>(2)?,
+                "parent_id": row.get::<_, Option<String>>(3)?,
+                "sort_order": row.get::<_, i32>(4)?,
+                "is_active": row.get::<_, bool>(5)?,
+                "created_at": row.get::<_, String>(6)?,
+                "updated_at": row.get::<_, String>(7)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(categories)
 }
@@ -166,7 +182,8 @@ pub fn upload_image(file_data: String) -> Result<String, String> {
     if file_data.len() > MAX_SIZE {
         return Err(format!(
             "Image too large: {} bytes (max {} bytes / 10MB)",
-            file_data.len(), MAX_SIZE
+            file_data.len(),
+            MAX_SIZE
         ));
     }
     Ok(file_data)
@@ -182,7 +199,7 @@ pub fn get_command_stats(options: Option<serde_json::Value>) -> Result<serde_jso
     let options = options.unwrap_or(serde_json::json!({"type": "all"}));
     let stat_type = options["type"].as_str().unwrap_or("all");
     let limit = options["limit"].as_u64().unwrap_or(10) as usize;
-    
+
     let stats = match stat_type {
         "slowest" => {
             let slowest = COMMAND_STATS.get_slowest_commands(limit);
@@ -195,7 +212,7 @@ pub fn get_command_stats(options: Option<serde_json::Value>) -> Result<serde_jso
                     })
                 }).collect::<Vec<_>>()
             })
-        },
+        }
         "most_called" => {
             let most_called = COMMAND_STATS.get_most_called_commands(limit);
             serde_json::json!({
@@ -207,7 +224,7 @@ pub fn get_command_stats(options: Option<serde_json::Value>) -> Result<serde_jso
                     })
                 }).collect::<Vec<_>>()
             })
-        },
+        }
         "errors" => {
             let error_prone = COMMAND_STATS.get_error_prone_commands(limit);
             serde_json::json!({
@@ -219,7 +236,7 @@ pub fn get_command_stats(options: Option<serde_json::Value>) -> Result<serde_jso
                     })
                 }).collect::<Vec<_>>()
             })
-        },
+        }
         _ => {
             let all_stats = COMMAND_STATS.get_all_stats();
             serde_json::json!({
@@ -237,7 +254,7 @@ pub fn get_command_stats(options: Option<serde_json::Value>) -> Result<serde_jso
             })
         }
     };
-    
+
     Ok(stats)
 }
 

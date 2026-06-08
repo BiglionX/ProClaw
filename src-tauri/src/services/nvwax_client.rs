@@ -6,7 +6,6 @@
 /// 使用方式：
 ///   let client = NvwaXClient::new("nvwax_your_api_key".into());
 ///   let agents = client.search_agents(SearchParams::default()).await?;
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -486,10 +485,13 @@ impl NvwaXCache {
 
     /// 设置 Agent 搜索结果缓存（2 分钟 TTL）
     pub fn set_agent_search(&mut self, key: String, result: AgentListResponse) {
-        self.agent_search.insert(key, CacheEntry {
-            data: result,
-            expires_at: Instant::now() + Duration::from_secs(120),
-        });
+        self.agent_search.insert(
+            key,
+            CacheEntry {
+                data: result,
+                expires_at: Instant::now() + Duration::from_secs(120),
+            },
+        );
     }
 
     /// 获取缓存的 AiTeam 搜索结果
@@ -505,10 +507,13 @@ impl NvwaXCache {
 
     /// 设置 AiTeam 搜索结果缓存（2 分钟 TTL）
     pub fn set_aiteam_search(&mut self, key: String, result: AiTeamListResponse) {
-        self.aiteam_search.insert(key, CacheEntry {
-            data: result,
-            expires_at: Instant::now() + Duration::from_secs(120),
-        });
+        self.aiteam_search.insert(
+            key,
+            CacheEntry {
+                data: result,
+                expires_at: Instant::now() + Duration::from_secs(120),
+            },
+        );
     }
 
     /// 清理所有过期缓存
@@ -608,7 +613,14 @@ impl NvwaXClient {
     // ---------- 缓存键生成 ----------
 
     /// 生成搜索参数的缓存键
-    fn search_cache_key(q: Option<&str>, category: Option<&str>, tags: Option<&str>, industry: Option<&str>, page: Option<u32>, limit: Option<u32>) -> String {
+    fn search_cache_key(
+        q: Option<&str>,
+        category: Option<&str>,
+        tags: Option<&str>,
+        industry: Option<&str>,
+        page: Option<u32>,
+        limit: Option<u32>,
+    ) -> String {
         format!(
             "q:{};cat:{};tags:{};ind:{};p:{};l:{}",
             q.unwrap_or(""),
@@ -728,9 +740,7 @@ impl NvwaXClient {
         match status.as_u16() {
             200 | 201 | 202 => {
                 // 尝试解析为通用响应格式
-                if let Ok(api_resp) =
-                    serde_json::from_str::<NvwaXApiResponse<T>>(&body_text)
-                {
+                if let Ok(api_resp) = serde_json::from_str::<NvwaXApiResponse<T>>(&body_text) {
                     if api_resp.success {
                         if let Some(data) = api_resp.data {
                             return Ok(data);
@@ -766,9 +776,7 @@ impl NvwaXClient {
                 let err = Self::parse_error(&body_text, "Resource not found");
                 Err(NvwaXError::NotFound(err))
             }
-            429 => {
-                Err(NvwaXError::RateLimited { retry_after })
-            }
+            429 => Err(NvwaXError::RateLimited { retry_after }),
             _ => {
                 let msg = if status.as_u16() >= 500 {
                     "Server error"
@@ -800,7 +808,10 @@ impl NvwaXClient {
         params: SearchParams,
     ) -> Result<AgentListResponse, NvwaXError> {
         if self.closed {
-            return Ok(AgentListResponse { agents: vec![], pagination: None });
+            return Ok(AgentListResponse {
+                agents: vec![],
+                pagination: None,
+            });
         }
         let cache_key = Self::search_cache_key(
             params.q.as_deref(),
@@ -817,7 +828,8 @@ impl NvwaXClient {
             }
         }
         let query = serde_json::to_value(&params).ok();
-        let result = self.get::<AgentListResponse>("/marketplace/agents", query.as_ref())
+        let result = self
+            .get::<AgentListResponse>("/marketplace/agents", query.as_ref())
             .await?;
         // 写入缓存
         if let Ok(mut cache) = self.cache.lock() {
@@ -846,7 +858,8 @@ impl NvwaXClient {
                 return Ok(cached.clone());
             }
         }
-        let result = self.get::<Vec<Category>>("/marketplace/categories", None)
+        let result = self
+            .get::<Vec<Category>>("/marketplace/categories", None)
             .await?;
         // 写入缓存
         if let Ok(mut cache) = self.cache.lock() {
@@ -861,7 +874,10 @@ impl NvwaXClient {
         params: SearchParams,
     ) -> Result<AiTeamListResponse, NvwaXError> {
         if self.closed {
-            return Ok(AiTeamListResponse { aiteams: vec![], pagination: None });
+            return Ok(AiTeamListResponse {
+                aiteams: vec![],
+                pagination: None,
+            });
         }
         let cache_key = Self::search_cache_key(
             params.q.as_deref(),
@@ -878,7 +894,8 @@ impl NvwaXClient {
             }
         }
         let query = serde_json::to_value(&params).ok();
-        let result = self.get::<AiTeamListResponse>("/marketplace/aiteams", query.as_ref())
+        let result = self
+            .get::<AiTeamListResponse>("/marketplace/aiteams", query.as_ref())
             .await?;
         // 写入缓存
         if let Ok(mut cache) = self.cache.lock() {
@@ -907,7 +924,8 @@ impl NvwaXClient {
                 return Ok(cached.clone());
             }
         }
-        let result = self.get::<Vec<Industry>>("/marketplace/industries", None)
+        let result = self
+            .get::<Vec<Industry>>("/marketplace/industries", None)
             .await?;
         // 写入缓存
         if let Ok(mut cache) = self.cache.lock() {
@@ -942,12 +960,12 @@ impl NvwaXClient {
     }
 
     /// 获取 Agent 列表
-    pub async fn get_agents(
-        &self,
-        params: ListParams,
-    ) -> Result<AgentListResponse, NvwaXError> {
+    pub async fn get_agents(&self, params: ListParams) -> Result<AgentListResponse, NvwaXError> {
         if self.closed {
-            return Ok(AgentListResponse { agents: vec![], pagination: None });
+            return Ok(AgentListResponse {
+                agents: vec![],
+                pagination: None,
+            });
         }
         let query = serde_json::to_value(&params).ok();
         self.get::<AgentListResponse>("/agents", query.as_ref())
@@ -1019,12 +1037,12 @@ impl NvwaXClient {
     }
 
     /// 获取 AiTeam 列表
-    pub async fn get_aiteams(
-        &self,
-        params: ListParams,
-    ) -> Result<AiTeamListResponse, NvwaXError> {
+    pub async fn get_aiteams(&self, params: ListParams) -> Result<AiTeamListResponse, NvwaXError> {
         if self.closed {
-            return Ok(AiTeamListResponse { aiteams: vec![], pagination: None });
+            return Ok(AiTeamListResponse {
+                aiteams: vec![],
+                pagination: None,
+            });
         }
         let query = serde_json::to_value(&params).ok();
         self.get::<AiTeamListResponse>("/aiteams", query.as_ref())
@@ -1100,11 +1118,8 @@ impl NvwaXClient {
             ..Default::default()
         };
         let query = serde_json::to_value(&params).ok();
-        self.get::<Vec<AgentSummary>>(
-            "/search/agents",
-            query.as_ref(),
-        )
-        .await
+        self.get::<Vec<AgentSummary>>("/search/agents", query.as_ref())
+            .await
     }
 
     /// 搜索 SkillHub 技能
@@ -1124,11 +1139,8 @@ impl NvwaXClient {
             ..Default::default()
         };
         let query = serde_json::to_value(&params).ok();
-        self.get::<Vec<Skill>>(
-            "/search/skills",
-            query.as_ref(),
-        )
-        .await
+        self.get::<Vec<Skill>>("/search/skills", query.as_ref())
+            .await
     }
 
     /// 统一搜索
@@ -1137,14 +1149,13 @@ impl NvwaXClient {
         params: UnifiedSearchParams,
     ) -> Result<SearchResult, NvwaXError> {
         if self.closed {
-            return Ok(SearchResult { agents: vec![], skills: vec![] });
+            return Ok(SearchResult {
+                agents: vec![],
+                skills: vec![],
+            });
         }
         let query = serde_json::to_value(&params).ok();
-        self.get::<SearchResult>(
-            "/search",
-            query.as_ref(),
-        )
-        .await
+        self.get::<SearchResult>("/search", query.as_ref()).await
     }
 
     // ============================================================
@@ -1160,11 +1171,8 @@ impl NvwaXClient {
         if self.closed {
             return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
         }
-        self.post::<ExportResult, ExportPayload>(
-            &format!("/agents/{}/export", id),
-            payload,
-        )
-        .await
+        self.post::<ExportResult, ExportPayload>(&format!("/agents/{}/export", id), payload)
+            .await
     }
 
     /// 导出 AiTeam
@@ -1176,11 +1184,8 @@ impl NvwaXClient {
         if self.closed {
             return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
         }
-        self.post::<ExportResult, ExportPayload>(
-            &format!("/aiteams/{}/export", id),
-            payload,
-        )
-        .await
+        self.post::<ExportResult, ExportPayload>(&format!("/aiteams/{}/export", id), payload)
+            .await
     }
 
     /// 批量导出
@@ -1196,14 +1201,11 @@ impl NvwaXClient {
     }
 
     /// 获取导出历史
-    pub async fn get_export_history(
-        &self,
-    ) -> Result<Vec<ExportResult>, NvwaXError> {
+    pub async fn get_export_history(&self) -> Result<Vec<ExportResult>, NvwaXError> {
         if self.closed {
             return Ok(vec![]);
         }
-        self.get::<Vec<ExportResult>>("/export/history", None)
-            .await
+        self.get::<Vec<ExportResult>>("/export/history", None).await
     }
 
     // ============================================================
@@ -1212,18 +1214,12 @@ impl NvwaXClient {
 
     /// 获取 Token 消耗统计
     /// period: day / week / month
-    pub async fn get_usage_stats(
-        &self,
-        period: &str,
-    ) -> Result<UsageStats, NvwaXError> {
+    pub async fn get_usage_stats(&self, period: &str) -> Result<UsageStats, NvwaXError> {
         if self.closed {
             return Err(NvwaXError::Auth("NvwaX API Key 未配置".to_string()));
         }
         let query = serde_json::json!({"period": period});
-        self.get::<UsageStats>(
-            "/user/api-keys/usage",
-            Some(&query),
-        )
-        .await
+        self.get::<UsageStats>("/user/api-keys/usage", Some(&query))
+            .await
     }
 }

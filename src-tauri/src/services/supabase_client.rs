@@ -116,11 +116,7 @@ impl SupabaseClient {
     }
 
     /// 查询记录（带去重列名保护）
-    pub async fn select(
-        &self,
-        table: &str,
-        filters: &[QueryFilter],
-    ) -> Result<Value, String> {
+    pub async fn select(&self, table: &str, filters: &[QueryFilter]) -> Result<Value, String> {
         let url = self.rest_url(table);
         let mut req = self.client.get(&url);
 
@@ -188,12 +184,7 @@ impl SupabaseClient {
     }
 
     /// 根据 ID 更新单条记录
-    pub async fn update_by_id(
-        &self,
-        table: &str,
-        id: &str,
-        data: &Value,
-    ) -> Result<Value, String> {
+    pub async fn update_by_id(&self, table: &str, id: &str, data: &Value) -> Result<Value, String> {
         let url = format!("{}?id=eq.{}", self.rest_url(table), id);
         let mut req = self.client.patch(&url);
 
@@ -253,7 +244,11 @@ impl SupabaseClient {
 
     /// 获取原始的加密二进制数据（用于下载加密备份）
     pub async fn download_raw(&self, table: &str, id: &str) -> Result<Vec<u8>, String> {
-        let url = format!("{}?id=eq.{}&select=encrypted_data", self.rest_url(table), id);
+        let url = format!(
+            "{}?id=eq.{}&select=encrypted_data",
+            self.rest_url(table),
+            id
+        );
         let mut req = self.client.get(&url);
 
         for (key, value) in self.headers() {
@@ -351,15 +346,16 @@ impl SupabaseClient {
             if body.is_empty() {
                 return Ok(Value::Null);
             }
-            serde_json::from_slice(&body)
-                .map_err(|e| format!("Failed to parse response JSON: {} (body: {:?})", e, String::from_utf8_lossy(&body[..body.len().min(200)])))
+            serde_json::from_slice(&body).map_err(|e| {
+                format!(
+                    "Failed to parse response JSON: {} (body: {:?})",
+                    e,
+                    String::from_utf8_lossy(&body[..body.len().min(200)])
+                )
+            })
         } else {
             let error_body = String::from_utf8_lossy(&body);
-            Err(format!(
-                "Supabase HTTP {}: {}",
-                status.as_u16(),
-                error_body
-            ))
+            Err(format!("Supabase HTTP {}: {}", status.as_u16(), error_body))
         }
     }
 }

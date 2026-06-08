@@ -216,7 +216,12 @@ pub async fn test_ollama_connection(endpoint: String) -> Result<ConnectionTestRe
     let url = format!("{}/api/tags", endpoint.trim_end_matches('/'));
 
     let client = reqwest::Client::new();
-    match client.get(&url).timeout(std::time::Duration::from_secs(10)).send().await {
+    match client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+    {
         Ok(response) => {
             if response.status().is_success() {
                 Ok(ConnectionTestResult {
@@ -226,20 +231,24 @@ pub async fn test_ollama_connection(endpoint: String) -> Result<ConnectionTestRe
             } else {
                 Ok(ConnectionTestResult {
                     success: false,
-                    message: format!("Ollama 服务响应异常 (HTTP {})，请检查 Ollama 是否已启动", response.status().as_u16()),
+                    message: format!(
+                        "Ollama 服务响应异常 (HTTP {})，请检查 Ollama 是否已启动",
+                        response.status().as_u16()
+                    ),
                 })
             }
         }
-        Err(e) => {
-            Ok(ConnectionTestResult {
-                success: false,
-                message: format!("连接失败：{}", if e.is_timeout() {
+        Err(e) => Ok(ConnectionTestResult {
+            success: false,
+            message: format!(
+                "连接失败：{}",
+                if e.is_timeout() {
                     "连接超时，请确认 Ollama 服务已启动（默认端口 11434）".to_string()
                 } else {
                     e.to_string()
-                }),
-            })
-        }
+                }
+            ),
+        }),
     }
 }
 
@@ -249,7 +258,12 @@ pub async fn test_llamacpp_connection(endpoint: String) -> Result<ConnectionTest
     let url = format!("{}/v1/models", endpoint.trim_end_matches('/'));
 
     let client = reqwest::Client::new();
-    match client.get(&url).timeout(std::time::Duration::from_secs(10)).send().await {
+    match client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+    {
         Ok(response) => {
             if response.status().is_success() {
                 Ok(ConnectionTestResult {
@@ -259,20 +273,24 @@ pub async fn test_llamacpp_connection(endpoint: String) -> Result<ConnectionTest
             } else {
                 Ok(ConnectionTestResult {
                     success: false,
-                    message: format!("llama.cpp 服务响应异常 (HTTP {})，请检查服务是否已启动", response.status().as_u16()),
+                    message: format!(
+                        "llama.cpp 服务响应异常 (HTTP {})，请检查服务是否已启动",
+                        response.status().as_u16()
+                    ),
                 })
             }
         }
-        Err(e) => {
-            Ok(ConnectionTestResult {
-                success: false,
-                message: format!("连接失败：{}", if e.is_timeout() {
+        Err(e) => Ok(ConnectionTestResult {
+            success: false,
+            message: format!(
+                "连接失败：{}",
+                if e.is_timeout() {
                     "连接超时，请确认 llama.cpp 服务已启动".to_string()
                 } else {
                     e.to_string()
-                }),
-            })
-        }
+                }
+            ),
+        }),
     }
 }
 

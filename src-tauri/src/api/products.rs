@@ -1,14 +1,14 @@
 // 产品管理 API 处理器
 // 提供产品的 CRUD 操作 RESTful API
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path, Query},
+    extract::{Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::{Deserialize, Serialize};
-use super::AppState;
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
 
 /// 产品创建/更新请求
 #[derive(Debug, Deserialize)]
@@ -68,27 +68,29 @@ pub async fn get_products(
     // 审计修复 #7: 避免 Mutex poison 传播 panic，改用 map_err 优雅处理
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
-    
+
     // 构建查询
     let mut sql = "SELECT * FROM products WHERE 1=1".to_string();
     let mut params = Vec::new();
-    
+
     if let Some(cat_id) = query.category_id {
         sql.push_str(" AND category_id = ?");
         params.push(cat_id);
     }
-    
+
     if let Some(brand_id) = query.brand_id {
         sql.push_str(" AND brand_id = ?");
         params.push(brand_id);
     }
-    
+
     if let Some(search) = query.search {
         sql.push_str(" AND (name LIKE ? OR sku LIKE ? OR barcode LIKE ?)");
         let search_pattern = format!("%{}%", search);
@@ -96,14 +98,14 @@ pub async fn get_products(
         params.push(search_pattern.clone());
         params.push(search_pattern);
     }
-    
+
     if let Some(is_active) = query.is_active {
         sql.push_str(" AND is_active = ?");
         params.push(is_active.to_string());
     }
-    
+
     sql.push_str(" ORDER BY created_at DESC");
-    
+
     // 分页（R7 修复：参数化绑定）
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(20);
@@ -113,16 +115,18 @@ pub async fn get_products(
     params.push(page_size.to_string());
     params.push(offset.to_string());
     sql.push_str(&format!(" LIMIT ?{} OFFSET ?{}", idx_limit, idx_offset));
-    
+
     // 执行查询
     let mut stmt = match conn.prepare(&sql) {
         Ok(stmt) => stmt,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR, 
-            Json(serde_json::json!({"error": e.to_string()}))
-        ),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
-    
+
     let product_iter = match stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| {
         Ok(ProductResponse {
             id: row.get(0)?,
@@ -145,18 +149,23 @@ pub async fn get_products(
         })
     }) {
         Ok(iter) => iter,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR, 
-            Json(serde_json::json!({"error": e.to_string()}))
-        ),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
-    
+
     let products: Vec<ProductResponse> = product_iter.filter_map(|r| r.ok()).collect();
-    
+
     // 统一返回 Json<serde_json::Value>
     (
-        StatusCode::OK, 
-        Json(serde_json::to_value(products).unwrap_or(serde_json::json!({"error": "Serialization failed"})))
+        StatusCode::OK,
+        Json(
+            serde_json::to_value(products)
+                .unwrap_or(serde_json::json!({"error": "Serialization failed"})),
+        ),
     )
 }
 
@@ -167,51 +176,52 @@ pub async fn get_product(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
-    
-    let result = conn.query_row(
-        "SELECT * FROM products WHERE id = ?1",
-        params![id],
-        |row| {
-            Ok(ProductResponse {
-                id: row.get(0)?,
-                sku: row.get(1)?,
-                name: row.get(2)?,
-                description: row.get(3)?,
-                category_id: row.get(4)?,
-                brand_id: row.get(5)?,
-                unit: row.get(6)?,
-                cost_price: row.get(7)?,
-                sell_price: row.get(8)?,
-                current_stock: row.get(9)?,
-                min_stock: row.get(10)?,
-                max_stock: row.get(11)?,
-                image_url: row.get(12)?,
-                barcode: row.get(13)?,
-                is_active: row.get(14)?,
-                created_at: row.get(15)?,
-                updated_at: row.get(16)?,
-            })
-        },
-    );
-    
+
+    let result = conn.query_row("SELECT * FROM products WHERE id = ?1", params![id], |row| {
+        Ok(ProductResponse {
+            id: row.get(0)?,
+            sku: row.get(1)?,
+            name: row.get(2)?,
+            description: row.get(3)?,
+            category_id: row.get(4)?,
+            brand_id: row.get(5)?,
+            unit: row.get(6)?,
+            cost_price: row.get(7)?,
+            sell_price: row.get(8)?,
+            current_stock: row.get(9)?,
+            min_stock: row.get(10)?,
+            max_stock: row.get(11)?,
+            image_url: row.get(12)?,
+            barcode: row.get(13)?,
+            is_active: row.get(14)?,
+            created_at: row.get(15)?,
+            updated_at: row.get(16)?,
+        })
+    });
+
     match result {
         Ok(product) => (
-            StatusCode::OK, 
-            Json(serde_json::to_value(product).unwrap_or(serde_json::json!({"error": "Serialization failed"})))
+            StatusCode::OK,
+            Json(
+                serde_json::to_value(product)
+                    .unwrap_or(serde_json::json!({"error": "Serialization failed"})),
+            ),
         ),
         Err(rusqlite::Error::QueryReturnedNoRows) => (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "Product not found"}))
+            Json(serde_json::json!({"error": "Product not found"})),
         ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()}))
+            Json(serde_json::json!({"error": e.to_string()})),
         ),
     }
 }
@@ -223,31 +233,35 @@ pub async fn create_product(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
-    
+
     // 验证SKU唯一性
-    let sku_exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM products WHERE sku = ?1)",
-        params![payload.sku],
-        |row| row.get(0),
-    ).unwrap_or(false);
-    
+    let sku_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM products WHERE sku = ?1)",
+            params![payload.sku],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
     if sku_exists {
         return (
             StatusCode::CONFLICT,
-            Json(serde_json::json!({"error": "SKU already exists"}))
+            Json(serde_json::json!({"error": "SKU already exists"})),
         );
     }
-    
+
     // 生成ID
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    
+
     // 插入数据库
     match conn.execute(
         "INSERT INTO products (id, sku, name, description, category_id, brand_id, unit, cost_price, sell_price, min_stock, max_stock, image_url, barcode, is_active, created_at, updated_at)
@@ -277,17 +291,20 @@ pub async fn create_product(
             Json(serde_json::json!({"error": e.to_string()}))
         ),
     };
-    
+
     // 返回创建的产品
     let product = get_product_by_id(&conn, &id);
     match product {
         Ok(p) => (
-            StatusCode::CREATED, 
-            Json(serde_json::to_value(p).unwrap_or(serde_json::json!({"error": "Serialization failed"})))
+            StatusCode::CREATED,
+            Json(
+                serde_json::to_value(p)
+                    .unwrap_or(serde_json::json!({"error": "Serialization failed"})),
+            ),
         ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()}))
+            Json(serde_json::json!({"error": e.to_string()})),
         ),
     }
 }
@@ -300,30 +317,34 @@ pub async fn update_product(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
-    
+
     // 检查产品是否存在
-    let exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1)",
-        params![id],
-        |row| row.get(0),
-    ).unwrap_or(false);
-    
+    let exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1)",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
     if !exists {
         return (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "Product not found"}))
+            Json(serde_json::json!({"error": "Product not found"})),
         );
     }
-    
+
     // 更新数据库
     let now = chrono::Utc::now().to_rfc3339();
-    
+
     match conn.execute(
         "UPDATE products SET name = ?2, description = ?3, category_id = ?4, brand_id = ?5, unit = ?6, 
          cost_price = ?7, sell_price = ?8, min_stock = ?9, max_stock = ?10, 
@@ -351,17 +372,20 @@ pub async fn update_product(
             Json(serde_json::json!({"error": e.to_string()}))
         ),
     };
-    
+
     // 返回更新后的产品
     let product = get_product_by_id(&conn, &id);
     match product {
         Ok(p) => (
-            StatusCode::OK, 
-            Json(serde_json::to_value(p).unwrap_or(serde_json::json!({"error": "Serialization failed"})))
+            StatusCode::OK,
+            Json(
+                serde_json::to_value(p)
+                    .unwrap_or(serde_json::json!({"error": "Serialization failed"})),
+            ),
         ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()}))
+            Json(serde_json::json!({"error": e.to_string()})),
         ),
     }
 }
@@ -373,70 +397,73 @@ pub async fn delete_product(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": "Database lock error"}))
-        ),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
     let conn = db.connection();
-    
+
     // 检查产品是否存在
-    let exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1)",
-        params![id],
-        |row| row.get(0),
-    ).unwrap_or(false);
-    
+    let exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1)",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
     if !exists {
         return (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "Product not found"}))
+            Json(serde_json::json!({"error": "Product not found"})),
         );
     }
-    
+
     // 软删除：设置 is_active = 0
     let now = chrono::Utc::now().to_rfc3339();
-    
+
     match conn.execute(
         "UPDATE products SET is_active = 0, updated_at = ?2 WHERE id = ?1",
         params![id, now],
     ) {
         Ok(_) => (
-            StatusCode::NO_CONTENT, 
-            Json(serde_json::json!({"success": true}))
+            StatusCode::NO_CONTENT,
+            Json(serde_json::json!({"success": true})),
         ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()}))
+            Json(serde_json::json!({"error": e.to_string()})),
         ),
     }
 }
 
 /// 辅助函数：根据ID获取产品
-fn get_product_by_id(conn: &rusqlite::Connection, id: &str) -> Result<ProductResponse, rusqlite::Error> {
-    conn.query_row(
-        "SELECT * FROM products WHERE id = ?1",
-        params![id],
-        |row| {
-            Ok(ProductResponse {
-                id: row.get(0)?,
-                sku: row.get(1)?,
-                name: row.get(2)?,
-                description: row.get(3)?,
-                category_id: row.get(4)?,
-                brand_id: row.get(5)?,
-                unit: row.get(6)?,
-                cost_price: row.get(7)?,
-                sell_price: row.get(8)?,
-                current_stock: row.get(9)?,
-                min_stock: row.get(10)?,
-                max_stock: row.get(11)?,
-                image_url: row.get(12)?,
-                barcode: row.get(13)?,
-                is_active: row.get(14)?,
-                created_at: row.get(15)?,
-                updated_at: row.get(16)?,
-            })
-        },
-    )
+fn get_product_by_id(
+    conn: &rusqlite::Connection,
+    id: &str,
+) -> Result<ProductResponse, rusqlite::Error> {
+    conn.query_row("SELECT * FROM products WHERE id = ?1", params![id], |row| {
+        Ok(ProductResponse {
+            id: row.get(0)?,
+            sku: row.get(1)?,
+            name: row.get(2)?,
+            description: row.get(3)?,
+            category_id: row.get(4)?,
+            brand_id: row.get(5)?,
+            unit: row.get(6)?,
+            cost_price: row.get(7)?,
+            sell_price: row.get(8)?,
+            current_stock: row.get(9)?,
+            min_stock: row.get(10)?,
+            max_stock: row.get(11)?,
+            image_url: row.get(12)?,
+            barcode: row.get(13)?,
+            is_active: row.get(14)?,
+            created_at: row.get(15)?,
+            updated_at: row.get(16)?,
+        })
+    })
 }

@@ -2,11 +2,11 @@
 //!
 //! 提供命令执行统计和监控功能
 
+use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use parking_lot::RwLock;
 
 /// 命令执行统计信息
 #[derive(Debug, Clone)]
@@ -59,7 +59,9 @@ impl CommandStatsCollector {
     pub fn record(&self, name: &str, duration: Duration, error: bool) {
         let stats = self.get_or_create(name);
         stats.total_calls.fetch_add(1, Ordering::Relaxed);
-        stats.total_duration_ms.fetch_add(duration.as_millis() as u64, Ordering::Relaxed);
+        stats
+            .total_duration_ms
+            .fetch_add(duration.as_millis() as u64, Ordering::Relaxed);
         if error {
             stats.errors.fetch_add(1, Ordering::Relaxed);
         }
@@ -79,7 +81,8 @@ impl CommandStatsCollector {
     /// 获取所有命令的统计
     pub fn get_all_stats(&self) -> Vec<CommandStats> {
         let stats = self.stats.read();
-        stats.values()
+        stats
+            .values()
             .map(|inner| CommandStats {
                 name: inner.name.clone(),
                 total_calls: inner.total_calls.load(Ordering::Relaxed),
@@ -191,12 +194,12 @@ mod tests {
     #[test]
     fn test_command_stats() {
         let collector = CommandStatsCollector::new();
-        
+
         // 模拟命令执行
         collector.record("test_cmd", Duration::from_millis(100), false);
         collector.record("test_cmd", Duration::from_millis(200), false);
         collector.record("test_cmd", Duration::from_millis(150), true);
-        
+
         let stats = collector.get_stats("test_cmd").unwrap();
         assert_eq!(stats.total_calls, 3);
         assert_eq!(stats.total_duration_ms, 450);
@@ -207,12 +210,12 @@ mod tests {
     #[test]
     fn test_most_called() {
         let collector = CommandStatsCollector::new();
-        
+
         collector.record("cmd1", Duration::from_millis(10), false);
         collector.record("cmd2", Duration::from_millis(10), false);
         collector.record("cmd2", Duration::from_millis(10), false);
         collector.record("cmd3", Duration::from_millis(10), false);
-        
+
         let most_called = collector.get_most_called_commands(2);
         assert_eq!(most_called[0].0, "cmd2");
         assert_eq!(most_called[0].1, 2);

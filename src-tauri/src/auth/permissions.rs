@@ -71,18 +71,26 @@ pub fn has_any_permission(role_permissions: &[String], required: &[&str]) -> boo
     if role_permissions.contains(&perm::ALL.to_string()) {
         return true;
     }
-    required.iter().any(|r| role_permissions.contains(&r.to_string()))
+    required
+        .iter()
+        .any(|r| role_permissions.contains(&r.to_string()))
 }
 
 /// 从 JSON 权限字符串解析为 Vec
 #[allow(dead_code)]
 pub fn parse_permissions(json_perms: &str) -> Vec<String> {
-    serde_json::from_str::<Vec<String>>(json_perms)
-        .unwrap_or_else(|e| {
-            eprintln!("[Permissions] Failed to parse permissions JSON: {} - raw: {}", e,
-                if json_perms.len() > 100 { &json_perms[..100] } else { json_perms });
-            vec![]
-        })
+    serde_json::from_str::<Vec<String>>(json_perms).unwrap_or_else(|e| {
+        eprintln!(
+            "[Permissions] Failed to parse permissions JSON: {} - raw: {}",
+            e,
+            if json_perms.len() > 100 {
+                &json_perms[..100]
+            } else {
+                json_perms
+            }
+        );
+        vec![]
+    })
 }
 
 /// 获取角色对应的默认权限列表
@@ -122,9 +130,7 @@ pub fn get_role_permissions(role_name: &str) -> Vec<String> {
             perm::VIEW_OWN_ORDERS.to_string(),
             perm::VIEW_OWN_PRODUCTS.to_string(),
         ],
-        "supplier" => vec![
-            perm::VIEW_OWN_PRODUCTS.to_string(),
-        ],
+        "supplier" => vec![perm::VIEW_OWN_PRODUCTS.to_string()],
         _ => vec![],
     }
 }
@@ -184,7 +190,9 @@ pub fn required_permission_for_route(method: &str, path: &str) -> Option<&'stati
         (_, p) if p == "/api/invitations/create" => Some(perm::CREATE_INVITATION),
         (_, p) if p == "/api/invitations/create_employee" => Some(perm::CREATE_INVITATION),
         (_, p) if p == "/api/invitations" && method == "GET" => Some(perm::VIEW_INVITATIONS),
-        (_, p) if p.contains("/api/invitations/") && p.contains("/revoke") => Some(perm::REVOKE_INVITATION),
+        (_, p) if p.contains("/api/invitations/") && p.contains("/revoke") => {
+            Some(perm::REVOKE_INVITATION)
+        }
 
         // 审计修复 #19: 云商城 API 权限控制
         (_, p) if p == "/api/cloud-store" && method == "POST" => Some(perm::MANAGE_FINANCE),
@@ -242,8 +250,14 @@ mod tests {
     #[test]
     fn test_has_any_permission() {
         let perms = vec!["view_products".to_string()];
-        assert!(has_any_permission(&perms, &["view_products", "manage_products"]));
-        assert!(!has_any_permission(&perms, &["manage_products", "manage_users"]));
+        assert!(has_any_permission(
+            &perms,
+            &["view_products", "manage_products"]
+        ));
+        assert!(!has_any_permission(
+            &perms,
+            &["manage_products", "manage_users"]
+        ));
     }
 
     #[test]

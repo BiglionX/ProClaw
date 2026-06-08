@@ -1,14 +1,14 @@
 // 设备授权管理 API 处理器
 
+use super::AppState;
 use axum::{
-    extract::{State, Json, Path},
+    extract::{Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::{Deserialize, Serialize};
-use super::AppState;
-use rusqlite::params;
 use chrono::Utc;
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
 
 /// 生成配对码请求
 #[derive(Debug, Deserialize)]
@@ -35,33 +35,41 @@ pub async fn generate_pairing_code(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
-    
+
     let conn = db.connection();
-    
+
     // 生成6位数字配对码
     let code = generate_random_code();
     let now = Utc::now().timestamp();
     let expires_at = now + 300; // 5分钟有效期
     let pairing_id = uuid::Uuid::new_v4().to_string();
-    
+
     // 保存配对码到数据库
     let result = conn.execute(
         "INSERT INTO pairing_codes (id, code, created_by, expires_at, is_used) VALUES (?1, ?2, ?3, ?4, 0)",
         params![pairing_id, code, payload.user_id, expires_at],
     );
-    
+
     match result {
         Ok(_) => {
             // 获取本机IP
             let local_ips = get_local_ip();
-            let ip = local_ips.first().unwrap_or(&"127.0.0.1".to_string()).clone();
+            let ip = local_ips
+                .first()
+                .unwrap_or(&"127.0.0.1".to_string())
+                .clone();
             let port = 8888;
-            
+
             // 生成二维码内容
             let qr_content = format!("proclaw://pair?host={}&port={}&code={}", ip, port, code);
-            
+
             (
                 StatusCode::OK,
                 Json(serde_json::json!({
@@ -70,40 +78,45 @@ pub async fn generate_pairing_code(
                     "expires_in": 300,
                     "local_ips": local_ips,
                     "port": port
-                }))
+                })),
             )
-        },
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to generate pairing code: {}", e)}))
+            Json(serde_json::json!({"error": format!("Failed to generate pairing code: {}", e)})),
         ),
     }
 }
 
 /// 获取已授权设备列表
-pub async fn list_devices(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn list_devices(State(state): State<AppState>) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
-    
+
     let conn = db.connection();
-    
+
     let mut stmt = match conn.prepare(
         "SELECT id, device_name, device_type, last_active_at, is_revoked 
          FROM devices 
          WHERE is_revoked = 0 
-         ORDER BY last_active_at DESC"
+         ORDER BY last_active_at DESC",
     ) {
         Ok(stmt) => stmt,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to prepare statement: {}", e)}))
-        ),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to prepare statement: {}", e)})),
+            )
+        }
     };
-    
+
     let devices_iter = stmt.query_map([], |row| {
         Ok(DeviceResponse {
             id: row.get(0)?,
@@ -113,20 +126,26 @@ pub async fn list_devices(
             is_revoked: row.get(4)?,
         })
     });
-    
+
     let devices: Vec<DeviceResponse> = match devices_iter {
-        Ok(iter) => {
-            iter.filter_map(|r| {
-                r.map_err(|e| eprintln!("[Devices] Corrupt row skipped: {}", e)).ok()
-            }).collect()
-        },
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to query devices: {}", e)}))
-        ),
+        Ok(iter) => iter
+            .filter_map(|r| {
+                r.map_err(|e| eprintln!("[Devices] Corrupt row skipped: {}", e))
+                    .ok()
+            })
+            .collect(),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to query devices: {}", e)})),
+            )
+        }
     };
-    
-    (StatusCode::OK, Json(serde_json::json!({"devices": devices})))
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"devices": devices})),
+    )
 }
 
 /// 踢除设备
@@ -136,27 +155,38 @@ pub async fn revoke_device(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
-    
+
     let conn = db.connection();
-    
+
     let result = conn.execute(
         "UPDATE devices SET is_revoked = 1 WHERE id = ?1",
         params![id],
     );
-    
+
     match result {
         Ok(count) => {
             if count > 0 {
-                (StatusCode::OK, Json(serde_json::json!({"message": "Device revoked successfully"})))
+                (
+                    StatusCode::OK,
+                    Json(serde_json::json!({"message": "Device revoked successfully"})),
+                )
             } else {
-                (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Device not found"})))
+                (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({"error": "Device not found"})),
+                )
             }
-        },
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to revoke device: {}", e)}))
+            Json(serde_json::json!({"error": format!("Failed to revoke device: {}", e)})),
         ),
     }
 }
@@ -173,14 +203,14 @@ fn generate_random_code() -> String {
 #[allow(dead_code)]
 fn get_local_ip() -> Vec<String> {
     use std::net::TcpStream;
-    
+
     // 尝试连接到外部地址以获取本机IP
     if let Ok(stream) = TcpStream::connect("8.8.8.8:80") {
         if let Ok(local_addr) = stream.local_addr() {
             return vec![local_addr.ip().to_string()];
         }
     }
-    
+
     // 回退到 localhost
     vec!["127.0.0.1".to_string()]
 }

@@ -5,16 +5,24 @@ use uuid::Uuid;
 
 /// 创建供应商
 #[tauri::command]
-pub fn create_supplier(db: tauri::State<Mutex<Database>>, supplier: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn create_supplier(
+    db: tauri::State<Mutex<Database>>,
+    supplier: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let id = Uuid::new_v4().to_string();
-    let name = supplier["name"].as_str().ok_or("Supplier name is required")?;
+    let name = supplier["name"]
+        .as_str()
+        .ok_or("Supplier name is required")?;
 
     // 自动生成 code
     let code_str = format!("SUP-{}", &id[..8]);
-    let code = supplier.get("code").and_then(|v| v.as_str()).unwrap_or(&code_str);
+    let code = supplier
+        .get("code")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&code_str);
 
     conn.execute(
         "INSERT INTO suppliers (id, name, code, contact_person, phone, email, address, website, payment_terms, tax_number, notes, is_active, sync_status)
@@ -43,14 +51,17 @@ pub fn create_supplier(db: tauri::State<Mutex<Database>>, supplier: serde_json::
 
 /// 获取供应商列表
 #[tauri::command]
-pub fn get_suppliers(db: tauri::State<Mutex<Database>>, options: Option<serde_json::Value>) -> Result<Vec<serde_json::Value>, String> {
+pub fn get_suppliers(
+    db: tauri::State<Mutex<Database>>,
+    options: Option<serde_json::Value>,
+) -> Result<Vec<serde_json::Value>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let mut sql = String::from(
         "SELECT id, name, code, contact_person, phone, email, address, website,
                 payment_terms, tax_number, notes, is_active, created_at, updated_at
-         FROM suppliers WHERE deleted_at IS NULL"
+         FROM suppliers WHERE deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -98,14 +109,18 @@ pub fn get_suppliers(db: tauri::State<Mutex<Database>>, options: Option<serde_js
 
 /// 创建采购订单
 #[tauri::command]
-pub fn create_purchase_order(db: tauri::State<Mutex<Database>>, order: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn create_purchase_order(
+    db: tauri::State<Mutex<Database>>,
+    order: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let id = Uuid::new_v4().to_string();
 
     // 自动生成 PO 编号
-    let po_number = order.get("po_number")
+    let po_number = order
+        .get("po_number")
         .and_then(|v| v.as_str())
         .unwrap_or(&format!("PO-{}", &id[..8]))
         .to_string();
@@ -115,7 +130,8 @@ pub fn create_purchase_order(db: tauri::State<Mutex<Database>>, order: serde_jso
         .ok_or("Supplier ID is required")?
         .to_string();
 
-    let order_date = order.get("order_date")
+    let order_date = order
+        .get("order_date")
         .and_then(|v| v.as_str())
         .unwrap_or("2024-01-01")
         .to_string();
@@ -146,9 +162,15 @@ pub fn create_purchase_order(db: tauri::State<Mutex<Database>>, order: serde_jso
     if let Some(items) = order.get("items").and_then(|v| v.as_array()) {
         for item in items {
             let item_id = Uuid::new_v4().to_string();
-            let product_id = item["product_id"].as_str().ok_or("Product ID required in items")?;
-            let quantity = item["quantity"].as_i64().ok_or("Quantity required in items")? as i32;
-            let unit_price = item["unit_price"].as_f64().ok_or("Unit price required in items")?;
+            let product_id = item["product_id"]
+                .as_str()
+                .ok_or("Product ID required in items")?;
+            let quantity = item["quantity"]
+                .as_i64()
+                .ok_or("Quantity required in items")? as i32;
+            let unit_price = item["unit_price"]
+                .as_f64()
+                .ok_or("Unit price required in items")?;
             let total_price = quantity as f64 * unit_price;
 
             tx.execute(
@@ -178,7 +200,8 @@ pub fn create_purchase_order(db: tauri::State<Mutex<Database>>, order: serde_jso
     tx.execute(
         "UPDATE purchase_orders SET total_amount = ?1 WHERE id = ?2",
         params![total_amount, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
 
@@ -192,7 +215,10 @@ pub fn create_purchase_order(db: tauri::State<Mutex<Database>>, order: serde_jso
 
 /// 获取采购订单列表
 #[tauri::command]
-pub fn get_purchase_orders(db: tauri::State<Mutex<Database>>, options: Option<serde_json::Value>) -> Result<Vec<serde_json::Value>, String> {
+pub fn get_purchase_orders(
+    db: tauri::State<Mutex<Database>>,
+    options: Option<serde_json::Value>,
+) -> Result<Vec<serde_json::Value>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -203,7 +229,7 @@ pub fn get_purchase_orders(db: tauri::State<Mutex<Database>>, options: Option<se
                 po.notes, po.created_at, po.updated_at
          FROM purchase_orders po
          LEFT JOIN suppliers s ON po.supplier_id = s.id
-         WHERE po.deleted_at IS NULL"
+         WHERE po.deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -254,48 +280,55 @@ pub fn get_purchase_orders(db: tauri::State<Mutex<Database>>, options: Option<se
 
 /// 获取采购订单详情(包含明细)
 #[tauri::command]
-pub fn get_purchase_order_detail(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+pub fn get_purchase_order_detail(
+    db: tauri::State<Mutex<Database>>,
+    order_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     // 获取订单主表信息
-    let order: serde_json::Value = conn.query_row(
-        "SELECT po.id, po.po_number, po.supplier_id, s.name as supplier_name,
+    let order: serde_json::Value = conn
+        .query_row(
+            "SELECT po.id, po.po_number, po.supplier_id, s.name as supplier_name,
                 po.order_date, po.expected_delivery_date, po.status,
                 po.total_amount, po.paid_amount, po.payment_status,
                 po.notes, po.created_at, po.updated_at
          FROM purchase_orders po
          LEFT JOIN suppliers s ON po.supplier_id = s.id
          WHERE po.id = ?1 AND po.deleted_at IS NULL",
-        params![order_id],
-        |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "po_number": row.get::<_, String>(1)?,
-                "supplier_id": row.get::<_, String>(2)?,
-                "supplier_name": row.get::<_, Option<String>>(3)?,
-                "order_date": row.get::<_, String>(4)?,
-                "expected_delivery_date": row.get::<_, Option<String>>(5)?,
-                "status": row.get::<_, String>(6)?,
-                "total_amount": row.get::<_, f64>(7)?,
-                "paid_amount": row.get::<_, f64>(8)?,
-                "payment_status": row.get::<_, String>(9)?,
-                "notes": row.get::<_, Option<String>>(10)?,
-                "created_at": row.get::<_, String>(11)?,
-                "updated_at": row.get::<_, String>(12)?,
-            }))
-        },
-    ).map_err(|e| e.to_string())?;
+            params![order_id],
+            |row| {
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?,
+                    "po_number": row.get::<_, String>(1)?,
+                    "supplier_id": row.get::<_, String>(2)?,
+                    "supplier_name": row.get::<_, Option<String>>(3)?,
+                    "order_date": row.get::<_, String>(4)?,
+                    "expected_delivery_date": row.get::<_, Option<String>>(5)?,
+                    "status": row.get::<_, String>(6)?,
+                    "total_amount": row.get::<_, f64>(7)?,
+                    "paid_amount": row.get::<_, f64>(8)?,
+                    "payment_status": row.get::<_, String>(9)?,
+                    "notes": row.get::<_, Option<String>>(10)?,
+                    "created_at": row.get::<_, String>(11)?,
+                    "updated_at": row.get::<_, String>(12)?,
+                }))
+            },
+        )
+        .map_err(|e| e.to_string())?;
 
     // 获取订单明细
-    let mut stmt = conn.prepare(
-        "SELECT poi.id, poi.product_id, p.name as product_name, p.sku,
+    let mut stmt = conn
+        .prepare(
+            "SELECT poi.id, poi.product_id, p.name as product_name, p.sku,
                 poi.quantity, poi.unit_price, poi.total_price, poi.received_quantity, poi.notes
          FROM purchase_order_items poi
          LEFT JOIN products p ON poi.product_id = p.id
          WHERE poi.purchase_order_id = ?1
-         ORDER BY poi.id"
-    ).map_err(|e| e.to_string())?;
+         ORDER BY poi.id",
+        )
+        .map_err(|e| e.to_string())?;
 
     let items: Vec<serde_json::Value> = stmt
         .query_map(params![order_id], |row| {
@@ -323,14 +356,21 @@ pub fn get_purchase_order_detail(db: tauri::State<Mutex<Database>>, order_id: St
 
 /// 更新采购订单 (Tauri command)
 #[tauri::command]
-pub fn update_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String, order: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn update_purchase_order_cmd(
+    db: tauri::State<Mutex<Database>>,
+    order_id: String,
+    order: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase order not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",
+            params![order_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase order not found".to_string())?;
 
     if status != "draft" {
         return Err("Only draft orders can be updated".to_string());
@@ -349,7 +389,11 @@ pub fn update_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: St
         ],
     ).map_err(|e| e.to_string())?;
 
-    tx.execute("DELETE FROM purchase_order_items WHERE purchase_order_id = ?1", params![order_id]).map_err(|e| e.to_string())?;
+    tx.execute(
+        "DELETE FROM purchase_order_items WHERE purchase_order_id = ?1",
+        params![order_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     if let Some(items) = order.get("items").and_then(|v| v.as_array()) {
         for item in items {
@@ -364,7 +408,11 @@ pub fn update_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: St
     }
 
     let total: f64 = tx.query_row("SELECT COALESCE(SUM(total_price),0.0) FROM purchase_order_items WHERE purchase_order_id = ?1", params![order_id], |row| row.get(0)).unwrap_or(0.0);
-    tx.execute("UPDATE purchase_orders SET total_amount = ?1 WHERE id = ?2", params![total, order_id]).map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE purchase_orders SET total_amount = ?1 WHERE id = ?2",
+        params![total, order_id],
+    )
+    .map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({"id": order_id, "message": "Purchase order updated"}))
@@ -372,14 +420,20 @@ pub fn update_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: St
 
 /// 删除采购订单 (软删除)
 #[tauri::command]
-pub fn delete_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+pub fn delete_purchase_order_cmd(
+    db: tauri::State<Mutex<Database>>,
+    order_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase order not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",
+            params![order_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase order not found".to_string())?;
 
     if status != "draft" && status != "cancelled" {
         return Err("Only draft or cancelled orders can be deleted".to_string());
@@ -393,14 +447,20 @@ pub fn delete_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: St
 
 /// 确认收货 (增加库存)
 #[tauri::command]
-pub fn receive_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+pub fn receive_purchase_order_cmd(
+    db: tauri::State<Mutex<Database>>,
+    order_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase order not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",
+            params![order_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase order not found".to_string())?;
 
     if status != "confirmed" && status != "draft" && status != "approved" {
         return Err(format!("Cannot receive order with status '{}'", status));
@@ -410,7 +470,10 @@ pub fn receive_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: S
 
     let items: Vec<(String, i32)> = {
         let mut stmt = tx.prepare("SELECT product_id, quantity FROM purchase_order_items WHERE purchase_order_id = ?1").map_err(|e| e.to_string())?;
-        let rows = stmt.query_map(params![order_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)))
+        let rows = stmt
+            .query_map(params![order_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+            })
             .map_err(|e| e.to_string())?;
         rows.filter_map(|r| r.ok()).collect()
     };
@@ -426,19 +489,27 @@ pub fn receive_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: S
     tx.execute("UPDATE purchase_orders SET status = 'received', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id]).map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({"id": order_id, "status": "received", "message": "Purchase order received. Inventory updated."}))
+    Ok(
+        serde_json::json!({"id": order_id, "status": "received", "message": "Purchase order received. Inventory updated."}),
+    )
 }
 
 /// 确认采购订单 (draft → confirmed)
 #[tauri::command]
-pub fn confirm_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+pub fn confirm_purchase_order_cmd(
+    db: tauri::State<Mutex<Database>>,
+    order_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase order not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",
+            params![order_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase order not found".to_string())?;
 
     if status != "draft" {
         return Err(format!("Cannot confirm order with status '{}'", status));
@@ -447,19 +518,27 @@ pub fn confirm_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: S
     conn.execute("UPDATE purchase_orders SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
         .map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({"id": order_id, "status": "confirmed", "message": "Purchase order confirmed"}))
+    Ok(
+        serde_json::json!({"id": order_id, "status": "confirmed", "message": "Purchase order confirmed"}),
+    )
 }
 
 /// 取消采购订单 (任意状态 → cancelled)
 #[tauri::command]
-pub fn cancel_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: String) -> Result<serde_json::Value, String> {
+pub fn cancel_purchase_order_cmd(
+    db: tauri::State<Mutex<Database>>,
+    order_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL", params![order_id],
-        |row| row.get(0),
-    ).map_err(|_| "Purchase order not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",
+            params![order_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Purchase order not found".to_string())?;
 
     if status == "received" || status == "cancelled" {
         return Err(format!("Cannot cancel order with status '{}'", status));
@@ -468,5 +547,7 @@ pub fn cancel_purchase_order_cmd(db: tauri::State<Mutex<Database>>, order_id: St
     conn.execute("UPDATE purchase_orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id])
         .map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({"id": order_id, "status": "cancelled", "message": "Purchase order cancelled"}))
+    Ok(
+        serde_json::json!({"id": order_id, "status": "cancelled", "message": "Purchase order cancelled"}),
+    )
 }

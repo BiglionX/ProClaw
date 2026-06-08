@@ -1,23 +1,19 @@
 // Relay API - 云中继通信端点
 // 处理中继消息收发、同步触发、连接状态查询
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use crate::api::AppState;
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use crate::api::AppState;
 
 // ========== 请求/响应类型 ==========
 
 #[derive(Debug, Deserialize)]
 pub struct RelaySendRequest {
     pub receiver_id: String,
-    pub message_type: String,       // "chat", "order", "sync", "command"
-    pub content: Value,              // 消息内容（可以是任意JSON）
-    pub priority: Option<i32>,       // 优先级 0-100，越高越优先
+    pub message_type: String,  // "chat", "order", "sync", "command"
+    pub content: Value,        // 消息内容（可以是任意JSON）
+    pub priority: Option<i32>, // 优先级 0-100，越高越优先
 }
 
 #[derive(Debug, Serialize)]
@@ -30,13 +26,13 @@ pub struct RelaySendResponse {
 #[derive(Debug, Deserialize)]
 pub struct RelayMessagesQuery {
     #[allow(dead_code)]
-    pub since: Option<String>,       // ISO 8601 时间戳，只返回此时间之后的消息
-    pub limit: Option<i32>,          // 返回数量限制，默认 50
+    pub since: Option<String>, // ISO 8601 时间戳，只返回此时间之后的消息
+    pub limit: Option<i32>, // 返回数量限制，默认 50
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SyncTriggerRequest {
-    pub sync_type: Option<String>,   // "full", "upload_only", "download_only"
+    pub sync_type: Option<String>, // "full", "upload_only", "download_only"
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,10 +51,13 @@ pub async fn relay_send(
 ) -> (StatusCode, Json<Value>) {
     // 注意：relay功能需要Supabase配置
     let relay_id = uuid::Uuid::new_v4().to_string();
-    
+
     // 将消息存储到本地的 relay_messages 表中（待同步到云端）
     let db = state.db.lock().map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
     });
 
     let db = match db {
@@ -67,11 +66,10 @@ pub async fn relay_send(
     };
 
     // 审计修复 #4: 序列化失败时记录错误
-    let content_str = serde_json::to_string(&req.content)
-        .unwrap_or_else(|e| {
-            eprintln!("[Relay] Failed to serialize message content: {}", e);
-            String::from("{}")
-        });
+    let content_str = serde_json::to_string(&req.content).unwrap_or_else(|e| {
+        eprintln!("[Relay] Failed to serialize message content: {}", e);
+        String::from("{}")
+    });
 
     let result = db.connection().execute(
         "INSERT INTO relay_messages (id, receiver_id, message_type, content, priority, status, direction)
@@ -135,7 +133,10 @@ pub async fn relay_get_messages(
     axum::extract::Query(query): axum::extract::Query<RelayMessagesQuery>,
 ) -> (StatusCode, Json<Value>) {
     let db = state.db.lock().map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
     });
 
     let db = match db {
@@ -148,16 +149,29 @@ pub async fn relay_get_messages(
     let messages: Vec<Value> = query_relay_messages(db.connection(), &query.since, limit);
     let is_err = matches!(messages.first(), Some(v) if v.get("_error").is_some());
     if is_err {
-        let err_msg = messages.first().and_then(|v| v.get("_error").and_then(|e| e.as_str()).map(|s| s.to_string()))
+        let err_msg = messages
+            .first()
+            .and_then(|v| {
+                v.get("_error")
+                    .and_then(|e| e.as_str())
+                    .map(|s| s.to_string())
+            })
             .unwrap_or_default();
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": err_msg})));
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": err_msg})),
+        );
     }
 
     // 标记获取到的消息为已拉取
     if !messages.is_empty() {
-        let ids: Vec<String> = messages.iter()
+        let ids: Vec<String> = messages
+            .iter()
             .filter(|m| m.get("direction").and_then(|d| d.as_str()) == Some("incoming"))
-            .filter_map(|m| m.get("id").and_then(|id| id.as_str().map(|s| s.to_string())))
+            .filter_map(|m| {
+                m.get("id")
+                    .and_then(|id| id.as_str().map(|s| s.to_string()))
+            })
             .collect();
 
         for id in &ids {
@@ -182,9 +196,7 @@ pub async fn relay_get_messages(
 
 /// GET /api/relay/status
 /// 获取云中继连接状态
-pub async fn relay_status(
-    State(_state): State<AppState>,
-) -> (StatusCode, Json<Value>) {
+pub async fn relay_status(State(_state): State<AppState>) -> (StatusCode, Json<Value>) {
     // 检查 Supabase 配置状态
     let supabase_url = std::env::var("SUPABASE_URL").unwrap_or_default();
     let supabase_key = std::env::var("SUPABASE_ANON_KEY").unwrap_or_default();
@@ -192,7 +204,12 @@ pub async fn relay_status(
 
     let db = match _state.db.lock() {
         Ok(db) => db,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        }
     };
 
     // 统计中继消息队列
@@ -209,11 +226,15 @@ pub async fn relay_status(
     ).unwrap_or(0);
 
     // 获取最后同步时间
-    let last_sync: Option<String> = db.connection().query_row(
-        "SELECT MAX(created_at) FROM relay_messages WHERE status IN ('delivered', 'synced')",
-        [],
-        |row| row.get(0),
-    ).ok().flatten();
+    let last_sync: Option<String> = db
+        .connection()
+        .query_row(
+            "SELECT MAX(created_at) FROM relay_messages WHERE status IN ('delivered', 'synced')",
+            [],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten();
 
     (
         StatusCode::OK,
@@ -238,7 +259,10 @@ pub async fn sync_trigger(
     Json(req): Json<SyncTriggerRequest>,
 ) -> (StatusCode, Json<Value>) {
     let db = state.db.lock().map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
     });
 
     let db = match db {
@@ -276,7 +300,7 @@ pub async fn sync_trigger(
              FROM offline_queue
              WHERE status = 'pending' AND retry_count < max_retries
              ORDER BY priority DESC, created_at ASC
-             LIMIT 100"
+             LIMIT 100",
         ) {
             Ok(s) => s,
             Err(_) => {
@@ -287,8 +311,8 @@ pub async fn sync_trigger(
             }
         };
 
-        let operations: Vec<(String, String, String, String, String, i32)> = match stmt
-            .query_map([], |row| {
+        let operations: Vec<(String, String, String, String, String, i32)> =
+            match stmt.query_map([], |row| {
                 Ok((
                     row.get(0)?,
                     row.get(1)?,
@@ -308,7 +332,10 @@ pub async fn sync_trigger(
                 "UPDATE offline_queue SET status = 'processing' WHERE id = ?1",
                 rusqlite::params![id],
             ) {
-                eprintln!("[Sync] Failed to mark queue entry {} as processing: {}", id, e);
+                eprintln!(
+                    "[Sync] Failed to mark queue entry {} as processing: {}",
+                    id, e
+                );
             }
 
             // 尝试同步（这里做实际 Supabase 调用需要外部服务，暂用简化处理）
@@ -378,7 +405,10 @@ pub async fn sync_status(
     axum::extract::Query(_query): axum::extract::Query<SyncStatusQuery>,
 ) -> (StatusCode, Json<Value>) {
     let db = state.db.lock().map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
     });
 
     let db = match db {
@@ -389,53 +419,84 @@ pub async fn sync_status(
     let conn = db.connection();
 
     // 统计信息
-    let pending: i32 = conn.query_row(
-        "SELECT COUNT(*) FROM offline_queue WHERE status = 'pending'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let pending: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM offline_queue WHERE status = 'pending'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    let processing: i32 = conn.query_row(
-        "SELECT COUNT(*) FROM offline_queue WHERE status = 'processing'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let processing: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM offline_queue WHERE status = 'processing'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    let failed: i32 = conn.query_row(
-        "SELECT COUNT(*) FROM offline_queue WHERE status = 'failed'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let failed: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM offline_queue WHERE status = 'failed'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     // 各表的同步状态统计
-    let tables = ["products", "customers", "suppliers", "sales_orders", "purchase_orders", "financial_transactions"];
+    let tables = [
+        "products",
+        "customers",
+        "suppliers",
+        "sales_orders",
+        "purchase_orders",
+        "financial_transactions",
+    ];
     let mut table_stats = json!({});
 
     for table in &tables {
-        let synced: i32 = conn.query_row(
-            &format!("SELECT COUNT(*) FROM {} WHERE sync_status = 'synced'", table),
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let synced: i32 = conn
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM {} WHERE sync_status = 'synced'",
+                    table
+                ),
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
-        let pending: i32 = conn.query_row(
-            &format!("SELECT COUNT(*) FROM {} WHERE sync_status = 'pending'", table),
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let pending: i32 = conn
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM {} WHERE sync_status = 'pending'",
+                    table
+                ),
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
-        let conflicts: i32 = conn.query_row(
-            &format!("SELECT COUNT(*) FROM {} WHERE sync_status = 'conflict'", table),
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let conflicts: i32 = conn
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM {} WHERE sync_status = 'conflict'",
+                    table
+                ),
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         if let Some(obj) = table_stats.as_object_mut() {
-            obj.insert(table.to_string(), json!({
-                "synced": synced,
-                "pending": pending,
-                "conflicts": conflicts,
-            }));
+            obj.insert(
+                table.to_string(),
+                json!({
+                    "synced": synced,
+                    "pending": pending,
+                    "conflicts": conflicts,
+                }),
+            );
         }
     }
 
@@ -493,7 +554,11 @@ pub async fn sync_status(
 // ========== 辅助函数 ==========
 
 /// 查询中继消息（从本地 relay_messages 表）
-fn query_relay_messages(conn: &rusqlite::Connection, since: &Option<String>, limit: i64) -> Vec<Value> {
+fn query_relay_messages(
+    conn: &rusqlite::Connection,
+    since: &Option<String>,
+    limit: i64,
+) -> Vec<Value> {
     let result = if let Some(since_val) = since {
         query_messages_with_since(conn, since_val, limit)
     } else {
@@ -503,30 +568,40 @@ fn query_relay_messages(conn: &rusqlite::Connection, since: &Option<String>, lim
     result.unwrap_or_default()
 }
 
-fn query_messages_with_since(conn: &rusqlite::Connection, since_val: &str, limit: i64) -> Result<Vec<Value>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT id, receiver_id, message_type, content, priority, status, direction, created_at
+fn query_messages_with_since(
+    conn: &rusqlite::Connection,
+    since_val: &str,
+    limit: i64,
+) -> Result<Vec<Value>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, receiver_id, message_type, content, priority, status, direction, created_at
          FROM relay_messages
          WHERE created_at > ?1
          ORDER BY created_at ASC
-         LIMIT ?2"
-    ).map_err(|e| e.to_string())?;
+         LIMIT ?2",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(rusqlite::params![since_val, limit], row_to_value)
+    let rows = stmt
+        .query_map(rusqlite::params![since_val, limit], row_to_value)
         .map_err(|e| e.to_string())?;
 
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
 fn query_messages_all(conn: &rusqlite::Connection, limit: i64) -> Result<Vec<Value>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT id, receiver_id, message_type, content, priority, status, direction, created_at
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, receiver_id, message_type, content, priority, status, direction, created_at
          FROM relay_messages
          ORDER BY created_at DESC
-         LIMIT ?1"
-    ).map_err(|e| e.to_string())?;
+         LIMIT ?1",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(rusqlite::params![limit], row_to_value)
+    let rows = stmt
+        .query_map(rusqlite::params![limit], row_to_value)
         .map_err(|e| e.to_string())?;
 
     Ok(rows.filter_map(|r| r.ok()).collect())
@@ -551,12 +626,21 @@ fn row_to_value(row: &rusqlite::Row) -> rusqlite::Result<Value> {
 /// 标记本地记录为已同步
 
 /// 标记本地记录为已同步
-fn mark_record_synced(conn: &rusqlite::Connection, table_name: &str, record_id: &str) -> Result<(), String> {
+fn mark_record_synced(
+    conn: &rusqlite::Connection,
+    table_name: &str,
+    record_id: &str,
+) -> Result<(), String> {
     let tables = vec![
-        "products", "product_categories", "brands",
-        "customers", "suppliers",
-        "sales_orders", "purchase_orders",
-        "inventory_transactions", "financial_transactions",
+        "products",
+        "product_categories",
+        "brands",
+        "customers",
+        "suppliers",
+        "sales_orders",
+        "purchase_orders",
+        "inventory_transactions",
+        "financial_transactions",
     ];
 
     if tables.contains(&table_name) {
@@ -565,7 +649,12 @@ fn mark_record_synced(conn: &rusqlite::Connection, table_name: &str, record_id: 
             table_name
         );
         conn.execute(&sql, rusqlite::params![record_id])
-            .map_err(|e| format!("Failed to mark {}/{} as synced: {}", table_name, record_id, e))?;
+            .map_err(|e| {
+                format!(
+                    "Failed to mark {}/{} as synced: {}",
+                    table_name, record_id, e
+                )
+            })?;
         Ok(())
     } else {
         // 对于不在列表中的表，不做标记但也不报错
@@ -575,7 +664,14 @@ fn mark_record_synced(conn: &rusqlite::Connection, table_name: &str, record_id: 
 
 /// 本地冲突解决
 fn resolve_conflicts_local(conn: &rusqlite::Connection) -> Result<usize, String> {
-    let tables = ["products", "customers", "suppliers", "sales_orders", "purchase_orders", "financial_transactions"];
+    let tables = [
+        "products",
+        "customers",
+        "suppliers",
+        "sales_orders",
+        "purchase_orders",
+        "financial_transactions",
+    ];
     let mut total = 0;
 
     for table in &tables {

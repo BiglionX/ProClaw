@@ -1,27 +1,27 @@
-﻿// 外部伙伴邀请 & 员工邀请 API (PRD v4.2 + v4.3)
+// 外部伙伴邀请 & 员工邀请 API (PRD v4.2 + v4.3)
 // 提供邀请创建、接受、撤销、查询功能
 // 接受邀请接口无需预先认证（新用户尚无 token），使用 IP 限流防滥用
 // v4.2.1: 添加 HMAC-SHA256 签名防伪
 
 use axum::{
-    extract::{State, Json, Path, ConnectInfo},
+    extract::{ConnectInfo, Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
     Extension,
 };
+use chrono::Utc;
+use hmac::{Hmac, Mac};
+use rusqlite::params;
 use serde::Deserialize;
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Mutex;
-use rusqlite::params;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
-use chrono::Utc;
-use std::time::{Instant, Duration};
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
 
-use super::AppState;
 use super::auth::{hash_password, Claims};
+use super::AppState;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -43,7 +43,7 @@ lazy_static::lazy_static! {
 fn check_ip_rate_limit(ip: &str) -> bool {
     use std::sync::atomic::{AtomicU64, Ordering};
     static CALL_COUNT: AtomicU64 = AtomicU64::new(0);
-    
+
     // 限流检查：锁作用域用花括号显式限定
     let limited = {
         let mut map = match IP_RATE_LIMIT.lock() {
@@ -80,7 +80,7 @@ fn check_ip_rate_limit(ip: &str) -> bool {
             true
         }
     };
-    
+
     limited
 }
 
@@ -113,11 +113,13 @@ fn get_invite_secret(db_conn: &rusqlite::Connection) -> Vec<u8> {
         }
     }
     // 从数据库读取
-    let stored: Option<String> = db_conn.query_row(
-        "SELECT value FROM system_config WHERE key = 'invite_secret_key'",
-        [],
-        |row| row.get(0),
-    ).ok();
+    let stored: Option<String> = db_conn
+        .query_row(
+            "SELECT value FROM system_config WHERE key = 'invite_secret_key'",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
     if let Some(s) = stored {
         if !s.is_empty() {
             return s.into_bytes();
@@ -138,10 +140,14 @@ fn get_invite_secret(db_conn: &rusqlite::Connection) -> Vec<u8> {
 }
 
 /// 为邀请码生成 HMAC-SHA256 签名
-fn sign_invite_code(body: &str, inviter_id: &str, expires_at: i64, conn: &rusqlite::Connection) -> String {
+fn sign_invite_code(
+    body: &str,
+    inviter_id: &str,
+    expires_at: i64,
+    conn: &rusqlite::Connection,
+) -> String {
     let secret = get_invite_secret(conn);
-    let mut mac = HmacSha256::new_from_slice(&secret)
-        .expect("HMAC can take key of any size");
+    let mut mac = HmacSha256::new_from_slice(&secret).expect("HMAC can take key of any size");
 
     let payload = format!("{}|{}|{}", body, inviter_id, expires_at);
     mac.update(payload.as_bytes());
@@ -153,10 +159,15 @@ fn sign_invite_code(body: &str, inviter_id: &str, expires_at: i64, conn: &rusqli
 }
 
 /// 验证邀请码签名
-fn verify_invite_signature(invite_code: &str, inviter_id: &str, expires_at: i64, conn: &rusqlite::Connection) -> bool {
+fn verify_invite_signature(
+    invite_code: &str,
+    inviter_id: &str,
+    expires_at: i64,
+    conn: &rusqlite::Connection,
+) -> bool {
     if let Some(pos) = invite_code.rfind('.') {
         let body = &invite_code[..pos];
-        let sig = &invite_code[pos+1..];
+        let sig = &invite_code[pos + 1..];
         let expected = sign_invite_code(body, inviter_id, expires_at, conn);
         sig == expected
     } else {
@@ -165,7 +176,11 @@ fn verify_invite_signature(invite_code: &str, inviter_id: &str, expires_at: i64,
 }
 
 /// 生成带签名的邀请码
-fn generate_signed_invite_code(inviter_id: &str, expires_at: i64, conn: &rusqlite::Connection) -> String {
+fn generate_signed_invite_code(
+    inviter_id: &str,
+    expires_at: i64,
+    conn: &rusqlite::Connection,
+) -> String {
     let body = Uuid::new_v4().to_string().replace('-', "");
     let sig = sign_invite_code(&body, inviter_id, expires_at, conn);
     format!("{}.{}", body, sig)
@@ -178,8 +193,8 @@ fn generate_signed_invite_code(inviter_id: &str, expires_at: i64, conn: &rusqlit
 /// 创建邀请请求（外部伙伴）
 #[derive(Debug, Deserialize)]
 pub struct CreateInvitationRequest {
-    pub invitation_type: String,  // "order_share" | "price_update"
-    pub business_ref_id: String,  // 订单号或商品ID列表(JSON)
+    pub invitation_type: String, // "order_share" | "price_update"
+    pub business_ref_id: String, // 订单号或商品ID列表(JSON)
     pub target_phone: Option<String>,
 }
 
@@ -215,7 +230,7 @@ pub struct InvitationQuery {
 /// 创建员工邀请请求
 #[derive(Debug, Deserialize)]
 pub struct CreateEmployeeInvitationRequest {
-    pub role_ids: Vec<i32>,         // 如 [1, 3] 表示采购+销售
+    pub role_ids: Vec<i32>, // 如 [1, 3] 表示采购+销售
     pub target_phone: Option<String>,
 }
 
@@ -244,7 +259,12 @@ pub async fn create_employee_invitation(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -254,24 +274,38 @@ pub async fn create_employee_invitation(
     // 查询用户角色和权限
     let (_, permissions) = super::auth::get_user_role_and_permissions(&conn, &inviter_id);
     if !permissions.contains(&"*".to_string())
-        && !permissions.contains(&"create_invitation".to_string()) {
-        return (StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Permission denied: cannot create employee invitation"})));
+        && !permissions.contains(&"create_invitation".to_string())
+    {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(
+                serde_json::json!({"error": "Permission denied: cannot create employee invitation"}),
+            ),
+        );
     }
 
     // 验证 role_ids 非空
     if payload.role_ids.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "role_ids cannot be empty"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "role_ids cannot be empty"})),
+        );
     }
 
     // 验证 role_ids 是否都存在于 roles 表
     for &role_id in &payload.role_ids {
-        let count: i32 = conn.query_row(
-            "SELECT COUNT(*) FROM roles WHERE id = ?1",
-            params![role_id],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM roles WHERE id = ?1",
+                params![role_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
         if count == 0 {
-            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invalid role_id: {}", role_id)})));
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("Invalid role_id: {}", role_id)})),
+            );
         }
     }
 
@@ -288,11 +322,10 @@ pub async fn create_employee_invitation(
     let invite_code = generate_signed_invite_code(&inviter_id, expires_at, conn);
 
     // role_ids 存储为 JSON 数组字符串
-    let role_ids_json = serde_json::to_string(&payload.role_ids)
-        .unwrap_or_else(|e| {
-            eprintln!("[Invitation] Failed to serialize role_ids: {}", e);
-            String::from("[]")
-        });
+    let role_ids_json = serde_json::to_string(&payload.role_ids).unwrap_or_else(|e| {
+        eprintln!("[Invitation] Failed to serialize role_ids: {}", e);
+        String::from("[]")
+    });
 
     // 插入邀请记录（包含 invite_type='employee' 和 role_ids）
     if let Err(e) = conn.execute(
@@ -304,14 +337,20 @@ pub async fn create_employee_invitation(
     }
 
     // 生成二维码数据（包含 type=employee 参数）
-    let qr_data = format!("proclaw://invite?code={}&host={}&type=employee", invite_code, host);
+    let qr_data = format!(
+        "proclaw://invite?code={}&host={}&type=employee",
+        invite_code, host
+    );
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "invite_code": invite_code,
-        "qr_data": qr_data,
-        "expires_at": expires_at,
-        "role_ids": payload.role_ids,
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "invite_code": invite_code,
+            "qr_data": qr_data,
+            "expires_at": expires_at,
+            "role_ids": payload.role_ids,
+        })),
+    )
 }
 
 /// 接受员工邀请（无需预先认证，使用 IP 限流 + HMAC 签名验证）
@@ -324,9 +363,12 @@ pub async fn accept_employee_invitation(
     // IP 限流检查
     let client_ip = addr.ip().to_string();
     if !check_ip_rate_limit(&client_ip) {
-        return (StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({
-            "error": "Too many requests, please try again later"
-        })));
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(serde_json::json!({
+                "error": "Too many requests, please try again later"
+            })),
+        );
     }
 
     // 定期清理限流记录
@@ -334,7 +376,12 @@ pub async fn accept_employee_invitation(
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -356,53 +403,78 @@ pub async fn accept_employee_invitation(
     ) {
         Ok(inv) => inv,
         Err(rusqlite::Error::QueryReturnedNoRows) => {
-            return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Invitation not found"})));
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Invitation not found"})),
+            );
         }
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let (inv_id, inviter_id, target_phone, status, expires_at, role_ids_json) = invitation;
 
     // 2. 验证 HMAC 签名（防伪造）
     if !verify_invite_signature(&payload.invite_code, &inviter_id, expires_at, conn) {
-        return (StatusCode::FORBIDDEN, Json(serde_json::json!({
-            "error": "Invalid invitation signature"
-        })));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "error": "Invalid invitation signature"
+            })),
+        );
     }
 
     // 3. 检查邀请状态
     if status != "active" {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invitation is {}", status)})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": format!("Invitation is {}", status)})),
+        );
     }
 
     // 4. 检查是否过期
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
-        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]) {
+        if let Err(e) = conn.execute(
+            "UPDATE invitations SET status = 'expired' WHERE id = ?1",
+            params![inv_id],
+        ) {
             eprintln!("[Invitation] Failed to mark invitation as expired: {}", e);
         }
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invitation has expired"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Invitation has expired"})),
+        );
     }
 
     // 5. 检查手机号匹配（如果指定了 target_phone）
     if let Some(ref tp) = target_phone {
         if &payload.phone != tp {
-            return (StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Phone number does not match"})));
+            return (
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({"error": "Phone number does not match"})),
+            );
         }
     }
 
     // 6. 解析 role_ids
     let role_ids: Vec<i32> = match role_ids_json {
-        Some(ref json_str) => serde_json::from_str(json_str)
-            .unwrap_or_else(|e| {
-                eprintln!("[Invitation] Failed to parse role_ids: {}", e);
-                vec![]
-            }),
+        Some(ref json_str) => serde_json::from_str(json_str).unwrap_or_else(|e| {
+            eprintln!("[Invitation] Failed to parse role_ids: {}", e);
+            vec![]
+        }),
         None => vec![],
     };
 
     if role_ids.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "No roles assigned to this invitation"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "No roles assigned to this invitation"})),
+        );
     }
 
     // 7. 创建或查找用户（类型为 internal）
@@ -432,12 +504,15 @@ pub async fn accept_employee_invitation(
                 let now_sec = Utc::now().timestamp();
 
                 let password_hash = match &payload.password {
-                    Some(pwd) if !pwd.is_empty() => {
-                        match hash_password(pwd) {
-                            Ok(h) => Some(h),
-                            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))),
+                    Some(pwd) if !pwd.is_empty() => match hash_password(pwd) {
+                        Ok(h) => Some(h),
+                        Err(e) => {
+                            return (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(serde_json::json!({"error": e})),
+                            )
                         }
-                    }
+                    },
                     _ => None,
                 };
 
@@ -461,7 +536,10 @@ pub async fn accept_employee_invitation(
              VALUES (?1, ?2, CURRENT_TIMESTAMP)",
             params![new_user_id, role_id],
         ) {
-            eprintln!("[Invitation] Failed to assign role {} to user {}: {}", role_id, new_user_id, e);
+            eprintln!(
+                "[Invitation] Failed to assign role {} to user {}: {}",
+                role_id, new_user_id, e
+            );
         }
     }
 
@@ -472,7 +550,12 @@ pub async fn accept_employee_invitation(
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
-        params![Uuid::new_v4().to_string(), inviter_id, new_user_id, now_ms_ts],
+        params![
+            Uuid::new_v4().to_string(),
+            inviter_id,
+            new_user_id,
+            now_ms_ts
+        ],
     ) {
         eprintln!("[Invitation] Failed to create inviter contact: {}", e);
     }
@@ -481,15 +564,28 @@ pub async fn accept_employee_invitation(
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, 'colleague', ?4)",
-        params![Uuid::new_v4().to_string(), new_user_id, inviter_id, now_ms_ts],
+        params![
+            Uuid::new_v4().to_string(),
+            new_user_id,
+            inviter_id,
+            now_ms_ts
+        ],
     ) {
         eprintln!("[Invitation] Failed to create employee contact: {}", e);
     }
 
     // 10. 生成系统消息（欢迎消息）
-    let role_names: Vec<String> = role_ids.iter().filter_map(|&rid| {
-        conn.query_row("SELECT name FROM roles WHERE id = ?1", params![rid], |row| row.get(0)).ok()
-    }).collect();
+    let role_names: Vec<String> = role_ids
+        .iter()
+        .filter_map(|&rid| {
+            conn.query_row(
+                "SELECT name FROM roles WHERE id = ?1",
+                params![rid],
+                |row| row.get(0),
+            )
+            .ok()
+        })
+        .collect();
 
     let role_names_str = role_names.join("、");
     let message_content = format!("欢迎加入团队！你已被授予 {} 角色。", role_names_str);
@@ -523,16 +619,25 @@ pub async fn accept_employee_invitation(
         "timestamp": now_sec
     });
 
-    if !state.ws_manager.send_to_user(&inviter_id, &notification.to_string()) {
-        eprintln!("[Invitation] Failed to send WS notification to inviter {}", inviter_id);
+    if !state
+        .ws_manager
+        .send_to_user(&inviter_id, &notification.to_string())
+    {
+        eprintln!(
+            "[Invitation] Failed to send WS notification to inviter {}",
+            inviter_id
+        );
     }
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "success": true,
-        "user_id": new_user_id,
-        "message": format!("您已成功加入团队，角色：{}", role_names_str),
-        "roles": role_names,
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "success": true,
+            "user_id": new_user_id,
+            "message": format!("您已成功加入团队，角色：{}", role_names_str),
+            "roles": role_names,
+        })),
+    )
 }
 
 // ============================================================
@@ -549,13 +654,21 @@ pub async fn create_invitation(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
     // 验证邀请类型
     if payload.invitation_type != "order_share" && payload.invitation_type != "price_update" {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid invitation_type"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Invalid invitation_type"})),
+        );
     }
 
     let inviter_id = claims.sub;
@@ -584,11 +697,14 @@ pub async fn create_invitation(
     // 生成二维码数据（签名已经在 invite_code 中）
     let qr_data = format!("proclaw://invite?code={}&host={}", invite_code, host);
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "invite_code": invite_code,
-        "qr_data": qr_data,
-        "expires_at": expires_at
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "invite_code": invite_code,
+            "qr_data": qr_data,
+            "expires_at": expires_at
+        })),
+    )
 }
 
 /// 接受邀请（无需预先认证，使用 IP 限流 + HMAC 签名验证）
@@ -600,9 +716,12 @@ pub async fn accept_invitation(
     // IP 限流检查
     let client_ip = addr.ip().to_string();
     if !check_ip_rate_limit(&client_ip) {
-        return (StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({
-            "error": "Too many requests, please try again later"
-        })));
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(serde_json::json!({
+                "error": "Too many requests, please try again later"
+            })),
+        );
     }
 
     // 定期清理限流记录
@@ -610,7 +729,12 @@ pub async fn accept_invitation(
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -633,43 +757,73 @@ pub async fn accept_invitation(
     ) {
         Ok(inv) => inv,
         Err(rusqlite::Error::QueryReturnedNoRows) => {
-            return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Invitation not found"})));
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Invitation not found"})),
+            );
         }
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
-    let (inv_id, inviter_id, target_phone, inv_type, business_ref_id, status, expires_at) = invitation;
+    let (inv_id, inviter_id, target_phone, inv_type, business_ref_id, status, expires_at) =
+        invitation;
 
     // 2. 验证 HMAC 签名（防伪造）
     if !verify_invite_signature(&payload.invite_code, &inviter_id, expires_at, conn) {
-        return (StatusCode::FORBIDDEN, Json(serde_json::json!({
-            "error": "Invalid invitation signature"
-        })));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "error": "Invalid invitation signature"
+            })),
+        );
     }
 
     // 3. 检查邀请状态
     if status != "active" {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("Invitation is {}", status)})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": format!("Invitation is {}", status)})),
+        );
     }
 
     // 4. 检查是否过期
     let now_ms = Utc::now().timestamp_millis();
     if now_ms > expires_at {
         // 标记为过期
-        if let Err(e) = conn.execute("UPDATE invitations SET status = 'expired' WHERE id = ?1", params![inv_id]) {
-            eprintln!("[Invitation] Failed to mark external invitation expired: {}", e);
+        if let Err(e) = conn.execute(
+            "UPDATE invitations SET status = 'expired' WHERE id = ?1",
+            params![inv_id],
+        ) {
+            eprintln!(
+                "[Invitation] Failed to mark external invitation expired: {}",
+                e
+            );
         }
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invitation has expired"})));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Invitation has expired"})),
+        );
     }
 
     // 5. 检查手机号匹配（如果指定了 target_phone）
     if let Some(ref tp) = target_phone {
         if let Some(ref phone) = payload.new_user.phone {
             if phone != tp {
-                return (StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Phone number does not match"})));
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(serde_json::json!({"error": "Phone number does not match"})),
+                );
             }
         } else {
-            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Phone number required for this invitation"})));
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "Phone number required for this invitation"})),
+            );
         }
     }
 
@@ -692,15 +846,22 @@ pub async fn accept_invitation(
                     // 创建新用户
                     let uid = Uuid::new_v4().to_string();
                     let user_type = "external";
-                    let external_type = if inv_type == "order_share" { "supplier" } else { "customer" };
+                    let external_type = if inv_type == "order_share" {
+                        "supplier"
+                    } else {
+                        "customer"
+                    };
 
                     let password_hash = match &payload.new_user.password {
-                        Some(pwd) if !pwd.is_empty() => {
-                            match hash_password(pwd) {
-                                Ok(h) => Some(h),
-                                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))),
+                        Some(pwd) if !pwd.is_empty() => match hash_password(pwd) {
+                            Ok(h) => Some(h),
+                            Err(e) => {
+                                return (
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    Json(serde_json::json!({"error": e})),
+                                )
                             }
-                        }
+                        },
                         _ => None,
                     };
 
@@ -721,15 +882,28 @@ pub async fn accept_invitation(
             // 没有手机号，创建匿名用户
             let uid = Uuid::new_v4().to_string();
             let user_type = "external";
-            let external_type = if inv_type == "order_share" { "supplier" } else { "customer" };
+            let external_type = if inv_type == "order_share" {
+                "supplier"
+            } else {
+                "customer"
+            };
 
             let now_sec = Utc::now().timestamp();
             if let Err(e) = conn.execute(
                 "INSERT INTO users (id, name, user_type, external_type, is_active, created_at) \
                  VALUES (?1, ?2, ?3, ?4, 1, ?5)",
-                params![uid, payload.new_user.name, user_type, external_type, now_sec],
+                params![
+                    uid,
+                    payload.new_user.name,
+                    user_type,
+                    external_type,
+                    now_sec
+                ],
             ) {
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()})));
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": e.to_string()})),
+                );
             }
 
             uid
@@ -737,25 +911,51 @@ pub async fn accept_invitation(
     };
 
     // 7. 建立双向联系人关系
-    let contact_type = if inv_type == "order_share" { "supplier" } else { "customer" };
+    let contact_type = if inv_type == "order_share" {
+        "supplier"
+    } else {
+        "customer"
+    };
 
     // 邀请方 -> 被邀请方
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![Uuid::new_v4().to_string(), inviter_id, new_user_id, contact_type, now_ms],
+        params![
+            Uuid::new_v4().to_string(),
+            inviter_id,
+            new_user_id,
+            contact_type,
+            now_ms
+        ],
     ) {
-        eprintln!("[Invitation] Failed to create inviter contact (external): {}", e);
+        eprintln!(
+            "[Invitation] Failed to create inviter contact (external): {}",
+            e
+        );
     }
 
     // 被邀请方 -> 邀请方（反向）
-    let inviter_contact_type = if contact_type == "supplier" { "customer" } else { "supplier" };
+    let inviter_contact_type = if contact_type == "supplier" {
+        "customer"
+    } else {
+        "supplier"
+    };
     if let Err(e) = conn.execute(
         "INSERT OR IGNORE INTO user_contacts (id, user_id, contact_id, contact_type, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![Uuid::new_v4().to_string(), new_user_id, inviter_id, inviter_contact_type, now_ms],
+        params![
+            Uuid::new_v4().to_string(),
+            new_user_id,
+            inviter_id,
+            inviter_contact_type,
+            now_ms
+        ],
     ) {
-        eprintln!("[Invitation] Failed to create invitee contact (external): {}", e);
+        eprintln!(
+            "[Invitation] Failed to create invitee contact (external): {}",
+            e
+        );
     }
 
     // 8. 生成系统消息
@@ -766,7 +966,11 @@ pub async fn accept_invitation(
     };
 
     let message_id = Uuid::new_v4().to_string();
-    let content_type = if inv_type == "order_share" { "order_card" } else { "text" };
+    let content_type = if inv_type == "order_share" {
+        "order_card"
+    } else {
+        "text"
+    };
 
     let now_sec = Utc::now().timestamp();
     if let Err(e) = conn.execute(
@@ -782,7 +986,10 @@ pub async fn accept_invitation(
         "UPDATE invitations SET status = 'used', used_at = ?1, used_by = ?2 WHERE id = ?3",
         params![now_sec, new_user_id, inv_id],
     ) {
-        eprintln!("[Invitation] Failed to mark external invitation as used: {}", e);
+        eprintln!(
+            "[Invitation] Failed to mark external invitation as used: {}",
+            e
+        );
     }
 
     // 10. 通过 WebSocket 推送通知给邀请方
@@ -795,15 +1002,24 @@ pub async fn accept_invitation(
         "timestamp": now_sec
     });
 
-    if !state.ws_manager.send_to_user(&inviter_id, &notification.to_string()) {
-        eprintln!("[Invitation] Failed to send WS notification for external invitation to {}", inviter_id);
+    if !state
+        .ws_manager
+        .send_to_user(&inviter_id, &notification.to_string())
+    {
+        eprintln!(
+            "[Invitation] Failed to send WS notification for external invitation to {}",
+            inviter_id
+        );
     }
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "success": true,
-        "message": "Invitation accepted successfully",
-        "user_id": new_user_id
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "success": true,
+            "message": "Invitation accepted successfully",
+            "user_id": new_user_id
+        })),
+    )
 }
 
 /// 撤销邀请（需要认证）
@@ -815,7 +1031,12 @@ pub async fn revoke_invitation(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -828,9 +1049,18 @@ pub async fn revoke_invitation(
     );
 
     match result {
-        Ok(0) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Invitation not found or already used"}))),
-        Ok(_) => (StatusCode::OK, Json(serde_json::json!({"message": "Invitation revoked successfully"}))),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Ok(0) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Invitation not found or already used"})),
+        ),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"message": "Invitation revoked successfully"})),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        ),
     }
 }
 
@@ -843,7 +1073,12 @@ pub async fn list_invitations(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -855,7 +1090,7 @@ pub async fn list_invitations(
          i.invite_type, i.role_ids \
          FROM invitations i \
          LEFT JOIN users u ON i.inviter_id = u.id \
-         WHERE i.inviter_id = ?1"
+         WHERE i.inviter_id = ?1",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -869,11 +1104,17 @@ pub async fn list_invitations(
 
     sql.push_str(" ORDER BY i.created_at DESC LIMIT 100");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -895,11 +1136,18 @@ pub async fn list_invitations(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
     };
 
     let invitations: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
 
-    (StatusCode::OK, Json(serde_json::json!({ "data": invitations })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": invitations })),
+    )
 }
-

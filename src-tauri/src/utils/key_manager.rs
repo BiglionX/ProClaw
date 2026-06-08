@@ -17,13 +17,13 @@ impl KeyManager {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;
         type HmacSha256 = Hmac<Sha256>;
-        
-        let mut mac = HmacSha256::new_from_slice(&manager.key)
-            .expect("HMAC-SHA256 can take key of any size");
+
+        let mut mac =
+            HmacSha256::new_from_slice(&manager.key).expect("HMAC-SHA256 can take key of any size");
         mac.update(context);
         let result = mac.finalize();
         let code_bytes = result.into_bytes();
-        
+
         let mut derived = [0u8; 32];
         derived.copy_from_slice(&code_bytes[..32]);
         derived

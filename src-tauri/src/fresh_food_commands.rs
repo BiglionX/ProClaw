@@ -1,10 +1,10 @@
 // 食材配送行业插件 Tauri 命令
 use crate::database::Database;
+use chrono::Utc;
 use rusqlite::params;
 use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
-use chrono::Utc;
 
 #[tauri::command]
 pub fn ff_get_delivery_routes(
@@ -15,20 +15,26 @@ pub fn ff_get_delivery_routes(
     let conn = db.connection();
     let target_date = date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
 
-    let mut stmt = conn.prepare(
-        "SELECT id, route_date, driver_name, stops, status, created_at
-         FROM ff_delivery_routes WHERE route_date = ?1 ORDER BY created_at DESC"
-    ).map_err(|e| e.to_string())?;
-    let routes: Vec<Value> = stmt.query_map(params![target_date], |row| {
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "route_date": row.get::<_, String>(1)?,
-            "driver_name": row.get::<_, Option<String>>(2)?,
-            "stops": row.get::<_, Option<String>>(3)?,
-            "status": row.get::<_, String>(4)?,
-            "created_at": row.get::<_, String>(5)?,
-        }))
-    }).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, route_date, driver_name, stops, status, created_at
+         FROM ff_delivery_routes WHERE route_date = ?1 ORDER BY created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let routes: Vec<Value> = stmt
+        .query_map(params![target_date], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "route_date": row.get::<_, String>(1)?,
+                "driver_name": row.get::<_, Option<String>>(2)?,
+                "stops": row.get::<_, Option<String>>(3)?,
+                "status": row.get::<_, String>(4)?,
+                "created_at": row.get::<_, String>(5)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
     Ok(json!({ "routes": routes, "date": target_date }))
 }
 

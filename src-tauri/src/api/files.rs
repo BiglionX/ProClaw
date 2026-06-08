@@ -1,16 +1,17 @@
 // 文件上传下载 API 处理器
 // Phase 4: 实现 multipart 文件上传、磁盘存储、元数据管理、下载和缩略图
 
-use axum::{
-    extract::{State, Path},
-    http::{StatusCode, header, Request},
-    response::{IntoResponse, Response},
-    Json, body::Body,
-};
 use crate::api::AppState;
+use axum::{
+    body::Body,
+    extract::{Path, State},
+    http::{header, Request, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
 use serde::Serialize;
-use uuid::Uuid;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 /// 文件上传响应
 #[derive(Debug, Serialize)]
@@ -26,9 +27,15 @@ pub struct FileUploadResponse {
 /// 获取上传目录路径
 fn get_upload_dir() -> PathBuf {
     let db_path = crate::database::get_database_path();
-    let upload_dir = db_path.parent().unwrap_or(std::path::Path::new(".")).join("uploads");
+    let upload_dir = db_path
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("uploads");
     if let Err(e) = std::fs::create_dir_all(&upload_dir) {
-        eprintln!("[files] Failed to create upload dir {:?}: {}", upload_dir, e);
+        eprintln!(
+            "[files] Failed to create upload dir {:?}: {}",
+            upload_dir, e
+        );
     }
     upload_dir
 }
@@ -66,11 +73,8 @@ fn is_image_mime(mime_type: &str) -> bool {
 
 /// 允许的文件类型
 const ALLOWED_EXTENSIONS: &[&str] = &[
-    "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg",
-    "pdf", "doc", "docx", "xls", "xlsx",
-    "txt", "csv", "json", "xml",
-    "zip", "rar",
-    "mp4", "mp3",
+    "jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "pdf", "doc", "docx", "xls", "xlsx", "txt",
+    "csv", "json", "xml", "zip", "rar", "mp4", "mp3",
 ];
 
 /// 最大文件大小: 50MB
@@ -78,10 +82,7 @@ const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
 
 /// POST /api/files/upload
 /// 接收 multipart/form-data，保存文件到磁盘，记录元数据到数据库
-pub async fn upload_file(
-    State(state): State<AppState>,
-    request: Request<Body>,
-) -> Response {
+pub async fn upload_file(State(state): State<AppState>, request: Request<Body>) -> Response {
     let upload_dir = get_upload_dir();
     let mut uploaded_files: Vec<FileUploadResponse> = Vec::new();
 
@@ -101,8 +102,11 @@ pub async fn upload_file(
     let boundary = match boundary {
         Some(b) => b,
         None => {
-            return (StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "Missing multipart boundary"}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "Missing multipart boundary"})),
+            )
+                .into_response();
         }
     };
 
@@ -110,15 +114,17 @@ pub async fn upload_file(
     let body_bytes = match axum::body::to_bytes(request.into_body(), usize::MAX).await {
         Ok(b) => b,
         Err(e) => {
-            return (StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": format!("Failed to read body: {}", e)}))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("Failed to read body: {}", e)})),
+            )
+                .into_response();
         }
     };
 
     // 使用 multer 解析 multipart（创建单元素流）
-    let byte_stream = futures_util::stream::once(async move {
-        Ok::<bytes::Bytes, multer::Error>(body_bytes)
-    });
+    let byte_stream =
+        futures_util::stream::once(async move { Ok::<bytes::Bytes, multer::Error>(body_bytes) });
     let mut multipart = multer::Multipart::new(byte_stream, boundary);
 
     while let Ok(Some(field)) = multipart.next_field().await {
@@ -137,17 +143,23 @@ pub async fn upload_file(
         let data = match field.bytes().await {
             Ok(d) => d,
             Err(e) => {
-                return (StatusCode::BAD_REQUEST,
-                    Json(serde_json::json!({"error": format!("Failed to read field: {}", e)}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error": format!("Failed to read field: {}", e)})),
+                )
+                    .into_response();
             }
         };
 
         // 验证文件大小
         if data.len() as u64 > MAX_FILE_SIZE {
-            return (StatusCode::BAD_REQUEST,
+            return (
+                StatusCode::BAD_REQUEST,
                 Json(serde_json::json!({
                     "error": format!("File '{}' exceeds maximum size of 50MB", original_name)
-                }))).into_response();
+                })),
+            )
+                .into_response();
         }
 
         // 验证文件扩展名
@@ -158,10 +170,13 @@ pub async fn upload_file(
             .to_lowercase();
 
         if !ext.is_empty() && !ALLOWED_EXTENSIONS.contains(&ext.as_str()) {
-            return (StatusCode::BAD_REQUEST,
+            return (
+                StatusCode::BAD_REQUEST,
                 Json(serde_json::json!({
                     "error": format!("File type '{}' is not allowed", ext)
-                }))).into_response();
+                })),
+            )
+                .into_response();
         }
 
         // 生成唯一文件名
@@ -176,8 +191,11 @@ pub async fn upload_file(
 
         // 写入磁盘
         if let Err(e) = std::fs::write(&file_path, &data) {
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to write file: {}", e)}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("Failed to write file: {}", e)})),
+            )
+                .into_response();
         }
 
         let file_size = data.len() as u64;
@@ -194,8 +212,11 @@ pub async fn upload_file(
                 if let Err(e) = std::fs::remove_file(&file_path) {
                     eprintln!("[files] Failed to clean up file {:?}: {}", file_path, e);
                 }
-                return (StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": "Database lock error"}))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": "Database lock error"})),
+                )
+                    .into_response();
             }
         };
         let conn = db.connection();
@@ -238,28 +259,34 @@ pub async fn upload_file(
     }
 
     if uploaded_files.is_empty() {
-        return (StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "No files uploaded"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "No files uploaded"})),
+        )
+            .into_response();
     }
 
-    (StatusCode::OK,
+    (
+        StatusCode::OK,
         Json(serde_json::json!({
             "files": uploaded_files,
             "count": uploaded_files.len(),
-        }))).into_response()
+        })),
+    )
+        .into_response()
 }
 
 /// GET /api/files/download/:id
 /// 根据文件 ID 下载文件
-pub async fn download_file(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+pub async fn download_file(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "Database lock error"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+                .into_response();
         }
     };
     let conn = db.connection();
@@ -279,8 +306,11 @@ pub async fn download_file(
     ) {
         Ok(info) => info,
         Err(_) => {
-            return (StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "File not found"}))).into_response();
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "File not found"})),
+            )
+                .into_response();
         }
     };
 
@@ -290,8 +320,11 @@ pub async fn download_file(
     let data = match std::fs::read(&file_path) {
         Ok(d) => d,
         Err(e) => {
-            return (StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": format!("File not found on disk: {}", e)}))).into_response();
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": format!("File not found on disk: {}", e)})),
+            )
+                .into_response();
         }
     };
 
@@ -306,22 +339,25 @@ pub async fn download_file(
         .body(Body::from(data))
     {
         Ok(resp) => resp.into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Response build error: {}", e)}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Response build error: {}", e)})),
+        )
+            .into_response(),
     }
 }
 
 /// GET /api/files/thumb/:id
 /// 获取文件缩略图（图片返回原图，非图片返回 404）
-pub async fn get_file_thumbnail(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+pub async fn get_file_thumbnail(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "Database lock error"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+                .into_response();
         }
     };
     let conn = db.connection();
@@ -350,8 +386,11 @@ pub async fn get_file_thumbnail(
 
     // 非图片类型返回 404
     if !is_image_mime(&mime_type) {
-        return (StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "Thumbnail not available for non-image files"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Thumbnail not available for non-image files"})),
+        )
+            .into_response();
     }
 
     // 尝试读取缩略图（如果已存在）
@@ -369,8 +408,11 @@ pub async fn get_file_thumbnail(
     let data = match std::fs::read(&thumb_path) {
         Ok(d) => d,
         Err(e) => {
-            return (StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": format!("File not found: {}", e)}))).into_response();
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": format!("File not found: {}", e)})),
+            )
+                .into_response();
         }
     };
 
@@ -384,18 +426,21 @@ pub async fn get_file_thumbnail(
         .body(Body::from(data))
     {
         Ok(resp) => resp.into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Response build error: {}", e)}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Response build error: {}", e)})),
+        )
+            .into_response(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::websocket::WebSocketManager;
+    use crate::utils::crypto::Aes256GcmCipher;
     use std::sync::Arc;
     use std::sync::Mutex;
-    use crate::utils::crypto::Aes256GcmCipher;
-    use crate::api::websocket::WebSocketManager;
 
     #[test]
     fn test_mime_from_ext() {
@@ -417,15 +462,12 @@ mod tests {
     async fn test_file_upload_endpoint_exists() {
         let cipher = Arc::new(Aes256GcmCipher::new(&[0u8; 32]).expect("test key must be 32 bytes"));
         let ws_manager = Arc::new(WebSocketManager::new());
-        let db = crate::database::Database::new(std::path::PathBuf::from(":memory:"))
-            .unwrap();
-        let cloud_backup = Arc::new(crate::services::cloud_backup_service::CloudBackupService::new(
-            db,
-            &[0u8; 32],
-        ));
+        let db = crate::database::Database::new(std::path::PathBuf::from(":memory:")).unwrap();
+        let cloud_backup = Arc::new(
+            crate::services::cloud_backup_service::CloudBackupService::new(db, &[0u8; 32]),
+        );
         let jwt_secret = Arc::new(vec![0u8; 32]);
-        let db = crate::database::Database::new(std::path::PathBuf::from(":memory:"))
-            .unwrap();
+        let db = crate::database::Database::new(std::path::PathBuf::from(":memory:")).unwrap();
         let _state = AppState {
             db: Arc::new(Mutex::new(db)),
             cipher,

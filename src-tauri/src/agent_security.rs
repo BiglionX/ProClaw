@@ -1,8 +1,8 @@
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
-use std::path::Path;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::path::Path;
 
 /// Agent 安全模块 - 签名验证和包完整性校验
 
@@ -13,11 +13,11 @@ pub fn verify_manifest_signature(
     signature_hex: &str,
     secret_key_hex: &str,
 ) -> Result<bool, String> {
-    let secret_key = hex::decode(secret_key_hex)
-        .map_err(|e| format!("Invalid secret key hex: {}", e))?;
+    let secret_key =
+        hex::decode(secret_key_hex).map_err(|e| format!("Invalid secret key hex: {}", e))?;
 
-    let signature = hex::decode(signature_hex)
-        .map_err(|e| format!("Invalid signature hex: {}", e))?;
+    let signature =
+        hex::decode(signature_hex).map_err(|e| format!("Invalid signature hex: {}", e))?;
 
     let mut mac = Hmac::<Sha256>::new_from_slice(&secret_key)
         .map_err(|e| format!("HMAC initialization error: {}", e))?;
@@ -30,8 +30,8 @@ pub fn verify_manifest_signature(
 
 /// 计算文件的 SHA-256 校验和
 pub fn compute_file_checksum(file_path: &Path) -> Result<String, String> {
-    let file = File::open(file_path)
-        .map_err(|e| format!("Cannot open file {:?}: {}", file_path, e))?;
+    let file =
+        File::open(file_path).map_err(|e| format!("Cannot open file {:?}: {}", file_path, e))?;
 
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
@@ -64,18 +64,12 @@ pub fn hash_bytes(data: &[u8]) -> String {
 }
 
 /// 检查权限是否在允许列表中
-pub fn is_permission_allowed(
-    permission: &str,
-    allowed_permissions: &[&str],
-) -> bool {
+pub fn is_permission_allowed(permission: &str, allowed_permissions: &[&str]) -> bool {
     allowed_permissions.contains(&permission)
 }
 
 /// 检查一组权限是否全部在允许列表中
-pub fn validate_permissions(
-    requested: &[String],
-    allowed: &[&str],
-) -> Result<(), Vec<String>> {
+pub fn validate_permissions(requested: &[String], allowed: &[&str]) -> Result<(), Vec<String>> {
     let mut denied: Vec<String> = Vec::new();
     for perm in requested {
         if !is_permission_allowed(perm, allowed) {
@@ -165,7 +159,8 @@ mod tests {
 
     #[test]
     fn test_manifest_signature() {
-        let manifest = r#"{"id":"test-agent","name":"Test","version":"1.0.0","permissions":["read_user"]}"#;
+        let manifest =
+            r#"{"id":"test-agent","name":"Test","version":"1.0.0","permissions":["read_user"]}"#;
         let secret_key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         // 计算签名
@@ -175,12 +170,14 @@ mod tests {
         let signature = hex::encode(mac.finalize().into_bytes());
 
         // 验证签名
-        let result = verify_manifest_signature(manifest, &signature, secret_key).expect("Should verify");
+        let result =
+            verify_manifest_signature(manifest, &signature, secret_key).expect("Should verify");
         assert!(result);
 
         // 错误的密钥应导致验证失败
         let wrong_key = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-        let result = verify_manifest_signature(manifest, &signature, wrong_key).expect("Should verify");
+        let result =
+            verify_manifest_signature(manifest, &signature, wrong_key).expect("Should verify");
         assert!(!result);
     }
 }

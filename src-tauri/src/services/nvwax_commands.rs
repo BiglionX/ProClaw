@@ -1,17 +1,15 @@
+use crate::database::Database;
+use crate::services::nvwax_billing::NvwaXBilling;
 /// NvwaX Tauri 命令桥接
 ///
 /// 将 NvwaX API 暴露为 Tauri IPC 命令，供前端调用。
 /// 所有命令在调用 NvwaX API 前自动检查用户 Token 余额。
 ///
 /// PRD: ProClaw × NvwaX API 集成需求文档
-
 use crate::services::nvwax_client::{
-    self, BatchExportPayload, CreateAgentPayload, CreateAiTeamPayload, ExportPayload,
-    ListParams, NvwaXClient, SearchParams, UnifiedSearchParams, UpdateAgentPayload,
-    UpdateAiTeamPayload,
+    self, BatchExportPayload, CreateAgentPayload, CreateAiTeamPayload, ExportPayload, ListParams,
+    NvwaXClient, SearchParams, UnifiedSearchParams, UpdateAgentPayload, UpdateAiTeamPayload,
 };
-use crate::services::nvwax_billing::NvwaXBilling;
-use crate::database::Database;
 use crate::utils::crypto::Aes256GcmCipher;
 use std::sync::{Arc, Mutex};
 use tauri::State;
@@ -98,7 +96,13 @@ pub async fn nvwax_search_agents(
 
     match client.search_agents(params).await {
         Ok(result) => {
-            billing.record_consumption(&user_id, estimated, "/api/v1/marketplace/agents", None, Some("marketplace"))?;
+            billing.record_consumption(
+                &user_id,
+                estimated,
+                "/api/v1/marketplace/agents",
+                None,
+                Some("marketplace"),
+            )?;
             Ok(NvwaXCmdResponse::ok(result))
         }
         Err(e) => Ok(NvwaXCmdResponse::err(map_error(e))),
@@ -153,7 +157,13 @@ pub async fn nvwax_search_aiteams(
 
     match client.search_aiteams(params).await {
         Ok(result) => {
-            billing.record_consumption(&user_id, estimated, "/api/v1/marketplace/aiteams", None, Some("marketplace"))?;
+            billing.record_consumption(
+                &user_id,
+                estimated,
+                "/api/v1/marketplace/aiteams",
+                None,
+                Some("marketplace"),
+            )?;
             Ok(NvwaXCmdResponse::ok(result))
         }
         Err(e) => Ok(NvwaXCmdResponse::err(map_error(e))),
@@ -234,7 +244,11 @@ pub async fn nvwax_get_agents(
     limit: Option<u32>,
     status: Option<String>,
 ) -> Result<NvwaXCmdResponse<nvwax_client::AgentListResponse>, String> {
-    let params = ListParams { page, limit, status };
+    let params = ListParams {
+        page,
+        limit,
+        status,
+    };
     match client.get_agents(params).await {
         Ok(result) => Ok(NvwaXCmdResponse::ok(result)),
         Err(e) => Ok(NvwaXCmdResponse::err(map_error(e))),
@@ -333,7 +347,13 @@ pub async fn nvwax_create_aiteam(
 
     match client.create_aiteam(&payload).await {
         Ok(result) => {
-            billing.record_consumption(&user_id, 50, "/api/v1/aiteams", None, Some("aiteam_crud"))?;
+            billing.record_consumption(
+                &user_id,
+                50,
+                "/api/v1/aiteams",
+                None,
+                Some("aiteam_crud"),
+            )?;
             Ok(NvwaXCmdResponse::ok(result))
         }
         Err(e) => Ok(NvwaXCmdResponse::err(map_error(e))),
@@ -589,7 +609,13 @@ pub async fn nvwax_record_consumption(
     source: Option<String>,
 ) -> Result<BoolResponse, String> {
     let user_id = current_user_id();
-    match billing.record_consumption(&user_id, tokens, &endpoint, model.as_deref(), source.as_deref()) {
+    match billing.record_consumption(
+        &user_id,
+        tokens,
+        &endpoint,
+        model.as_deref(),
+        source.as_deref(),
+    ) {
         Ok(_) => Ok(NvwaXCmdResponse::ok(true)),
         Err(e) => Ok(NvwaXCmdResponse::err(e)),
     }
@@ -656,12 +682,15 @@ pub fn save_nvwax_api_key(
 ) -> Result<(), String> {
     let db = db.lock().map_err(|e| format!("DB lock error: {}", e))?;
     // 加密后存储
-    let encrypted = cipher.encrypt_string(&api_key)
+    let encrypted = cipher
+        .encrypt_string(&api_key)
         .map_err(|e| format!("Encryption failed: {}", e))?;
-    db.connection().execute(
-        "INSERT OR REPLACE INTO system_config (key, value) VALUES ('nvwax_api_key', ?1)",
-        rusqlite::params![encrypted],
-    ).map_err(|e| format!("Failed to save API key: {}", e))?;
+    db.connection()
+        .execute(
+            "INSERT OR REPLACE INTO system_config (key, value) VALUES ('nvwax_api_key', ?1)",
+            rusqlite::params![encrypted],
+        )
+        .map_err(|e| format!("Failed to save API key: {}", e))?;
     Ok(())
 }
 
@@ -669,10 +698,9 @@ pub fn save_nvwax_api_key(
 #[tauri::command]
 pub fn clear_nvwax_api_key(db: State<'_, Mutex<Database>>) -> Result<(), String> {
     let db = db.lock().map_err(|e| format!("DB lock error: {}", e))?;
-    db.connection().execute(
-        "DELETE FROM system_config WHERE key = 'nvwax_api_key'",
-        [],
-    ).map_err(|e| format!("Failed to clear API key: {}", e))?;
+    db.connection()
+        .execute("DELETE FROM system_config WHERE key = 'nvwax_api_key'", [])
+        .map_err(|e| format!("Failed to clear API key: {}", e))?;
     Ok(())
 }
 

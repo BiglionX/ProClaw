@@ -55,7 +55,10 @@ impl SyncEngine {
     /// 检查实际同步是否可用
     #[allow(dead_code)]
     pub fn is_sync_available(&self) -> bool {
-        self.supabase.as_ref().map(|s| s.is_configured()).unwrap_or(false)
+        self.supabase
+            .as_ref()
+            .map(|s| s.is_configured())
+            .unwrap_or(false)
     }
 
     /// 添加操作到离线队列
@@ -93,7 +96,8 @@ impl SyncEngine {
         let operations = self.get_pending_operations(conn)?;
         let mut processed_count = 0;
 
-        conn.execute_batch("BEGIN TRANSACTION").map_err(|e| e.to_string())?;
+        conn.execute_batch("BEGIN TRANSACTION")
+            .map_err(|e| e.to_string())?;
 
         let result = (|| -> Result<usize, String> {
             for rec in &operations {
@@ -144,7 +148,8 @@ impl SyncEngine {
                 Ok(count)
             }
             Err(e) => {
-                conn.execute_batch("ROLLBACK").map_err(|e2| format!("{} (rollback also failed: {})", e, e2))?;
+                conn.execute_batch("ROLLBACK")
+                    .map_err(|e2| format!("{} (rollback also failed: {})", e, e2))?;
                 Err(e)
             }
         }
@@ -191,13 +196,16 @@ impl SyncEngine {
                 // 调用实际 Supabase REST API (同步阻塞等待)
                 let rt = tokio::runtime::Handle::try_current()
                     .map_err(|_| "No tokio runtime available for sync".to_string())?;
-                let _ = rt.block_on(supabase.insert(&format!("synced_{}", table_name), &payload))?;
+                let _ =
+                    rt.block_on(supabase.insert(&format!("synced_{}", table_name), &payload))?;
                 Ok(())
             }
             "DELETE" => {
                 let rt = tokio::runtime::Handle::try_current()
                     .map_err(|_| "No tokio runtime available for sync".to_string())?;
-                let _ = rt.block_on(supabase.delete_by_id(&format!("synced_{}", table_name), record_id))?;
+                let _ = rt.block_on(
+                    supabase.delete_by_id(&format!("synced_{}", table_name), record_id),
+                )?;
                 Ok(())
             }
             _ => Err(format!("Unknown sync operation: {}", operation)),
@@ -348,13 +356,16 @@ impl SyncEngine {
 
         // 3. 解决冲突
         let conflicts_resolved = self.resolve_conflicts()?;
-        println!(
-            "[SyncEngine] Resolved {} conflicts",
-            conflicts_resolved
-        );
+        println!("[SyncEngine] Resolved {} conflicts", conflicts_resolved);
 
         // 4. 记录同步日志
-        self.log_sync("full", "success", uploaded + downloaded, 0, conflicts_resolved)?;
+        self.log_sync(
+            "full",
+            "success",
+            uploaded + downloaded,
+            0,
+            conflicts_resolved,
+        )?;
 
         Ok(format!(
             "Sync completed: {} uploaded, {} downloaded, {} conflicts resolved",
@@ -382,7 +393,10 @@ impl SyncEngine {
         for table in SYNC_TABLES {
             let synced: i32 = conn
                 .query_row(
-                    &format!("SELECT COUNT(*) FROM {} WHERE sync_status = 'synced'", table),
+                    &format!(
+                        "SELECT COUNT(*) FROM {} WHERE sync_status = 'synced'",
+                        table
+                    ),
                     [],
                     |row| row.get(0),
                 )
@@ -520,7 +534,9 @@ pub async fn start_sync(sync_engine: tauri::State<'_, SyncEngine>) -> Result<Str
 }
 
 #[tauri::command]
-pub fn get_sync_status(sync_engine: tauri::State<'_, SyncEngine>) -> Result<serde_json::Value, String> {
+pub fn get_sync_status(
+    sync_engine: tauri::State<'_, SyncEngine>,
+) -> Result<serde_json::Value, String> {
     sync_engine.get_sync_status()
 }
 

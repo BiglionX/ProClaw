@@ -12,18 +12,27 @@ fn generate_sr_number() -> String {
 
 /// 创建销售退货单
 #[tauri::command]
-pub fn create_sales_return(db: tauri::State<Mutex<Database>>, r#return: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn create_sales_return(
+    db: tauri::State<Mutex<Database>>,
+    r#return: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     let id = uuid::Uuid::new_v4().to_string();
-    let sr_number = r#return.get("sr_number")
+    let sr_number = r#return
+        .get("sr_number")
         .and_then(|v| v.as_str())
         .unwrap_or(&generate_sr_number())
         .to_string();
-    let sales_order_id = r#return["sales_order_id"].as_str().ok_or("Sales order ID is required")?;
-    let customer_id = r#return["customer_id"].as_str().ok_or("Customer ID is required")?;
-    let return_date = r#return.get("return_date")
+    let sales_order_id = r#return["sales_order_id"]
+        .as_str()
+        .ok_or("Sales order ID is required")?;
+    let customer_id = r#return["customer_id"]
+        .as_str()
+        .ok_or("Customer ID is required")?;
+    let return_date = r#return
+        .get("return_date")
         .and_then(|v| v.as_str())
         .unwrap_or("2024-01-01")
         .to_string();
@@ -54,7 +63,8 @@ pub fn create_sales_return(db: tauri::State<Mutex<Database>>, r#return: serde_js
             ).map_err(|e| format!("获取原订单发货数量失败: {}", e))?;
             if quantity > shipped_qty {
                 return Err(format!(
-                    "商品「{}」退货数量({})超过原发货数量({})", product_id, quantity, shipped_qty
+                    "商品「{}」退货数量({})超过原发货数量({})",
+                    product_id, quantity, shipped_qty
                 ));
             }
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
@@ -77,7 +87,8 @@ pub fn create_sales_return(db: tauri::State<Mutex<Database>>, r#return: serde_js
     tx.execute(
         "UPDATE sales_returns SET total_amount = ?1 WHERE id = ?2",
         params![total_amount, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
 
@@ -91,7 +102,10 @@ pub fn create_sales_return(db: tauri::State<Mutex<Database>>, r#return: serde_js
 
 /// 获取销售退货单列表
 #[tauri::command]
-pub fn get_sales_returns(db: tauri::State<Mutex<Database>>, options: Option<serde_json::Value>) -> Result<Vec<serde_json::Value>, String> {
+pub fn get_sales_returns(
+    db: tauri::State<Mutex<Database>>,
+    options: Option<serde_json::Value>,
+) -> Result<Vec<serde_json::Value>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -104,7 +118,7 @@ pub fn get_sales_returns(db: tauri::State<Mutex<Database>>, options: Option<serd
          FROM sales_returns sr
          LEFT JOIN sales_orders so ON sr.sales_order_id = so.id
          LEFT JOIN customers c ON sr.customer_id = c.id
-         WHERE sr.deleted_at IS NULL"
+         WHERE sr.deleted_at IS NULL",
     );
 
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -162,7 +176,10 @@ pub fn get_sales_returns(db: tauri::State<Mutex<Database>>, options: Option<serd
 
 /// 获取销售退货单详情(含明细)
 #[tauri::command]
-pub fn get_sales_return_detail(db: tauri::State<Mutex<Database>>, return_id: String) -> Result<serde_json::Value, String> {
+pub fn get_sales_return_detail(
+    db: tauri::State<Mutex<Database>>,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -188,12 +205,14 @@ pub fn get_sales_return_detail(db: tauri::State<Mutex<Database>>, return_id: Str
         })),
     ).map_err(|_| "Sales return not found".to_string())?;
 
-    let mut stmt = conn.prepare(
-        "SELECT sri.id, sri.product_id, p.name as product_name, p.sku,
+    let mut stmt = conn
+        .prepare(
+            "SELECT sri.id, sri.product_id, p.name as product_name, p.sku,
                 sri.quantity, sri.unit_price, sri.total_price, sri.reason
          FROM sales_return_items sri LEFT JOIN products p ON sri.product_id = p.id
-         WHERE sri.sales_return_id = ?1 ORDER BY sri.id"
-    ).map_err(|e| e.to_string())?;
+         WHERE sri.sales_return_id = ?1 ORDER BY sri.id",
+        )
+        .map_err(|e| e.to_string())?;
 
     let items: Vec<serde_json::Value> = stmt
         .query_map(params![return_id], |row| Ok(serde_json::json!({
@@ -209,15 +228,20 @@ pub fn get_sales_return_detail(db: tauri::State<Mutex<Database>>, return_id: Str
 
 /// 确认销售退货 → 增加库存(inbound) + 记录库存交易
 #[tauri::command]
-pub fn confirm_sales_return(db: tauri::State<Mutex<Database>>, return_id: String) -> Result<serde_json::Value, String> {
+pub fn confirm_sales_return(
+    db: tauri::State<Mutex<Database>>,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM sales_returns WHERE id = ?1 AND deleted_at IS NULL",
-        params![return_id],
-        |row| row.get(0),
-    ).map_err(|_| "Sales return not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM sales_returns WHERE id = ?1 AND deleted_at IS NULL",
+            params![return_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Sales return not found".to_string())?;
 
     if status != "draft" {
         return Err(format!("Cannot confirm return with status '{}'", status));
@@ -225,15 +249,18 @@ pub fn confirm_sales_return(db: tauri::State<Mutex<Database>>, return_id: String
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
-    let items: Vec<(String, i32)> = {
-        let mut stmt = tx.prepare(
+    let items: Vec<(String, i32)> =
+        {
+            let mut stmt = tx.prepare(
             "SELECT product_id, quantity FROM sales_return_items WHERE sales_return_id = ?1"
         ).map_err(|e| e.to_string())?;
-        let rows = stmt.query_map(params![return_id], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
-        }).map_err(|e| e.to_string())?;
-        rows.filter_map(|r| r.ok()).collect()
-    };
+            let rows = stmt
+                .query_map(params![return_id], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+                })
+                .map_err(|e| e.to_string())?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
 
     // 销售退货 = 恢复库存（入库）
     for (pid, qty) in &items {
@@ -255,17 +282,21 @@ pub fn confirm_sales_return(db: tauri::State<Mutex<Database>>, return_id: String
     ).map_err(|e| e.to_string())?;
 
     // PRD v1.1: 退货确认时自动记录退款交易
-    let (total_amount, customer_id): (f64, String) = tx.query_row(
-        "SELECT total_amount, customer_id FROM sales_returns WHERE id = ?1",
-        params![return_id],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    ).map_err(|e| e.to_string())?;
+    let (total_amount, customer_id): (f64, String) = tx
+        .query_row(
+            "SELECT total_amount, customer_id FROM sales_returns WHERE id = ?1",
+            params![return_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
 
-    let customer_name: Option<String> = tx.query_row(
-        "SELECT name FROM customers WHERE id = ?1",
-        params![customer_id],
-        |row| row.get(0),
-    ).ok();
+    let customer_name: Option<String> = tx
+        .query_row(
+            "SELECT name FROM customers WHERE id = ?1",
+            params![customer_id],
+            |row| row.get(0),
+        )
+        .ok();
 
     let refund_id = uuid::Uuid::new_v4().to_string();
     tx.execute(
@@ -278,7 +309,8 @@ pub fn confirm_sales_return(db: tauri::State<Mutex<Database>>, return_id: String
     tx.execute(
         "UPDATE sales_returns SET refund_amount = ?1 WHERE id = ?2",
         params![total_amount, return_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
 
@@ -291,15 +323,20 @@ pub fn confirm_sales_return(db: tauri::State<Mutex<Database>>, return_id: String
 
 /// 取消销售退货
 #[tauri::command]
-pub fn cancel_sales_return(db: tauri::State<Mutex<Database>>, return_id: String) -> Result<serde_json::Value, String> {
+pub fn cancel_sales_return(
+    db: tauri::State<Mutex<Database>>,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let status: String = conn.query_row(
-        "SELECT status FROM sales_returns WHERE id = ?1 AND deleted_at IS NULL",
-        params![return_id],
-        |row| row.get(0),
-    ).map_err(|_| "Sales return not found".to_string())?;
+    let status: String = conn
+        .query_row(
+            "SELECT status FROM sales_returns WHERE id = ?1 AND deleted_at IS NULL",
+            params![return_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Sales return not found".to_string())?;
 
     if status != "draft" && status != "confirmed" {
         return Err(format!("Cannot cancel return with status '{}'", status));
@@ -310,5 +347,7 @@ pub fn cancel_sales_return(db: tauri::State<Mutex<Database>>, return_id: String)
         params![return_id],
     ).map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({"id": return_id, "status": "cancelled", "message": "Sales return cancelled"}))
+    Ok(
+        serde_json::json!({"id": return_id, "status": "cancelled", "message": "Sales return cancelled"}),
+    )
 }

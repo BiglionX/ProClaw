@@ -3,17 +3,15 @@
 
 use crate::database::Database;
 use rusqlite::params;
-use uuid::Uuid;
-use std::sync::Mutex;
 use serde_json::Value;
+use std::sync::Mutex;
+use uuid::Uuid;
 
 // ========== 商城管理命令 ==========
 
 /// 获取当前用户的云商城配置
 #[tauri::command]
-pub fn get_cloud_store(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn get_cloud_store(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -54,21 +52,29 @@ pub fn create_cloud_store(
     let conn = db.connection();
 
     // 验证子域名格式
-    if !subdomain.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+    if !subdomain
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
         return Err("子域名只能包含小写字母、数字和连字符".to_string());
     }
 
     // 检查是否已开通
-    if conn.query_row("SELECT id FROM cloud_stores", [], |_| Ok(())).is_ok() {
+    if conn
+        .query_row("SELECT id FROM cloud_stores", [], |_| Ok(()))
+        .is_ok()
+    {
         return Err("您已开通云商城".to_string());
     }
 
     // 检查子域名是否被占用
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM cloud_stores WHERE subdomain = ?1",
-        params![subdomain],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cloud_stores WHERE subdomain = ?1",
+            params![subdomain],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
     if count > 0 {
         return Err("子域名已被占用".to_string());
     }
@@ -80,14 +86,18 @@ pub fn create_cloud_store(
         "INSERT INTO cloud_stores (id, user_id, subdomain, api_key, status, plan_type)
          VALUES (?1, 'u_test001', ?2, ?3, 'active', ?4)",
         params![id, subdomain, api_key, plan_type],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     // 创建默认主题
     if let Err(e) = conn.execute(
         "INSERT INTO cloud_store_themes (store_id) VALUES (?1)",
         params![id],
     ) {
-        eprintln!("[CloudStore] Failed to create default theme for {}: {}", id, e);
+        eprintln!(
+            "[CloudStore] Failed to create default theme for {}: {}",
+            id, e
+        );
     }
 
     Ok(serde_json::json!({
@@ -155,9 +165,8 @@ pub fn get_syncable_products(
          LIMIT ?1 OFFSET ?2"
     ).map_err(|e| e.to_string())?;
 
-    let products: Vec<Value> = stmt.query_map(
-        params![page_size, offset],
-        |row: &rusqlite::Row| {
+    let products: Vec<Value> = stmt
+        .query_map(params![page_size, offset], |row: &rusqlite::Row| {
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "name": row.get::<_, String>(1)?,
@@ -168,17 +177,15 @@ pub fn get_syncable_products(
                 "cloud_sync_status": row.get::<_, Option<String>>(6).ok(),
                 "cloud_sync_time": row.get::<_, Option<String>>(7).ok(),
             }))
-        },
-    ).map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     // 获取总数
-    let total: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM product_spu",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total: i64 = conn
+        .query_row("SELECT COUNT(*) FROM product_spu", [], |row| row.get(0))
+        .unwrap_or(0);
 
     Ok(serde_json::json!({
         "data": products,
@@ -190,33 +197,27 @@ pub fn get_syncable_products(
 
 /// 同步所有商品到云商城
 #[tauri::command]
-pub fn sync_all_products_to_cloud(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn sync_all_products_to_cloud(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     // 获取商城 ID
-    let store_id: String = match conn.query_row(
-        "SELECT id FROM cloud_stores LIMIT 1",
-        [],
-        |row| row.get(0),
-    ) {
-        Ok(id) => id,
-        Err(rusqlite::Error::QueryReturnedNoRows) => {
-            return Err("请先开通云商城".to_string());
-        }
-        Err(e) => return Err(e.to_string()),
-    };
+    let store_id: String =
+        match conn.query_row("SELECT id FROM cloud_stores LIMIT 1", [], |row| row.get(0)) {
+            Ok(id) => id,
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                return Err("请先开通云商城".to_string());
+            }
+            Err(e) => return Err(e.to_string()),
+        };
 
     // 获取所有商品
-    let mut stmt = conn.prepare(
-        "SELECT id, name, sku, price, image FROM product_spu WHERE is_cloud_visible = 1"
-    ).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, name, sku, price, image FROM product_spu WHERE is_cloud_visible = 1")
+        .map_err(|e| e.to_string())?;
 
-    let products: Vec<(String, String, String, f64, Option<String>)> = stmt.query_map(
-        [],
-        |row: &rusqlite::Row| {
+    let products: Vec<(String, String, String, f64, Option<String>)> = stmt
+        .query_map([], |row: &rusqlite::Row| {
             Ok((
                 row.get(0)?,
                 row.get(1)?,
@@ -224,10 +225,10 @@ pub fn sync_all_products_to_cloud(
                 row.get(3)?,
                 row.get(4)?,
             ))
-        },
-    ).map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     let sync_count = products.len();
     let now = chrono::Utc::now().timestamp_millis();
@@ -247,7 +248,12 @@ pub fn sync_all_products_to_cloud(
     if let Err(e) = conn.execute(
         "INSERT INTO cloud_sync_log (id, store_id, sync_type, status, message, created_at) 
          VALUES (?1, ?2, 'full', 'success', ?3, ?4)",
-        params![log_id, store_id, format!("同步了 {} 个商品", sync_count), now.to_string()],
+        params![
+            log_id,
+            store_id,
+            format!("同步了 {} 个商品", sync_count),
+            now.to_string()
+        ],
     ) {
         eprintln!("[CloudSync] Failed to insert sync log: {}", e);
     }
@@ -260,36 +266,32 @@ pub fn sync_all_products_to_cloud(
 
 /// 增量同步（仅同步变更的商品）
 #[tauri::command]
-pub fn sync_incremental_products(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn sync_incremental_products(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     // 获取商城 ID
-    let store_id: String = match conn.query_row(
-        "SELECT id FROM cloud_stores LIMIT 1",
-        [],
-        |row| row.get(0),
-    ) {
-        Ok(id) => id,
-        Err(rusqlite::Error::QueryReturnedNoRows) => {
-            return Err("请先开通云商城".to_string());
-        }
-        Err(e) => return Err(e.to_string()),
-    };
+    let store_id: String =
+        match conn.query_row("SELECT id FROM cloud_stores LIMIT 1", [], |row| row.get(0)) {
+            Ok(id) => id,
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                return Err("请先开通云商城".to_string());
+            }
+            Err(e) => return Err(e.to_string()),
+        };
 
     // 获取需要同步的商品（未同步或更新时间晚于同步时间）
-    let mut stmt = conn.prepare(
-        "SELECT id, name, sku, price, image, cloud_sync_time 
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, sku, price, image, cloud_sync_time 
          FROM product_spu 
          WHERE is_cloud_visible = 1 
-         AND (cloud_sync_status IS NULL OR cloud_sync_status != 'synced')"
-    ).map_err(|e| e.to_string())?;
+         AND (cloud_sync_status IS NULL OR cloud_sync_status != 'synced')",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let products: Vec<(String, String, String, f64, Option<String>, Option<String>)> = stmt.query_map(
-        [],
-        |row: &rusqlite::Row| {
+    let products: Vec<(String, String, String, f64, Option<String>, Option<String>)> = stmt
+        .query_map([], |row: &rusqlite::Row| {
             Ok((
                 row.get(0)?,
                 row.get(1)?,
@@ -298,10 +300,10 @@ pub fn sync_incremental_products(
                 row.get(4)?,
                 row.get(5)?,
             ))
-        },
-    ).map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     let sync_count = products.len();
     let now = chrono::Utc::now().timestamp_millis();
@@ -322,7 +324,12 @@ pub fn sync_incremental_products(
         if let Err(e) = conn.execute(
             "INSERT INTO cloud_sync_log (id, store_id, sync_type, status, message, created_at) 
              VALUES (?1, ?2, 'incremental', 'success', ?3, ?4)",
-            params![log_id, store_id, format!("增量同步了 {} 个商品", sync_count), now.to_string()],
+            params![
+                log_id,
+                store_id,
+                format!("增量同步了 {} 个商品", sync_count),
+                now.to_string()
+            ],
         ) {
             eprintln!("[CloudSync] Failed to insert incremental sync log: {}", e);
         }
@@ -347,7 +354,8 @@ pub fn toggle_product_cloud_visible(
     conn.execute(
         "UPDATE product_spu SET is_cloud_visible = ?1 WHERE id = ?2",
         params![visible, product_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({
         "message": if visible { "已设为可见" } else { "已设为不可见" },
@@ -371,7 +379,10 @@ pub fn batch_toggle_products_visible(
             "UPDATE product_spu SET is_cloud_visible = ?1 WHERE id = ?2",
             params![visible, product_id],
         ) {
-            eprintln!("[CloudSync] Failed to update visibility for {}: {}", product_id, e);
+            eprintln!(
+                "[CloudSync] Failed to update visibility for {}: {}",
+                product_id, e
+            );
         }
     }
 
@@ -392,16 +403,17 @@ pub fn get_cloud_sync_logs(
     let conn = db.connection();
 
     let offset = (page - 1) * page_size;
-    let mut stmt = conn.prepare(
-        "SELECT id, store_id, sync_type, status, message, created_at
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, store_id, sync_type, status, message, created_at
          FROM cloud_sync_log
          ORDER BY created_at DESC
-         LIMIT ?1 OFFSET ?2"
-    ).map_err(|e| e.to_string())?;
+         LIMIT ?1 OFFSET ?2",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let logs: Vec<Value> = stmt.query_map(
-        params![page_size, offset],
-        |row: &rusqlite::Row| {
+    let logs: Vec<Value> = stmt
+        .query_map(params![page_size, offset], |row: &rusqlite::Row| {
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
                 "store_id": row.get::<_, String>(1)?,
@@ -410,16 +422,14 @@ pub fn get_cloud_sync_logs(
                 "message": row.get::<_, String>(4)?,
                 "created_at": row.get::<_, String>(5)?,
             }))
-        },
-    ).map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
-    let total: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM cloud_sync_log",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total: i64 = conn
+        .query_row("SELECT COUNT(*) FROM cloud_sync_log", [], |row| row.get(0))
+        .unwrap_or(0);
 
     Ok(serde_json::json!({
         "data": logs,
@@ -433,9 +443,7 @@ pub fn get_cloud_sync_logs(
 
 /// 获取商城主题配置
 #[tauri::command]
-pub fn get_store_theme(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn get_store_theme(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -478,11 +486,14 @@ pub fn update_store_theme(
     let conn = db.connection();
 
     // 获取现有主题或创建新主题
-    let exists = conn.query_row(
-        "SELECT COUNT(*) FROM cloud_store_themes WHERE store_id = ?1",
-        params![store_id],
-        |row| row.get::<_, i64>(0),
-    ).unwrap_or(0) > 0;
+    let exists = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cloud_store_themes WHERE store_id = ?1",
+            params![store_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
 
     if exists {
         // 动态构建更新语句
@@ -525,7 +536,10 @@ pub fn update_store_theme(
         sets.push("updated_at = (strftime('%s','now') * 1000)");
 
         if !sets.is_empty() {
-            let sql = format!("UPDATE cloud_store_themes SET {} WHERE store_id = ?", sets.join(", "));
+            let sql = format!(
+                "UPDATE cloud_store_themes SET {} WHERE store_id = ?",
+                sets.join(", ")
+            );
             params_vec.push(Box::new(store_id.clone()));
 
             conn.execute(&sql, rusqlite::params_from_iter(params_vec.iter()))
@@ -533,31 +547,38 @@ pub fn update_store_theme(
         }
     } else {
         // 创建新主题
-        let primary_color = theme.get("primary_color")
+        let primary_color = theme
+            .get("primary_color")
             .and_then(|v| v.as_str())
             .unwrap_or("#4F46E5")
             .to_string();
-        let secondary_color = theme.get("secondary_color")
+        let secondary_color = theme
+            .get("secondary_color")
             .and_then(|v| v.as_str())
             .unwrap_or("#F9FAFB")
             .to_string();
-        let background_color = theme.get("background_color")
+        let background_color = theme
+            .get("background_color")
             .and_then(|v| v.as_str())
             .unwrap_or("#FFFFFF")
             .to_string();
-        let font_family = theme.get("font_family")
+        let font_family = theme
+            .get("font_family")
             .and_then(|v| v.as_str())
             .unwrap_or("PingFang SC, Microsoft YaHei, sans-serif")
             .to_string();
-        let header_layout = theme.get("header_layout")
+        let header_layout = theme
+            .get("header_layout")
             .and_then(|v| v.as_str())
             .unwrap_or("centered")
             .to_string();
-        let logo_url = theme.get("logo_url")
+        let logo_url = theme
+            .get("logo_url")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        let banner_images = theme.get("banner_images")
+        let banner_images = theme
+            .get("banner_images")
             .map(|v| serde_json::to_string(v).unwrap_or_default())
             .unwrap_or("[]".to_string());
 
@@ -584,7 +605,7 @@ pub fn get_store_orders(
     let conn = db.connection();
 
     let offset = (page - 1) * page_size;
-    
+
     let (query, _params_vec): (String, Vec<String>) = if let Some(ref s) = status {
         (
             "SELECT id, store_id, product_id, buyer_info, total_amount, status, shipping_address, tracking_no, created_at, updated_at
@@ -605,7 +626,7 @@ pub fn get_store_orders(
     };
 
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
-    
+
     let orders: Vec<Value> = if status.is_some() {
         stmt.query_map(
             params![status.as_ref().unwrap(), page_size, offset],
@@ -623,27 +644,26 @@ pub fn get_store_orders(
                     "updated_at": row.get::<_, String>(9)?,
                 }))
             },
-        ).map_err(|e| e.to_string())?
+        )
+        .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?
     } else {
-        stmt.query_map(
-            params![page_size, offset],
-            |row: &rusqlite::Row| {
-                Ok(serde_json::json!({
-                    "id": row.get::<_, String>(0)?,
-                    "store_id": row.get::<_, String>(1)?,
-                    "product_id": row.get::<_, String>(2)?,
-                    "buyer_info": row.get::<_, String>(3)?,
-                    "total_amount": row.get::<_, f64>(4)?,
-                    "status": row.get::<_, String>(5)?,
-                    "shipping_address": row.get::<_, Option<String>>(6).ok(),
-                    "tracking_no": row.get::<_, Option<String>>(7).ok(),
-                    "created_at": row.get::<_, String>(8)?,
-                    "updated_at": row.get::<_, String>(9)?,
-                }))
-            },
-        ).map_err(|e| e.to_string())?
+        stmt.query_map(params![page_size, offset], |row: &rusqlite::Row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "store_id": row.get::<_, String>(1)?,
+                "product_id": row.get::<_, String>(2)?,
+                "buyer_info": row.get::<_, String>(3)?,
+                "total_amount": row.get::<_, f64>(4)?,
+                "status": row.get::<_, String>(5)?,
+                "shipping_address": row.get::<_, Option<String>>(6).ok(),
+                "tracking_no": row.get::<_, Option<String>>(7).ok(),
+                "created_at": row.get::<_, String>(8)?,
+                "updated_at": row.get::<_, String>(9)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?
     };
@@ -654,13 +674,11 @@ pub fn get_store_orders(
             "SELECT COUNT(*) FROM cloud_orders WHERE status = ?1",
             params![s],
             |row| row.get(0),
-        ).unwrap_or(0)
+        )
+        .unwrap_or(0)
     } else {
-        conn.query_row(
-            "SELECT COUNT(*) FROM cloud_orders",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0)
+        conn.query_row("SELECT COUNT(*) FROM cloud_orders", [], |row| row.get(0))
+            .unwrap_or(0)
     };
 
     Ok(serde_json::json!({
@@ -715,12 +733,14 @@ pub fn mark_store_order_shipped(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let affected = conn.execute(
-        "UPDATE cloud_orders 
+    let affected = conn
+        .execute(
+            "UPDATE cloud_orders 
          SET status = 'shipped', tracking_no = ?1, updated_at = (strftime('%s','now') * 1000)
          WHERE id = ?2",
-        params![tracking_no, order_id],
-    ).map_err(|e| e.to_string())?;
+            params![tracking_no, order_id],
+        )
+        .map_err(|e| e.to_string())?;
 
     if affected == 0 {
         return Err("订单不存在".to_string());
@@ -731,39 +751,41 @@ pub fn mark_store_order_shipped(
 
 /// 获取商城统计
 #[tauri::command]
-pub fn get_store_stats(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn get_store_stats(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     // 订单总数
-    let total_orders: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM cloud_orders",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total_orders: i64 = conn
+        .query_row("SELECT COUNT(*) FROM cloud_orders", [], |row| row.get(0))
+        .unwrap_or(0);
 
     // 总销售额
-    let total_sales: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(total_amount), 0) FROM cloud_orders WHERE status != 'cancelled'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0.0);
+    let total_sales: f64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(total_amount), 0) FROM cloud_orders WHERE status != 'cancelled'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
     // 待处理订单
-    let pending_orders: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM cloud_orders WHERE status = 'pending'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let pending_orders: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cloud_orders WHERE status = 'pending'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     // 已同步商品数
-    let synced_products: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM product_spu WHERE is_cloud_visible = 1",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let synced_products: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM product_spu WHERE is_cloud_visible = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     Ok(serde_json::json!({
         "total_orders": total_orders,
@@ -805,7 +827,8 @@ pub async fn generate_store_theme_ai(
 
     // 调用 AI API (DeepSeek)
     let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_default();
-    let api_base = std::env::var("DEEPSEEK_API_BASE").unwrap_or_else(|_| "https://api.deepseek.com".to_string());
+    let api_base = std::env::var("DEEPSEEK_API_BASE")
+        .unwrap_or_else(|_| "https://api.deepseek.com".to_string());
     let model = std::env::var("DEEPSEEK_MODEL").unwrap_or_else(|_| "deepseek-chat".to_string());
 
     if api_key.is_empty() {
@@ -834,7 +857,10 @@ pub async fn generate_store_theme_ai(
     });
 
     let response = client
-        .post(format!("{}/chat/completions", api_base.trim_end_matches('/')))
+        .post(format!(
+            "{}/chat/completions",
+            api_base.trim_end_matches('/')
+        ))
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&request_body)
@@ -849,7 +875,11 @@ pub async fn generate_store_theme_ai(
         .map_err(|e| format!("读取响应失败: {}", e))?;
 
     if !status.is_success() {
-        return Err(format!("API 返回错误 {}: {}", status.as_u16(), response_text));
+        return Err(format!(
+            "API 返回错误 {}: {}",
+            status.as_u16(),
+            response_text
+        ));
     }
 
     // 解析 DeepSeek 响应
@@ -868,9 +898,15 @@ pub async fn generate_store_theme_ai(
     // 提取 JSON（AI 可能返回带 markdown 代码块的 JSON）
     let content = content.trim();
     let content = if content.starts_with("```json") {
-        content.trim_start_matches("```json").trim_end_matches("```").trim()
+        content
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim()
     } else if content.starts_with("```") {
-        content.trim_start_matches("```").trim_end_matches("```").trim()
+        content
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim()
     } else {
         content
     };
@@ -884,31 +920,31 @@ pub async fn generate_store_theme_ai(
         .and_then(|v| v.as_str())
         .unwrap_or("#4F46E5")
         .to_string();
-    
+
     let secondary_color = theme_json
         .get("secondary_color")
         .and_then(|v| v.as_str())
         .unwrap_or("#F9FAFB")
         .to_string();
-    
+
     let background_color = theme_json
         .get("background_color")
         .and_then(|v| v.as_str())
         .unwrap_or("#FFFFFF")
         .to_string();
-    
+
     let layout_style = theme_json
         .get("layout_style")
         .and_then(|v| v.as_str())
         .unwrap_or("card")
         .to_string();
-    
+
     let font_family = theme_json
         .get("font_family")
         .and_then(|v| v.as_str())
         .unwrap_or("PingFang SC, Microsoft YaHei, sans-serif")
         .to_string();
-    
+
     let header_layout = theme_json
         .get("header_layout")
         .and_then(|v| v.as_str())
@@ -920,11 +956,14 @@ pub async fn generate_store_theme_ai(
     let conn = db.connection();
     let now = chrono::Utc::now().timestamp_millis();
 
-    let exists = conn.query_row(
-        "SELECT COUNT(*) FROM cloud_store_themes WHERE store_id = ?1",
-        params![store_id],
-        |row| row.get::<_, i64>(0),
-    ).unwrap_or(0) > 0;
+    let exists = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cloud_store_themes WHERE store_id = ?1",
+            params![store_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        > 0;
 
     if exists {
         conn.execute(
@@ -933,8 +972,18 @@ pub async fn generate_store_theme_ai(
                  layout_style = ?4, font_family = ?5, header_layout = ?6,
                  ai_generated = 1, updated_at = ?7
              WHERE store_id = ?8",
-            params![primary_color, secondary_color, background_color, layout_style, font_family, header_layout, now, store_id],
-        ).map_err(|e| e.to_string())?;
+            params![
+                primary_color,
+                secondary_color,
+                background_color,
+                layout_style,
+                font_family,
+                header_layout,
+                now,
+                store_id
+            ],
+        )
+        .map_err(|e| e.to_string())?;
     } else {
         conn.execute(
             "INSERT INTO cloud_store_themes 
@@ -978,7 +1027,8 @@ pub fn create_product_review(
 
     let id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().timestamp_millis();
-    let images_json = serde_json::to_string(&images.unwrap_or_default()).map_err(|e| e.to_string())?;
+    let images_json =
+        serde_json::to_string(&images.unwrap_or_default()).map_err(|e| e.to_string())?;
 
     conn.execute(
         "INSERT INTO product_reviews (id, product_id, user_id, user_name, rating, content, images, created_at, updated_at) 
@@ -1004,13 +1054,15 @@ pub fn get_product_reviews(
     let conn = db.connection();
 
     let offset = (page - 1) * page_size;
-    let mut stmt = conn.prepare(
-        "SELECT id, user_id, user_name, rating, content, images, reply, reply_time, created_at 
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, user_id, user_name, rating, content, images, reply, reply_time, created_at 
          FROM product_reviews 
          WHERE product_id = ?1 
          ORDER BY created_at DESC 
-         LIMIT ?2 OFFSET ?3"
-    ).map_err(|e| e.to_string())?;
+         LIMIT ?2 OFFSET ?3",
+        )
+        .map_err(|e| e.to_string())?;
 
     let reviews: Vec<Value> = stmt.query_map(
         params![product_id, page_size, offset],
@@ -1032,11 +1084,13 @@ pub fn get_product_reviews(
     .map_err(|e| e.to_string())?;
 
     // 获取总数
-    let total: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM product_reviews WHERE product_id = ?1",
-        params![product_id],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM product_reviews WHERE product_id = ?1",
+            params![product_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     Ok(serde_json::json!({
         "data": reviews,
@@ -1057,10 +1111,12 @@ pub fn reply_product_review(
     let conn = db.connection();
 
     let now = chrono::Utc::now().timestamp_millis();
-    let affected = conn.execute(
-        "UPDATE product_reviews SET reply = ?1, reply_time = ?2, updated_at = ?3 WHERE id = ?4",
-        params![reply, now, now, review_id],
-    ).map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "UPDATE product_reviews SET reply = ?1, reply_time = ?2, updated_at = ?3 WHERE id = ?4",
+            params![reply, now, now, review_id],
+        )
+        .map_err(|e| e.to_string())?;
 
     if affected == 0 {
         return Err("评价不存在".to_string());
@@ -1080,10 +1136,12 @@ pub fn delete_product_review(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let affected = conn.execute(
-        "DELETE FROM product_reviews WHERE id = ?1",
-        params![review_id],
-    ).map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "DELETE FROM product_reviews WHERE id = ?1",
+            params![review_id],
+        )
+        .map_err(|e| e.to_string())?;
 
     if affected == 0 {
         return Err("评价不存在".to_string());
@@ -1113,11 +1171,13 @@ pub fn create_coupon(
     let conn = db.connection();
 
     // 检查优惠码是否已存在
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM coupons WHERE code = ?1",
-        params![code],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM coupons WHERE code = ?1",
+            params![code],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     if count > 0 {
         return Err("优惠码已存在".to_string());
@@ -1152,7 +1212,7 @@ pub fn get_coupons(
 
     let offset = (page - 1) * page_size;
     let status_ref = status.as_deref();
-    
+
     let (query, use_status_filter) = if status_ref.is_some() {
         (
             "SELECT id, code, discount_type, discount_value, min_amount, max_uses, used_count, start_time, end_time, status, created_at 
@@ -1193,7 +1253,8 @@ pub fn get_coupons(
                     "created_at": row.get::<_, String>(10)?,
                 }))
             },
-        ).map_err(|e| e.to_string())?
+        )
+        .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?
     } else {
@@ -1214,7 +1275,8 @@ pub fn get_coupons(
                     "created_at": row.get::<_, String>(10)?,
                 }))
             },
-        ).map_err(|e| e.to_string())?
+        )
+        .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?
     };
@@ -1225,13 +1287,15 @@ pub fn get_coupons(
             "SELECT COUNT(*) FROM coupons WHERE store_id = ?1 AND status = ?2",
             params![store_id, s],
             |row| row.get(0),
-        ).unwrap_or(0)
+        )
+        .unwrap_or(0)
     } else {
         conn.query_row(
             "SELECT COUNT(*) FROM coupons WHERE store_id = ?1",
             params![store_id],
             |row| row.get(0),
-        ).unwrap_or(0)
+        )
+        .unwrap_or(0)
     };
 
     Ok(serde_json::json!({
@@ -1253,10 +1317,12 @@ pub fn update_coupon_status(
     let conn = db.connection();
 
     let now = chrono::Utc::now().timestamp_millis();
-    let affected = conn.execute(
-        "UPDATE coupons SET status = ?1, updated_at = ?2 WHERE id = ?3",
-        params![status, now, coupon_id],
-    ).map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute(
+            "UPDATE coupons SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![status, now, coupon_id],
+        )
+        .map_err(|e| e.to_string())?;
 
     if affected == 0 {
         return Err("优惠券不存在".to_string());
@@ -1276,10 +1342,9 @@ pub fn delete_coupon(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let affected = conn.execute(
-        "DELETE FROM coupons WHERE id = ?1",
-        params![coupon_id],
-    ).map_err(|e| e.to_string())?;
+    let affected = conn
+        .execute("DELETE FROM coupons WHERE id = ?1", params![coupon_id])
+        .map_err(|e| e.to_string())?;
 
     if affected == 0 {
         return Err("优惠券不存在".to_string());
@@ -1297,7 +1362,7 @@ pub fn use_coupon(
     code: String,
     user_id: String,
     order_id: String,
-    order_amount: f64,  // 添加订单金额参数
+    order_amount: f64, // 添加订单金额参数
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
@@ -1329,7 +1394,17 @@ pub fn use_coupon(
         Err(e) => return Err(e.to_string()),
     };
 
-    let (coupon_id, discount_type, discount_value, min_amount, max_uses, used_count, start_time, end_time, status) = coupon;
+    let (
+        coupon_id,
+        discount_type,
+        discount_value,
+        min_amount,
+        max_uses,
+        used_count,
+        start_time,
+        end_time,
+        status,
+    ) = coupon;
 
     // 检查状态
     if status != "active" {
@@ -1363,13 +1438,15 @@ pub fn use_coupon(
         "INSERT INTO coupon_usage (id, coupon_id, user_id, order_id, used_at) 
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![usage_id, coupon_id, user_id, order_id, usage_now],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     // 更新使用次数
     conn.execute(
         "UPDATE coupons SET used_count = used_count + 1 WHERE id = ?1",
         params![coupon_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({
         "coupon_id": coupon_id,

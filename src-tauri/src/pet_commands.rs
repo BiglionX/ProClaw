@@ -2,11 +2,11 @@
 // 需求文档：行业插件功能实现
 
 use crate::database::Database;
+use chrono::Utc;
 use rusqlite::params;
 use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// 创建宠物档案
 #[tauri::command]
@@ -49,48 +49,52 @@ pub fn pet_get_profiles(
             "SELECT id, owner_id, name, species, breed, gender, birth_date, weight, color, chip_no, is_neutered, photo_url, notes, created_at
              FROM pet_profiles WHERE owner_id = ?1 ORDER BY name"
         ).map_err(|e| e.to_string())?;
-        let r = stmt.query_map(params![oid], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "owner_id": row.get::<_, String>(1)?,
-                "name": row.get::<_, String>(2)?,
-                "species": row.get::<_, Option<String>>(3)?,
-                "breed": row.get::<_, Option<String>>(4)?,
-                "gender": row.get::<_, Option<String>>(5)?,
-                "birth_date": row.get::<_, Option<String>>(6)?,
-                "weight": row.get::<_, Option<f64>>(7)?,
-                "color": row.get::<_, Option<String>>(8)?,
-                "chip_no": row.get::<_, Option<String>>(9)?,
-                "is_neutered": row.get::<_, Option<bool>>(10)?,
-                "photo_url": row.get::<_, Option<String>>(11)?,
-                "notes": row.get::<_, Option<String>>(12)?,
-                "created_at": row.get::<_, String>(13)?,
-            }))
-        }).map_err(|e| e.to_string())?;
+        let r = stmt
+            .query_map(params![oid], |row| {
+                Ok(json!({
+                    "id": row.get::<_, String>(0)?,
+                    "owner_id": row.get::<_, String>(1)?,
+                    "name": row.get::<_, String>(2)?,
+                    "species": row.get::<_, Option<String>>(3)?,
+                    "breed": row.get::<_, Option<String>>(4)?,
+                    "gender": row.get::<_, Option<String>>(5)?,
+                    "birth_date": row.get::<_, Option<String>>(6)?,
+                    "weight": row.get::<_, Option<f64>>(7)?,
+                    "color": row.get::<_, Option<String>>(8)?,
+                    "chip_no": row.get::<_, Option<String>>(9)?,
+                    "is_neutered": row.get::<_, Option<bool>>(10)?,
+                    "photo_url": row.get::<_, Option<String>>(11)?,
+                    "notes": row.get::<_, Option<String>>(12)?,
+                    "created_at": row.get::<_, String>(13)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
         r.filter_map(|r| r.ok()).collect()
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, owner_id, name, species, breed, gender, birth_date, weight, color, chip_no, is_neutered, photo_url, notes, created_at
              FROM pet_profiles ORDER BY name"
         ).map_err(|e| e.to_string())?;
-        let r = stmt.query_map([], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "owner_id": row.get::<_, String>(1)?,
-                "name": row.get::<_, String>(2)?,
-                "species": row.get::<_, Option<String>>(3)?,
-                "breed": row.get::<_, Option<String>>(4)?,
-                "gender": row.get::<_, Option<String>>(5)?,
-                "birth_date": row.get::<_, Option<String>>(6)?,
-                "weight": row.get::<_, Option<f64>>(7)?,
-                "color": row.get::<_, Option<String>>(8)?,
-                "chip_no": row.get::<_, Option<String>>(9)?,
-                "is_neutered": row.get::<_, Option<bool>>(10)?,
-                "photo_url": row.get::<_, Option<String>>(11)?,
-                "notes": row.get::<_, Option<String>>(12)?,
-                "created_at": row.get::<_, String>(13)?,
-            }))
-        }).map_err(|e| e.to_string())?;
+        let r = stmt
+            .query_map([], |row| {
+                Ok(json!({
+                    "id": row.get::<_, String>(0)?,
+                    "owner_id": row.get::<_, String>(1)?,
+                    "name": row.get::<_, String>(2)?,
+                    "species": row.get::<_, Option<String>>(3)?,
+                    "breed": row.get::<_, Option<String>>(4)?,
+                    "gender": row.get::<_, Option<String>>(5)?,
+                    "birth_date": row.get::<_, Option<String>>(6)?,
+                    "weight": row.get::<_, Option<f64>>(7)?,
+                    "color": row.get::<_, Option<String>>(8)?,
+                    "chip_no": row.get::<_, Option<String>>(9)?,
+                    "is_neutered": row.get::<_, Option<bool>>(10)?,
+                    "photo_url": row.get::<_, Option<String>>(11)?,
+                    "notes": row.get::<_, Option<String>>(12)?,
+                    "created_at": row.get::<_, String>(13)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
         r.filter_map(|r| r.ok()).collect()
     };
 
@@ -122,7 +126,8 @@ pub fn pet_create_boarding(
     conn.execute(
         "UPDATE pet_boarding_rooms SET status = 'occupied' WHERE id = ?1",
         params![room_id],
-    ).ok();
+    )
+    .ok();
 
     Ok(json!({ "id": id, "status": "active", "message": "寄养记录已创建" }))
 }
@@ -141,40 +146,44 @@ pub fn pet_get_boarding_records(
             "SELECT id, pet_id, room_id, check_in_at, check_out_at, daily_rate, total_amount, status, notes, created_at
              FROM pet_boarding_records WHERE status = ?1 ORDER BY created_at DESC"
         ).map_err(|e| e.to_string())?;
-        let r = stmt.query_map(params![s], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "pet_id": row.get::<_, String>(1)?,
-                "room_id": row.get::<_, String>(2)?,
-                "check_in_at": row.get::<_, String>(3)?,
-                "check_out_at": row.get::<_, String>(4)?,
-                "daily_rate": row.get::<_, f64>(5)?,
-                "total_amount": row.get::<_, Option<f64>>(6)?,
-                "status": row.get::<_, String>(7)?,
-                "notes": row.get::<_, Option<String>>(8)?,
-                "created_at": row.get::<_, String>(9)?,
-            }))
-        }).map_err(|e| e.to_string())?;
+        let r = stmt
+            .query_map(params![s], |row| {
+                Ok(json!({
+                    "id": row.get::<_, String>(0)?,
+                    "pet_id": row.get::<_, String>(1)?,
+                    "room_id": row.get::<_, String>(2)?,
+                    "check_in_at": row.get::<_, String>(3)?,
+                    "check_out_at": row.get::<_, String>(4)?,
+                    "daily_rate": row.get::<_, f64>(5)?,
+                    "total_amount": row.get::<_, Option<f64>>(6)?,
+                    "status": row.get::<_, String>(7)?,
+                    "notes": row.get::<_, Option<String>>(8)?,
+                    "created_at": row.get::<_, String>(9)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
         r.filter_map(|r| r.ok()).collect()
     } else {
         let mut stmt = conn.prepare(
             "SELECT id, pet_id, room_id, check_in_at, check_out_at, daily_rate, total_amount, status, notes, created_at
              FROM pet_boarding_records ORDER BY created_at DESC LIMIT 50"
         ).map_err(|e| e.to_string())?;
-        let r = stmt.query_map([], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "pet_id": row.get::<_, String>(1)?,
-                "room_id": row.get::<_, String>(2)?,
-                "check_in_at": row.get::<_, String>(3)?,
-                "check_out_at": row.get::<_, String>(4)?,
-                "daily_rate": row.get::<_, f64>(5)?,
-                "total_amount": row.get::<_, Option<f64>>(6)?,
-                "status": row.get::<_, String>(7)?,
-                "notes": row.get::<_, Option<String>>(8)?,
-                "created_at": row.get::<_, String>(9)?,
-            }))
-        }).map_err(|e| e.to_string())?;
+        let r = stmt
+            .query_map([], |row| {
+                Ok(json!({
+                    "id": row.get::<_, String>(0)?,
+                    "pet_id": row.get::<_, String>(1)?,
+                    "room_id": row.get::<_, String>(2)?,
+                    "check_in_at": row.get::<_, String>(3)?,
+                    "check_out_at": row.get::<_, String>(4)?,
+                    "daily_rate": row.get::<_, f64>(5)?,
+                    "total_amount": row.get::<_, Option<f64>>(6)?,
+                    "status": row.get::<_, String>(7)?,
+                    "notes": row.get::<_, Option<String>>(8)?,
+                    "created_at": row.get::<_, String>(9)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
         r.filter_map(|r| r.ok()).collect()
     };
 
@@ -193,11 +202,13 @@ pub fn pet_check_out_boarding(
     let now = Utc::now().to_rfc3339();
 
     // 查询房间 ID 并释放
-    let room_id: Option<String> = conn.query_row(
-        "SELECT room_id FROM pet_boarding_records WHERE id = ?1",
-        params![boarding_id],
-        |row| row.get(0),
-    ).ok();
+    let room_id: Option<String> = conn
+        .query_row(
+            "SELECT room_id FROM pet_boarding_records WHERE id = ?1",
+            params![boarding_id],
+            |row| row.get(0),
+        )
+        .ok();
 
     conn.execute(
         "UPDATE pet_boarding_records SET status = 'checked_out', total_amount = ?1, check_out_at = ?2 WHERE id = ?3",
@@ -208,7 +219,8 @@ pub fn pet_check_out_boarding(
         conn.execute(
             "UPDATE pet_boarding_rooms SET status = 'vacant' WHERE id = ?1",
             params![rid],
-        ).ok();
+        )
+        .ok();
     }
 
     Ok(json!({ "message": "离店结算完成", "total_amount": final_amount }))

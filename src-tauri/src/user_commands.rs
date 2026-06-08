@@ -1,8 +1,8 @@
 // 用户管理 Tauri 命令 (Phase 6)
 // 提供桌面端用户 CRUD、角色分配、密码管理
 
-use crate::database::Database;
 use crate::api::auth::hash_password;
+use crate::database::Database;
 use rusqlite::params;
 use std::sync::Mutex;
 use uuid::Uuid;
@@ -46,8 +46,14 @@ pub fn create_user_cmd(
     let utype = user_type.unwrap_or_else(|| "internal".to_string());
 
     let password_hash = if let Some(ref pwd) = password {
-        if !pwd.is_empty() { Some(hash_password(pwd)?) } else { None }
-    } else { None };
+        if !pwd.is_empty() {
+            Some(hash_password(pwd)?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     conn.execute(
         "INSERT INTO users (id, name, phone, email, user_type, password_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -83,7 +89,7 @@ pub fn get_users_cmd(
          FROM users u \
          LEFT JOIN user_roles ur ON u.id = ur.user_id \
          LEFT JOIN roles r ON ur.role_id = r.id \
-         WHERE 1=1"
+         WHERE 1=1",
     );
     let mut pv: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
@@ -94,7 +100,12 @@ pub fn get_users_cmd(
     if let Some(ref s) = search {
         if !s.is_empty() {
             let idx = pv.len() + 1;
-            sql.push_str(&format!(" AND (u.name LIKE ?{} OR u.phone LIKE ?{} OR u.email LIKE ?{})", idx, idx+1, idx+2));
+            sql.push_str(&format!(
+                " AND (u.name LIKE ?{} OR u.phone LIKE ?{} OR u.email LIKE ?{})",
+                idx,
+                idx + 1,
+                idx + 2
+            ));
             let pattern = format!("%{}%", s);
             pv.push(Box::new(pattern.clone()));
             pv.push(Box::new(pattern.clone()));
@@ -179,10 +190,13 @@ pub fn update_user_cmd(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE id = ?1)", params![id],
-        |row| row.get(0),
-    ).unwrap_or(false);
+    let exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM users WHERE id = ?1)",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
 
     if !exists {
         return Err("User not found".to_string());
@@ -218,7 +232,8 @@ pub fn update_user_cmd(
     let sql = format!("UPDATE users SET {} WHERE id = ?{}", sets.join(", "), idx);
 
     let refs: Vec<&dyn rusqlite::types::ToSql> = pv.iter().map(|b| b.as_ref()).collect();
-    conn.execute(&sql, rusqlite::params_from_iter(refs)).map_err(|e| e.to_string())?;
+    conn.execute(&sql, rusqlite::params_from_iter(refs))
+        .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({"message": "User updated successfully"}))
 }
@@ -232,10 +247,12 @@ pub fn delete_user_cmd(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let affected = conn.execute(
-        "UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        params![id],
-    ).unwrap_or(0);
+    let affected = conn
+        .execute(
+            "UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+            params![id],
+        )
+        .unwrap_or(0);
 
     if affected == 0 {
         return Err("User not found".to_string());
@@ -270,32 +287,34 @@ pub fn change_user_password_cmd(
     conn.execute(
         "UPDATE users SET password_hash = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
         params![hash, user_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({"message": "Password changed successfully"}))
 }
 
 /// 获取角色列表
 #[tauri::command]
-pub fn get_roles_cmd(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<serde_json::Value, String> {
+pub fn get_roles_cmd(db: tauri::State<Mutex<Database>>) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    let mut stmt = conn.prepare("SELECT id, name, description, permissions FROM roles ORDER BY id")
+    let mut stmt = conn
+        .prepare("SELECT id, name, description, permissions FROM roles ORDER BY id")
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, i32>(0)?,
-            "name": row.get::<_, String>(1)?,
-            "description": row.get::<_, Option<String>>(2)?,
-            "permissions": serde_json::from_str::<serde_json::Value>(
-                &row.get::<_, Option<String>>(3).unwrap_or_default().unwrap_or("[]".to_string())
-            ).unwrap_or(serde_json::json!([])),
-        }))
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, i32>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "description": row.get::<_, Option<String>>(2)?,
+                "permissions": serde_json::from_str::<serde_json::Value>(
+                    &row.get::<_, Option<String>>(3).unwrap_or_default().unwrap_or("[]".to_string())
+                ).unwrap_or(serde_json::json!([])),
+            }))
+        })
+        .map_err(|e| e.to_string())?;
 
     let roles: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
     Ok(serde_json::json!({ "data": roles }))
@@ -334,19 +353,33 @@ pub fn get_current_user_cmd(
 }
 
 /// 内部分配角色函数
-fn assign_user_role(conn: &rusqlite::Connection, user_id: &str, role_name: &str) -> Result<(), String> {
-    let role_id: i32 = conn.query_row(
-        "SELECT id FROM roles WHERE name = ?1", params![role_name],
-        |row| row.get(0),
-    ).map_err(|_| format!("Role '{}' not found", role_name))?;
+fn assign_user_role(
+    conn: &rusqlite::Connection,
+    user_id: &str,
+    role_name: &str,
+) -> Result<(), String> {
+    let role_id: i32 = conn
+        .query_row(
+            "SELECT id FROM roles WHERE name = ?1",
+            params![role_name],
+            |row| row.get(0),
+        )
+        .map_err(|_| format!("Role '{}' not found", role_name))?;
 
-    if let Err(e) = conn.execute("DELETE FROM user_roles WHERE user_id = ?1", params![user_id]) {
-        eprintln!("[UserRoles] Failed to clear existing roles for {}: {}", user_id, e);
+    if let Err(e) = conn.execute(
+        "DELETE FROM user_roles WHERE user_id = ?1",
+        params![user_id],
+    ) {
+        eprintln!(
+            "[UserRoles] Failed to clear existing roles for {}: {}",
+            user_id, e
+        );
     }
     conn.execute(
         "INSERT INTO user_roles (user_id, role_id) VALUES (?1, ?2)",
         params![user_id, role_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }

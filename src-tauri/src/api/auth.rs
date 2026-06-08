@@ -1,29 +1,29 @@
 // 认证和授权模块
 // Phase 6 增强: argon2 密码哈希, JWT 密钥管理, 设备配对, 用户登录
 
-use axum::{
-    extract::{State, Json, ConnectInfo},
-    http::StatusCode,
-    response::IntoResponse,
-};
-use serde::{Deserialize, Serialize};
 use super::AppState;
-use jsonwebtoken::{encode, decode, Header, Validation};
-use chrono::{Utc, Duration};
-use rusqlite::params;
-use rand::Rng;
-use std::net::SocketAddr;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
+use axum::{
+    extract::{ConnectInfo, Json, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use chrono::{Duration, Utc};
+use jsonwebtoken::{decode, encode, Header, Validation};
+use rand::Rng;
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 
 /// JWT Claims
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String,  // 用户ID
-    pub exp: usize,   // 过期时间
-    pub iat: usize,   // 签发时间
+    pub sub: String, // 用户ID
+    pub exp: usize,  // 过期时间
+    pub iat: usize,  // 签发时间
     pub device_id: String,
     pub role: String,
     pub permissions: Vec<String>, // Phase 6: 嵌入权限列表
@@ -88,7 +88,12 @@ pub async fn pair_device(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
 
     let conn = db.connection();
@@ -105,7 +110,12 @@ pub async fn pair_device(
 
     let (pairing_id, user_id) = match result {
         Ok(data) => data,
-        Err(_) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "Invalid or expired pairing code"}))),
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "Invalid or expired pairing code"})),
+            )
+        }
     };
 
     // 2. 标记配对码为已使用
@@ -121,14 +131,38 @@ pub async fn pair_device(
 
     // 4. 生成设备ID和token
     let device_id = uuid::Uuid::new_v4().to_string();
-    let access_token = match generate_token(&user_id, &device_id, &role, &permissions, &state.jwt_secret, 3600) {
+    let access_token = match generate_token(
+        &user_id,
+        &device_id,
+        &role,
+        &permissions,
+        &state.jwt_secret,
+        3600,
+    ) {
         Ok(token) => token,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e})),
+            )
+        }
     };
 
-    let refresh_token = match generate_token(&user_id, &device_id, &role, &permissions, &state.jwt_secret, 86400 * 30) {
+    let refresh_token = match generate_token(
+        &user_id,
+        &device_id,
+        &role,
+        &permissions,
+        &state.jwt_secret,
+        86400 * 30,
+    ) {
         Ok(token) => token,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e})),
+            )
+        }
     };
 
     // 5. 存储设备信息
@@ -159,13 +193,30 @@ pub async fn refresh_token(
     // 验证refresh token
     let claims = match verify_token(&payload.refresh_token, &state.jwt_secret) {
         Ok(claims) => claims,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Invalid refresh token"}))),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "Invalid refresh token"})),
+            )
+        }
     };
 
     // 生成新的access token
-    let access_token = match generate_token(&claims.sub, &claims.device_id, &claims.role, &claims.permissions, &state.jwt_secret, 3600) {
+    let access_token = match generate_token(
+        &claims.sub,
+        &claims.device_id,
+        &claims.role,
+        &claims.permissions,
+        &state.jwt_secret,
+        3600,
+    ) {
         Ok(token) => token,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e})),
+            )
+        }
     };
 
     (
@@ -186,7 +237,12 @@ pub async fn login(
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database lock error"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
     };
 
     let conn = db.connection();
@@ -207,12 +263,20 @@ pub async fn login(
 
     let (user_id, name, email, password_hash) = match result {
         Ok(data) => data,
-        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Invalid username or password"}))),
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "Invalid username or password"})),
+            )
+        }
     };
 
     // 2. 使用 argon2 验证密码
     if !verify_password(&payload.password, password_hash.as_deref()) {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Invalid username or password"})));
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "Invalid username or password"})),
+        );
     }
 
     // 3. 获取用户角色和权限
@@ -223,19 +287,46 @@ pub async fn login(
         "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?1",
         params![user_id],
     ) {
-        eprintln!("[Auth] Failed to update last login time for {}: {}", user_id, e);
+        eprintln!(
+            "[Auth] Failed to update last login time for {}: {}",
+            user_id, e
+        );
     }
 
     // 5. 生成JWT token
     let device_id = "web".to_string();
-    let access_token = match generate_token(&user_id, &device_id, &role, &permissions, &state.jwt_secret, 3600) {
+    let access_token = match generate_token(
+        &user_id,
+        &device_id,
+        &role,
+        &permissions,
+        &state.jwt_secret,
+        3600,
+    ) {
         Ok(token) => token,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e})),
+            )
+        }
     };
 
-    let refresh_token = match generate_token(&user_id, &device_id, &role, &permissions, &state.jwt_secret, 86400 * 30) {
+    let refresh_token = match generate_token(
+        &user_id,
+        &device_id,
+        &role,
+        &permissions,
+        &state.jwt_secret,
+        86400 * 30,
+    ) {
         Ok(token) => token,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e}))),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e})),
+            )
+        }
     };
 
     (
@@ -373,12 +464,22 @@ pub async fn get_current_user(
 ) -> impl IntoResponse {
     let claims = match super::extract_claims(&request) {
         Some(c) => c,
-        None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Not authenticated"}))),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "Not authenticated"})),
+            )
+        }
     };
 
     let db = match state.db.lock() {
         Ok(db) => db,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "DB lock"}))),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "DB lock"})),
+            )
+        }
     };
     let conn = db.connection();
 
@@ -397,7 +498,12 @@ pub async fn get_current_user(
         },
     ) {
         Ok(r) => r,
-        Err(_) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "User not found"}))),
+        Err(_) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "User not found"})),
+            )
+        }
     };
 
     let (user_id, name, email, phone, user_type) = user_row;
@@ -410,7 +516,7 @@ pub async fn get_current_user(
         "SELECT r.id, r.name, r.permissions \
          FROM user_roles ur \
          JOIN roles r ON ur.role_id = r.id \
-         WHERE ur.user_id = ?1"
+         WHERE ur.user_id = ?1",
     ) {
         let rows = stmt.query_map(params![&user_id], |row| {
             let role_id: i32 = row.get(0)?;
@@ -460,31 +566,45 @@ pub async fn get_current_user(
         "permissions": all_permissions,
     });
 
-    (StatusCode::OK, Json(serde_json::json!({ "data": user_info })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "data": user_info })),
+    )
 }
 
 // ========== 角色/权限查询 ==========
 
 /// 获取用户的主角色名和聚合权限列表（支持多角色）
 /// 返回 (primary_role_name, all_permissions)
-pub fn get_user_role_and_permissions(conn: &rusqlite::Connection, user_id: &str) -> (String, Vec<String>) {
+pub fn get_user_role_and_permissions(
+    conn: &rusqlite::Connection,
+    user_id: &str,
+) -> (String, Vec<String>) {
     // 查询用户所有角色，聚合权限
     let mut stmt = match conn.prepare(
         "SELECT r.name, r.permissions FROM user_roles ur \
          JOIN roles r ON ur.role_id = r.id \
-         WHERE ur.user_id = ?1"
+         WHERE ur.user_id = ?1",
     ) {
         Ok(s) => s,
         Err(_) => {
             // 检查是否外部用户
-            let user_type: String = conn.query_row(
-                "SELECT user_type FROM users WHERE id = ?1",
-                params![user_id],
-                |row| row.get(0),
-            ).unwrap_or_else(|_| "external".to_string());
+            let user_type: String = conn
+                .query_row(
+                    "SELECT user_type FROM users WHERE id = ?1",
+                    params![user_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or_else(|_| "external".to_string());
 
             if user_type == "external" {
-                return ("customer".to_string(), vec!["view_own_orders".to_string(), "view_own_products".to_string()]);
+                return (
+                    "customer".to_string(),
+                    vec![
+                        "view_own_orders".to_string(),
+                        "view_own_products".to_string(),
+                    ],
+                );
             } else {
                 return ("customer".to_string(), vec![]);
             }
@@ -492,10 +612,7 @@ pub fn get_user_role_and_permissions(conn: &rusqlite::Connection, user_id: &str)
     };
 
     let rows = stmt.query_map(params![user_id], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, Option<String>>(1)?,
-        ))
+        Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
     });
 
     let mut primary_role = "customer".to_string();
