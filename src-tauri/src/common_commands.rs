@@ -171,3 +171,79 @@ pub fn upload_image(file_data: String) -> Result<String, String> {
     }
     Ok(file_data)
 }
+
+// ==================== 命令统计命令 ====================
+
+use crate::COMMAND_STATS;
+
+/// 获取命令执行统计
+#[tauri::command]
+pub fn get_command_stats(options: Option<serde_json::Value>) -> Result<serde_json::Value, String> {
+    let options = options.unwrap_or(serde_json::json!({"type": "all"}));
+    let stat_type = options["type"].as_str().unwrap_or("all");
+    let limit = options["limit"].as_u64().unwrap_or(10) as usize;
+    
+    let stats = match stat_type {
+        "slowest" => {
+            let slowest = COMMAND_STATS.get_slowest_commands(limit);
+            serde_json::json!({
+                "type": "slowest",
+                "data": slowest.into_iter().map(|(name, avg_ms)| {
+                    serde_json::json!({
+                        "command": name,
+                        "avg_duration_ms": avg_ms
+                    })
+                }).collect::<Vec<_>>()
+            })
+        },
+        "most_called" => {
+            let most_called = COMMAND_STATS.get_most_called_commands(limit);
+            serde_json::json!({
+                "type": "most_called",
+                "data": most_called.into_iter().map(|(name, calls)| {
+                    serde_json::json!({
+                        "command": name,
+                        "total_calls": calls
+                    })
+                }).collect::<Vec<_>>()
+            })
+        },
+        "errors" => {
+            let error_prone = COMMAND_STATS.get_error_prone_commands(limit);
+            serde_json::json!({
+                "type": "errors",
+                "data": error_prone.into_iter().map(|(name, rate)| {
+                    serde_json::json!({
+                        "command": name,
+                        "error_rate_percent": rate
+                    })
+                }).collect::<Vec<_>>()
+            })
+        },
+        _ => {
+            let all_stats = COMMAND_STATS.get_all_stats();
+            serde_json::json!({
+                "type": "all",
+                "total_commands": all_stats.len(),
+                "total_calls": all_stats.iter().map(|s| s.total_calls).sum::<u64>(),
+                "data": all_stats.into_iter().map(|s| {
+                    serde_json::json!({
+                        "command": s.name,
+                        "total_calls": s.total_calls,
+                        "avg_duration_ms": s.avg_duration_ms(),
+                        "errors": s.errors
+                    })
+                }).collect::<Vec<_>>()
+            })
+        }
+    };
+    
+    Ok(stats)
+}
+
+/// 重置命令统计
+#[tauri::command]
+pub fn reset_command_stats() -> Result<serde_json::Value, String> {
+    COMMAND_STATS.reset();
+    Ok(serde_json::json!({"message": "Command stats reset successfully"}))
+}

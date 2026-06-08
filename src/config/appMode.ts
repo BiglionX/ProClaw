@@ -9,8 +9,15 @@
  */
 import { create } from 'zustand';
 
-/** 行业模式标识 - 扩展支持现有 + 第三方插件 */
-export type AppMode = 'inventory' | 'virtual_company' | 'light' | 'catering' | 'beauty' | 'pet' | 'cloud-proclaw' | string;
+/** 行业模式标识 - 内置模式 + 第三方插件模式（branded type） */
+export type BuiltinAppMode = 'inventory' | 'virtual_company' | 'light' | 'catering' | 'beauty' | 'pet' | 'cloud-proclaw';
+export type PluginAppMode = string & { readonly __brand: unique symbol };
+export type AppMode = BuiltinAppMode | PluginAppMode;
+
+/** 类型守卫：判断是否为内置模式 */
+export function isBuiltinMode(mode: string): mode is BuiltinAppMode {
+  return ['inventory', 'virtual_company', 'light', 'catering', 'beauty', 'pet', 'cloud-proclaw'].includes(mode);
+}
 
 /** 第三方插件开发者信息 */
 export interface PluginDeveloper {
@@ -307,6 +314,10 @@ export class PluginManager {
    */
   async getStorePlugins(baseUrl: string): Promise<IndustryPluginManifest[]> {
     try {
+      if (!baseUrl.startsWith('https://')) {
+        console.warn('[PluginManager] 插件商店 URL 必须使用 HTTPS');
+        return [];
+      }
       const response = await fetch(`${baseUrl}/api/plugins/published`);
       if (!response.ok) return [];
       return await response.json();

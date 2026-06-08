@@ -223,7 +223,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
     if (!teamContext && mode !== 'light') {
       const cleanup = startBriefingScheduler(secretaryName, (briefingContent) => {
         const briefingMsg: Message = {
-          id: Date.now().toString(),
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: briefingContent,
           timestamp: new Date(),
@@ -370,7 +370,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
     localStorage.setItem(SECRETARY_STORAGE_KEYS.NAME, name);
     // 添加秘书确认改名消息
     const confirmMsg: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'assistant',
       content: `好的老板，以后就叫我「${name}」吧！有什么吩咐？`,
       timestamp: new Date(),
@@ -393,7 +393,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
       if (!status.isConnected) {
         const guideMessage = await getConnectionGuideMessage();
         const guideMsg: Message = {
-          id: Date.now().toString(),
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: guideMessage,
           timestamp: new Date(),
@@ -404,7 +404,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
         const recommendations = getPersonalizedRecommendations();
         if (recommendations) {
           const recMsg: Message = {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             role: 'assistant',
             content: recommendations,
             timestamp: new Date(),
@@ -421,7 +421,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'user',
       content: input.trim(),
       timestamp: new Date(),
@@ -439,7 +439,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
     const boundaryResponse = checkBoundary(userInput);
     if (boundaryResponse) {
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(),
         role: 'assistant',
         content: boundaryResponse,
         timestamp: new Date(),
@@ -456,7 +456,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
       if (guideResult.response) {
         // 引导类问题，直接返回响应
         const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: guideResult.response,
           timestamp: new Date(),
@@ -464,7 +464,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
         setMessages(prev => [...prev, assistantMessage]);
       } else if (mode === 'light') {
         // Light 版使用四库联动 AI 助手
-        const result = queryLightAI(userInput);
+        const result = await queryLightAI(userInput);
         let responseText = result.text;
         if (result.sources.length > 0) {
           responseText += '\n\n---\n📎 参考来源：\n' + result.sources.map(s =>
@@ -472,7 +472,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
           ).join('\n');
         }
         const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: responseText,
           timestamp: new Date(),
@@ -490,7 +490,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
             const balance = getTokenBalance();
             if (balance <= 0) {
               const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: crypto.randomUUID(),
                 role: 'assistant',
                 content: '⚠️ 您的演示 Token 余额已用完（10,000 PT）。如需继续测试，请联系我们获取更多 Token。',
                 timestamp: new Date(),
@@ -526,7 +526,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
             }
 
             const assistantMessage: Message = {
-              id: (Date.now() + 1).toString(),
+              id: crypto.randomUUID(),
               role: 'assistant',
               content: finalContent,
               timestamp: new Date(),
@@ -540,7 +540,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
             if (isAborted) {
               abortControllerRef.current = null;
               const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: crypto.randomUUID(),
                 role: 'assistant',
                 content: '⏹️ 已停止响应。',
                 timestamp: new Date(),
@@ -563,7 +563,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
 
               if (isNetworkError) {
                 const assistantMessage: Message = {
-                  id: (Date.now() + 1).toString(),
+                  id: crypto.randomUUID(),
                   role: 'assistant',
                   content: '⚠️ 无法连接到 ProClaw 云 LLM 服务。\n\n请前往 **设置 → AI 设置** 配置你自己的大模型（如 DeepSeek API），配置后秘书即可使用智能对话。',
                   timestamp: new Date(),
@@ -573,7 +573,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
                 // 其他 LLM 错误，回退到 commandParser 的提示
                 const fallbackResponse = await executeCommand(command);
                 const assistantMessage: Message = {
-                  id: (Date.now() + 1).toString(),
+                  id: crypto.randomUUID(),
                   role: 'assistant',
                   content: fallbackResponse,
                   timestamp: new Date(),
@@ -586,7 +586,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
           // 识别的业务命令，正常执行
           const response = await executeCommand(command);
           const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
+            id: crypto.randomUUID(),
             role: 'assistant',
             content: response,
             timestamp: new Date(),
@@ -600,10 +600,12 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
         setUnreadCount(prev => prev + 1);
       }
     } catch (error) {
+      console.error('[AgentChat] 处理指令失败:', error);
+      const errorDetail = error instanceof Error ? error.message : String(error);
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(),
         role: 'assistant',
-        content: '抱歉,处理您的指令时出现了错误。请稍后重试。',
+        content: `抱歉,处理您的指令时出现了错误。\n\n错误详情：${errorDetail}\n\n请稍后重试，或联系技术支持。`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);

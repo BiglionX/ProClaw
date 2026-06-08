@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
+use directories::ProjectDirs;
 
 /// 插件命令的参数与返回值（JSON 格式互通）
 pub type PluginCommandFn = fn(args: &str) -> Result<String, String>;
@@ -86,7 +87,6 @@ impl PluginLoader {
         plugin_id: &str,
         library_path: &Path,
     ) -> Result<Vec<PluginCommandDef>, String> {
-        // 审计修复 #12: 合并检查和加载到单个持锁区域，消除 TOCTOU 竞态
         // 安全检查：验证文件存在
         if !library_path.exists() {
             return Err(format!("动态库文件不存在：{}", library_path.display()));
@@ -105,6 +105,21 @@ impl PluginLoader {
                     ext
                 ));
             }
+        }
+
+        // 路径白名单：必须在插件数据目录下
+        let proj_dirs = ProjectDirs::from("com", "proclaw", "ProClaw")
+            .ok_or("无法获取应用数据目录".to_string())?;
+        let data_dir = proj_dirs.data_dir();
+        let plugin_dir = data_dir.join("plugins").join(plugin_id);
+        let canonical_path = library_path
+            .canonicalize()
+            .map_err(|e| format!("路径无效: {}", e))?;
+        let canonical_plugin_dir = plugin_dir
+            .canonicalize()
+            .map_err(|e| format!("插件目录无效: {}", e))?;
+        if !canonical_path.starts_with(&canonical_plugin_dir) {
+            return Err("插件库路径必须在插件数据目录下".to_string());
         }
 
         {

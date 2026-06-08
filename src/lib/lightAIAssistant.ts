@@ -44,18 +44,11 @@ export function analyzeIntent(query: string): QueryIntent {
 }
 
 /**
- * 获取商品数据（同步辅助函数，在浏览器模式下可用）
+ * 获取商品数据（异步）
  */
-function getProductsSync(): Product[] {
+async function getProductsAsync(): Promise<Product[]> {
   try {
-    // getProducts 在浏览器模式下返回空数组（同步），
-    // 在 Tauri 模式下返回 Promise。
-    // 这里使用同步方式处理兼容
-    const result = getProducts({ limit: 50 });
-    if (result instanceof Promise) {
-      return []; // 异步情况先返回空，由调用者处理
-    }
-    return result as unknown as Product[];
+    return await getProducts({ limit: 50 });
   } catch {
     return [];
   }
@@ -64,7 +57,7 @@ function getProductsSync(): Product[] {
 /**
  * 处理数据查询类请求
  */
-function handleDataQuery(query: string): AIResponse {
+async function handleDataQuery(query: string): Promise<AIResponse> {
   const q = query.toLowerCase();
   let text = '';
   const sources: AIResponse['sources'] = [];
@@ -72,7 +65,7 @@ function handleDataQuery(query: string): AIResponse {
   if (/库存/.test(q)) {
     text = '当前库存情况：\n';
     try {
-      const products = getProductsSync();
+      const products = await getProductsAsync();
       const lowStock = products.filter(p => p.current_stock <= p.min_stock);
       const totalProducts = products.length;
       const totalStock = products.reduce((s, p) => s + p.current_stock, 0);
@@ -98,18 +91,18 @@ function handleDataQuery(query: string): AIResponse {
 /**
  * 处理创作类请求
  */
-function handleContentCreate(query: string): AIResponse {
+async function handleContentCreate(query: string): Promise<AIResponse> {
   const q = query.toLowerCase();
   const sources: AIResponse['sources'] = [];
 
   let productName = '';
-  const match = q.match(/[''"「」]?([^'"「」]+?)[''"」]?\s*(?:的|文案|推广|介绍)/);
+  const match = q.match(/['"「」]?([^'"「」]+?)['"」]?\s*(?:的|文案|推广|介绍)/);
   if (match) productName = match[1];
 
   let productInfo = '';
   if (productName) {
     try {
-      const products = getProductsSync();
+      const products = await getProductsAsync();
       const found = products.find(p => p.name.toLowerCase().includes(productName.toLowerCase()));
       if (found) {
         productInfo = `商品：${found.name}\n价格：¥${found.sell_price}${found.description ? `\n描述：${found.description}` : ''}`;
@@ -122,7 +115,7 @@ function handleContentCreate(query: string): AIResponse {
 
   const priceMatch = productInfo.match(/价格：¥(\d+\.?\d*)/);
   const text = productInfo
-    ? `【商品信息】\n${productInfo}\n\n【推荐文案】\n✨ 今天给大家安利一款超级好用的好物！\n\n🌟 【${productName}】\n\n💰 只要 ¥${priceMatch?.[1] || '??'}，性价比超高！\n\n✅ 品质保证，用过都说好\n📦 现货秒发，闪电配送\n💁 售后无忧，放心购买\n\n🔥 数量有限，先到先得！\n\n#好物推荐 #良心推荐`
+    ? `【商品信息】\n${productInfo}\n\n【推荐文案】\n✨ 今天给大家安利一款超级好用的好物！\n\n🌟 【${productName}】\n\n💰 只要 ¥${priceMatch?.[1] ?? '??'}，性价比超高！\n\n✅ 品质保证，用过都说好\n📦 现货秒发，闪电配送\n💁 售后无忧，放心购买\n\n🔥 数量有限，先到先得！\n\n#好物推荐 #良心推荐`
     : `请告诉我您想推广的商品名称，我可以帮您生成营销文案。\n\n例如："帮我生成一条小红书文案，商品是土鸡蛋。"`;
 
   return { text, sources };
@@ -195,14 +188,14 @@ function handleKnowledgeQuery(query: string): AIResponse {
 /**
  * 主查询接口
  */
-export function queryLightAI(userQuery: string): AIResponse {
+export async function queryLightAI(userQuery: string): Promise<AIResponse> {
   const intent = analyzeIntent(userQuery);
 
   switch (intent) {
     case 'data_query':
-      return handleDataQuery(userQuery);
+      return await handleDataQuery(userQuery);
     case 'content_create':
-      return handleContentCreate(userQuery);
+      return await handleContentCreate(userQuery);
     case 'customer_service':
       return handleCustomerService(userQuery);
     case 'knowledge_query':

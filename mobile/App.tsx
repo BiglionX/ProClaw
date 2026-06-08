@@ -26,6 +26,7 @@ import ProductsScreen from './src/screens/ProductsScreen';
 import SupplyChainScreen from './src/screens/SupplyChainScreen';
 import SalesOrderScreen from './src/screens/SalesOrderScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import CallScreen from './src/screens/CallScreen';
 import CallHistoryScreen from './src/screens/CallHistoryScreen';
 import AgentsScreen from './src/screens/AgentsScreen';
@@ -46,8 +47,6 @@ import ChatDetailScreen from './src/screens/ChatDetailScreen';
 import IdentityChatScreen from './src/screens/IdentityChatScreen';
 import OnboardingWizard from './src/screens/OnboardingWizard';
 import SettingsScreen from './src/screens/SettingsScreen';
-import AISettingsScreen from './src/screens/AISettingsScreen';
-import SupabaseConfigScreen from './src/screens/SupabaseConfigScreen';
 import FloatingSecretaryButton from './src/components/FloatingSecretaryButton';
 
 type MainTabParamList = {
@@ -59,11 +58,10 @@ type MainTabParamList = {
 
 import { useAppStore } from './src/stores/AppStore';
 import { listProfiles, getCurrentProfile, setCurrentProfile } from './src/services/ProfileManager';
-import { openDatabase, getDatabase } from './src/services/DatabaseFactory';
+import { openDatabase } from './src/services/DatabaseFactory';
 import { setupChangeLogTriggers } from './src/services/ChangeLogManager';
 import { initSyncMetadata, getOrCreateDeviceId } from './src/services/SyncMetadataManager';
 import { getInstalledPlugins, getDynamicRoutes, onRoutesChanged } from './src/services/PluginRegistry';
-import { initAIConfig } from './src/config/ai';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -179,12 +177,8 @@ export default function App() {
         await openDatabase(targetProfile.id);
         await setCurrentProfile(targetProfile.id);
 
-        // 审计 W12：初始加载时也需应用 Schema 迁移（与 switchProfile 保持一致）
-        const { applySchema } = await import('./src/services/SchemaManager');
-        const db = getDatabase();
-        await applySchema(db);
-
         // 初始化同步元数据
+        const db = (await import('./src/services/DatabaseFactory')).getDatabase();
         const deviceId = await getOrCreateDeviceId();
         await initSyncMetadata(db, deviceId);
 
@@ -213,8 +207,6 @@ export default function App() {
       console.warn('[App] Init error:', error?.message);
       setInitialRoute('ProfileSelect');
     } finally {
-      // 异步初始化 AI 配置（不阻塞主流程）
-      initAIConfig().catch((e) => console.warn('[App] AI config init failed:', e));
       setLoading(false);
     }
   };
@@ -362,6 +354,11 @@ export default function App() {
                 options={{ title: '数据看板' }}
               />
               <Stack.Screen
+                name="Profile"
+                component={ProfileScreen}
+                options={{ title: '设置' }}
+              />
+              <Stack.Screen
                 name="ChatDetail"
                 component={ChatDetailScreen}
                 options={({ route }: any) => ({
@@ -377,16 +374,6 @@ export default function App() {
                 name="Settings"
                 component={SettingsScreen}
                 options={{ title: '设置' }}
-              />
-              <Stack.Screen
-                name="AISettings"
-                component={AISettingsScreen}
-                options={{ title: 'AI 配置' }}
-              />
-              <Stack.Screen
-                name="SupabaseConfig"
-                component={SupabaseConfigScreen}
-                options={{ title: '云端同步配置' }}
               />
             </Stack.Navigator>
           </NavigationContainer>

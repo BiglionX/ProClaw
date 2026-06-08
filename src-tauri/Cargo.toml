@@ -50,6 +50,7 @@ mime = "0.3.17"
 chrono = { version = "0.4.31", features = ["serde", "clock"] }
 regex = "1.10.2"
 lazy_static = "1.4.0"
+parking_lot = "0.12"
 dashmap = "5.5.3"
 hex = "0.4.3"
 
@@ -103,4 +104,5 @@ panic = "abort"        # panic 时直接终止，减少二进制体积
 default = ["custom-protocol", "inventory"]
 custom-protocol = ["tauri/custom-protocol"]
 inventory = []
+light = []
 virtual_company = []

@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      "description": "文件系统操作"
+    },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "description": "Git 版本控制"
+    },
+    "browser": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "description": "浏览器自动化测试"
+    }
+  },
+  "global": {
+    "timeout": 30000,
+    "maxConcurrent": 5
+  },
+  "tools": {
+    "filesystem": {
+      "enabled": true,
+      "allowedPaths": ["d:/BigLionX/ProClaw"],
+      "deniedPaths": ["**/node_modules/**", "**/.git/**"]
+    },
+    "git": { "enabled": true },
+    "browser": { "enabled": true }
+  }
+}

@@ -10,6 +10,7 @@ pub enum AgentPackageError {
     MissingEntry(String),
     InvalidSignature(String),
     IoError(std::io::Error),
+    InvalidAgentId(String),
 }
 
 impl std::fmt::Display for AgentPackageError {
@@ -19,6 +20,7 @@ impl std::fmt::Display for AgentPackageError {
             AgentPackageError::MissingEntry(msg) => write!(f, "Missing entry: {}", msg),
             AgentPackageError::InvalidSignature(msg) => write!(f, "Invalid signature: {}", msg),
             AgentPackageError::IoError(e) => write!(f, "IO error: {}", e),
+            AgentPackageError::InvalidAgentId(msg) => write!(f, "Invalid agent ID: {}", msg),
         }
     }
 }
@@ -57,8 +59,14 @@ impl AgentSandbox {
     }
 
     /// 获取指定 Agent 的数据目录
-    pub fn get_agent_dir(&self, agent_id: &str) -> PathBuf {
-        self.base_data_dir.join("agents").join(agent_id)
+    pub fn get_agent_dir(&self, agent_id: &str) -> Result<PathBuf, AgentPackageError> {
+        let sanitized = crate::utils::path_safety::sanitize_path_component(agent_id);
+        if sanitized.contains("..") || sanitized.starts_with('/') || sanitized.starts_with('\\') {
+            return Err(AgentPackageError::InvalidAgentId(
+                "Agent ID contains path traversal characters".to_string()
+            ));
+        }
+        Ok(self.base_data_dir.join("agents").join(&sanitized))
     }
 
     /// 获取 Agent 的 assets 目录（存放前端资源）

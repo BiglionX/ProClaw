@@ -20,7 +20,6 @@ import { clearTokens } from '../services/AuthService';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { showToast } from '../components/Toast';
 import { hasBackupConfig } from '../services/BackupConfigStore';
-import { hasSupabaseConfig } from '../services/SupabaseConfigStore';
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
@@ -30,7 +29,6 @@ export default function SettingsScreen() {
   const [encryptData, setEncryptData] = useState(true);
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>('checking');
   const [backupConfigured, setBackupConfigured] = useState(false);
-  const [supabaseConfigured, setSupabaseConfigured] = useState(false);
 
   const checkCurrentConnection = async () => {
     try {
@@ -49,24 +47,14 @@ export default function SettingsScreen() {
     }
   };
 
-  const checkSupabaseConfig = async () => {
-    try {
-      setSupabaseConfigured(await hasSupabaseConfig());
-    } catch {
-      setSupabaseConfigured(false);
-    }
-  };
-
   useEffect(() => {
     checkCurrentConnection();
     checkBackupConfig();
-    checkSupabaseConfig();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       checkBackupConfig();
-      checkSupabaseConfig();
     }, [])
   );
 
@@ -140,14 +128,6 @@ export default function SettingsScreen() {
         />
         <Divider />
         <List.Item
-          title="云端同步 (Supabase)"
-          description={supabaseConfigured ? '已配置' : '可选 - 多设备数据同步'}
-          left={() => <List.Icon icon="cloud-sync" />}
-          right={() => <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />}
-          onPress={() => navigation.navigate('SupabaseConfig')}
-        />
-        <Divider />
-        <List.Item
           title="云备份"
           description={backupConfigured ? '已配置' : '端到端加密，数据自主可控'}
           left={() => <List.Icon icon="cloud-upload" />}
@@ -161,18 +141,6 @@ export default function SettingsScreen() {
           left={() => <List.Icon icon="swap-horizontal-bold" />}
           right={() => <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />}
           onPress={() => navigation.navigate('DataTransfer')}
-        />
-      </List.Section>
-
-      {/* AI 大模型 */}
-      <Text style={styles.sectionLabel}>AI 大模型</Text>
-      <List.Section style={styles.section}>
-        <List.Item
-          title="AI 配置"
-          description="管理 DeepSeek / OpenAI / Anthropic / Ollama API 密钥"
-          left={() => <List.Icon icon="robot" />}
-          right={() => <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />}
-          onPress={() => navigation.navigate('AISettings')}
         />
       </List.Section>
 

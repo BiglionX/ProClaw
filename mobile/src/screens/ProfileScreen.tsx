@@ -1,7 +1,6 @@
 /**
- * ProfileTab - 我的 Tab
+ * ProfileScreen - 个人中心独立页面
  * 整合：身份卡片 + 数据看板 + 快捷操作 + 已装插件
- * 设置通过右上角齿轮图标进入独立 SettingsScreen
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
@@ -20,7 +19,6 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { getProducts, getCustomers } from '../services/ApiService';
 import { isDemoMode } from '../services/AuthService';
-import { showToast } from '../components/Toast';
 import { getInstalledPlugins, parseManifest, type InstalledPlugin } from '../services/PluginRegistry';
 import { getDatabase } from '../services/DatabaseFactory';
 import { useAppStore } from '../stores/AppStore';
@@ -51,7 +49,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 // ============ 组件 ============
 
-export default function ProfileTab() {
+export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
 

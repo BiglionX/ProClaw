@@ -2,14 +2,16 @@
 [![Downloads](https://img.shields.io/github/downloads/BiglionX/ProClaw/total)](https://github.com/BiglionX/ProClaw/releases)
 # 🦞 ProClaw
 
-> 开源AI驱动的商户经营操作系�?| Open-Source AI-Powered Business OS
+> 开源AI驱动的商户经营操作系统 | Open-Source AI-Powered Business OS
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0--beta.2-green.svg)](https://github.com/BiglionX/ProClaw/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/BiglionX/ProClaw/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.11-blue.svg)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![Stars](https://img.shields.io/github/stars/BiglionX/ProClaw?style=social)](https://github.com/BiglionX/ProClaw)
+
+> **🎉 v1.0.0 正式版已发布！生产环境验收通过，可以推广使用。**
 
 ## 🎯 项目定位
 
@@ -313,16 +315,30 @@ npm run dev
 | 维度 | 数据 |
 |------|------|
 | **前端页面** | 55+ 个路由页面（含行业插件） |
-| **前端组件** | 70+ �?UI 组件�?4 个组件目录） |
-| **前端服务模块** | 65 �?lib 模块 |
-| **Rust 后端** | 31+ 个命令模块，22 �?API 端点 |
-| **Agent Bundles** | 25 个行�?Agent �?|
-| **行业插件** | 7 个插件（餐饮/美业/宠物/Cloud/零售/库存/虚拟公司�?|
-| **数据库迁�?* | 12 个迁移脚�?|
+| **前端组件** | 70+ 个UI 组件（4 个组件目录） |
+| **前端服务模块** | 65 个lib 模块 |
+| **Rust 后端** | 31+ 个命令模块，22 个API 端点 |
+| **Agent Bundles** | 25 个行业Agent 包 |
+| **行业插件** | 7 个插件（餐饮/美业/宠物/Cloud/零售/库存/虚拟公司） |
+| **数据库迁移** | 12 个迁移脚本 |
 | **单元测试** | 15 个测试模块，~200+ 测试用例 |
-| **E2E 测试** | 17 �?spec 文件 |
-| **Rust 测试** | ~40 个测试用�?|
+| **E2E 测试** | 18 个spec 文件 |
+| **Rust 测试** | ~40 个测试用例 |
 | **安装包大小** | ~6.8 MB (Windows x64) |
+
+## ✅ 生产环境验收
+
+| 版本 | 验收状态 | 核心功能 |
+|------|----------|----------|
+| **ProClaw Plus** | ✅ 通过 | 供应链(库存/采购/销售)、AI团队、财务管理 |
+| **ProClaw Light** | ✅ 通过 | AI知识库(媒体/问答/资料三库)、侧边栏导航 |
+
+### 测试覆盖
+- **单元测试**: 96.5% 通过率 (221/229)
+- **E2E测试**: 18个测试套件覆盖核心流程
+- **浏览器测试**: Browser MCP自动化验证通过
+
+详见 [CHANGELOG](CHANGELOG.md) 和 [发布说明](RELEASE_NOTES_v0.1.0.md)
 
 ## 📖 文档
 

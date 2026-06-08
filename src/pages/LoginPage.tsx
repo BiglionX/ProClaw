@@ -12,6 +12,7 @@ import {
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
+import { MOCK_PASSWORD } from '../lib/authStore';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -71,7 +72,7 @@ export default function LoginPage() {
               <br />
               用户名: <code>boss</code>
               <br />
-              密码: <code>IamBigBoss</code>
+              密码: <code>{MOCK_PASSWORD}</code>
             </Typography>
           </Alert>
 
@@ -166,7 +167,7 @@ export default function LoginPage() {
               size="medium"
               onClick={async () => {
                 try {
-                  await login('boss', 'IamBigBoss');
+                  await login('boss', MOCK_PASSWORD);
                   navigate('/');
                 } catch (err) {
                   console.error('Quick login failed:', err);

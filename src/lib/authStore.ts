@@ -1,11 +1,15 @@
 import { create } from 'zustand';
 import { Session, supabase, User } from '../lib/supabase';
 
+// 导出 mock 密码，供登录页显示
+// 密码从环境变量读取，生产环境自动失效
+export const MOCK_PASSWORD = import.meta.env.VITE_MOCK_PASSWORD || `mock-${Date.now()}`;
+
 // 模拟账号配置 - 用于快速体验软件功能
 const MOCK_ACCOUNTS = [
   {
     username: 'boss',
-    password: 'IamBigBoss',
+    password: MOCK_PASSWORD,
     user: {
       id: 'mock-boss-001',
       email: 'boss@proclaw.demo',

@@ -11,9 +11,13 @@ mod auth;
 pub mod types;
 mod types_tests;
 
-// 进销存版模块
-#[cfg(feature = "inventory")]
+// Light 版产品模块（只读 + 基础 CRUD，不含采购销售）
+#[cfg(any(feature = "light", feature = "inventory"))]
 pub mod product_commands;
+#[cfg(any(feature = "light", feature = "inventory"))]
+pub mod store_commands;
+
+// 进销存版模块
 #[cfg(feature = "inventory")]
 pub mod inventory_commands;
 #[cfg(feature = "inventory")]
@@ -42,7 +46,6 @@ pub mod subscription_commands;
 pub mod message_commands;
 pub mod call_commands;
 pub mod invitation_commands;
-pub mod store_commands;
 pub mod ceo_commands;
 
 // 云备份模块（Cloud 版）
@@ -77,9 +80,6 @@ pub mod finance_agent_commands;
 pub mod market_commands;
 
 use database::{Database, get_database_path};
-use store_commands::*;
-use ceo_commands::*;
-use secretary_commands::*;
 use sync_engine::*;
 use sync_engine::SyncEngine;
 use services::cloud_backup_service::CloudBackupService;
@@ -94,8 +94,39 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 // 重新导出所有命令
+pub mod commands;
+use commands::{ModuleRegistry, stats::CommandStatsCollector};
+use commands::core::CoreModule;
+use commands::product::ProductModule;
+
+// 全局命令统计收集器
+lazy_static::lazy_static! {
+    pub static ref COMMAND_STATS: CommandStatsCollector = CommandStatsCollector::new();
+}
 #[cfg(feature = "inventory")]
+use commands::inventory::InventoryModule;
+#[cfg(any(feature = "inventory", feature = "virtual_company"))]
+use commands::agent::AgentModule;
+#[cfg(any(feature = "inventory", feature = "virtual_company"))]
+use commands::cloud::CloudModule;
+use commands::plugin::PluginModule;
+use commands::industry_catering::IndustryCateringModule;
+use commands::industry_beauty::IndustryBeautyModule;
+use commands::industry_pet::IndustryPetModule;
+use commands::industry_convenience::IndustryConvenienceModule;
+use commands::industry_liquor::IndustryLiquorModule;
+use commands::industry_phone_accessories::IndustryPhoneAccessoriesModule;
+use commands::industry_fresh_food::IndustryFreshFoodModule;
+use commands::industry_auto_parts::IndustryAutoPartsModule;
+use commands::industry_hardware::IndustryHardwareModule;
+use commands::industry_decoration_material::IndustryDecorationMaterialModule;
+use commands::industry_community_group_buy::IndustryCommunityGroupBuyModule;
+
+// 命令实现模块（用于 Tauri generate_handler! 宏）
+#[cfg(any(feature = "light", feature = "inventory"))]
 use product_commands::*;
+#[cfg(any(feature = "light", feature = "inventory"))]
+use store_commands::*;
 #[cfg(feature = "inventory")]
 use inventory_commands::*;
 #[cfg(feature = "inventory")]
@@ -123,6 +154,8 @@ use subscription_commands::*;
 use message_commands::*;
 use call_commands::*;
 use invitation_commands::*;
+use ceo_commands::*;
+use secretary_commands::*;
 use cloud_backup_commands::*;
 use catering_commands::*;
 use beauty_commands::*;
@@ -142,6 +175,71 @@ use agent_commands::*;
 use finance_agent_commands::*;
 #[cfg(feature = "virtual_company")]
 use market_commands::*;
+
+/// 构建命令注册表
+fn build_command_registry() -> ModuleRegistry {
+    let mut registry = ModuleRegistry::new();
+    
+    // 按优先级顺序注册模块
+    registry.register(CoreModule);
+    registry.register(ProductModule);
+    #[cfg(feature = "inventory")]
+    registry.register(InventoryModule);
+    #[cfg(any(feature = "inventory", feature = "virtual_company"))]
+    registry.register(AgentModule);
+    #[cfg(any(feature = "inventory", feature = "virtual_company"))]
+    registry.register(CloudModule);
+    registry.register(PluginModule);
+    // 行业插件模块
+    registry.register(IndustryCateringModule);
+    registry.register(IndustryBeautyModule);
+    registry.register(IndustryPetModule);
+    registry.register(IndustryConvenienceModule);
+    registry.register(IndustryLiquorModule);
+    registry.register(IndustryPhoneAccessoriesModule);
+    registry.register(IndustryFreshFoodModule);
+    registry.register(IndustryAutoPartsModule);
+    registry.register(IndustryHardwareModule);
+    registry.register(IndustryDecorationMaterialModule);
+    registry.register(IndustryCommunityGroupBuyModule);
+    
+    registry
+}
+
+// 打印已注册的命令（调试用）
+#[allow(dead_code)]
+fn print_registered_commands() {
+    let registry = build_command_registry();
+    let commands = registry.get_enabled_commands();
+    println!("\n[ProClaw] Registered {} commands:", commands.len());
+    
+    // 按模块分组显示
+    let mut current_module = String::new();
+    for cmd in &commands {
+        // 简单按命令名前缀分组
+        let module = if cmd.name.starts_with("product") || cmd.name.starts_with("create_product") || cmd.name.starts_with("get_product") || cmd.name.starts_with("update_product") || cmd.name.starts_with("delete_product") || cmd.name.starts_with("get_brands") || cmd.name.starts_with("create_brand") || cmd.name.starts_with("get_categories") || cmd.name.starts_with("create_category") || cmd.name.starts_with("get_store") || cmd.name.starts_with("update_store") {
+            "product"
+        } else if cmd.name.starts_with("inventory") || cmd.name.starts_with("get_sales_trend") || cmd.name.starts_with("get_product_analytics") {
+            "inventory"
+        } else if cmd.name.starts_with("purchase") || cmd.name.starts_with("get_suppliers") || cmd.name.starts_with("create_supplier") {
+            "purchase"
+        } else if cmd.name.starts_with("sales") || cmd.name.starts_with("create_customer") || cmd.name.starts_with("get_customers") {
+            "sales"
+        } else if cmd.name.starts_with("ceo") || cmd.name.starts_with("pcp") {
+            "ceo"
+        } else if cmd.name.starts_with("plugin") || cmd.name.starts_with("install") || cmd.name.starts_with("uninstall") || cmd.name.starts_with("enable") || cmd.name.starts_with("disable") || cmd.name.starts_with("list_") {
+            "plugin"
+        } else {
+            "other"
+        };
+        
+        if module != current_module {
+            println!("  [{}]", module);
+            current_module = module.to_string();
+        }
+        println!("    - {}", cmd.name);
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -357,30 +455,50 @@ async fn main() {
             // 分类管理
             create_category,
             get_categories,
-            // 库存管理
+            // 库存管理 (进销存版)
+            #[cfg(feature = "inventory")]
             create_inventory_transaction,
+            #[cfg(feature = "inventory")]
             get_inventory_transactions,
+            #[cfg(feature = "inventory")]
             get_inventory_stats,
-            // 数据分析
+            // 数据分析 (进销存版)
+            #[cfg(feature = "inventory")]
             get_sales_trend,
+            #[cfg(feature = "inventory")]
             get_product_analytics,
-            // 采购管理
+            // 采购管理 (进销存版)
+            #[cfg(feature = "inventory")]
             create_supplier,
+            #[cfg(feature = "inventory")]
             get_suppliers,
+            #[cfg(feature = "inventory")]
             create_purchase_order,
+            #[cfg(feature = "inventory")]
             get_purchase_orders,
+            #[cfg(feature = "inventory")]
             get_purchase_order_detail,
-            // 销售管理
+            // 销售管理 (进销存版)
+            #[cfg(feature = "inventory")]
             create_customer,
+            #[cfg(feature = "inventory")]
             get_customers,
+            #[cfg(feature = "inventory")]
             create_sales_order,
+            #[cfg(feature = "inventory")]
             get_sales_orders,
-            // 财务报表
+            // 财务报表 (进销存版)
+            #[cfg(feature = "inventory")]
             get_profit_loss_report,
+            #[cfg(feature = "inventory")]
             get_cash_flow_report,
+            #[cfg(feature = "inventory")]
             get_financial_summary,
             // 文件上传
             upload_image,
+            // 命令统计
+            get_command_stats,
+            reset_command_stats,
             // 数据库和同步
             get_database_stats,
             get_pending_sync_records,
@@ -409,46 +527,82 @@ async fn main() {
             get_approvals_cmd,
             approve_request_cmd,
             reject_request_cmd,
-            // 付款记录与AR/AP台账 (Phase 6)
+            // 付款记录与AR/AP台账 (进销存版)
+            #[cfg(feature = "inventory")]
             record_payment_cmd,
+            #[cfg(feature = "inventory")]
             record_receipt_cmd,
+            #[cfg(feature = "inventory")]
             get_payments_cmd,
+            #[cfg(feature = "inventory")]
             get_ar_ap_summary_cmd,
+            #[cfg(feature = "inventory")]
             get_ar_ap_detail_cmd,
-            // 对账管理 (Phase 5)
+            // 对账管理 (进销存版)
+            #[cfg(feature = "inventory")]
             generate_statement,
+            #[cfg(feature = "inventory")]
             send_statement_email,
+            #[cfg(feature = "inventory")]
             create_reconciliation_rule,
+            #[cfg(feature = "inventory")]
             update_reconciliation_rule,
+            #[cfg(feature = "inventory")]
             delete_reconciliation_rule,
+            #[cfg(feature = "inventory")]
             get_reconciliation_rules,
+            #[cfg(feature = "inventory")]
             set_smtp_config,
+            #[cfg(feature = "inventory")]
             get_smtp_config,
+            #[cfg(feature = "inventory")]
             check_reconciliation_rules,
-            // 补充的采购/销售命令
+            // 补充的采购/销售命令 (进销存版)
+            #[cfg(feature = "inventory")]
             update_purchase_order_cmd,
+            #[cfg(feature = "inventory")]
             delete_purchase_order_cmd,
+            #[cfg(feature = "inventory")]
             receive_purchase_order_cmd,
+            #[cfg(feature = "inventory")]
             confirm_purchase_order_cmd,
+            #[cfg(feature = "inventory")]
             cancel_purchase_order_cmd,
+            #[cfg(feature = "inventory")]
             update_sales_order_cmd,
+            #[cfg(feature = "inventory")]
             delete_sales_order_cmd,
+            #[cfg(feature = "inventory")]
             submit_sales_order_cmd,
+            #[cfg(feature = "inventory")]
             cancel_sales_order_cmd,
+            #[cfg(feature = "inventory")]
             mark_sales_shipped_cmd,
+            #[cfg(feature = "inventory")]
             mark_sales_delivered_cmd,
-            // 采购退货
+            // 采购退货 (进销存版)
+            #[cfg(feature = "inventory")]
             create_purchase_return,
+            #[cfg(feature = "inventory")]
             get_purchase_returns,
+            #[cfg(feature = "inventory")]
             get_purchase_return_detail,
+            #[cfg(feature = "inventory")]
             confirm_purchase_return,
+            #[cfg(feature = "inventory")]
             cancel_purchase_return,
+            #[cfg(feature = "inventory")]
             update_purchase_return,
-            // 销售退货
+            // 销售退货 (进销存版)
+            #[cfg(feature = "inventory")]
             create_sales_return,
+            #[cfg(feature = "inventory")]
             get_sales_returns,
+            #[cfg(feature = "inventory")]
             get_sales_return_detail,
+            #[cfg(feature = "inventory")]
             confirm_sales_return,
+            #[cfg(feature = "inventory")]
             cancel_sales_return,
             // 订阅与计费 (Phase 7)
             get_plans_cmd,

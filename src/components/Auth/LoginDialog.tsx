@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { useState } from 'react';
 import { useAuthStore } from '../../lib/authStore';
+import { MOCK_PASSWORD } from '../../lib/authStore';
 
 export default function LoginDialog() {
   const {
@@ -42,7 +43,7 @@ export default function LoginDialog() {
   const handleQuickLogin = async () => {
     clearError();
     try {
-      await login('boss', 'IamBigBoss');
+      await login('boss', MOCK_PASSWORD);
       closeLoginDialog();
       setEmail('');
       setPassword('');
@@ -120,7 +121,7 @@ export default function LoginDialog() {
             <br />
             用户名: <code style={{ color: '#fff' }}>boss</code>
             <br />
-            密码: <code style={{ color: '#fff' }}>IamBigBoss</code>
+            密码: <code style={{ color: '#fff' }}>{MOCK_PASSWORD}</code>
           </Typography>
         </Alert>
 

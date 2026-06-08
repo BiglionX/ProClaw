@@ -88,12 +88,16 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 const DEFAULT_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' | 'contact' })[] = [
   { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter', _group: 'home', isLive: true },
   { text: '商品库', icon: <ProductsIcon />, path: '/products', _group: 'home' },
-  { text: '供应链', icon: <FinanceIcon />, path: '/supplychain', _group: 'home' },
   { text: '云商城', icon: <StoreIcon />, path: '/cloud-store', _group: 'home' },
   { text: '联系人', icon: <ContactsIcon />, path: '/contacts', _group: 'contact' },
   { text: '消息', icon: <ChatIcon />, path: '/messages', _group: 'contact' },
   { text: 'AI 团队', icon: <TeamsIcon />, path: '/teams', _group: 'ai', badge: 2 },
   { text: 'AI 知识库', icon: <KnowledgeIcon />, path: '/ai-knowledge', _group: 'ai' },
+];
+
+/** Plus 版本专属导航项 */
+const PLUS_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' | 'contact' })[] = [
+  { text: '供应链', icon: <FinanceIcon />, path: '/supplychain', _group: 'home' },
 ];
 
 /** 将 PluginNavItem[] 转换为 NavItem[]（解析 icon 字符串为组件） */
@@ -107,20 +111,30 @@ function resolvePluginNavItems(pluginItems: PluginNavItem[]): NavItem[] {
 }
 
 function useNavItems(): NavItem[] {
+  const mode = useAppModeStore(state => state.mode);
   const pluginNavItems = useAppModeStore(state => state.getNavAddItems());
   const pluginRemovePaths = useAppModeStore(state => state.getNavRemovePaths());
 
   // 优先使用插件 manifest 定义的导航项
   if (pluginNavItems.length > 0) {
     let items = resolvePluginNavItems(pluginNavItems);
+    // Plus 版本追加专属导航项
+    if (mode === 'inventory') {
+      items = [...items, ...PLUS_NAV_ITEMS];
+    }
     if (pluginRemovePaths.length > 0) {
       items = items.filter(item => !pluginRemovePaths.includes(item.path));
     }
     return items;
   }
 
-  // 无插件时使用默认导航（回退行为）
-  return DEFAULT_NAV_ITEMS;
+  // 无插件时使用默认导航
+  const defaultItems = [...DEFAULT_NAV_ITEMS];
+  // Plus 版本追加专属导航项
+  if (mode === 'inventory') {
+    defaultItems.push(...PLUS_NAV_ITEMS);
+  }
+  return defaultItems;
 }
 
 export default function Sidebar() {

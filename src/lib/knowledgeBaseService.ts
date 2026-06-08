@@ -157,10 +157,11 @@ export function searchKnowledge(query: string, limit: number = 5): KnowledgeDocu
  * 从上传的文件内容中提取可搜索文本
  */
 export function extractTextContent(dataUrl: string, fileType: string): string {
-  if (fileType === 'text' || fileType === 'txt') {
+  if (fileType === 'text' || fileType === 'txt' || fileType === 'md') {
     try {
       const base64 = dataUrl.split(',')[1];
-      return atob(base64);
+      const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      return new TextDecoder('utf-8').decode(binary);
     } catch {
       return '';
     }

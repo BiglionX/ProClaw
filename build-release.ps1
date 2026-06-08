@@ -29,9 +29,12 @@ Write-Host ""
 # 设置构建模式
 $env:VITE_BUILD_MODE = $Mode
 Write-Host "Build Mode: $Mode" -ForegroundColor Yellow
-if ($Mode -eq "virtual_company") {
-    $env:CARGO_FEATURES = "virtual_company,custom-protocol"
+if ($Mode -eq "light") {
+    $env:CARGO_FEATURES = "light,custom-protocol"
     $outputSuffix = "Light版"
+} elseif ($Mode -eq "virtual_company") {
+    $env:CARGO_FEATURES = "virtual_company,custom-protocol"
+    $outputSuffix = "虚拟公司版"
 } else {
     $env:CARGO_FEATURES = "inventory,custom-protocol"
     $outputSuffix = "Plus版"

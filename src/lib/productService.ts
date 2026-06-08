@@ -381,8 +381,8 @@ export interface CreateProductInput {
 function convertSPUToProduct(spu: ProductSPU): Product {
   const firstSku = spu.skus?.[0];
   const totalStock = spu.skus?.reduce((sum, sku) => sum + sku.current_stock, 0) || 0;
-  const minStock = spu.skus?.reduce((sum, sku) => sum + sku.min_stock, 0) || 0;
-  const maxStock = spu.skus?.reduce((sum, sku) => sum + sku.max_stock, 0) || 999999;
+  const minStock = spu.skus?.reduce((min, sku) => Math.min(min, sku.min_stock), Infinity) || 0;
+  const maxStock = spu.skus?.reduce((max, sku) => Math.max(max, sku.max_stock), 0) || 999999;
   
   return {
     id: spu.id,

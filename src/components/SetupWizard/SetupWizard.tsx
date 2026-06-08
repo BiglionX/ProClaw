@@ -121,7 +121,12 @@ export function SetupWizard() {
     };
 
     if (newIsLight) {
-      const personalGreeting = await generatePersonalizedText('greeting', ctx);
+      let personalGreeting: string | null = null;
+      try {
+        personalGreeting = await generatePersonalizedText('greeting', ctx);
+      } catch {
+        // LLM 不可用，降级为硬编码问候语
+      }
       const greetingNodes = getGreetingDialogue(ctx);
       if (personalGreeting) {
         greetingNodes[0].text = personalGreeting;
@@ -131,7 +136,12 @@ export function SetupWizard() {
       pushStepHistory();
       setCurrentStep('store_type');
     } else {
-      const personalGreeting = await generatePersonalizedText('greeting', ctx);
+      let personalGreeting: string | null = null;
+      try {
+        personalGreeting = await generatePersonalizedText('greeting', ctx);
+      } catch {
+        // LLM 不可用，降级为硬编码问候语
+      }
       const greetingNodes = getGreetingDialogue(ctx);
       if (personalGreeting) {
         greetingNodes[0].text = personalGreeting;
@@ -195,7 +205,12 @@ export function SetupWizard() {
       };
 
       if (isLight) {
-        const personalGreeting = await generatePersonalizedText('greeting', ctx);
+        let personalGreeting: string | null = null;
+        try {
+          personalGreeting = await generatePersonalizedText('greeting', ctx);
+        } catch {
+          // LLM 不可用，降级为硬编码问候语
+        }
         const greetingNodes = getGreetingDialogue(ctx);
         if (personalGreeting) {
           greetingNodes[0].text = personalGreeting;
@@ -208,7 +223,12 @@ export function SetupWizard() {
       }
 
       // 尝试 LLM 个性化欢迎语
-      const personalGreeting = await generatePersonalizedText('greeting', ctx);
+      let personalGreeting: string | null = null;
+      try {
+        personalGreeting = await generatePersonalizedText('greeting', ctx);
+      } catch {
+        // LLM 不可用，降级为硬编码问候语
+      }
       const greetingNodes = getGreetingDialogue(ctx);
       if (personalGreeting) {
         greetingNodes[0].text = personalGreeting;
@@ -364,7 +384,12 @@ export function SetupWizard() {
       };
 
       // 尝试 LLM 个性化公司名回应
-      const personalResponse = await generatePersonalizedText('company_response', ctx);
+      let personalResponse: string | null = null;
+      try {
+        personalResponse = await generatePersonalizedText('company_response', ctx);
+      } catch {
+        // LLM 不可用，降级为硬编码回应
+      }
 
       // 构建公司名确认节点
       const confirmNode: DialogueNode = {
@@ -433,6 +458,32 @@ export function SetupWizard() {
   }, [mode]);
 
   const handleEnterWorkspace = useCallback(async () => {
+    if (mode === 'light') {
+      // Light 版：保存 Light 配置到 Rust 后端
+      try {
+        const storeTypeName = setupData.storeType
+          ? ({ catering: '餐饮店', retail: '零售店', service: '服务店', fresh: '生鲜店', other: '店铺' } as Record<string, string>)[setupData.storeType] || '店铺'
+          : '店铺';
+        await safeInvoke('complete_setup_and_switch', {
+          config: {
+            install_path: 'default',
+            company_name: storeTypeName,
+            model_provider: 'light-rule-engine',
+            model_path: null,
+            // Light 扩展字段
+            store_type: setupData.storeType || 'retail',
+            has_data: setupData.hasData ?? false,
+            bound_platforms: setupData.boundPlatforms || [],
+          },
+        });
+      } catch {
+        // 非 Tauri 环境降级
+      }
+      window.location.hash = '#/login';
+      return;
+    }
+
+    // Plus 版：原有逻辑不变
     if (!setupData.installPath || !setupData.companyName || !setupData.modelProvider) {
       // 尝试直接调用 complete_setup_and_switch（可能是首次初始化跳过后直接完成的场景）
       try {
@@ -460,7 +511,12 @@ export function SetupWizard() {
       modelProvider: setupData.modelProvider,
       appMode: mode,
     };
-    await generatePersonalizedText('completion_summary', ctx);
+
+    try {
+      await generatePersonalizedText('completion_summary', ctx);
+    } catch {
+      // LLM 不可用，忽略
+    }
 
     // 保存配置到后端并切换到主窗口
     try {
