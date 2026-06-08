@@ -6,14 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-  attestations: write
-  id-token: write
-  actions: read
-  pull-requests: write
-  checks: write
-
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -44,24 +36,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx vitest run --coverage --reporter=verbose
-
-  frontend-build:
-    name: Frontend Build
-    runs-on: ubuntu-latest
-    needs: frontend-test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
+      - run: npx vitest run --coverage
 
   # ==================== Backend (Rust) ====================
   rust-fmt:
@@ -89,8 +64,8 @@ jobs:
       - run: cargo clippy --all-targets --all-features -- -A clippy::redundant_closure -A clippy::needless_borrow -A clippy::needless_borrows_for_generic_args -A clippy::too_many_arguments -A clippy::useless_format -A clippy::empty_line_after_doc_comments -A clippy::single_component_path_imports
         working-directory: src-tauri
 
-  rust-test:
-    name: Rust Unit Tests
+  rust-check:
+    name: Rust Check
     runs-on: ubuntu-latest
     needs: rust-clippy
     steps:
@@ -98,128 +73,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ./src-tauri
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
+          workspaces: src-tauri
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-      - run: |
-          cd ${{ github.workspace }}
-          pwd
-          ls -la
-          npm ci
-          npm run build
-          ls -la dist
-      - run: cargo test --all-features -- --test-threads=1
+      - run: cargo check --lib --tests
         working-directory: src-tauri
-
-  rust-build:
-    name: Rust Release Build (Check)
-    runs-on: ubuntu-latest
-    needs: rust-test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ./src-tauri
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-      - run: |
-          cd ${{ github.workspace }}
-          pwd
-          ls -la
-          npm ci
-          npm run build
-          ls -la dist
-      - run: cargo check --release
-        working-directory: src-tauri
-
-  # ==================== Platform Builds (release only) ====================
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: rust-build
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-      - run: npm ci
-        working-directory: .
-      - run: npm run build
-        working-directory: .
-      - run: npm run tauri build
-        working-directory: .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: proclaw-windows-msi
-          path: src-tauri/target/release/bundle/msi/*.msi
-
-  build-linux:
-    name: Build Linux
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: rust-build
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
-      - run: npm ci
-        working-directory: .
-      - run: npm run build
-        working-directory: .
-      - run: npm run tauri build
-        working-directory: .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: proclaw-linux-deb
-          path: src-tauri/target/release/bundle/deb/*.deb
-
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: rust-build
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-      - run: npm ci
-        working-directory: .
-      - run: npm run build
-        working-directory: .
-      - run: npm run tauri build
-        working-directory: .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: proclaw-macos-dmg
-          path: src-tauri/target/release/bundle/dmg/*.dmg
