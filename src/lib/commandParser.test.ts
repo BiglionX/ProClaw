@@ -1,5 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { parseCommand, executeCommand } from '../lib/commandParser';
+
+// Mock 依赖的模块
+vi.mock('../lib/productService', () => ({
+  getProductSPUs: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../lib/inventoryService', () => ({
+  getInventoryStats: vi.fn().mockResolvedValue({
+    total_products: 0,
+    total_stock: 0,
+    low_stock_count: 0,
+    zero_stock_count: 0,
+    today_transactions: 0,
+    total_value: 0,
+    low_stock_products: [],
+  }),
+}));
 
 describe('commandParser', () => {
   describe('parseCommand', () => {

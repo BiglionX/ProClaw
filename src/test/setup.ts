@@ -1,6 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
+// Mock import.meta.env for all tests
+Object.defineProperty(globalThis, 'importMeta', {
+  value: { env: { VITE_MOCK_PASSWORD: 'IamBigBoss' } },
+  writable: true,
+});
+
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),

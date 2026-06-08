@@ -8,6 +8,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // 测试环境变量
+    env: {
+      VITE_MOCK_PASSWORD: 'IamBigBoss',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

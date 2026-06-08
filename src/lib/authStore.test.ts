@@ -6,10 +6,10 @@ import { useAuthStore } from '../lib/authStore';
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
-      getSession: vi.fn(),
+      signInWithPassword: vi.fn().mockResolvedValue({ data: null, error: null }),
+      signUp: vi.fn().mockResolvedValue({ data: { user: null, session: null }, error: null }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
     },
   },
 }));
