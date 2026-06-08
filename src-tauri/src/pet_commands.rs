@@ -25,8 +25,7 @@ pub fn pet_create_profile(
     db: tauri::State<Mutex<Database>>,
     owner_id: String,
     name: String,
-    #[allow(dead_code)]
-    options: Option<PetProfileOptions>,
+    #[allow(dead_code)] options: Option<PetProfileOptions>,
 ) -> Result<Value, String> {
     let options = options.unwrap_or(PetProfileOptions {
         species: None,
