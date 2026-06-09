@@ -1,7 +1,33 @@
 // 订阅服务封装层 (Phase 7)
 // 封装 Tauri invoke 调用，提供类型安全的订阅操作
+// 桌面端 Token 用量同时同步到 Supabase（平台统一统计）
 
 import { invoke } from '@tauri-apps/api/core';
+import { supabase } from './supabase';
+
+// Supabase Token 用量同步（平台侧统一统计）
+async function syncTokenToSupabase(
+  userId: string,
+  resourceType: string,
+  tokensUsed: number,
+  endpoint?: string
+): Promise<void> {
+  try {
+    // @ts-expect-error - api_usage_logs 表类型未定义
+    const { error } = await supabase.from('api_usage_logs').insert({
+      user_id: userId,
+      resource_type: resourceType,
+      tokens_used: tokensUsed,
+      endpoint: endpoint || null,
+      created_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.warn('[Token Sync] Failed to sync to Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Token Sync] Supabase sync error:', err);
+  }
+}
 
 export interface Plan {
   id: string;
@@ -116,12 +142,37 @@ export async function getTokenUsage(userId: string, limit: number = 50, offset: 
   return result.data;
 }
 
-export async function recordToken(userId: string, actionType: string, resourcePath?: string): Promise<void> {
+export async function recordToken(
+  userId: string,
+  actionType: string,
+  resourcePath?: string,
+  tokensUsed?: number
+): Promise<void> {
+  // 1. 记录到本地 SQLite
   await invoke('record_token_cmd', {
     user_id: userId,
     action_type: actionType,
     resource_path: resourcePath || '',
   });
+
+  // 2. 同步到 Supabase（平台侧统一统计）
+  // tokensUsed 未传入时使用默认值
+  const tokens = tokensUsed ?? getDefaultTokenCost(actionType);
+  await syncTokenToSupabase(userId, actionType, tokens, resourcePath);
+}
+
+// 根据 actionType 获取默认 Token 消耗
+function getDefaultTokenCost(actionType: string): number {
+  const costMap: Record<string, number> = {
+    'ai_chat': 10,
+    'ai_product_query': 5,
+    'ai_order_ocr': 15,
+    'ai_order_recognition': 10,
+    'data_export': 20,
+    'data_sync': 5,
+    'chat_message': 2,
+  };
+  return costMap[actionType] ?? 1;
 }
 
 // ========== Token 新定价系统 (PRD v8.0) ==========

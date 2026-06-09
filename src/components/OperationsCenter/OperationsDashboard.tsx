@@ -53,13 +53,37 @@ const OperationsDashboard: React.FC = () => {
 
 // ==================== 总览标签 ====================
 
+interface OverviewStats {
+  aiUsage: number;
+  tenantCount: number;
+}
+
 const OverviewTab: React.FC = () => {
+  const [stats, setStats] = React.useState<OverviewStats>({ aiUsage: 0, tenantCount: 0 });
+
+  React.useEffect(() => {
+    const fetchOverviewStats = async () => {
+      try {
+        const { data: tenants } = await supabase.from('tenants').select('id');
+        const { data: usage } = await supabase.from('api_usage_logs').select('tokens_used');
+        const totalUsage = (usage || []).reduce((sum: number, r: { tokens_used: number }) => sum + r.tokens_used, 0);
+        setStats({
+          aiUsage: totalUsage,
+          tenantCount: (tenants || []).length,
+        });
+      } catch (e) {
+        console.error('Failed to fetch overview stats:', e);
+      }
+    };
+    fetchOverviewStats();
+  }, []);
+
   const summaryCards = [
-    { label: 'SEO 健康评分', value: '82/100', color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20' },
+    { label: 'AI 总消耗', value: `${stats.aiUsage} PT`, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+    { label: '租户数量', value: `${stats.tenantCount} 个`, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
     { label: '社媒账号', value: '5 个', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
     { label: '待发布内容', value: '3 条', color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20' },
     { label: '进行中 Agent', value: '4 个', color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-    { label: '异常预警', value: '2 条', color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
     { label: '本周发帖', value: '12 条', color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-900/20' },
   ];
 
@@ -430,6 +454,12 @@ const AIUsageStats: React.FC = () => {
 
   return (
     <div>
+      {/* 数据来源说明 */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-6 text-sm text-blue-700 dark:text-blue-300">
+        <span className="font-medium">数据来源：</span>
+        Supabase api_usage_logs 表（包含云商城 + 桌面端同步数据）
+      </div>
+
       {/* 总计统计 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-gradient-to-br from-red-500 to-orange-500 rounded-xl p-4 text-white">
