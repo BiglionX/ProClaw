@@ -30,13 +30,6 @@ export default function CheckoutPage() {
     remark: '',
   });
 
-  // 联系信息
-  const [contactInfo, setContactInfo] = useState({
-    phone: '',
-    wechat: '',
-    email: '',
-  });
-  
   // 加载购物车数据
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -52,29 +45,6 @@ export default function CheckoutPage() {
         console.error('Failed to fetch cart:', error);
       } finally {
         setLoading(false);
-      }
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // 加载联系信息（从 API 或本地存储）
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/tenant/settings');
-        const data = await res.json();
-
-        if (data.success && data.data.contact) {
-          setContactInfo({
-            phone: data.data.contact.phone || '',
-            wechat: data.data.contact.wechat || '',
-            email: data.data.contact.email || '',
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load contact info:', error);
-        // 静默失败，使用默认空值
       }
     }, 0);
 

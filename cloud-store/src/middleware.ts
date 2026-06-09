@@ -101,11 +101,34 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // 获取主机名
-  const hostname = request.headers.get('host') || '';
-  const subdomain = extractSubdomain(hostname);
+  // 路径格式: /shop/[store] 或 /[store] (租户商城)
+  // 例如: /shop/demo, /demo
+  let subdomain: string | null = null;
   
-  // 如果没有子域名，返回主平台页面
+  // 情况1: /shop/[store] 路径格式
+  const shopMatch = pathname.match(new RegExp('^/shop/([a-z0-9-]+)'));
+  if (shopMatch) {
+    subdomain = shopMatch[1];
+  }
+  
+  // 情况2: /[store] 直接路径格式（不匹配已知的平台路径）
+  if (!subdomain) {
+    const knownPaths = ['api', 'app', 'auth', 'cart', 'checkout', 'login', 'orders', 'products', 'register', 'tenant', 'shop', 'admin'];
+    const pathMatch = pathname.match(new RegExp('^/([a-z0-9-]+)'));
+    if (pathMatch) {
+      const firstPath = pathMatch[1].toLowerCase();
+      if (!knownPaths.includes(firstPath)) {
+        subdomain = pathMatch[1];
+      }
+    }
+  }
+  
+  // 情况3: 子域名格式 (e.g., demo.localhost:3000)
+  if (!subdomain) {
+    subdomain = extractSubdomain(request.headers.get('host') || '');
+  }
+  
+  // 如果没有子域名/租户，返回主平台页面
   if (!subdomain) {
     return NextResponse.next();
   }

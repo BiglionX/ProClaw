@@ -126,3 +126,65 @@ CREATE POLICY "Users can manage their own product sync"
 -- 9. Insert demo store for testing
 -- Find test user first, then insert demo store
 -- Demo subdomain: demo
+
+-- ============================================
+-- 10. Create tenant schema function (if not exists)
+-- This function is used by /api/tenant/register to create per-tenant schemas
+CREATE OR REPLACE FUNCTION public.create_tenant_schema(tenant_schema VARCHAR(50))
+RETURNS VOID AS $$
+BEGIN
+    -- Check if schema exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = tenant_schema) THEN
+        -- Create schema
+        EXECUTE format('CREATE SCHEMA %I', tenant_schema);
+        
+        -- Create products table
+        EXECUTE format('CREATE TABLE %I.products (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            local_id TEXT,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            price DECIMAL(12, 2) NOT NULL,
+            stock INTEGER DEFAULT 0,
+            category VARCHAR(100),
+            images TEXT DEFAULT ''[]''::jsonb,
+            is_on_sale BOOLEAN DEFAULT true,
+            sync_version INTEGER DEFAULT 1,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )', tenant_schema);
+        
+        -- Create orders table
+        EXECUTE format('CREATE TABLE %I.orders (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            order_no VARCHAR(50) UNIQUE NOT NULL,
+            customer_name VARCHAR(100),
+            customer_phone VARCHAR(20),
+            customer_address TEXT,
+            total_amount DECIMAL(12, 2) NOT NULL,
+            status VARCHAR(20) DEFAULT ''pending'',
+            payment_method VARCHAR(20),
+            payment_id VARCHAR(100),
+            items TEXT DEFAULT ''[]''::jsonb,
+            remark TEXT,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            paid_at TIMESTAMPTZ
+        )', tenant_schema);
+        
+        -- Create cart_items table
+        EXECUTE format('CREATE TABLE %I.cart_items (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            device_id VARCHAR(100) NOT NULL,
+            product_id UUID NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            status VARCHAR(20) DEFAULT ''active'',
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )', tenant_schema);
+        
+        -- Create indexes
+        EXECUTE format('CREATE INDEX %I_cart_device ON %I.cart_items(device_id)', tenant_schema, tenant_schema);
+        EXECUTE format('CREATE INDEX %I_orders_status ON %I.orders(status)', tenant_schema, tenant_schema);
+    END IF;
+END;
+$$ LANGUAGE plpgsql;

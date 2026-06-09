@@ -11,10 +11,13 @@ const navItems = [
   { href: '/app/purchase', label: '采购管理', icon: '📥' },
   { href: '/app/sales', label: '销售管理', icon: '📤' },
   { href: '/app/inventory', label: '库存管理', icon: '🏭' },
+  { href: '/app/order-recognition', label: 'AI 订单识别', icon: '📷' },
+  { href: '/app/reports', label: '数据报表', icon: '📈' },
   { href: '/app/chat', label: '消息聊天', icon: '💬' },
   { href: '/app/contacts', label: '联系人', icon: '👥' },
   { href: '/app/agents', label: 'AI 助手', icon: '🤖' },
   { href: '/app/token-billing', label: 'Token 计费', icon: '💰' },
+  { href: '/app/export', label: '数据导出', icon: '📥' },
   { href: '/app/settings', label: '设置', icon: '⚙️' },
 ];
 

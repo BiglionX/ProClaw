@@ -5,15 +5,21 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { NextRequest, NextResponse } from 'next/server';
 
+// 强制使用正确的 Supabase URL
+const SUPABASE_URL = 'https://ourolpgrntjrtapgaztt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SQoKN2LQZ2Y15XtZplLoDw_R7KVviPC';
+
+console.log('[supabase-server] SUPABASE_URL:', SUPABASE_URL);
+
 /**
  * 创建服务端 Supabase 客户端 (用于 Server Components / Route Handlers)
  */
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
-
+  
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    SUPABASE_URL,
+    SUPABASE_KEY,
     {
       cookies: {
         getAll() {
@@ -42,8 +48,8 @@ export function createMiddlewareSupabaseClient(
   response: NextResponse
 ) {
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    SUPABASE_URL,
+    SUPABASE_KEY,
     {
       cookies: {
         getAll() {
@@ -67,8 +73,8 @@ export function createRouteSupabaseClient(
   response: NextResponse
 ) {
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    SUPABASE_URL,
+    SUPABASE_KEY,
     {
       cookies: {
         getAll() {

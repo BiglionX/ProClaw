@@ -8,6 +8,18 @@
   body {
     margin: 0;
     padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 移动端安全区域支持 */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* 禁用 iOS 点击高亮 */
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* 滚动条样式 */
@@ -27,6 +39,17 @@
 
   ::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
+  }
+
+  /* 触摸友好的交互 */
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* 禁用文字选择（按钮和链接） */
+  button, a {
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 

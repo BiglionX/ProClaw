@@ -1,29 +1,25 @@
 import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Grid,
+  Paper,
+  Typography,
+} from '@mui/material';
+import {
   Add as AddIcon,
   Launch as LaunchIcon,
   Refresh as RefreshIcon,
   Visibility as PreviewIcon,
   OpenInNew as TokenIcon,
 } from '@mui/icons-material';
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  Paper,
-  TextField,
-  Typography,
-} from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCloudStore, createCloudStore, getStoreStats, CloudStore, StoreStats } from '../../lib/cloudStoreService';
+import { getCloudStore, getStoreStats, CloudStore, StoreStats } from '../../lib/cloudStoreService';
 import { isTauri } from '../../lib/tauri';
+import CloudStoreSetupWizard from './StoreSetupWizard';
 
 interface StoreDashboardProps {
   loading: boolean;
@@ -39,8 +35,8 @@ export default function StoreDashboard({
   const navigate = useNavigate();
   const [store, setStore] = useState<CloudStore | null>(null);
   const [stats, setStats] = useState<StoreStats | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [subdomain, setSubdomain] = useState('');
+  const [openWizard, setOpenWizard] = useState(false);
+  const [wizardSubdomain, setWizardSubdomain] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const loadData = async () => {
@@ -63,27 +59,26 @@ export default function StoreDashboard({
     loadData();
   }, []);
 
-  const handleCreateStore = async () => {
-    if (!subdomain.trim()) {
-      setError('请输入子域名');
-      return;
-    }
-    if (!/^[a-z0-9-]+$/.test(subdomain)) {
-      setError('子域名只能包含小写字母、数字和连字符');
-      return;
-    }
-    try {
-      setLoading(true);
-      const newStore = await createCloudStore('free', subdomain.trim());
-      setStore(newStore);
-      setOpenDialog(false);
-      setSuccessMessage('商城开通成功！');
-      loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '开通失败');
-    } finally {
-      setLoading(false);
-    }
+  // 处理开通商城
+  const handleOpenSetupWizard = (subdomainValue: string) => {
+    console.log('[StoreDashboard] handleOpenSetupWizard called, subdomain:', subdomainValue);
+    setWizardSubdomain(subdomainValue);
+    setOpenWizard(true);
+    console.log('[StoreDashboard] openWizard set to true');
+  };
+
+  // 向导完成回调
+  const handleWizardComplete = (newStore: CloudStore) => {
+    setStore(newStore);
+    setOpenWizard(false);
+    setSuccessMessage('商城开通成功！请同步商品到云端。');
+    loadData();
+  };
+
+  // 向导取消回调
+  const handleWizardCancel = () => {
+    setOpenWizard(false);
+    setWizardSubdomain('');
   };
 
   const handlePreviewStore = async () => {
@@ -94,14 +89,15 @@ export default function StoreDashboard({
     
     setPreviewLoading(true);
     try {
-      const storeUrl = `https://${store.subdomain}.proclaw.cc`;
+      // 优先使用 /shop/ 路径格式
+      const storeUrl = `/shop/${store.subdomain}`;
       
       if (isTauri()) {
         // 在 Tauri 环境中，使用 Tauri API 打开新窗口
         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
         new WebviewWindow(`store-preview-${Date.now()}`, {
           url: storeUrl,
-          title: `预览商城 - ${store.subdomain}.proclaw.cc`,
+          title: `预览商城 - ${store.subdomain}`,
           width: 1200,
           height: 800,
           center: true,
@@ -137,21 +133,21 @@ export default function StoreDashboard({
             云商城已全面切换为 Token 按量计费模式，告别固定月费：
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip label="免费注册" size="small" color="success" /> 注册即赠送 50,000 PT（≈¥50）
-            </Typography>
-            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip label="商品同步" size="small" /> 50 PT/个
-            </Typography>
-            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip label="订单处理" size="small" /> 10 PT/单
-            </Typography>
-            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip label="AI 主题" size="small" /> 5,000 PT/次
-            </Typography>
-            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip label="子域名" size="small" color="info" /> 永久免费
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="免费注册" size="small" color="success" /> <Typography variant="body2" component="span">注册即赠送 50,000 PT（≈¥50）</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="商品同步" size="small" /> <Typography variant="body2" component="span">50 PT/个</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="订单处理" size="small" /> <Typography variant="body2" component="span">10 PT/单</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="AI 主题" size="small" /> <Typography variant="body2" component="span">5,000 PT/次</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label="子域名" size="small" color="info" /> <Typography variant="body2" component="span">永久免费</Typography>
+            </Box>
           </Box>
           <Button
             size="small"
@@ -167,41 +163,25 @@ export default function StoreDashboard({
           variant="contained"
           size="large"
           startIcon={loading ? <CircularProgress size={20} /> : <AddIcon />}
-          onClick={() => setOpenDialog(true)}
+          onClick={() => {
+            console.log('[Button] clicked, loading:', loading, 'store:', store);
+            // 生成默认 subdomain
+            const defaultSubdomain = `store${Date.now().toString(36)}`;
+            handleOpenSetupWizard(defaultSubdomain);
+          }}
           disabled={loading}
         >
           立即开通
         </Button>
 
-        {/* 开通对话框 */}
-        <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>开通云托管商城</DialogTitle>
-          <DialogContent>
-            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Alert severity="info" sx={{ mb: 1 }}>
-                开通免费，按 Token 计费。新用户获赠 50,000 PT。
-              </Alert>
-              <TextField
-                label="子域名"
-                value={subdomain}
-                onChange={e => setSubdomain(e.target.value.toLowerCase())}
-                placeholder="mystore"
-                helperText="将生成 https://mystore.proclaw.cc"
-                fullWidth
-                required
-                InputProps={{
-                  endAdornment: <Typography variant="body2" color="text.secondary">.proclaw.cc</Typography>,
-                }}
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpenDialog(false)}>取消</Button>
-            <Button onClick={handleCreateStore} variant="contained" disabled={loading}>
-              {loading ? '开通中...' : '确认开通'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        {/* 开通向导 - 在未开通状态也需要渲染 */}
+        <CloudStoreSetupWizard
+          open={openWizard}
+          subdomain={wizardSubdomain}
+          storeName={wizardSubdomain || '我的商城'}
+          onComplete={handleWizardComplete}
+          onCancel={handleWizardCancel}
+        />
       </Box>
     );
   }
@@ -273,6 +253,7 @@ export default function StoreDashboard({
           <CircularProgress />
         </Box>
       )}
+
     </Box>
   );
 }

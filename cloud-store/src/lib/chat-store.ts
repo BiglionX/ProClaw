@@ -21,7 +21,7 @@ export interface Message {
   contact_id: string;
   direction: 'incoming' | 'outgoing';
   content: string;
-  content_type: 'text' | 'image' | 'file';
+  content_type: 'text' | 'image' | 'file' | 'voice';
   file_url: string;
   is_read: boolean;
   created_at: string;
@@ -46,7 +46,7 @@ interface ChatState {
   fetchContacts: () => Promise<void>;
   fetchMessages: (contactId: string) => Promise<void>;
   loadMoreMessages: (contactId: string) => Promise<void>;
-  sendMessage: (contactId: string, content: string, contentType?: 'text' | 'image' | 'file', fileUrl?: string) => Promise<boolean>;
+  sendMessage: (contactId: string, content: string, contentType?: 'text' | 'image' | 'file' | 'voice', fileUrl?: string) => Promise<boolean>;
   setActiveContact: (contactId: string | null) => void;
   subscribeToMessages: (contactId: string) => () => void;
 }
@@ -136,7 +136,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (contactId: string, content: string, contentType: 'text' | 'image' | 'file' = 'text', fileUrl = '') => {
+  sendMessage: async (contactId: string, content: string, contentType: 'text' | 'image' | 'file' | 'voice' = 'text', fileUrl = '') => {
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',

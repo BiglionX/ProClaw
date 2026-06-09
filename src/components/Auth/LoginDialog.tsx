@@ -106,25 +106,6 @@ export default function LoginDialog() {
           AI-Powered Business Operating System
         </Typography>
 
-        {/* 模拟账号提示 */}
-        <Alert
-          severity="info"
-          sx={{
-            mb: 2,
-            bgcolor: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            '& .MuiAlert-message': { color: '#93c5fd' },
-          }}
-        >
-          <Typography variant="body2" sx={{ color: '#93c5fd' }}>
-            <strong>快速体验账号</strong>
-            <br />
-            用户名: <code style={{ color: '#fff' }}>boss</code>
-            <br />
-            密码: <code style={{ color: '#fff' }}>{MOCK_PASSWORD}</code>
-          </Typography>
-        </Alert>
-
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={clearError}>
             {error}

@@ -1,4 +1,4 @@
-// ProClaw Cloud 托管版 - 聊天页面
+// ProClaw Shop - 聊天页面
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -111,6 +111,7 @@ export default function ChatPage() {
     }
   };
 
+  //
   const activeMessages = activeContactId ? messages[activeContactId] || [] : [];
   const activeContact = contacts.find(c => c.id === activeContactId);
 

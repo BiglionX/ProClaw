@@ -26,15 +26,20 @@ export default async function StoreHomePage({ params }: PageProps) {
     );
   }
   
-  // 获取租户信息（使用 cookies() 而非伪造请求）
+  // 获取租户信息（使用 tenants 表）
   const supabase = await createServerSupabaseClient();
+  
+  console.log('[DEBUG] subdomain:', subdomain);
+  console.log('[DEBUG] SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  const { data: tenant } = await (supabase as any)
+  const { data: tenant, error } = await (supabase as any)
     .from('tenants')
     .select('id, name, subdomain, status, theme_config, logo_url, banner_url, contact_info')
     .eq('subdomain', subdomain)
     .single();
+  
+  console.log('[DEBUG] tenant query result:', { tenant, error });
   
   if (!tenant || tenant.status !== 'active') {
     return (
@@ -42,15 +47,16 @@ export default async function StoreHomePage({ params }: PageProps) {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">商城暂时不可用</h1>
           <p className="text-gray-500">该商城可能已被关闭或不存在</p>
+          <p className="text-gray-400 text-sm mt-4">subdomain: {subdomain}</p>
         </div>
       </div>
     );
   }
-
+  
   // 计算 schema 名称（带长度限制）
   const schemaName = `tenant_${subdomain.replace(/[^a-z0-9]/g, '_').substring(0, 53)}`;
 
-  // 获取商品列表（带降级处理）
+  // 获取商品列表（从租户 schema 查询）
   let products: any[] = [];
   try {
     const { data } = await (supabase as any)
@@ -62,7 +68,6 @@ export default async function StoreHomePage({ params }: PageProps) {
     products = data || [];
   } catch (error) {
     console.warn(`Schema ${schemaName} 不存在或无权限访问，商品列表为空:`, error);
-    // 优雅降级：返回空商品列表而非抛出错误
   }
   
   // 解析主题配置

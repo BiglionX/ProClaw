@@ -269,7 +269,7 @@ function App() {
 
         {/* 云商城路由 */}
         <Route
-          path="/cloud-store/*"
+          path="/shop/*"
           element={
             <ProtectedRoute>
               <CloudStorePage />
