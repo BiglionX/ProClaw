@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 
 // ==================== 运营中心主仪表板 ====================
 
 const OperationsDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'seo' | 'social' | 'approvals' | 'alerts'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'seo' | 'social' | 'approvals' | 'alerts' | 'usage'>('overview');
 
   const tabs = [
     { key: 'overview', label: '总览' },
@@ -11,6 +12,7 @@ const OperationsDashboard: React.FC = () => {
     { key: 'social', label: '社媒数据' },
     { key: 'approvals', label: '待审核内容' },
     { key: 'alerts', label: '异常预警' },
+    { key: 'usage', label: 'AI 用量' },
   ];
 
   return (
@@ -44,6 +46,7 @@ const OperationsDashboard: React.FC = () => {
       {activeTab === 'social' && <SocialMediaStats />}
       {activeTab === 'approvals' && <PendingContentList />}
       {activeTab === 'alerts' && <AlertList />}
+      {activeTab === 'usage' && <AIUsageStats />}
     </div>
   );
 };
@@ -311,6 +314,202 @@ const AlertList: React.FC = () => {
           </div>
         </div>
       ))}
+    </div>
+  );
+};
+
+// ==================== AI 用量统计标签 ====================
+
+interface TenantUsage {
+  tenant_id: string;
+  tenant_name: string;
+  today_usage: number;
+  week_usage: number;
+  month_usage: number;
+  total_usage: number;
+  user_count: number;
+}
+
+interface UsageRecord {
+  id: string;
+  user_id: string;
+  resource_type: string;
+  tokens_used: number;
+  endpoint: string | null;
+  created_at: string;
+}
+
+const AIUsageStats: React.FC = () => {
+  const [tenants, setTenants] = useState<TenantUsage[]>([]);
+  const [recentRecords, setRecentRecords] = useState<UsageRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalStats, setTotalStats] = useState({ today: 0, week: 0, month: 0, total: 0 });
+
+  useEffect(() => {
+    const fetchUsageData = async () => {
+      try {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+        // 获取所有租户
+        const { data: allTenants } = await supabase.from('tenants').select('id, name');
+        
+        // 获取所有用户
+        const { data: allProfiles } = await supabase.from('profiles').select('id, tenant_id');
+        const profilesByTenant: Record<string, string[]> = {};
+        (allProfiles || []).forEach((p: { id: string; tenant_id: string }) => {
+          if (!profilesByTenant[p.tenant_id]) profilesByTenant[p.tenant_id] = [];
+          profilesByTenant[p.tenant_id].push(p.id);
+        });
+
+        // 获取所有用量记录
+        const { data: allUsage } = await supabase
+          .from('api_usage_logs')
+          .select('user_id, resource_type, tokens_used, endpoint, created_at, id')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        // 计算每个租户的用量
+        const tenantStats: Record<string, TenantUsage> = {};
+        (allTenants || []).forEach((t: { id: string; name: string }) => {
+          const userIds = profilesByTenant[t.id] || [];
+          const tenantRecords = (allUsage || []).filter((r: { user_id: string }) => userIds.includes(r.user_id));
+          
+          tenantStats[t.id] = {
+            tenant_id: t.id,
+            tenant_name: t.name || '未命名',
+            today_usage: tenantRecords.filter((r: { created_at: string; tokens_used: number }) => new Date(r.created_at) >= new Date(todayStart)).reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0),
+            week_usage: tenantRecords.filter((r: { created_at: string; tokens_used: number }) => new Date(r.created_at) >= new Date(weekStart)).reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0),
+            month_usage: tenantRecords.filter((r: { created_at: string; tokens_used: number }) => new Date(r.created_at) >= new Date(monthStart)).reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0),
+            total_usage: tenantRecords.reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0),
+            user_count: userIds.length,
+          };
+        });
+
+        setTenants(Object.values(tenantStats));
+        setRecentRecords((allUsage || []).slice(0, 20) as UsageRecord[]);
+
+        // 计算总计
+        const total = (allUsage || []).reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0);
+        setTotalStats({
+          today: (allUsage || []).filter((r: { created_at: string; tokens_used: number }) => new Date(r.created_at) >= new Date(todayStart)).reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0),
+          week: (allUsage || []).filter((r: { created_at: string; tokens_used: number }) => new Date(r.created_at) >= new Date(weekStart)).reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0),
+          month: (allUsage || []).filter((r: { created_at: string; tokens_used: number }) => new Date(r.created_at) >= new Date(monthStart)).reduce((s: number, r: { tokens_used: number }) => s + r.tokens_used, 0),
+          total,
+        });
+      } catch (error) {
+        console.error('Failed to fetch usage data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsageData();
+  }, []);
+
+  const resourceTypeNames: Record<string, string> = {
+    ai_chat: 'AI 对话',
+    ai_product_query: '商品查询',
+    ai_order_ocr: '订单 OCR',
+    ai_order_recognition: '订单识别',
+    data_export: '数据导出',
+    data_sync: '数据同步',
+    other: '其他',
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('zh-CN', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  if (loading) {
+    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>;
+  }
+
+  return (
+    <div>
+      {/* 总计统计 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-red-500 to-orange-500 rounded-xl p-4 text-white">
+          <div className="text-sm opacity-80">今日消耗</div>
+          <div className="text-2xl font-bold">{totalStats.today} PT</div>
+        </div>
+        <div className="bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl p-4 text-white">
+          <div className="text-sm opacity-80">本周消耗</div>
+          <div className="text-2xl font-bold">{totalStats.week} PT</div>
+        </div>
+        <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-4 text-white">
+          <div className="text-sm opacity-80">本月消耗</div>
+          <div className="text-2xl font-bold">{totalStats.month} PT</div>
+        </div>
+        <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl p-4 text-white">
+          <div className="text-sm opacity-80">累计消耗</div>
+          <div className="text-2xl font-bold">{totalStats.total} PT</div>
+        </div>
+      </div>
+
+      {/* 各租户用量 */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">各租户用量排行</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500 dark:text-gray-400 border-b dark:border-gray-700">
+                <th className="pb-3">租户</th>
+                <th className="pb-3">用户数</th>
+                <th className="pb-3">今日</th>
+                <th className="pb-3">本周</th>
+                <th className="pb-3">本月</th>
+                <th className="pb-3">累计</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y dark:divide-gray-700">
+              {tenants.length > 0 ? (
+                tenants
+                  .sort((a, b) => b.month_usage - a.month_usage)
+                  .map((tenant) => (
+                    <tr key={tenant.tenant_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="py-3 font-medium text-gray-900 dark:text-white">{tenant.tenant_name}</td>
+                      <td className="py-3 text-gray-500">{tenant.user_count}</td>
+                      <td className="py-3 text-red-500">{tenant.today_usage}</td>
+                      <td className="py-3 text-orange-500">{tenant.week_usage}</td>
+                      <td className="py-3 text-blue-500">{tenant.month_usage}</td>
+                      <td className="py-3 text-purple-500">{tenant.total_usage}</td>
+                    </tr>
+                  ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-500">暂无数据</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 最近消费记录 */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">最近消费记录</h3>
+        <div className="space-y-3">
+          {recentRecords.length > 0 ? (
+            recentRecords.map((record) => (
+              <div key={record.id} className="flex items-center justify-between py-2 border-b dark:border-gray-700 last:border-0">
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {resourceTypeNames[record.resource_type] || record.resource_type}
+                  </span>
+                  <span className="text-gray-400 text-xs ml-2">{formatDate(record.created_at)}</span>
+                </div>
+                <span className="text-red-500 font-medium">-{record.tokens_used} PT</span>
+              </div>
+            ))
+          ) : (
+            <div className="text-center text-gray-500 py-8">暂无消费记录</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
