@@ -3,6 +3,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
+  "regions": ["sin1"],
+  "aliases": ["app.proclaw.cc"],
   "headers": [
     {
       "source": "/(.*)",

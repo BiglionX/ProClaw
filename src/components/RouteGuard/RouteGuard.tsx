@@ -64,7 +64,7 @@ const ROUTE_TO_FEATURE_MAP: Record<string, RouteFeatureId> = {
   '/finance-agent': 'finance_agent',
   '/media-library': 'common',
   '/user-management': 'common',
-  '/cloud-store': 'cloud_backup',
+  '/shop': 'cloud_backup',
   '/cloud-backup': 'cloud_backup',
   '/teams': 'team',
   // 行业插件路由

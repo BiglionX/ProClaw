@@ -8,6 +8,12 @@ import Link from 'next/link';
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('order_id');
+  const store = searchParams.get('store');
+  
+  // 构建联系客服 URL
+  const customerServiceUrl = store 
+    ? `https://proclaw.cc/customer-service?store=${encodeURIComponent(store)}${orderId ? `&order=${encodeURIComponent(orderId)}` : ''}`
+    : `https://proclaw.cc/customer-service${orderId ? `?order=${encodeURIComponent(orderId)}` : ''}`;
   
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -40,6 +46,18 @@ function OrderSuccessContent() {
             <li>• 如有疑问，请联系商家客服</li>
           </ul>
         </div>
+        
+        {/* 联系客服 */}
+        {customerServiceUrl && (
+          <a
+            href={customerServiceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full py-3 border border-green-600 text-green-600 font-semibold rounded-lg hover:bg-green-50 transition-colors"
+          >
+            联系客服咨询订单
+          </a>
+        )}
         
         {/* 操作按钮 */}
         <div className="space-y-3">

@@ -384,10 +384,10 @@ export const PAGE_ROUTES: PageRoute[] = [
     order: 96,
   },
   {
-    path: '/cloud-store',
+    path: '/shop',
     component: 'CloudStorePage',
     featureId: 'cloud_backup',
-    title: '云端备份',
+    title: '云商城',
     icon: 'cloud',
     showInNav: true,
     order: 97,

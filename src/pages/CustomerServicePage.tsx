@@ -61,7 +61,7 @@ import {
   Badge,
 } from '@mui/material';
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // ===== 类型定义 =====
 
@@ -910,6 +910,8 @@ function SettingsTab() {
 
 export default function CustomerServicePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const storeParam = searchParams.get('store');
   const [tabValue, setTabValue] = useState(0);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -924,11 +926,23 @@ export default function CustomerServicePage() {
           <ArrowBackIcon />
         </IconButton>
         <Box sx={{ flex: 1 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-            AI 客服管理
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+              AI 客服管理
+            </Typography>
+            {storeParam && (
+              <Chip 
+                label={`商城: ${storeParam}`} 
+                color="success" 
+                variant="outlined"
+                size="small"
+              />
+            )}
+          </Box>
           <Typography variant="body1" color="text.secondary">
-            管理云商城 AI 客服，查看聊天记录，维护问答库
+            {storeParam 
+              ? `来自「${storeParam}」商城的客户咨询`
+              : '管理云商城 AI 客服，查看聊天记录，维护问答库'}
           </Typography>
         </Box>
       </Box>

@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 interface Order {
   id: string;
@@ -32,6 +33,8 @@ const statusMap: Record<string, { label: string; color: string }> = {
 };
 
 export default function OrdersPage() {
+  const params = useParams();
+  const subdomain = (params.store as string) || '';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
@@ -80,7 +83,7 @@ export default function OrdersPage() {
       
       {/* 标签页 */}
       <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4">
+        <div className="max-w-4xl mx-auto px-4 flex items-center justify-between">
           <div className="flex">
             {[
               { key: 'all', label: '全部订单' },
@@ -100,6 +103,17 @@ export default function OrdersPage() {
               </button>
             ))}
           </div>
+          <a
+            href={`https://proclaw.cc/customer-service?store=${encodeURIComponent(subdomain)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3 py-2 text-green-600 hover:text-green-700 text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            联系客服
+          </a>
         </div>
       </div>
       

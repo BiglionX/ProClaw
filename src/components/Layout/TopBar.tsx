@@ -44,7 +44,7 @@ const PATH_LABELS: Record<string, string> = {
   '/contacts': '联系人',
   '/chat': '聊天',
   '/call': '通话',
-  '/cloud-store': '云商城',
+  '/shop': '云商城',
   '/agents': 'Agent 管理',
   '/finance-agent': '财务 Agent',
   '/project-overview': '项目概览',

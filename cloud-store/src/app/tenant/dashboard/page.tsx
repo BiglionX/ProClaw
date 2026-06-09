@@ -152,7 +152,7 @@ export default function TenantDashboard() {
           <div className="px-6 py-4 border-b">
             <h2 className="text-lg font-semibold text-gray-900">快捷操作</h2>
           </div>
-          <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-6 grid grid-cols-2 md:grid-cols-5 gap-4">
             <Link
               href="/tenant/products"
               className="flex flex-col items-center p-4 rounded-lg border hover:border-blue-500 hover:bg-blue-50 transition-colors"
@@ -182,6 +182,18 @@ export default function TenantDashboard() {
               </svg>
               <span className="text-sm font-medium text-gray-900">充值 Token</span>
             </Link>
+
+            <a
+              href="https://proclaw.cc/customer-service"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center p-4 rounded-lg border hover:border-green-500 hover:bg-green-50 transition-colors"
+            >
+              <svg className="w-8 h-8 text-green-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span className="text-sm font-medium text-gray-900">客服管理</span>
+            </a>
 
             <Link
               href="/tenant/settings"

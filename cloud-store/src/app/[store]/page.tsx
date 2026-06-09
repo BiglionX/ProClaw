@@ -1,10 +1,8 @@
 // ProClaw Shop - 动态商城首页
 // 根据子域名自动加载对应商户的商城
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createRouteSupabaseClient } from '@/lib/supabase-server';
-import { getCurrentTenantSubdomain } from '@/lib/tenant-router';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getCurrentTenantSubdomain } from '@/lib/tenant-router';
 import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
@@ -241,6 +239,14 @@ export default async function StoreHomePage({ params }: PageProps) {
               {tenant.contact_info?.phone && <span>电话: {tenant.contact_info.phone}</span>}
               {tenant.contact_info?.wechat && <span>微信: {tenant.contact_info.wechat}</span>}
               {tenant.contact_info?.email && <span>邮箱: {tenant.contact_info.email}</span>}
+              <a 
+                href={`https://proclaw.cc/customer-service?store=${encodeURIComponent(subdomain || '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-400 hover:text-green-300"
+              >
+                联系客服
+              </a>
             </div>
           </div>
           <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400 text-sm">

@@ -53,7 +53,7 @@ export default function CloudStorePage() {
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-    const paths = ['/cloud-store', '/cloud-store/products', '/cloud-store/theme', '/cloud-store/settings', '/cloud-store/orders', '/cloud-store/reviews', '/cloud-store/coupons'];
+    const paths = ['/shop', '/shop/products', '/shop/theme', '/shop/settings', '/shop/orders', '/shop/reviews', '/shop/coupons'];
     navigate(paths[newValue]);
   };
 

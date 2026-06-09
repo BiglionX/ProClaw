@@ -80,7 +80,7 @@ export default function ChatWidget({ tenantId }: ChatWidgetProps) {
   // ===== 聊天面板 =====
   const renderChatPanel = () => (
     <div
-      className="fixed bottom-24 right-6 z-[1199] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transition-all duration-300"
+      className="fixed bottom-24 right-6 z-1199 flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transition-all duration-300"
       style={{
         width: isMinimized ? '60px' : '380px',
         height: isMinimized ? '60px' : '520px',
@@ -267,7 +267,7 @@ export default function ChatWidget({ tenantId }: ChatWidgetProps) {
       {/* 悬浮按钮 */}
       <button
         onClick={() => { toggleOpen(); setIsMinimized(false); }}
-        className="fixed bottom-6 right-6 z-[1200] w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+        className="fixed bottom-6 right-6 z-1200 w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
         style={{
           background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
         }}

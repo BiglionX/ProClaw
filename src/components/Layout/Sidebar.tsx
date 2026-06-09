@@ -88,7 +88,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 const DEFAULT_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' | 'contact' })[] = [
   { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter', _group: 'home', isLive: true },
   { text: '商品库', icon: <ProductsIcon />, path: '/products', _group: 'home' },
-  { text: '云商城', icon: <StoreIcon />, path: '/cloud-store', _group: 'home' },
+  { text: '云商城', icon: <StoreIcon />, path: '/shop', _group: 'home' },
   { text: '联系人', icon: <ContactsIcon />, path: '/contacts', _group: 'contact' },
   { text: '消息', icon: <ChatIcon />, path: '/messages', _group: 'contact' },
   { text: 'AI 团队', icon: <TeamsIcon />, path: '/teams', _group: 'ai', badge: 2 },

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 interface CartItem {
   id: string;
@@ -20,6 +20,8 @@ interface CartItem {
 
 export default function CartPage() {
   const router = useRouter();
+  const params = useParams();
+  const subdomain = (params.store as string) || '';
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -194,12 +196,22 @@ export default function CartPage() {
                       ¥{totalAmount.toFixed(2)}
                     </p>
                   </div>
-                  <button
-                    onClick={() => router.push('/checkout')}
-                    className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    去结算
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={`https://proclaw.cc/customer-service?store=${encodeURIComponent(subdomain)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-3 text-green-600 border border-green-600 rounded-lg font-medium hover:bg-green-50 transition-colors"
+                    >
+                      联系客服
+                    </a>
+                    <button
+                      onClick={() => router.push('/checkout')}
+                      className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      去结算
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
