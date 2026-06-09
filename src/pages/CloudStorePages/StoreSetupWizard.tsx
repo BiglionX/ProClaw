@@ -16,7 +16,7 @@ interface CloudStoreSetupWizardProps {
 export default function CloudStoreSetupWizard({
   open,
   subdomain,
-  storeName,
+  storeName: _storeName, // TODO: 后续可用于传递店铺名称到后端
   onComplete,
   onCancel,
 }: CloudStoreSetupWizardProps) {

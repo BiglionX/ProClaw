@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
     root: import.meta.dirname || process.cwd(),
   },
 
+  // Docker 独立部署支持
+  output: 'standalone',
+
   // 图片远程域名白名单 (Supabase Storage)
   images: {
     remotePatterns: [
