@@ -4,10 +4,8 @@ test.describe('销售流程功能', () => {
   test.beforeEach(async ({ page }) => {
     // 先登录
     await page.goto('/');
-    await page.fill('input[type="email"]', 'test@example.com');
-    await page.fill('input[type="password"]', 'password123');
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard', { timeout: 10000 });
+    await page.click('button:has-text("一键体验")');
+    await page.waitForURL('**/datacenter**', { timeout: 15000 });
     
     // 导航到销售页面
     await page.click('text=销售');

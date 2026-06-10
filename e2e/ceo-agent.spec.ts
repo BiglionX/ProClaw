@@ -8,10 +8,8 @@ test.describe('CEO Agent 主控官功能 (PRD v6.2)', () => {
   test.beforeEach(async ({ page }) => {
     // 登录
     await page.goto('/');
-    await page.fill('input[type="email"]', 'boss');
-    await page.fill('input[type="password"]', 'IamBigBoss');
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/', { timeout: 10000 });
+    await page.click('button:has-text("一键体验")');
+    await page.waitForURL('**/datacenter**', { timeout: 15000 });
   });
 
   test('CEO Agent 聊天页面应显示主控官标识和上下文指示器', async ({ page }) => {
@@ -164,10 +162,8 @@ test.describe('CEO Agent 决策确认与个性化学习 (PRD v6.3)', () => {
   test.beforeEach(async ({ page }) => {
     // 登录
     await page.goto('/');
-    await page.fill('input[type="email"]', 'boss');
-    await page.fill('input[type="password"]', 'IamBigBoss');
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/', { timeout: 10000 });
+    await page.click('button:has-text("一键体验")');
+    await page.waitForURL('**/datacenter**', { timeout: 15000 });
   });
 
   test('决策历史按钮应在 CEO 聊天头部显示', async ({ page }) => {

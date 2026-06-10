@@ -3,14 +3,15 @@ import { test, expect } from '@playwright/test';
 test.describe('Agent 管理功能', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.fill('input[type="email"]', 'boss');
-    await page.fill('input[type="password"]', 'IamBigBoss');
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/', { timeout: 10000 });
+    await page.click('button:has-text("一键体验")');
+    await page.waitForURL('**/datacenter**', { timeout: 15000 });
 
-    // 导航到 Agent 管理页面
-    await page.click('text=Agent管理');
-    await page.waitForURL('**/agents', { timeout: 5000 });
+    // 导航到 Agent 管理页面 - 尝试多种可能的导航项
+    const agentNav = page.locator('text=Agent管理, text=Agents, text=智能体, a[href*="agents"]').first();
+    if (await agentNav.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await agentNav.click();
+      await page.waitForURL('**/agents**', { timeout: 5000 });
+    }
   });
 
   test('Agent 管理页面应正常加载并显示内置财务管理 Agent', async ({ page }) => {

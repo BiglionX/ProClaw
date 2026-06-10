@@ -8,10 +8,8 @@ test.describe('邀请系统功能', () => {
   test.beforeEach(async ({ page }) => {
     // 登录
     await page.goto('/');
-    await page.fill('input[type="email"]', 'boss');
-    await page.fill('input[type="password"]', 'IamBigBoss');
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/', { timeout: 10000 });
+    await page.click('button:has-text("一键体验")');
+    await page.waitForURL('**/datacenter**', { timeout: 15000 });
   });
 
   test.describe('从采购页面创建邀请', () => {

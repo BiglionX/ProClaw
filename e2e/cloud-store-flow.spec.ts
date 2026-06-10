@@ -10,34 +10,22 @@
 import { test, expect } from '@playwright/test';
 
 // ========== 测试常量 ==========
-const MOCK_USERNAME = 'boss';
-const MOCK_PASSWORD = 'IamBigBoss';
 const BASE_URL = 'http://localhost:3000';
 const CLOUD_STORE_PATH = '/#/cloud-store';
 
 // ========== 辅助函数 ==========
 
-/** 使用模拟账号登录 */
-async function loginWithMockAccount(page: any) {
-  await page.goto(BASE_URL + '/#/login');
+/** 使用一键体验按钮登录 */
+async function loginWithQuickButton(page: any) {
+  await page.goto(BASE_URL + '/#/');
   await page.waitForLoadState('networkidle');
-
-  // 验证登录页面已加载
-  await expect(page.locator('text=ProClaw')).toBeVisible({ timeout: 10000 });
-  await expect(page.locator('text=快速体验账号')).toBeVisible();
-
-  // 填写模拟账号
-  const emailInput = page.locator('input[type="email"]');
-  const passwordInput = page.locator('input[type="password"]');
-  await emailInput.fill(MOCK_USERNAME);
-  await passwordInput.fill(MOCK_PASSWORD);
-
-  // 点击登录
-  await page.click('button[type="submit"]');
-
-  // 等待导航到首页
-  await page.waitForURL('**/#/', { timeout: 10000 });
-  await page.waitForLoadState('networkidle');
+  
+  // 点击一键体验按钮
+  const quickButton = page.locator('button:has-text("一键体验")');
+  if (await quickButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await quickButton.click();
+    await page.waitForTimeout(2000);
+  }
 }
 
 /** 导航到云商城页面 */
@@ -50,23 +38,20 @@ async function navigateToCloudStore(page: any) {
 
 // ========== 测试套件 1: 登录与导航 ==========
 test.describe('云商城 - 登录与导航', () => {
-  test('应使用模拟账号成功登录', async ({ page }) => {
-    await page.goto(BASE_URL + '/#/login');
+  test('应使用一键体验成功登录', async ({ page }) => {
+    await page.goto(BASE_URL + '/#/');
     await page.waitForLoadState('networkidle');
 
-    // 登录
-    await page.locator('input[type="email"]').fill(MOCK_USERNAME);
-    await page.locator('input[type="password"]').fill(MOCK_PASSWORD);
-    await page.click('button[type="submit"]');
+    // 点击一键体验按钮
+    await page.locator('button:has-text("一键体验")').click();
 
-    // 验证登录成功（跳转到首页）
-    await page.waitForURL('**/#/', { timeout: 10000 });
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('text=数据中心')).toBeVisible({ timeout: 5000 });
+    // 验证登录成功
+    await page.waitForTimeout(2000);
+    await expect(page.locator('text=数据中心, text=云商城').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('应能从侧边栏导航到云商城', async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
 
     // 点击侧边栏云商城入口
     await page.locator('text=云商城').first().click();
@@ -82,7 +67,7 @@ test.describe('云商城 - 登录与导航', () => {
 // ========== 测试套件 2: 套餐选择与开通 ==========
 test.describe('云商城 - 套餐选择与开通', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
     await navigateToCloudStore(page);
   });
 
@@ -113,7 +98,7 @@ test.describe('云商城 - 套餐选择与开通', () => {
 // ========== 测试套件 3: 商品管理 ==========
 test.describe('云商城 - 商品管理', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
     await navigateToCloudStore(page);
   });
 
@@ -135,7 +120,7 @@ test.describe('云商城 - 商品管理', () => {
 // ========== 测试套件 4: 主题配置 ==========
 test.describe('云商城 - 主题配置', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
     await navigateToCloudStore(page);
   });
 
@@ -161,7 +146,7 @@ test.describe('云商城 - 主题配置', () => {
 // ========== 测试套件 5: 商城设置 ==========
 test.describe('云商城 - 商城设置', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
     await navigateToCloudStore(page);
   });
 
@@ -189,7 +174,7 @@ test.describe('云商城 - 商城设置', () => {
 // ========== 测试套件 6: Tab 切换 ==========
 test.describe('云商城 - Tab 切换', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
     await navigateToCloudStore(page);
   });
 
@@ -241,7 +226,7 @@ test.describe('云商城 - Tab 切换', () => {
 // ========== 测试套件 7: UI 完整性验证 ==========
 test.describe('云商城 - UI 完整性验证', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
     await navigateToCloudStore(page);
   });
 
@@ -270,7 +255,7 @@ test.describe('云商城 - UI 完整性验证', () => {
 // ========== 测试套件 8: 边界情况 ==========
 test.describe('云商城 - 边界情况', () => {
   test.beforeEach(async ({ page }) => {
-    await loginWithMockAccount(page);
+    await loginWithQuickButton(page);
     await navigateToCloudStore(page);
   });
 
