@@ -18,6 +18,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { scanLanDevices, LanDevice, getDeviceDisplayName } from '../services/LanDiscoveryService';
@@ -138,7 +139,7 @@ const LanSyncScreen: React.FC = () => {
       activeOpacity={0.7}
     >
       <Text style={styles.deviceIcon}>
-        {item.deviceType === 'desktop' ? '💻' : '📱'}
+        {item.deviceType === 'desktop' ? '\uD83D\uDCA5' : '\uD83D\uDCF1'}
       </Text>
       <View style={styles.deviceInfo}>
         <Text style={styles.deviceName}>{item.name}</Text>
@@ -146,11 +147,12 @@ const LanSyncScreen: React.FC = () => {
           {item.ip}:{item.port}
         </Text>
       </View>
-      <Text style={styles.selectIcon}>→</Text>
+      <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.3)" />
     </TouchableOpacity>
   );
 
   return (
+    <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>局域网同步</Text>
@@ -160,10 +162,10 @@ const LanSyncScreen: React.FC = () => {
           <>
             {screenState === 'scanning' && (
               <View style={styles.scanningIndicator}>
-                <ActivityIndicator size="large" color="#6366f1" />
+                <ActivityIndicator size="large" color="#00d2ff" />
                 <Text style={styles.scanningLabel}>正在扫描局域网设备...</Text>
                 {scanProgress.total > 0 && (
-                  <View style={styles.scanProgressBar}>
+                  <View style={styles.glassScanProgressBar}>
                     <View style={[styles.scanProgressFill, { width: `${Math.round((scanProgress.current / scanProgress.total) * 100)}%` }]} />
                   </View>
                 )}
@@ -174,9 +176,9 @@ const LanSyncScreen: React.FC = () => {
             )}
               {screenState !== 'scanning' && (
                 <TouchableOpacity
-                  style={styles.scanButton}
+                  style={styles.glassScanButton}
                   onPress={handleScan}
-                  disabled={screenState === 'scanning'}
+                  activeOpacity={0.7}
                 >
                   <MaterialCommunityIcons name="wifi" size={20} color="#fff" style={{ marginRight: 8 }} />
                   <Text style={styles.scanButtonText}>重新扫描</Text>
@@ -184,7 +186,7 @@ const LanSyncScreen: React.FC = () => {
               )}
 
             {error && (
-              <View style={styles.errorBox}>
+              <View style={styles.glassErrorBox}>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -222,7 +224,7 @@ const LanSyncScreen: React.FC = () => {
             </View>
 
             <TouchableOpacity
-              style={styles.scanCodeButton}
+              style={styles.glassScanCodeButton}
               onPress={async () => {
                 if (!cameraPermission?.granted) {
                   const result = await requestCameraPermission();
@@ -234,8 +236,9 @@ const LanSyncScreen: React.FC = () => {
                 scannedRef.current = false;
                 setShowScanner(true);
               }}
+              activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="qrcode-scan" size={22} color="#6366f1" />
+              <MaterialCommunityIcons name="qrcode-scan" size={22} color="#00d2ff" />
               <Text style={styles.scanCodeText}>扫码配对</Text>
             </TouchableOpacity>
 
@@ -244,8 +247,9 @@ const LanSyncScreen: React.FC = () => {
             </Text>
 
             <TextInput
-              style={styles.codeInput}
+              style={styles.glassCodeInput}
               placeholder="输入配对验证码"
+              placeholderTextColor="rgba(255,255,255,0.3)"
               value={pairingCode}
               onChangeText={setPairingCode}
               maxLength={6}
@@ -258,10 +262,11 @@ const LanSyncScreen: React.FC = () => {
               <TouchableOpacity
                 key={d}
                 style={[
-                  styles.directionOption,
-                  direction === d && styles.directionOptionActive,
+                  styles.glassDirectionOption,
+                  direction === d && styles.glassDirectionOptionActive,
                 ]}
                 onPress={() => setDirection(d)}
+                activeOpacity={0.7}
               >
                 <Text
                   style={[
@@ -276,26 +281,28 @@ const LanSyncScreen: React.FC = () => {
             ))}
 
             {error && (
-              <View style={styles.errorBox}>
+              <View style={styles.glassErrorBox}>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
             <View style={styles.pairingActions}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={styles.glassCancelButton}
                 onPress={() => {
                   setSelectedDevice(null);
                   setScreenState('devices');
                   setError(null);
                 }}
+                activeOpacity={0.7}
               >
                 <Text style={styles.cancelButtonText}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.confirmButton, !pairingCode.trim() && styles.buttonDisabled]}
+                style={[styles.glassConfirmButton, !pairingCode.trim() && styles.buttonDisabled]}
                 onPress={handlePairAndSync}
                 disabled={!pairingCode.trim()}
+                activeOpacity={0.7}
               >
                 <Text style={styles.confirmButtonText}>开始同步</Text>
               </TouchableOpacity>
@@ -306,7 +313,7 @@ const LanSyncScreen: React.FC = () => {
         {/* 同步中 */}
         {screenState === 'syncing' && (
           <View style={styles.syncingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
+            <ActivityIndicator size="large" color="#00d2ff" />
             <Text style={styles.syncingText}>同步中...</Text>
             {syncProgress.total > 0 && (
               <Text style={styles.progressText}>
@@ -353,38 +360,39 @@ const LanSyncScreen: React.FC = () => {
       {/* 同步完成 */}
         {screenState === 'complete' && (
           <View style={styles.completeContainer}>
-            <Text style={styles.completeIcon}>✅</Text>
+            <MaterialCommunityIcons name="check-circle" size={64} color="#00f5d4" />
             <Text style={styles.completeText}>同步完成</Text>
             {syncResult && (
-              <View style={styles.syncSummaryCard}>
+              <View style={styles.glassSyncSummaryCard}>
                 <View style={styles.syncSummaryRow}>
-                  <MaterialCommunityIcons name="swap-horizontal-bold" size={20} color="#22c55e" />
+                  <MaterialCommunityIcons name="swap-horizontal-bold" size={20} color="#00f5d4" />
                   <Text style={styles.syncSummaryLabel}>已处理变更</Text>
                   <Text style={styles.syncSummaryValue}>{syncResult.applied} 条</Text>
                 </View>
                 {syncResult.conflicts > 0 && (
                   <View style={styles.syncSummaryRow}>
-                    <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#f59e0b" />
+                    <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#ff6b9d" />
                     <Text style={styles.syncSummaryLabel}>冲突</Text>
-                    <Text style={[styles.syncSummaryValue, { color: '#f59e0b' }]}>{syncResult.conflicts} 条</Text>
+                    <Text style={[styles.syncSummaryValue, { color: '#ff6b9d' }]}>{syncResult.conflicts} 条</Text>
                   </View>
                 )}
                 {syncResult.errors.length > 0 && (
                   <View style={styles.syncSummaryRow}>
-                    <MaterialCommunityIcons name="close-circle-outline" size={20} color="#ef4444" />
+                    <MaterialCommunityIcons name="close-circle-outline" size={20} color="#ff6b9d" />
                     <Text style={styles.syncSummaryLabel}>错误</Text>
-                    <Text style={[styles.syncSummaryValue, { color: '#ef4444' }]}>{syncResult.errors.length} 个</Text>
+                    <Text style={[styles.syncSummaryValue, { color: '#ff6b9d' }]}>{syncResult.errors.length} 个</Text>
                   </View>
                 )}
               </View>
             )}
             <TouchableOpacity
-              style={styles.doneButton}
+              style={styles.glassDoneButton}
               onPress={() => {
                 lanSyncProvider.disconnect();
                 setScreenState('devices');
                 setSelectedDevice(null);
               }}
+              activeOpacity={0.7}
             >
               <Text style={styles.doneButtonText}>完成</Text>
             </TouchableOpacity>
@@ -392,13 +400,13 @@ const LanSyncScreen: React.FC = () => {
         )}
       </View>
     </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9ff',
   },
   content: {
     flex: 1,
@@ -407,7 +415,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.95)',
     marginBottom: 20,
   },
   scanningIndicator: {
@@ -416,58 +424,69 @@ const styles = StyleSheet.create({
   },
   scanningLabel: {
     fontSize: 16,
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 16,
   },
-  scanProgressBar: {
+  glassScanProgressBar: {
     width: '80%',
     height: 4,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 2,
     marginTop: 12,
     overflow: 'hidden',
   },
   scanProgressFill: {
     height: '100%',
-    backgroundColor: '#6366f1',
+    backgroundColor: '#00d2ff',
     borderRadius: 2,
   },
   scanningCount: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255,255,255,0.3)',
     marginTop: 8,
   },
-  syncSummaryCard: {
+  glassSyncSummaryCard: {
     width: '100%',
-    backgroundColor: '#f8f9ff',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   syncSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   syncSummaryLabel: {
     flex: 1,
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
     marginLeft: 8,
   },
   syncSummaryValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.85)',
   },
-  scanButton: {
-    backgroundColor: '#6366f1',
+  glassScanButton: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,210,255,0.2)',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.35)',
+    shadowColor: '#00d2ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   scanButtonText: {
     fontSize: 16,
@@ -477,7 +496,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: 12,
   },
   deviceList: {
@@ -486,15 +505,12 @@ const styles = StyleSheet.create({
   deviceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   deviceIcon: {
     fontSize: 28,
@@ -506,33 +522,29 @@ const styles = StyleSheet.create({
   deviceName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.9)',
   },
   deviceAddress: {
     fontSize: 13,
-    color: '#999',
+    color: 'rgba(255,255,255,0.4)',
     marginTop: 2,
   },
-  selectIcon: {
-    fontSize: 18,
-    color: '#ccc',
-  },
-  errorBox: {
-    backgroundColor: '#fef2f2',
+  glassErrorBox: {
+    backgroundColor: 'rgba(255,107,157,0.1)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
     borderLeftWidth: 3,
-    borderLeftColor: '#ef4444',
+    borderLeftColor: '#ff6b9d',
   },
   errorText: {
     fontSize: 14,
-    color: '#dc2626',
+    color: '#ff6b9d',
   },
   hint: {
     textAlign: 'center',
     fontSize: 13,
-    color: '#999',
+    color: 'rgba(255,255,255,0.3)',
     marginTop: 16,
   },
   pairingContainer: {
@@ -540,18 +552,18 @@ const styles = StyleSheet.create({
   },
   pairingHint: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.45)',
     marginBottom: 20,
   },
-  codeInput: {
+  glassCodeInput: {
     borderWidth: 2,
-    borderColor: '#6366f1',
+    borderColor: 'rgba(0,210,255,0.35)',
     borderRadius: 12,
     padding: 16,
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a2e',
-    backgroundColor: '#fff',
+    color: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     marginBottom: 24,
     letterSpacing: 8,
   },
@@ -563,28 +575,28 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   dividerText: {
     marginHorizontal: 12,
     fontSize: 13,
-    color: '#999',
+    color: 'rgba(255,255,255,0.3)',
   },
-  scanCodeButton: {
+  glassScanCodeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f0ff',
+    backgroundColor: 'rgba(0,210,255,0.1)',
     borderRadius: 12,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#d0d0ff',
+    borderColor: 'rgba(0,210,255,0.25)',
     marginBottom: 20,
   },
   scanCodeText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#6366f1',
+    color: '#00d2ff',
     marginLeft: 8,
   },
   scannerContainer: {
@@ -615,7 +627,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#00d2ff',
     borderRadius: 16,
     backgroundColor: 'transparent',
   },
@@ -628,27 +640,27 @@ const styles = StyleSheet.create({
   directionLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.7)',
     marginBottom: 10,
   },
-  directionOption: {
-    backgroundColor: '#fff',
+  glassDirectionOption: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 10,
     padding: 14,
     marginBottom: 8,
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  directionOptionActive: {
-    borderColor: '#6366f1',
-    backgroundColor: '#f0f0ff',
+  glassDirectionOptionActive: {
+    borderColor: '#00d2ff',
+    backgroundColor: 'rgba(0,210,255,0.1)',
   },
   directionText: {
     fontSize: 15,
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
   },
   directionTextActive: {
-    color: '#6366f1',
+    color: '#00d2ff',
     fontWeight: '600',
   },
   pairingActions: {
@@ -657,24 +669,28 @@ const styles = StyleSheet.create({
     marginTop: 20,
     gap: 12,
   },
-  cancelButton: {
+  glassCancelButton: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#666',
+    color: 'rgba(255,255,255,0.6)',
   },
-  confirmButton: {
+  glassConfirmButton: {
     flex: 1,
-    backgroundColor: '#6366f1',
+    backgroundColor: 'rgba(0,210,255,0.25)',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.4)',
   },
   confirmButtonText: {
     fontSize: 15,
@@ -692,12 +708,12 @@ const styles = StyleSheet.create({
   syncingText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 16,
   },
   progressText: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 8,
   },
   completeContainer: {
@@ -705,21 +721,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  completeIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
   completeText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 16,
     marginBottom: 24,
   },
-  doneButton: {
-    backgroundColor: '#6366f1',
+  glassDoneButton: {
+    backgroundColor: 'rgba(0,210,255,0.2)',
     borderRadius: 12,
     paddingHorizontal: 40,
     paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.35)',
   },
   doneButtonText: {
     fontSize: 16,

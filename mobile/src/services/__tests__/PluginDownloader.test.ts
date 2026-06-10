@@ -32,16 +32,35 @@ jest.mock('crypto-js', () => {
     })),
   };
 
+  // 默认返回与测试断言一致的 hex 签名，使 verifySignature 走通完整 HMAC 流程
   const HmacSHA256 = jest.fn(() => ({
     toString: jest.fn(() => 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'),
+  }));
+
+  // Hex.parse 必须返回有效 WordArray（否则 signingKey 为 null，验证直接被拒）
+  const HexParseMock = jest.fn((hex: string) => ({
+    words: [],
+    sigBytes: (hex?.length ?? 0) / 2,
+    toString: () => hex ?? '',
   }));
 
   return {
     HmacSHA256,
     lib: { WordArray },
-    enc: { Hex: { parse: jest.fn() } },
+    enc: { Hex: { parse: HexParseMock } },
   };
 });
+
+// Mock SecureConfig 以提供签名公钥（审计 S3 路径）
+jest.mock('../SecureConfig', () => ({
+  secureGet: jest.fn(async (key: string) => {
+    if (key === 'proclaw_plugin_signing_key') {
+      // 32 字节 hex（64 字符）足以走完 HMAC 流程
+      return '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+    }
+    return null;
+  }),
+}));
 
 // Mock Platform
 jest.mock('react-native', () => ({
@@ -154,22 +173,23 @@ describe('PluginDownloader', () => {
       expect(result).toBe(false);
     });
 
-    it('should allow unsigned in dev mode', async () => {
+    // 审计 S5：无签名 URL 时拒绝插件（不允许 dev 模式放行）
+    it('should reject unsigned plugin (审计 S5)', async () => {
       const pluginWithoutSig: FlowHubPluginInfo = {
         ...mockPluginInfo,
         signatureUrl: '',
       };
 
       const result = await verifySignature(pluginWithoutSig, new ArrayBuffer(10));
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
-    it('should allow unsigned when signature fetch fails', async () => {
-      // Use mockResolvedValue with non-ok response so the !response.ok branch is taken (returns true for dev mode)
+    // 审计 S4：签名获取失败时拒绝插件
+    it('should reject when signature fetch fails (审计 S4)', async () => {
       mockFetch.mockResolvedValueOnce({ ok: false });
 
       const result = await verifySignature(mockPluginInfo, new ArrayBuffer(10));
-      expect(result).toBe(true); // Dev mode allows unsigned
+      expect(result).toBe(false);
     });
   });
 

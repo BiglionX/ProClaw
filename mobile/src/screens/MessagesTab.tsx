@@ -1,6 +1,8 @@
 /**
  * MessagesTab - 消息 Tab
  * 会话列表页，显示所有聊天会话，支持搜索、置顶、标记已读/未读
+ *
+ * 玻璃拟态美学 — 半透明会话项、发光头像、深色渐变底
  */
 import React, { useEffect, useState, useCallback, useLayoutEffect, useMemo } from 'react';
 import {
@@ -13,13 +15,12 @@ import {
 import {
   Text,
   Avatar,
-  useTheme,
   ActivityIndicator,
   Badge,
-  IconButton,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import LinearGradient from 'react-native-linear-gradient';
 import SearchHeaderTitle from '../components/SearchHeaderTitle';
 import {
   togglePin,
@@ -51,7 +52,6 @@ function formatTime(ts: number): string {
 
 export default function MessagesTab() {
   const navigation = useNavigation<any>();
-  const { colors } = useTheme();
   const {
     sessions: allSessions,
     loading,
@@ -155,26 +155,38 @@ export default function MessagesTab() {
 
   const renderSession = ({ item }: { item: ChatSession }) => (
     <TouchableOpacity
-      style={styles.sessionItem}
+      style={[styles.sessionItem, item.is_pinned === 1 && styles.sessionItemPinned]}
       onPress={() => handleSessionPress(item)}
       onLongPress={() => handleTogglePin(item.id)}
       activeOpacity={0.7}
     >
       {/* 头像 */}
       <View style={styles.avatarContainer}>
-        <Avatar.Text
-          size={48}
-          label={item.target_name.charAt(0)}
-          style={{
-            backgroundColor: item.session_type === 'agent' ? '#6366f1'
-              : item.session_type === 'team' ? '#8b5cf6'
-              : '#10b981',
-          }}
-        />
+        <View style={[
+          styles.glassAvatarWrap,
+          {
+            borderColor: item.session_type === 'agent' ? 'rgba(0,210,255,0.5)'
+              : item.session_type === 'team' ? 'rgba(123,47,247,0.5)'
+              : 'rgba(0,245,212,0.5)',
+          },
+        ]}>
+          <Avatar.Text
+            size={42}
+            label={item.target_name.charAt(0)}
+            color="#fff"
+            style={{
+              backgroundColor: item.session_type === 'agent' ? '#00d2ff'
+                : item.session_type === 'team' ? '#7b2ff7'
+                : '#00f5d4',
+            }}
+          />
+        </View>
         {item.unread_count > 0 && (
-          <Badge size={18} style={styles.unreadBadge}>
-            {item.unread_count > 99 ? '99+' : item.unread_count}
-          </Badge>
+          <View style={styles.unreadBadgeWrap}>
+            <Text style={styles.unreadBadgeText}>
+              {item.unread_count > 99 ? '99+' : item.unread_count}
+            </Text>
+          </View>
         )}
       </View>
 
@@ -193,12 +205,7 @@ export default function MessagesTab() {
             {item.last_message || '暂无消息'}
           </Text>
           {item.is_pinned === 1 && (
-            <IconButton
-              icon="pin"
-              size={14}
-              iconColor="#6366f1"
-              style={styles.pinIcon}
-            />
+            <MaterialCommunityIcons name="pin" size={14} color="#00d2ff" style={styles.pinIcon} />
           )}
         </View>
       </View>
@@ -207,10 +214,18 @@ export default function MessagesTab() {
 
   return (
     <View style={styles.container}>
+      {/* 渐变背景 */}
+      <LinearGradient
+        colors={['#0f0c29', '#302b63', '#24243e']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
       {/* 会话列表 */}
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color="#00d2ff" />
         </View>
       ) : (
         <FlatList
@@ -219,11 +234,11 @@ export default function MessagesTab() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d2ff" />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <MaterialCommunityIcons name="chat-outline" size={56} color="#ddd" />
+              <MaterialCommunityIcons name="chat-outline" size={56} color="rgba(255,255,255,0.15)" />
               <Text variant="bodyLarge" style={styles.emptyText}>
                 {searchQuery ? '没有匹配的会话' : '暂无消息'}
               </Text>
@@ -241,7 +256,7 @@ export default function MessagesTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   loader: {
     flex: 1,
@@ -251,25 +266,63 @@ const styles = StyleSheet.create({
   list: {
     paddingVertical: 4,
   },
+
+  // ---- 会话项 ----
   sessionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#f0f0f0',
+    marginHorizontal: 8,
+    marginVertical: 3,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
+  sessionItemPinned: {
+    backgroundColor: 'rgba(0,210,255,0.06)',
+    borderColor: 'rgba(0,210,255,0.15)',
+  },
+
+  // ---- 头像 ----
   avatarContainer: {
     position: 'relative',
     marginRight: 14,
   },
-  unreadBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#ef4444',
-    fontSize: 10,
+  glassAvatarWrap: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
+  unreadBadgeWrap: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ff6b9d',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    shadowColor: '#ff6b9d',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  // ---- 内容 ----
   sessionContent: {
     flex: 1,
   },
@@ -282,13 +335,14 @@ const styles = StyleSheet.create({
   sessionName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: 'rgba(255,255,255,0.92)',
     flex: 1,
     marginRight: 8,
   },
   sessionTime: {
     fontSize: 11,
-    color: '#999',
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '300',
   },
   sessionPreview: {
     flexDirection: 'row',
@@ -296,24 +350,26 @@ const styles = StyleSheet.create({
   },
   previewText: {
     fontSize: 13,
-    color: '#888',
+    color: 'rgba(255,255,255,0.45)',
     flex: 1,
+    fontWeight: '300',
   },
   pinIcon: {
-    margin: 0,
-    padding: 0,
+    marginLeft: 6,
   },
+
+  // ---- 空状态 ----
   empty: {
     alignItems: 'center',
     paddingTop: 100,
   },
   emptyText: {
-    color: '#999',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 16,
     fontWeight: '500',
   },
   emptyHint: {
-    color: '#bbb',
+    color: 'rgba(255,255,255,0.3)',
     marginTop: 6,
   },
 });

@@ -4,6 +4,8 @@
  *   1. 个人联系人（同事/客户/供应商/朋友）
  *   2. AI Agent（小如/CEO/客服）
  *   3. AI Team（从插件数据动态生成）
+ *
+ * 玻璃拟态美学 — 半透明卡片、发光边框、深色渐变底
  */
 import React, { useEffect, useState, useCallback, useMemo, useLayoutEffect } from 'react';
 import {
@@ -14,16 +16,18 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import {
   Text,
-  Card,
   Avatar,
   useTheme,
   ActivityIndicator,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
+import LinearGradient from 'react-native-linear-gradient';
 import SearchHeaderTitle from '../components/SearchHeaderTitle';
 import { getCustomers, Customer, ContactType, CONTACT_TYPE_LABELS } from '../services/ApiService';
 import { isDemoMode } from '../services/AuthService';
@@ -51,10 +55,10 @@ interface ContactSection {
 
 // ============ 常量 ============
 
-const PERSONAL_TYPE_CONFIG: Record<ContactType, { icon: string; color: string; bg: string }> = {
-  colleague: { icon: 'account-tie',       color: '#6366f1', bg: '#e0e7ff' },
-  customer:  { icon: 'account-star',       color: '#10b981', bg: '#d1fae5' },
-  supplier:  { icon: 'truck-delivery',     color: '#f59e0b', bg: '#fef3c7' },
+const PERSONAL_TYPE_CONFIG: Record<ContactType, { icon: string; color: string; glow: string }> = {
+  colleague: { icon: 'account-tie',   color: '#00d2ff', glow: 'rgba(0,210,255,0.25)' },
+  customer:  { icon: 'account-star',   color: '#00f5d4', glow: 'rgba(0,245,212,0.25)' },
+  supplier:  { icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.25)' },
 };
 
 /** 内置 AI Agent 兜底数据 */
@@ -358,28 +362,32 @@ export default function ContactsTab() {
 
   const renderSectionHeader = ({ section }: { section: ContactSection }) => (
     <View style={styles.sectionHeader}>
-      <MaterialCommunityIcons name={section.icon} size={18} color="#6366f1" />
+      <MaterialCommunityIcons name={section.icon} size={18} color="#00d2ff" />
       <Text style={styles.sectionTitle}>{section.title}</Text>
-      <Text style={styles.sectionCount}>{section.data.length}</Text>
+      <View style={styles.sectionCountBadge}>
+        <Text style={styles.sectionCount}>{section.data.length}</Text>
+      </View>
     </View>
   );
 
   const renderPersonalItem = (item: Customer) => {
     const typeCfg = item.contact_type ? PERSONAL_TYPE_CONFIG[item.contact_type] : null;
-    const avatarColor = typeCfg?.color || colors.primary;
+    const avatarColor = typeCfg?.color || '#00d2ff';
     const subtitle = item.company || item.department
       ? (item.company || item.department) + (item.position ? ` · ${item.position}` : '')
       : item.position || '';
 
     return (
-      <Card style={styles.card} onPress={() => handlePersonalPress(item)}>
-        <Card.Content style={styles.cardContent}>
-          <Avatar.Text size={44} label={item.name.charAt(0)} style={{ backgroundColor: avatarColor }} />
+      <TouchableOpacity activeOpacity={0.7} onPress={() => handlePersonalPress(item)} style={styles.glassCard}>
+        <View style={styles.cardContent}>
+          <View style={[styles.glassAvatarWrap, { borderColor: `${avatarColor}66` }]}>
+            <Avatar.Text size={40} label={item.name.charAt(0)} color="#fff" style={{ backgroundColor: avatarColor }} />
+          </View>
           <View style={styles.info}>
             <View style={styles.nameRow}>
               <Text variant="titleSmall" style={styles.name}>{item.name}</Text>
               {item.contact_type && typeCfg && (
-                <View style={[styles.badge, { backgroundColor: typeCfg.bg }]}>
+                <View style={[styles.glassBadge, { backgroundColor: typeCfg.glow, borderColor: `${typeCfg.color}55` }]}>
                   <MaterialCommunityIcons name={typeCfg.icon} size={11} color={typeCfg.color} />
                   <Text style={[styles.badgeText, { color: typeCfg.color }]}>
                     {CONTACT_TYPE_LABELS[item.contact_type]}
@@ -393,15 +401,15 @@ export default function ContactsTab() {
           </View>
           <View style={styles.callActions}>
             <TouchableOpacity
-              style={[styles.callBtn, { backgroundColor: '#e0e7ff' }]}
+              style={[styles.glassCallBtn, { borderColor: `${avatarColor}55` }]}
               onPress={(e) => { e.stopPropagation?.(); handleCall(item, 'audio'); }}
             >
-              <MaterialCommunityIcons name="phone" size={16} color="#6366f1" />
+              <MaterialCommunityIcons name="phone" size={16} color={avatarColor} />
             </TouchableOpacity>
-            <MaterialCommunityIcons name="chevron-right" size={20} color="#e0e0e0" />
+            <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.2)" />
           </View>
-        </Card.Content>
-      </Card>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -409,9 +417,9 @@ export default function ContactsTab() {
     const isOnline = agent.enabled;
     const isSecretary = agent.id === 'secretary';
     return (
-      <Card style={styles.card} onPress={() => handleAgentPress(agent)}>
-        <Card.Content style={styles.cardContent}>
-          <View style={styles.agentAvatar}>
+      <TouchableOpacity activeOpacity={0.7} onPress={() => handleAgentPress(agent)} style={styles.glassCard}>
+        <View style={styles.cardContent}>
+          <View style={styles.agentAvatarWrap}>
             {isSecretary ? (
               <Image
                 source={require('../../assets/avatars/secretary/default.png')}
@@ -420,12 +428,13 @@ export default function ContactsTab() {
               />
             ) : (
               <Avatar.Text
-                size={44}
+                size={40}
                 label={agent.name.charAt(0)}
-                style={{ backgroundColor: isOnline ? '#6366f1' : '#ccc' }}
+                color="#fff"
+                style={{ backgroundColor: isOnline ? '#00d2ff' : '#555' }}
               />
             )}
-            <View style={[styles.statusDot, { backgroundColor: isOnline ? '#10b981' : '#999' }]} />
+            <View style={[styles.statusDot, { backgroundColor: isOnline ? '#00f5d4' : '#666', shadowColor: isOnline ? '#00f5d4' : 'transparent' }]} />
           </View>
           <View style={styles.info}>
             <Text variant="titleSmall" style={styles.name}>{agent.name}</Text>
@@ -433,20 +442,23 @@ export default function ContactsTab() {
               {agent.manifest.description || (isOnline ? '在线' : '离线')}
             </Text>
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={20} color="#e0e0e0" />
-        </Card.Content>
-      </Card>
+          <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.2)" />
+        </View>
+      </TouchableOpacity>
     );
   };
 
   const renderTeamItem = (team: { id: string; name: string; description?: string }) => (
-    <Card style={styles.card} onPress={() => handleTeamPress(team)}>
-      <Card.Content style={styles.cardContent}>
-        <Avatar.Text
-          size={44}
-          label={team.name.charAt(0)}
-          style={{ backgroundColor: '#8b5cf6' }}
-        />
+    <TouchableOpacity activeOpacity={0.7} onPress={() => handleTeamPress(team)} style={styles.glassCard}>
+      <View style={styles.cardContent}>
+        <View style={[styles.glassAvatarWrap, { borderColor: 'rgba(123,47,247,0.4)' }]}>
+          <Avatar.Text
+            size={40}
+            label={team.name.charAt(0)}
+            color="#fff"
+            style={{ backgroundColor: '#7b2ff7' }}
+          />
+        </View>
         <View style={styles.info}>
           <Text variant="titleSmall" style={styles.name}>{team.name}</Text>
           {team.description ? (
@@ -455,9 +467,9 @@ export default function ContactsTab() {
             </Text>
           ) : null}
         </View>
-        <MaterialCommunityIcons name="chevron-right" size={20} color="#e0e0e0" />
-      </Card.Content>
-    </Card>
+        <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.2)" />
+      </View>
+    </TouchableOpacity>
   );
 
   const renderItem = ({ item }: { item: ContactEntry }) => {
@@ -476,17 +488,25 @@ export default function ContactsTab() {
       style={styles.marketLink}
       onPress={() => navigation.navigate('PluginStore')}
     >
-      <MaterialCommunityIcons name="store-plus" size={18} color="#6366f1" />
+      <MaterialCommunityIcons name="store-plus" size={18} color="#00d2ff" />
       <Text style={styles.marketLinkText}>从市场安装更多 AI 团队</Text>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
+      {/* 渐变背景 */}
+      <LinearGradient
+        colors={['#0f0c29', '#302b63', '#24243e']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
       {/* 列表 */}
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color="#00d2ff" />
         </View>
       ) : (
         <SectionList
@@ -503,12 +523,12 @@ export default function ContactsTab() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d2ff" />
           }
           ListFooterComponent={ListFooter}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <MaterialCommunityIcons name="account-search" size={56} color="#ddd" />
+              <MaterialCommunityIcons name="account-search" size={56} color="rgba(255,255,255,0.15)" />
               <Text variant="bodyLarge" style={styles.emptyText}>
                 {searchQuery ? '没有匹配的结果' : '暂无联系人'}
               </Text>
@@ -525,7 +545,7 @@ export default function ContactsTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: 'transparent',
   },
   loader: {
     flex: 1,
@@ -536,65 +556,73 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingBottom: 80,
   },
+
+  // ---- 区头 ----
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 4,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#333',
+    color: 'rgba(255,255,255,0.9)',
     marginLeft: 8,
     flex: 1,
+    letterSpacing: 0.3,
+  },
+  sectionCountBadge: {
+    backgroundColor: 'rgba(0,210,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.25)',
   },
   sectionCount: {
     fontSize: 12,
-    color: '#999',
-    fontWeight: '500',
+    color: '#00d2ff',
+    fontWeight: '600',
   },
-  card: {
-    marginBottom: 6,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    elevation: 1,
+
+  // ---- 玻璃拟态卡片 ----
+  glassCard: {
+    marginBottom: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
   },
-  info: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  nameRow: {
-    flexDirection: 'row',
+
+  // ---- 头像 ----
+  glassAvatarWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,210,255,0.4)',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
+    overflow: 'hidden',
   },
-  name: {
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  subtitle: {
-    color: '#888',
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginLeft: 3,
-  },
-  agentAvatar: {
+  agentAvatarWrap: {
     position: 'relative',
+    width: 46,
+    height: 46,
+  justifyContent: 'center',
+    alignItems: 'center',
   },
   agentAvatarImage: {
     width: 44,
@@ -608,20 +636,65 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#302b63',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 2,
   },
+
+  // ---- 信息 ----
+  info: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  name: {
+    fontWeight: '600',
+    marginRight: 8,
+    color: 'rgba(255,255,255,0.92)',
+  },
+  subtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '300',
+  },
+
+  // ---- 玻璃拟态徽章 ----
+  glassBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 3,
+  },
+
+  // ---- 通话按钮 ----
   callActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  callBtn: {
+  glassCallBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
+    backgroundColor: 'rgba(0,210,255,0.1)',
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  // ---- 底部链接 ----
   marketLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -631,16 +704,18 @@ const styles = StyleSheet.create({
   },
   marketLinkText: {
     fontSize: 13,
-    color: '#6366f1',
+    color: '#00d2ff',
     fontWeight: '500',
     marginLeft: 6,
   },
+
+  // ---- 空状态 ----
   empty: {
     alignItems: 'center',
     paddingTop: 80,
   },
   emptyText: {
-    color: '#999',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 16,
     fontWeight: '500',
   },

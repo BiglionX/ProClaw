@@ -17,6 +17,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { listProfiles, type Profile } from '../services/ProfileManager';
 import { exportProfileData, importProfileData, estimateRowCounts, DEFAULT_EXPORT_TABLES } from '../services/DataExportService';
@@ -128,7 +129,7 @@ const DataTransferScreen: React.FC = () => {
 
       {currentProfile && (
         <View style={styles.targetBadge}>
-          <MaterialCommunityIcons name="arrow-down-circle" size={20} color="#6366f1" />
+          <MaterialCommunityIcons name="arrow-down-circle" size={20} color="#00d2ff" />
           <Text style={styles.targetBadgeText}>
             导入目标：{currentProfile.name}
           </Text>
@@ -146,7 +147,7 @@ const DataTransferScreen: React.FC = () => {
             ]}
             onPress={() => handleSelectSource(item)}
           >
-            <Text style={styles.profileAvatar}>{item.avatar || '👤'}</Text>
+            <Text style={styles.profileAvatar}>{item.avatar || '\uD83D\uDC64'}</Text>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{item.name}</Text>
               <Text style={styles.profileDate}>
@@ -154,14 +155,14 @@ const DataTransferScreen: React.FC = () => {
               </Text>
             </View>
             {selectedSource?.id === item.id && (
-              <MaterialCommunityIcons name="check-circle" size={24} color="#6366f1" />
+              <MaterialCommunityIcons name="check-circle" size={24} color="#00d2ff" />
             )}
           </TouchableOpacity>
         )}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="information-outline" size={48} color="#ccc" />
+          <View style={styles.glassEmptyState}>
+            <MaterialCommunityIcons name="information-outline" size={48} color="rgba(0,210,255,0.3)" />
             <Text style={styles.emptyText}>没有其他身份可供选择</Text>
             <Text style={styles.emptyHint}>请先在身份管理页面创建其他身份</Text>
           </View>
@@ -182,7 +183,7 @@ const DataTransferScreen: React.FC = () => {
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
         <TouchableOpacity onPress={() => setStep('select_profile')}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#6366f1" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#00d2ff" />
         </TouchableOpacity>
         <Text style={styles.stepTitle}>选择要传输的数据表</Text>
       </View>
@@ -191,7 +192,7 @@ const DataTransferScreen: React.FC = () => {
         <MaterialCommunityIcons
           name={selectedTables.size === DEFAULT_EXPORT_TABLES.length ? 'checkbox-marked' : 'checkbox-blank-outline'}
           size={22}
-          color="#6366f1"
+          color="#00d2ff"
         />
         <Text style={styles.selectAllText}>
           {selectedTables.size === DEFAULT_EXPORT_TABLES.length ? '取消全选' : '全选'}
@@ -211,9 +212,9 @@ const DataTransferScreen: React.FC = () => {
               <MaterialCommunityIcons
                 name={selectedTables.has(table.key) ? 'checkbox-marked' : 'checkbox-blank-outline'}
                 size={22}
-                color={selectedTables.has(table.key) ? '#6366f1' : '#ccc'}
+                color={selectedTables.has(table.key) ? '#00d2ff' : 'rgba(255,255,255,0.25)'}
               />
-              <MaterialCommunityIcons name={table.icon as any} size={20} color="#666" style={styles.tableIcon} />
+              <MaterialCommunityIcons name={table.icon as any} size={20} color="rgba(255,255,255,0.5)" style={styles.tableIcon} />
               <Text style={styles.tableLabel}>{table.label}</Text>
               {count !== undefined && (
                 <Text style={styles.tableCount}>{count > 0 ? `${count} 条` : '空'}</Text>
@@ -237,7 +238,7 @@ const DataTransferScreen: React.FC = () => {
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
         <TouchableOpacity onPress={() => setStep('select_tables')}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#6366f1" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#00d2ff" />
         </TouchableOpacity>
         <Text style={styles.stepTitle}>传输配置</Text>
       </View>
@@ -262,7 +263,7 @@ const DataTransferScreen: React.FC = () => {
           <MaterialCommunityIcons
             name={conflictStrategy === option.value ? 'radiobox-marked' : 'radiobox-blank'}
             size={22}
-            color={conflictStrategy === option.value ? '#6366f1' : '#ccc'}
+            color={conflictStrategy === option.value ? '#00d2ff' : 'rgba(255,255,255,0.25)'}
           />
           <View style={styles.optionContent}>
             <Text style={styles.optionLabel}>{option.label}</Text>
@@ -279,10 +280,10 @@ const DataTransferScreen: React.FC = () => {
         <MaterialCommunityIcons
           name={clearBeforeImport ? 'checkbox-marked' : 'checkbox-blank-outline'}
           size={22}
-          color={clearBeforeImport ? '#ef4444' : '#ccc'}
+          color={clearBeforeImport ? '#ff6b9d' : 'rgba(255,255,255,0.25)'}
         />
         <View style={styles.optionContent}>
-          <Text style={[styles.optionLabel, clearBeforeImport && { color: '#ef4444' }]}>
+          <Text style={[styles.optionLabel, clearBeforeImport && { color: '#ff6b9d' }]}>
             导入前清空目标表
           </Text>
           <Text style={styles.optionDesc}>先删除目标身份中的所有数据，再导入（不可恢复）</Text>
@@ -290,7 +291,7 @@ const DataTransferScreen: React.FC = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.primaryButton, { backgroundColor: '#22c55e' }]}
+        style={[styles.primaryButton, { backgroundColor: 'rgba(0,245,212,0.25)', borderColor: 'rgba(0,245,212,0.4)' }]}
         onPress={handleExecute}
       >
         <Text style={styles.primaryButtonText}>开始传输</Text>
@@ -300,7 +301,7 @@ const DataTransferScreen: React.FC = () => {
 
   const renderProgressStep = () => (
     <View style={[styles.stepContainer, styles.centerStep]}>
-      <ActivityIndicator size="large" color="#6366f1" />
+      <ActivityIndicator size="large" color="#00d2ff" />
       <Text style={styles.progressTitle}>正在传输数据...</Text>
       <Text style={styles.progressMessage}>{progress.message}</Text>
     </View>
@@ -311,7 +312,7 @@ const DataTransferScreen: React.FC = () => {
       <MaterialCommunityIcons
         name={result && result.errors.length === 0 ? 'check-circle' : 'alert-circle'}
         size={64}
-        color={result && result.errors.length === 0 ? '#22c55e' : '#f59e0b'}
+        color={result && result.errors.length === 0 ? '#00f5d4' : '#ff6b9d'}
       />
       <Text style={styles.resultTitle}>
         {result && result.errors.length === 0 ? '传输完成' : '传输完成（有警告）'}
@@ -328,8 +329,8 @@ const DataTransferScreen: React.FC = () => {
         </View>
         {result && result.errors.length > 0 && (
           <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: '#ef4444' }]}>错误</Text>
-            <Text style={[styles.resultValue, { color: '#ef4444' }]}>{result.errors.length} 条</Text>
+            <Text style={[styles.resultLabel, { color: '#ff6b9d' }]}>错误</Text>
+            <Text style={[styles.resultValue, { color: '#ff6b9d' }]}>{result.errors.length} 条</Text>
           </View>
         )}
       </View>
@@ -356,10 +357,11 @@ const DataTransferScreen: React.FC = () => {
   );
 
   return (
+    <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* 步骤指示器 */}
-        <View style={styles.stepsIndicator}>
+        <View style={styles.glassStepsIndicator}>
           {['select_profile', 'select_tables', 'configure', 'progress', 'result'].map((s, idx) => {
             const stepNames = ['选择身份', '选择表', '配置', '传输', '完成'];
             const isActive = step === s;
@@ -368,7 +370,7 @@ const DataTransferScreen: React.FC = () => {
               <View key={s} style={styles.stepDotRow}>
                 <View style={[styles.stepDot, isActive && styles.stepDotActive, isDone && styles.stepDotDone]}>
                   <Text style={[styles.stepDotText, (isActive || isDone) && styles.stepDotTextActive]}>
-                    {isDone ? '✓' : idx + 1}
+                    {isDone ? '\u2713' : idx + 1}
                   </Text>
                 </View>
                 <Text style={[styles.stepDotLabel, isActive && styles.stepDotLabelActive]}>
@@ -387,27 +389,27 @@ const DataTransferScreen: React.FC = () => {
         {step === 'result' && renderResultStep()}
       </ScrollView>
     </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9ff',
   },
   content: {
     flexGrow: 1,
     paddingBottom: 40,
   },
-  stepsIndicator: {
+  glassStepsIndicator: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 20,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   stepDotRow: {
     flexDirection: 'row',
@@ -417,42 +419,42 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepDotActive: {
-    backgroundColor: '#6366f1',
+    backgroundColor: '#00d2ff',
   },
   stepDotDone: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#00f5d4',
   },
   stepDotText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#999',
+    color: 'rgba(255,255,255,0.4)',
   },
   stepDotTextActive: {
     color: '#fff',
   },
   stepDotLabel: {
     fontSize: 11,
-    color: '#999',
+    color: 'rgba(255,255,255,0.35)',
     marginLeft: 4,
     minWidth: 36,
   },
   stepDotLabelActive: {
-    color: '#6366f1',
+    color: '#00d2ff',
     fontWeight: '600',
   },
   stepLine: {
     width: 20,
     height: 2,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     marginHorizontal: 4,
   },
   stepLineDone: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#00f5d4',
   },
   stepContainer: {
     padding: 20,
@@ -470,27 +472,29 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.95)',
     marginBottom: 8,
     marginLeft: 12,
   },
   stepSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.45)',
     marginBottom: 20,
     lineHeight: 20,
   },
   targetBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0ff',
+    backgroundColor: 'rgba(0,210,255,0.1)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.25)',
   },
   targetBadgeText: {
     fontSize: 14,
-    color: '#6366f1',
+    color: '#00d2ff',
     fontWeight: '500',
     marginLeft: 8,
   },
@@ -500,21 +504,16 @@ const styles = StyleSheet.create({
   profileItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   profileItemSelected: {
-    borderColor: '#6366f1',
-    backgroundColor: '#f8f8ff',
+    borderColor: '#00d2ff',
+    backgroundColor: 'rgba(0,210,255,0.08)',
   },
   profileAvatar: {
     fontSize: 32,
@@ -526,47 +525,47 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.9)',
   },
   profileDate: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255,255,255,0.35)',
     marginTop: 2,
   },
-  emptyState: {
+  glassEmptyState: {
     alignItems: 'center',
     paddingVertical: 40,
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 12,
   },
   emptyHint: {
     fontSize: 13,
-    color: '#ccc',
+    color: 'rgba(255,255,255,0.3)',
     marginTop: 4,
   },
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f8ff',
+    backgroundColor: 'rgba(0,210,255,0.08)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0e0ff',
+    borderColor: 'rgba(0,210,255,0.2)',
   },
   selectAllText: {
     fontSize: 14,
-    color: '#6366f1',
+    color: '#00d2ff',
     fontWeight: '500',
     marginLeft: 8,
     flex: 1,
   },
   selectAllCount: {
     fontSize: 13,
-    color: '#999',
+    color: 'rgba(255,255,255,0.4)',
   },
   tableList: {
     maxHeight: 400,
@@ -574,12 +573,12 @@ const styles = StyleSheet.create({
   tableItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 10,
     padding: 14,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   tableIcon: {
     marginLeft: 10,
@@ -587,20 +586,27 @@ const styles = StyleSheet.create({
   },
   tableLabel: {
     fontSize: 15,
-    color: '#333',
+    color: 'rgba(255,255,255,0.8)',
     flex: 1,
   },
   tableCount: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255,255,255,0.35)',
     marginLeft: 8,
   },
   primaryButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: 'rgba(0,210,255,0.25)',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.4)',
+    shadowColor: '#00d2ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   primaryButtonText: {
     fontSize: 16,
@@ -608,41 +614,42 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   buttonDisabled: {
-    backgroundColor: '#b1b3f1',
-  },
+    backgroundColor: 'rgba(0,210,255,0.08)',
+    borderColor: 'rgba(0,210,255,0.15)',
+    },
   configSummary: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(0,210,255,0.08)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: '#00d2ff',
   },
   configSummaryText: {
     fontSize: 14,
-    color: '#333',
+    color: 'rgba(255,255,255,0.7)',
     lineHeight: 20,
   },
   configHighlight: {
     fontWeight: '700',
-    color: '#6366f1',
+    color: '#00d2ff',
   },
   configSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: 12,
     marginTop: 8,
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 10,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   optionContent: {
     flex: 1,
@@ -651,38 +658,40 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#333',
+    color: 'rgba(255,255,255,0.8)',
   },
   optionDesc: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255,255,255,0.35)',
     marginTop: 2,
     lineHeight: 16,
   },
   progressTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.9)',
     marginTop: 20,
   },
   progressMessage: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 8,
   },
   resultTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.95)',
     marginTop: 16,
   },
   resultCard: {
     width: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
     padding: 16,
     marginTop: 20,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   resultRow: {
     flexDirection: 'row',
@@ -690,16 +699,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   resultLabel: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
   },
   resultValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.85)',
   },
   errorList: {
     maxHeight: 120,
@@ -707,7 +716,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    color: '#ef4444',
+    color: '#ff6b9d',
     marginBottom: 4,
   },
 });

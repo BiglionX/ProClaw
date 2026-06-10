@@ -1,6 +1,8 @@
 /**
  * ChatDetailScreen - 消息详情/聊天页
  * 显示某会话的全部消息，支持发送新消息
+ *
+ * 玻璃拟态美学 — 毛玻璃气泡、深色渐变底、磨砂输入栏
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -12,9 +14,10 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
-import { Text, useTheme, ActivityIndicator, Surface } from 'react-native-paper';
+import { Text, ActivityIndicator } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import LinearGradient from 'react-native-linear-gradient';
 import { getMessages, sendMessage, createOrGetSession, type ChatMessage } from '../services/ChatService';
 import { chatWithAgentStream } from '../services/AIService';
 import { useChatStore } from '../stores/ChatStore';
@@ -32,7 +35,6 @@ type ChatParams = {
 export default function ChatDetailScreen() {
   const route = useRoute<RouteProp<ChatParams, 'ChatDetail'>>();
   const navigation = useNavigation<any>();
-  const { colors } = useTheme();
   const { sessionId: initialSessionId, targetId, targetName, targetType, targetIcon } = route.params;
   const flatListRef = useRef<FlatList>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
@@ -208,14 +210,14 @@ export default function ChatDetailScreen() {
         ]}
       >
         {isSystem ? (
-          <View style={styles.systemMsg}>
+          <View style={styles.glassSystemMsg}>
             <Text style={styles.systemMsgText}>{item.content}</Text>
           </View>
         ) : (
           <View
             style={[
               styles.msgBubble,
-              isSelf ? styles.msgBubbleSelf : styles.msgBubbleOther,
+              isSelf ? styles.glassBubbleSelf : styles.glassBubbleOther,
             ]}
           >
             <Text style={[styles.msgText, isSelf && styles.msgTextSelf]}>
@@ -233,7 +235,7 @@ export default function ChatDetailScreen() {
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color="#00d2ff" />
       </View>
     );
   }
@@ -244,10 +246,18 @@ export default function ChatDetailScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {/* 渐变背景 */}
+      <LinearGradient
+        colors={['#0f0c29', '#302b63', '#24243e']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
       {/* 消息列表 */}
       {messages.length === 0 ? (
         <View style={styles.empty}>
-          <MaterialCommunityIcons name="chat-plus-outline" size={48} color="#ddd" />
+          <MaterialCommunityIcons name="chat-plus-outline" size={48} color="rgba(255,255,255,0.15)" />
           <Text style={styles.emptyText}>开始对话吧</Text>
         </View>
       ) : (
@@ -266,26 +276,26 @@ export default function ChatDetailScreen() {
       {/* AI 思考中指示器 */}
       {aiThinking && (
         <View style={styles.thinkingBar}>
-          <ActivityIndicator size="small" color="#6366f1" />
+          <ActivityIndicator size="small" color="#00d2ff" />
           <Text style={styles.thinkingText}>AI 正在思考...</Text>
         </View>
       )}
 
-      {/* 输入栏 */}
-      <Surface style={styles.inputBar}>
+      {/* 玻璃拟态输入栏 */}
+      <View style={styles.glassInputBar}>
         <TextInput
-          style={styles.textInput}
+          style={styles.glassTextInput}
           value={inputText}
           onChangeText={setInputText}
           placeholder="输入消息..."
-          placeholderTextColor="#aaa"
+          placeholderTextColor="rgba(255,255,255,0.35)"
           multiline
           maxLength={2000}
           returnKeyType="send"
           onSubmitEditing={handleSend}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+          style={[styles.glassSendBtn, !inputText.trim() && styles.glassSendBtnDisabled]}
           onPress={handleSend}
           disabled={!inputText.trim() || sending}
           activeOpacity={0.7}
@@ -293,10 +303,10 @@ export default function ChatDetailScreen() {
           <MaterialCommunityIcons
             name={sending ? 'loading' : 'send'}
             size={20}
-            color={inputText.trim() ? '#fff' : '#ccc'}
+            color={inputText.trim() ? '#fff' : 'rgba(255,255,255,0.3)'}
           />
         </TouchableOpacity>
-      </Surface>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -304,17 +314,20 @@ export default function ChatDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'transparent',
   },
   loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#24243e',
   },
   msgList: {
     padding: 16,
     paddingBottom: 8,
   },
+
+  // ---- 消息行 ----
   msgRow: {
     marginBottom: 12,
     flexDirection: 'row',
@@ -328,103 +341,138 @@ const styles = StyleSheet.create({
   msgRowSystem: {
     justifyContent: 'center',
   },
+
+  // ---- 玻璃拟态气泡 ----
   msgBubble: {
     maxWidth: '75%',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 16,
+    borderRadius: 20,
   },
-  msgBubbleSelf: {
-    backgroundColor: '#6366f1',
-    borderBottomRightRadius: 4,
+  glassBubbleSelf: {
+    backgroundColor: 'rgba(0,210,255,0.2)',
+    borderBottomRightRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.35)',
+    shadowColor: '#00d2ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  msgBubbleOther: {
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+  glassBubbleOther: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderBottomLeftRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
   },
   msgText: {
     fontSize: 15,
-    color: '#1a1a1a',
-    lineHeight: 20,
+    color: 'rgba(255,255,255,0.92)',
+    lineHeight: 22,
+    fontWeight: '400',
   },
   msgTextSelf: {
     color: '#fff',
+    fontWeight: '500',
   },
   msgTime: {
     fontSize: 10,
-    color: '#999',
+    color: 'rgba(255,255,255,0.35)',
     marginTop: 4,
     textAlign: 'right',
+    fontWeight: '300',
   },
   msgTimeSelf: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.6)',
   },
-  systemMsg: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    paddingHorizontal: 12,
+
+  // ---- 系统消息 ----
+  glassSystemMsg: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 16,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   systemMsgText: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255,255,255,0.45)',
     textAlign: 'center',
+    fontWeight: '300',
   },
+
+  // ---- 空状态 ----
   empty: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyText: {
-    color: '#bbb',
+    color: 'rgba(255,255,255,0.4)',
     marginTop: 12,
     fontSize: 14,
   },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e0e0e0',
-    elevation: 4,
-  },
-  textInput: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#1a1a1a',
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6366f1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  sendBtnDisabled: {
-    backgroundColor: '#e0e0e0',
-  },
+
+  // ---- 思考条 ----
   thinkingBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#f0f0ff',
+    backgroundColor: 'rgba(0,210,255,0.06)',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e0e0ff',
+    borderTopColor: 'rgba(0,210,255,0.15)',
   },
   thinkingText: {
     fontSize: 13,
-    color: '#6366f1',
+    color: '#00d2ff',
     marginLeft: 8,
+    fontWeight: '400',
+  },
+
+  // ---- 玻璃拟态输入栏 ----
+  glassInputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  glassTextInput: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 100,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  glassSendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,210,255,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  glassSendBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
 });

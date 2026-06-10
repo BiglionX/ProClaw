@@ -12,6 +12,10 @@ import {
 import wsService from './WebSocketService';
 import { useCallStore, CallType } from '../stores/CallStore';
 
+// 审计 M6：明确类型定义
+// RTCSessionDescriptionInit 为 DOM lib 全局类型，type 字段约束为 RTCSdpType 字面量
+type OfferPayload = RTCSessionDescriptionInit;
+
 // 审计 D5：Web 平台不支持 WebRTC，提前检测
 const isWebRTCSupported = (): boolean => {
   return Platform.OS !== 'web' && typeof RTCPeerConnection === 'function';
@@ -386,7 +390,8 @@ class CallManager {
   // ============================================================
 
   // 审计 M6：明确类型定义
-  private pendingOffer: { sdp: string; type: string } | null = null;
+  // 使用 RTCSessionDescriptionInit（Web 标准）确保 type 字段为 RTCSdpType 字面量
+  private pendingOffer: OfferPayload | null = null;
 
   private async createPeerConnection(sessionId: string, callType: CallType, isCaller: boolean): Promise<void> {
     const config = {

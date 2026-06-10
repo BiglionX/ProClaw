@@ -7,14 +7,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import {
   Text,
-  Card,
   Avatar,
-  Divider,
-  useTheme,
   ActivityIndicator,
-  List,
-  Chip,
 } from 'react-native-paper';
+import LinearGradient from 'react-native-linear-gradient';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
@@ -35,25 +31,25 @@ interface QuickAction {
   label: string;
   icon: string;
   color: string;
-  bg: string;
+  glow: string;
   navigateTo: string;
   params?: any;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'products', label: '商品目录', icon: 'package-variant-closed', color: '#6366f1', bg: '#e0e7ff', navigateTo: 'Products' },
-  { id: 'sales', label: '创建销售单', icon: 'clipboard-text', color: '#10b981', bg: '#d1fae5', navigateTo: 'SalesOrder' },
-  { id: 'supply', label: '采购入库', icon: 'truck-delivery', color: '#f59e0b', bg: '#fef3c7', navigateTo: 'SupplyChain' },
-  { id: 'calls', label: '通话记录', icon: 'phone-classic', color: '#ef4444', bg: '#fee2e2', navigateTo: 'CallHistory' },
-  { id: 'lansync', label: '局域网同步', icon: 'wifi', color: '#06b6d4', bg: '#cffafe', navigateTo: 'LanSync' },
-  { id: 'backup', label: '云备份', icon: 'cloud-upload', color: '#8b5cf6', bg: '#ede9fe', navigateTo: 'BackupWallet' },
+  { id: 'products', label: '商品目录', icon: 'package-variant-closed', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'Products' },
+  { id: 'sales', label: '创建销售单', icon: 'clipboard-text', color: '#00f5d4', glow: 'rgba(0,245,212,0.2)', navigateTo: 'SalesOrder' },
+  { id: 'supply', label: '采购入库', icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.2)', navigateTo: 'SupplyChain' },
+  { id: 'calls', label: '通话记录', icon: 'phone-classic', color: '#7b2ff7', glow: 'rgba(123,47,247,0.2)', navigateTo: 'CallHistory' },
+  { id: 'lansync', label: '局域网同步', icon: 'wifi', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'LanSync' },
+  { id: 'backup', label: '云备份', icon: 'cloud-upload', color: '#7b2ff7', glow: 'rgba(123,47,247,0.2)', navigateTo: 'BackupWallet' },
 ];
 
 // ============ 组件 ============
 
 export default function ProfileTab() {
   const navigation = useNavigation<any>();
-  const { colors } = useTheme();
+  // theme removed for glassmorphism
 
   // 看板数据
   const [connectionStatus, setConnectionStatus] = useState<ConnectionMode>('checking');
@@ -122,7 +118,7 @@ export default function ProfileTab() {
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color="#00d2ff" />
       </View>
     );
   }
@@ -130,63 +126,68 @@ export default function ProfileTab() {
   const statusCfg = getStatusCfg();
 
   return (
+    <LinearGradient
+      colors={['#0f0c29', '#302b63', '#24243e']}
+      style={{ flex: 1 }}
+    >
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* ============ 顶部身份卡片 ============ */}
-      <Card style={styles.identityCard}>
-        <Card.Content style={styles.identityContent}>
-          <Avatar.Text size={56} label={profileAvatar} style={{ backgroundColor: colors.primary }} />
+      <View style={styles.glassIdentityCard}>
+        <View style={styles.identityContent}>
+          <View style={styles.glassAvatarWrap}>
+            <Avatar.Text size={56} label={profileAvatar} style={{ backgroundColor: 'rgba(0,210,255,0.25)' }} />
+          </View>
           <View style={styles.identityInfo}>
             <Text variant="titleMedium" style={styles.identityName}>{profileName}</Text>
             <View style={styles.identityBadgeRow}>
-              <Chip
-                icon={() => <MaterialCommunityIcons name={statusCfg.icon} size={14} color="#fff" />}
-                style={[styles.statusChip, { backgroundColor: statusCfg.color }]}
-                textStyle={styles.statusChipText}
-              >
-                {statusCfg.label}{latency > 0 ? ` ${latency}ms` : ''}
-              </Chip>
+              <View style={[styles.glassStatusChip, { backgroundColor: statusCfg.color }]}>
+                <MaterialCommunityIcons name={statusCfg.icon} size={12} color="#fff" style={{marginRight:4}} />
+                <Text style={styles.statusChipText}>
+                  {statusCfg.label}{latency > 0 ? ` ${latency}ms` : ''}
+                </Text>
+              </View>
             </View>
           </View>
           <TouchableOpacity
             style={styles.switchBtn}
             onPress={() => navigation.navigate('IdentityManage')}
           >
-            <MaterialCommunityIcons name="account-switch" size={16} color="#6366f1" style={{marginRight:4}} />
+            <MaterialCommunityIcons name="account-switch" size={16} color="#00d2ff" style={{marginRight:4}} />
             <Text style={styles.switchBtnText}>身份管理</Text>
-            <MaterialCommunityIcons name="chevron-right" size={18} color="#6366f1" />
+            <MaterialCommunityIcons name="chevron-right" size={18} color="#00d2ff" />
           </TouchableOpacity>
-        </Card.Content>
-      </Card>
+        </View>
+      </View>
 
       {/* ============ 数据概览 ============ */}
       <View style={styles.statsGrid}>
-        <Card style={styles.statCard} onPress={() => navigation.navigate('Products')}>
-          <Card.Content style={styles.statContent}>
-            <View style={[styles.statIcon, { backgroundColor: '#e0e7ff' }]}>
-              <MaterialCommunityIcons name="package-variant" size={22} color={colors.primary} />
+        <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('Products')} activeOpacity={0.7}>
+          <View style={styles.statContent}>
+            <View style={[styles.glassStatIcon, { backgroundColor: 'rgba(0,210,255,0.15)' }]}>
+              <MaterialCommunityIcons name="package-variant" size={22} color="#00d2ff" />
             </View>
             <Text variant="headlineSmall" style={styles.statValue}>{productCount}</Text>
             <Text style={styles.statLabel}>商品</Text>
-          </Card.Content>
-        </Card>
-        <Card style={styles.statCard} onPress={() => navigation.navigate('Contacts')}>
-          <Card.Content style={styles.statContent}>
-            <View style={[styles.statIcon, { backgroundColor: '#d1fae5' }]}>
-              <MaterialCommunityIcons name="account-group" size={22} color="#10b981" />
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('Contacts')} activeOpacity={0.7}>
+          <View style={styles.statContent}>
+            <View style={[styles.glassStatIcon, { backgroundColor: 'rgba(0,245,212,0.15)' }]}>
+              <MaterialCommunityIcons name="account-group" size={22} color="#00f5d4" />
             </View>
             <Text variant="headlineSmall" style={styles.statValue}>{customerCount}</Text>
             <Text style={styles.statLabel}>联系人</Text>
-          </Card.Content>
-        </Card>
-        <Card style={styles.statCard} onPress={() => navigation.navigate('SalesOrder')}>
-          <Card.Content style={styles.statContent}>
-            <View style={[styles.statIcon, { backgroundColor: '#fef3c7' }]}>
-              <MaterialCommunityIcons name="receipt" size={22} color="#f59e0b" />
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('SalesOrder')} activeOpacity={0.7}>
+          <View style={styles.statContent}>
+            <View style={[styles.glassStatIcon, { backgroundColor: 'rgba(123,47,247,0.15)' }]}>
+              <MaterialCommunityIcons name="receipt" size={22} color="#7b2ff7" />
             </View>
             <Text variant="headlineSmall" style={styles.statValue}>{installedPlugins.length}</Text>
             <Text style={styles.statLabel}>插件</Text>
-          </Card.Content>
-        </Card>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* ============ 快捷操作 ============ */}
@@ -195,11 +196,11 @@ export default function ProfileTab() {
         {QUICK_ACTIONS.map((action) => (
           <TouchableOpacity
             key={action.id}
-            style={styles.actionItem}
+            style={styles.glassActionItem}
             onPress={() => navigation.navigate(action.navigateTo, action.params)}
             activeOpacity={0.7}
           >
-            <View style={[styles.actionIcon, { backgroundColor: action.bg }]}>
+            <View style={[styles.glassActionIcon, { backgroundColor: action.glow }]}>
               <MaterialCommunityIcons name={action.icon} size={24} color={action.color} />
             </View>
             <Text style={styles.actionLabel} numberOfLines={1}>{action.label}</Text>
@@ -211,22 +212,22 @@ export default function ProfileTab() {
       <Text style={styles.sectionLabel}>数据管理</Text>
       <View style={styles.actionGrid}>
         <TouchableOpacity
-          style={styles.actionItem}
+          style={styles.glassActionItem}
           onPress={() => navigation.navigate('DataTransfer')}
           activeOpacity={0.7}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#f3e8ff' }]}>
-            <MaterialCommunityIcons name="swap-horizontal-bold" size={24} color="#8b5cf6" />
+          <View style={[styles.glassActionIcon, { backgroundColor: 'rgba(123,47,247,0.2)' }]}>
+            <MaterialCommunityIcons name="swap-horizontal-bold" size={24} color="#7b2ff7" />
           </View>
           <Text style={styles.actionLabel}>跨身份数据传输</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.actionItem}
+          style={styles.glassActionItem}
           onPress={() => navigation.navigate('LanSync')}
           activeOpacity={0.7}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#fff7ed' }]}>
-            <MaterialCommunityIcons name="sync" size={24} color="#f97316" />
+          <View style={[styles.glassActionIcon, { backgroundColor: 'rgba(0,210,255,0.2)' }]}>
+            <MaterialCommunityIcons name="sync" size={24} color="#00d2ff" />
           </View>
           <Text style={styles.actionLabel}>数据同步</Text>
         </TouchableOpacity>
@@ -236,50 +237,72 @@ export default function ProfileTab() {
       {installedPlugins.length > 0 && (
         <>
           <Text style={styles.sectionLabel}>已装插件 ({installedPlugins.length})</Text>
-          <List.Section style={styles.settingsSection}>
+          <View style={styles.glassPluginSection}>
             {installedPlugins.map((plugin, idx) => {
               const manifest = parseManifest(plugin.manifestJson);
               return (
                 <React.Fragment key={plugin.id}>
-                  {idx > 0 && <Divider />}
-                  <List.Item
-                    title={manifest?.name || plugin.name}
-                    description={`v${plugin.version}`}
-                    left={() => <List.Icon icon="puzzle" />}
-                    right={() => <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />}
+                  {idx > 0 && <View style={styles.glassDivider} />}
+                  <TouchableOpacity
+                    style={styles.glassPluginItem}
                     onPress={() => navigation.navigate('PluginPage', {
                       pluginId: plugin.id,
                       pluginTitle: manifest?.name || plugin.name,
                     })}
-                  />
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.glassPluginIcon}>
+                      <MaterialCommunityIcons name="puzzle" size={20} color="#00d2ff" />
+                    </View>
+                    <View style={{flex:1}}>
+                      <Text style={styles.glassPluginName}>{manifest?.name || plugin.name}</Text>
+                      <Text style={styles.glassPluginVersion}>{`v${plugin.version}`}</Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.3)" />
+                  </TouchableOpacity>
                 </React.Fragment>
               );
             })}
-          </List.Section>
+          </View>
         </>
       )}
 
-      {/* ============ 退出登录 ============ */}
+      {/* ============ 底部版本 ============ */}
       <View style={styles.footer}>
         <Text style={styles.versionText}>ProClaw Mobile v1.0.0</Text>
       </View>
     </ScrollView>
+    </LinearGradient>
   );
 }
 
 // ============ 样式 ============
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f8f8' },
+  container: { flex: 1 },
   content: { paddingBottom: 40 },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f0c29' },
 
   // 身份卡片
-  identityCard: {
+  glassIdentityCard: {
     margin: 16,
     marginBottom: 4,
-    borderRadius: 14,
-    backgroundColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  glassAvatarWrap: {
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: 'rgba(0,210,255,0.4)',
+    padding: 2,
   },
   identityContent: {
     flexDirection: 'row',
@@ -291,15 +314,20 @@ const styles = StyleSheet.create({
   },
   identityName: {
     fontWeight: '700',
+    color: 'rgba(255,255,255,0.95)',
   },
   identityBadgeRow: {
     flexDirection: 'row',
     marginTop: 6,
     alignItems: 'center',
   },
-  statusChip: {
+  glassStatusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 16,
     height: 26,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
   },
   statusChipText: {
     color: '#fff',
@@ -311,10 +339,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,210,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.25)',
   },
   switchBtnText: {
     fontSize: 13,
-    color: '#6366f1',
+    color: '#00d2ff',
     fontWeight: '500',
   },
 
@@ -325,16 +357,23 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 10,
   },
-  statCard: {
+  glassStatCard: {
     flex: 1,
     borderRadius: 14,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   statContent: {
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 14,
   },
-  statIcon: {
+  glassStatIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -344,11 +383,11 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontWeight: '700',
-    color: '#333',
+    color: 'rgba(255,255,255,0.95)',
   },
   statLabel: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 2,
   },
 
@@ -356,7 +395,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: 'rgba(255,255,255,0.6)',
     marginTop: 20,
     marginHorizontal: 16,
     marginBottom: 10,
@@ -367,16 +406,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     gap: 8,
   },
-  actionItem: {
+  glassActionItem: {
     width: '30%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
     padding: 12,
     alignItems: 'center',
     minWidth: 100,
     flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  actionIcon: {
+  glassActionIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -387,16 +428,47 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#333',
+    color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
   },
 
-  // 设置
-  settingsSection: {
-    backgroundColor: '#fff',
+  // 插件列表
+  glassPluginSection: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 14,
     marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
+  },
+  glassDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  glassPluginItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  glassPluginIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,210,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  glassPluginName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.85)',
+  },
+  glassPluginVersion: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 1,
   },
 
   // 退出
@@ -410,7 +482,7 @@ const styles = StyleSheet.create({
   },
   versionText: {
     textAlign: 'center',
-    color: '#999',
+    color: 'rgba(255,255,255,0.3)',
     fontSize: 12,
   },
 });

@@ -1,18 +1,19 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { Text, Searchbar, Card, Avatar, useTheme, ActivityIndicator, FAB } from 'react-native-paper';
+import { View, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
+import { Text, Avatar, useTheme, ActivityIndicator } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
+import LinearGradient from 'react-native-linear-gradient';
 import { getCustomers, Customer, ContactType, CONTACT_TYPE_LABELS } from '../services/ApiService';
 import { isDemoMode } from '../services/AuthService';
 import { showToast } from '../components/Toast';
 import { useCallStore } from '../stores/CallStore';
 
-const TYPE_CONFIG: Record<ContactType, { icon: string; color: string; bg: string }> = {
-  colleague:   { icon: 'account-tie',       color: '#6366f1', bg: '#e0e7ff' },
-  customer:    { icon: 'account-star',       color: '#10b981', bg: '#d1fae5' },
-  supplier:    { icon: 'truck-delivery',     color: '#f59e0b', bg: '#fef3c7' },
+const TYPE_CONFIG: Record<ContactType, { icon: string; color: string; glow: string }> = {
+  colleague:   { icon: 'account-tie',   color: '#00d2ff', glow: 'rgba(0,210,255,0.25)' },
+  customer:    { icon: 'account-star',   color: '#00f5d4', glow: 'rgba(0,245,212,0.25)' },
+  supplier:    { icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.25)' },
 };
 
 const DEMO_CONTACTS: Customer[] = [
@@ -108,12 +109,12 @@ const ContactsScreen: React.FC = () => {
 
   const getSwipeAction = (item: Customer) => {
     if (item.contact_type === 'colleague') {
-      return { icon: 'message-text', label: '消息', color: '#6366f1' };
+      return { icon: 'message-text', label: '消息', color: '#00d2ff' };
     }
     if (item.contact_type === 'supplier') {
-      return { icon: 'cart-arrow-down', label: '采购', color: '#f59e0b' };
+      return { icon: 'cart-arrow-down', label: '采购', color: '#ff6b9d' };
     }
-    return { icon: 'clipboard-text', label: '下单', color: '#10b981' };
+    return { icon: 'clipboard-text', label: '下单', color: '#00f5d4' };
   };
 
   const renderRightActions = (item: Customer) => {
@@ -132,7 +133,7 @@ const ContactsScreen: React.FC = () => {
     if (!type) return null;
     const cfg = TYPE_CONFIG[type];
     return (
-      <View style={[styles.typeBadge, { backgroundColor: cfg.bg }]}>
+      <View style={[styles.glassBadge, { backgroundColor: cfg.glow, borderColor: `${cfg.color}55` }]}>
         <MaterialCommunityIcons name={cfg.icon} size={12} color={cfg.color} />
         <Text style={[styles.typeBadgeText, { color: cfg.color }]}>
           {CONTACT_TYPE_LABELS[type]}
@@ -176,7 +177,7 @@ const ContactsScreen: React.FC = () => {
 
   const renderContact = ({ item }: { item: Customer }) => {
     const typeCfg = item.contact_type ? TYPE_CONFIG[item.contact_type] : null;
-    const avatarColor = typeCfg?.color || colors.primary;
+    const avatarColor = typeCfg?.color || '#00d2ff';
     const subtitle = item.company || item.department
       ? (item.company || item.department) + (item.position ? ` · ${item.position}` : '')
       : item.position || '';
@@ -186,21 +187,24 @@ const ContactsScreen: React.FC = () => {
 
     return (
       <Swipeable renderRightActions={() => renderRightActions(item)}>
-        <Card style={styles.card} onPress={() => handleCardPress(item)}>
-          <Card.Content style={styles.cardContent}>
-            <Avatar.Text
-              size={44}
-              label={item.name.charAt(0)}
-              style={{ backgroundColor: avatarColor }}
-            />
+        <TouchableOpacity activeOpacity={0.7} onPress={() => handleCardPress(item)} style={styles.glassCard}>
+          <View style={styles.cardContent}>
+            <View style={[styles.glassAvatarWrap, { borderColor: `${avatarColor}66` }]}>
+              <Avatar.Text
+                size={40}
+                label={item.name.charAt(0)}
+                color="#fff"
+                style={{ backgroundColor: avatarColor }}
+              />
+            </View>
             <View style={styles.info}>
               <View style={styles.nameRow}>
                 <Text variant="titleSmall" style={styles.name}>{item.name}</Text>
                 {renderTypeBadge(item.contact_type)}
                 {isInvited && (
-                  <View style={[styles.typeBadge, { backgroundColor: '#ede9fe' }]}>
-                    <MaterialCommunityIcons name="link-variant" size={10} color="#8b5cf6" />
-                    <Text style={[styles.typeBadgeText, { color: '#8b5cf6' }]}>邀请</Text>
+                  <View style={[styles.glassBadge, { backgroundColor: 'rgba(123,47,247,0.2)', borderColor: 'rgba(123,47,247,0.35)' }]}>
+                    <MaterialCommunityIcons name="link-variant" size={10} color="#7b2ff7" />
+                    <Text style={[styles.typeBadgeText, { color: '#7b2ff7' }]}>邀请</Text>
                   </View>
                 )}
               </View>
@@ -212,13 +216,13 @@ const ContactsScreen: React.FC = () => {
               <View style={styles.detailRow}>
                 {item.phone && (
                   <>
-                    <MaterialCommunityIcons name="phone" size={13} color="#999" style={styles.detailIcon} />
+                    <MaterialCommunityIcons name="phone" size={13} color="rgba(255,255,255,0.4)" style={styles.detailIcon} />
                     <Text variant="bodySmall" style={styles.detail}>{item.phone}</Text>
                   </>
                 )}
                 {item.email && (
                   <>
-                    <MaterialCommunityIcons name="email-outline" size={13} color="#999" style={[styles.detailIcon, item.phone ? { marginLeft: 12 } : {}]} />
+                    <MaterialCommunityIcons name="email-outline" size={13} color="rgba(255,255,255,0.4)" style={[styles.detailIcon, item.phone ? { marginLeft: 12 } : {}]} />
                     <Text variant="bodySmall" style={styles.detail}>{item.email}</Text>
                   </>
                 )}
@@ -227,40 +231,51 @@ const ContactsScreen: React.FC = () => {
             {/* 通话按钮 */}
             <View style={styles.callActions}>
               <TouchableOpacity
-                style={styles.callBtn}
+                style={[styles.glassCallBtn, { borderColor: `${avatarColor}55` }]}
                 onPress={(e) => { e.stopPropagation?.(); handleCall(item, 'audio'); }}
                 activeOpacity={0.6}
               >
-                <MaterialCommunityIcons name="phone" size={18} color="#6366f1" />
+                <MaterialCommunityIcons name="phone" size={18} color={avatarColor} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.callBtn, styles.videoCallBtn]}
+                style={[styles.glassCallBtn, { borderColor: 'rgba(0,245,212,0.35)' }]}
                 onPress={(e) => { e.stopPropagation?.(); handleCall(item, 'video'); }}
                 activeOpacity={0.6}
               >
-                <MaterialCommunityIcons name="video" size={18} color="#10b981" />
+                <MaterialCommunityIcons name="video" size={18} color="#00f5d4" />
               </TouchableOpacity>
-              <MaterialCommunityIcons name="chevron-right" size={22} color="#e0e0e0" />
+              <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.2)" />
             </View>
-          </Card.Content>
-        </Card>
+          </View>
+        </TouchableOpacity>
       </Swipeable>
     );
   };
 
   return (
     <View style={styles.container}>
+      {/* 渐变背景 */}
+      <LinearGradient
+        colors={['#0f0c29', '#302b63', '#24243e']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
       {/* 搜索栏 */}
       <View style={styles.searchBar}>
-        <Searchbar
-          placeholder="搜索姓名、电话、公司"
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          onSubmitEditing={onSearch}
-          onIconPress={onSearch}
-          style={styles.searchInput}
-          inputStyle={{ fontSize: 14 }}
-        />
+        <View style={styles.glassSearchWrap}>
+          <MaterialCommunityIcons name="magnify" size={20} color="rgba(255,255,255,0.5)" />
+          <TextInput
+            style={styles.glassSearchInput}
+            placeholder="搜索姓名、电话、公司"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            onSubmitEditing={onSearch}
+            returnKeyType="search"
+          />
+        </View>
       </View>
 
       {/* 分类筛选 Tab */}
@@ -271,7 +286,7 @@ const ContactsScreen: React.FC = () => {
             return (
               <TouchableOpacity
                 key={tab.key}
-                style={[styles.filterTab, active && styles.filterTabActive]}
+                style={[styles.glassFilterTab, active && styles.glassFilterTabActive]}
                 onPress={() => setFilterType(tab.key)}
                 activeOpacity={0.7}
               >
@@ -297,7 +312,7 @@ const ContactsScreen: React.FC = () => {
       {/* 列表 */}
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color="#00d2ff" />
         </View>
       ) : (
         <FlatList
@@ -306,11 +321,11 @@ const ContactsScreen: React.FC = () => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d2ff" />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <MaterialCommunityIcons name="account-group" size={56} color="#ddd" />
+              <MaterialCommunityIcons name="account-group" size={56} color="rgba(255,255,255,0.15)" />
               <Text variant="bodyLarge" style={styles.emptyText}>暂无联系人</Text>
               <Text variant="bodySmall" style={styles.emptyHint}>
                 {filterType !== 'all' ? '当前分类没有匹配的联系人' : '请在桌面端添加联系人信息'}
@@ -321,13 +336,14 @@ const ContactsScreen: React.FC = () => {
       )}
 
       {/* 邀请外部伙伴 FAB */}
-      <FAB
-        icon="account-plus"
-        label="邀请伙伴"
-        style={styles.fab}
+      <TouchableOpacity
+        style={styles.glassFab}
         onPress={handleInvite}
-        color="#fff"
-      />
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons name="account-plus" size={22} color="#fff" />
+        <Text style={styles.glassFabText}>邀请伙伴</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -335,23 +351,38 @@ const ContactsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: 'transparent',
   },
+
+  // ---- 搜索栏 ----
   searchBar: {
     padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  searchInput: {
-    borderRadius: 10,
-    elevation: 0,
-    backgroundColor: '#f5f5f5',
+  glassSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
+  glassSearchInput: {
+    flex: 1,
+    height: 42,
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 8,
+  },
+
+  // ---- 筛选条 ----
   filterBar: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   filterScroll: {
     paddingHorizontal: 12,
@@ -359,29 +390,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  filterTab: {
+  glassFilterTab: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 18,
     marginRight: 8,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  filterTabActive: {
-    backgroundColor: '#6366f1',
+  glassFilterTabActive: {
+    backgroundColor: 'rgba(0,210,255,0.2)',
+    borderColor: 'rgba(0,210,255,0.4)',
   },
   filterTabText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: 'rgba(255,255,255,0.6)',
   },
   filterTabTextActive: {
     color: '#fff',
   },
   filterTabCount: {
     fontSize: 11,
-    color: '#999',
+    color: 'rgba(255,255,255,0.35)',
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -390,7 +424,7 @@ const styles = StyleSheet.create({
   },
   count: {
     textAlign: 'center',
-    color: '#999',
+    color: 'rgba(255,255,255,0.4)',
     paddingTop: 12,
     paddingBottom: 4,
     fontSize: 12,
@@ -403,18 +437,42 @@ const styles = StyleSheet.create({
   list: {
     padding: 12,
   },
-  card: {
+
+  // ---- 玻璃拟态卡片 ----
+  glassCard: {
     marginBottom: 8,
-    borderRadius: 12,
-    backgroundColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+
+  // ---- 头像 ----
+  glassAvatarWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  // ---- 信息 ----
   info: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 12,
   },
   nameRow: {
     flexDirection: 'row',
@@ -424,23 +482,30 @@ const styles = StyleSheet.create({
   name: {
     fontWeight: '600',
     marginRight: 8,
+    color: 'rgba(255,255,255,0.92)',
   },
   subtitle: {
-    color: '#888',
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '300',
     marginBottom: 4,
   },
-  typeBadge: {
+
+  // ---- 玻璃拟态徽章 ----
+  glassBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 10,
+    borderWidth: 1,
   },
   typeBadgeText: {
     fontSize: 10,
     fontWeight: '600',
     marginLeft: 3,
   },
+
+  // ---- 详情 ----
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -450,22 +515,27 @@ const styles = StyleSheet.create({
     marginRight: 3,
   },
   detail: {
-    color: '#666',
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
   },
-  empty: {
+
+  // ---- 通话按钮 ----
+  callActions: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 80,
+    gap: 8,
   },
-  emptyText: {
-    color: '#999',
-    marginTop: 16,
-    fontWeight: '500',
+  glassCallBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,210,255,0.08)',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  emptyHint: {
-    color: '#bbb',
-    marginTop: 6,
-  },
+
+  // ---- 滑动操作 ----
   swipeActions: {
     flexDirection: 'row',
     marginBottom: 8,
@@ -482,29 +552,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  callActions: {
+
+  // ---- FAB ----
+  glassFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: 'rgba(0,210,255,0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,210,255,0.45)',
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    shadowColor: '#00d2ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  callBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#e0e7ff',
-    justifyContent: 'center',
+  glassFabText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 8,
+  },
+
+  // ---- 空状态 ----
+  empty: {
     alignItems: 'center',
+    paddingTop: 80,
   },
-  videoCallBtn: {
-    backgroundColor: '#d1fae5',
+  emptyText: {
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 16,
+    fontWeight: '500',
   },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#6366f1',
-    borderRadius: 30,
+  emptyHint: {
+    color: 'rgba(255,255,255,0.3)',
+    marginTop: 6,
   },
 });
 

@@ -35,8 +35,14 @@ class MockChangeLogDB implements IDatabase {
     // 模拟 UPDATE change_log SET sync_status
     if (sql.includes('UPDATE change_log') && sql.includes('sync_status')) {
       if (params && sql.includes('synced')) {
+        // 区分 markSynced (所有 params 都是 id) 与 clearSyncedChanges (最后一个是 timestamp)
+        // markSynced 的 SQL 为: UPDATE change_log SET sync_status = 'synced' WHERE id IN (?,?,...)
+        // clearSyncedChanges 的 SQL 为: UPDATE change_log SET sync_status ... WHERE sync_status = 'synced' AND timestamp < ?
+        // 通过是否含 timestamp 子句区分两者
+        const isMarkSynced = !sql.includes('timestamp');
+        const ids = isMarkSynced ? params : params.slice(0, -1);
         for (const entry of this.changeLog) {
-          if (params.includes(entry.id)) {
+          if (ids.includes(entry.id)) {
             entry.sync_status = 'synced';
           }
         }
@@ -102,15 +108,19 @@ class MockChangeLogDB implements IDatabase {
 
     // 模拟 UPDATE change_log SET sync_status = 'synced'
     if (sql.includes('UPDATE change_log') && sql.includes('sync_status')) {
-      const ids = params?.slice(0, -1); // 最后一个是 timestamp（清理时）
       if (sql.includes('synced')) {
+        // 区分 markSynced (所有 params 都是 id) 与 clearSyncedChanges (最后一个是 timestamp)
+        // markSynced 的 SQL: UPDATE change_log SET sync_status = 'synced' WHERE id IN (?,?,...)
+        // clearSyncedChanges 的 SQL: UPDATE change_log SET sync_status ... WHERE ... AND timestamp < ?
+        const isMarkSynced = !sql.includes('timestamp');
+        const ids = isMarkSynced ? (params ?? []) : (params?.slice(0, -1) ?? []);
         for (const entry of this.changeLog) {
-          if (ids?.includes(entry.id)) {
+          if (ids.includes(entry.id)) {
             entry.sync_status = 'synced';
           }
         }
+        return { rowsAffected: ids.length };
       }
-      return { rowsAffected: ids?.length || 0 };
     }
 
     // 模拟 DELETE FROM change_log

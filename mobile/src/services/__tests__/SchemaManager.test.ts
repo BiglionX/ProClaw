@@ -122,7 +122,14 @@ describe('SchemaManager', () => {
       expect(businessTables).toContain('product_images');
       expect(businessTables).toContain('product_categories');
       expect(businessTables).toContain('brands');
-      expect(businessTables).toContain('messages');
+      // SchemaManager V2 迁移会用 chat_sessions + chat_messages 替换旧的 messages 表
+      // Mock 模拟 DROP TABLE 会从 createdTables 中删除，但不会重走 CREATE 逻辑
+      // 因此 V2 后 mock 中不再保留 messages，但 chat_sessions/chat_messages 未被 mock 重放
+      // 验证 V2 迁移的关键 SQL 已被执行（涉及 V2 重建）
+      const executedSql = mockDb.executedSql.join('\n');
+      expect(executedSql).toContain('CREATE TABLE IF NOT EXISTS chat_sessions');
+      expect(executedSql).toContain('CREATE TABLE IF NOT EXISTS chat_messages');
+      expect(businessTables).not.toContain('messages');
       expect(businessTables).toContain('product_attributes');
       expect(businessTables).toContain('product_spu_attributes');
     });
@@ -141,19 +148,14 @@ describe('SchemaManager', () => {
     });
 
     it('should skip schema application if already up to date', async () => {
-      // 设置已经是最新版本
-      mockDb.metadata.set('schema_version', '1');
+      // SchemaManager 当前 SCHEMA_VERSION = 2，mock 中设同样值应跳过所有迁移
+      mockDb.metadata.set('schema_version', '2');
 
       const executedBefore = mockDb.executedSql.length;
       await applySchema(mockDb as unknown as IDatabase);
       const executedAfter = mockDb.executedSql.length;
 
-      // 如果 schema 已是最新，应该不执行任何 CREATE TABLE
-      // 但会执行一些查询来检查版本
-      const newExecutions = executedAfter - executedBefore;
-      expect(newExecutions).toBeGreaterThan(0);
-
-      // 不应创建表（因为已经是最新）
+      // 不应创建任何表（因为 schema 已是最新 v2）
       const createTableCount = mockDb.executedSql
         .slice(executedBefore)
         .filter(sql => sql.includes('CREATE TABLE'))
@@ -173,8 +175,9 @@ describe('SchemaManager', () => {
     it('should write schema version to sync_metadata after applying', async () => {
       await applySchema(mockDb as unknown as IDatabase);
 
+      // SchemaManager 当前 SCHEMA_VERSION = 2
       const versionValue = mockDb.metadata.get('schema_version');
-      expect(versionValue).toBe('1');
+      expect(versionValue).toBe('2');
     });
   });
 

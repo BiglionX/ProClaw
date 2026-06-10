@@ -101,7 +101,9 @@ export class LanSyncProvider implements ISyncProvider {
 
         // 审计 C4：在 onopen 之前获取 deviceId，避免 async onopen 时序缺口
         let deviceIdCache: string = 'unknown';
-        getDeviceId(db).then((id) => { deviceIdCache = id; }).catch(() => { deviceIdCache = 'unknown'; });
+        getDeviceId(db)
+          .then((id) => { deviceIdCache = id ?? 'unknown'; })
+          .catch(() => { deviceIdCache = 'unknown'; });
 
         ws.onopen = () => {
           clearTimeout(timeout);

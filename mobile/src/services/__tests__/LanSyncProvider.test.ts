@@ -202,7 +202,18 @@ describe('LanSyncProvider', () => {
       const wsSpy = jest.fn();
       mockWsInstance!.send = wsSpy;
 
-      const result = await provider.sync('send_only');
+      const syncPromise = provider.sync('send_only');
+
+      // 审计 W20/C2：sync 等远端 push_ack 确认，测试需模拟该消息
+      setTimeout(() => {
+        mockWsInstance!.simulateMessage(JSON.stringify({
+          type: 'sync_push_ack',
+          seq: 1,
+          success: true,
+        }));
+      }, 50);
+
+      const result = await syncPromise;
 
       expect(result.success).toBe(true);
       expect(result.applied).toBe(1);
@@ -282,7 +293,16 @@ describe('LanSyncProvider', () => {
 
       const syncPromise = provider.sync('merge');
 
-      // Simulate sync_data response
+      // 审计 W20/C2：merge 模式先 push（等 ack）后 pull
+      // 按消息时序响应 push_ack 和 sync_data
+      setTimeout(() => {
+        mockWsInstance!.simulateMessage(JSON.stringify({
+          type: 'sync_push_ack',
+          seq: 1,
+          success: true,
+        }));
+      }, 30);
+
       setTimeout(() => {
         mockWsInstance!.simulateMessage(JSON.stringify({
           type: 'sync_data',
@@ -294,7 +314,7 @@ describe('LanSyncProvider', () => {
           deviceId: 'remote_device',
           timestamp: 3000,
         }));
-      }, 50);
+      }, 80);
 
       const result = await syncPromise;
 

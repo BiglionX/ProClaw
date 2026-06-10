@@ -17,6 +17,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {
   listProfiles,
   createProfile,
@@ -124,13 +126,15 @@ const ProfileSelectScreen: React.FC = () => {
 
     return (
       <TouchableOpacity
-        style={styles.profileItem}
+        style={styles.glassProfileItem}
         onPress={() => handleSelect(item)}
         onLongPress={() => handleDelete(item)}
         disabled={isActive}
         activeOpacity={0.7}
       >
-        <Text style={styles.profileAvatar}>{item.avatar || '👤'}</Text>
+        <View style={styles.glassAvatarWrap}>
+          <Text style={styles.profileAvatar}>{item.avatar || '\uD83D\uDC64'}</Text>
+        </View>
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{item.name}</Text>
           <View style={styles.profileMeta}>
@@ -142,25 +146,28 @@ const ProfileSelectScreen: React.FC = () => {
             )}</View>
         </View>
         {isActive && (
-          <ActivityIndicator size="small" color="#6366f1" />
+          <ActivityIndicator size="small" color="#00d2ff" />
         )}
-        <Text style={styles.enterIcon}>→</Text>
+        <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.3)" />
       </TouchableOpacity>
     );
   };
 
   if (loading && profiles.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#6366f1" />
-          <Text style={styles.loadingText}>加载中...</Text>
-        </View>
-      </SafeAreaView>
+      <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.centerContent}>
+            <ActivityIndicator size="large" color="#00d2ff" />
+            <Text style={styles.loadingText}>加载中...</Text>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
   return (
+    <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>选择身份</Text>
@@ -171,7 +178,7 @@ const ProfileSelectScreen: React.FC = () => {
 
       {profiles.length === 0 && !showCreate ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📱</Text>
+          <MaterialCommunityIcons name="cellphone" size={64} color="rgba(0,210,255,0.4)" />
           <Text style={styles.emptyText}>欢迎使用 ProClaw</Text>
           <Text style={styles.emptyHint}>创建一个身份开始管理您的业务</Text>
           <Text style={styles.emptyGuide}>每个身份拥有独立的数据和插件，</Text>
@@ -187,10 +194,11 @@ const ProfileSelectScreen: React.FC = () => {
       )}
 
       {showCreate ? (
-        <View style={styles.createForm}>
+        <View style={styles.glassCreateForm}>
           <TextInput
-            style={styles.input}
+            style={styles.glassInput}
             placeholder="输入身份名称（如：个人店铺、公司A）"
+            placeholderTextColor="rgba(255,255,255,0.3)"
             value={newName}
             onChangeText={setNewName}
             autoFocus
@@ -198,7 +206,7 @@ const ProfileSelectScreen: React.FC = () => {
           />
           <View style={styles.createActions}>
             <TouchableOpacity
-              style={styles.cancelButton}
+              style={styles.glassCancelButton}
               onPress={() => {
                 setShowCreate(false);
                 setNewName('');
@@ -207,7 +215,7 @@ const ProfileSelectScreen: React.FC = () => {
               <Text style={styles.cancelButtonText}>取消</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.createButton, !newName.trim() && styles.createButtonDisabled]}
+              style={[styles.glassCreateButton, !newName.trim() && styles.glassCreateButtonDisabled]}
               onPress={handleCreate}
               disabled={!newName.trim() || loading}
             >
@@ -217,10 +225,12 @@ const ProfileSelectScreen: React.FC = () => {
         </View>
       ) : (
         <TouchableOpacity
-          style={styles.addButton}
+          style={styles.glassAddButton}
           onPress={() => setShowCreate(true)}
+          activeOpacity={0.7}
         >
-          <Text style={styles.addButtonText}>+ 新建身份</Text>
+          <MaterialCommunityIcons name="plus" size={20} color="#fff" style={{marginRight:8}} />
+          <Text style={styles.addButtonText}>新建身份</Text>
         </TouchableOpacity>
       )}
 
@@ -228,13 +238,13 @@ const ProfileSelectScreen: React.FC = () => {
         长按身份名称可删除 | 点击进入
       </Text>
     </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9ff',
   },
   centerContent: {
     flex: 1,
@@ -244,7 +254,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#999',
+    color: 'rgba(255,255,255,0.5)',
   },
   header: {
     paddingHorizontal: 24,
@@ -254,32 +264,44 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.95)',
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.45)',
     marginTop: 4,
   },
   listContent: {
     paddingHorizontal: 16,
   },
-  profileItem: {
+  glassProfileItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  glassAvatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,210,255,0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,210,255,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
   },
   profileAvatar: {
-    fontSize: 32,
-    marginRight: 14,
+    fontSize: 24,
   },
   profileInfo: {
     flex: 1,
@@ -293,17 +315,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1a1a2e',
+    color: 'rgba(255,255,255,0.9)',
   },
   profileDate: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255,255,255,0.35)',
     marginTop: 2,
-  },
-  enterIcon: {
-    fontSize: 18,
-    color: '#ccc',
-    marginLeft: 8,
   },
   emptyState: {
     flex: 1,
@@ -311,60 +328,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
   emptyText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 16,
   },
   emptyHint: {
     fontSize: 14,
-    color: '#999',
+    color: 'rgba(255,255,255,0.4)',
     marginTop: 8,
     textAlign: 'center',
   },
   emptyGuide: {
     fontSize: 13,
-    color: '#bbb',
+    color: 'rgba(255,255,255,0.25)',
     marginTop: 2,
     textAlign: 'center',
   },
-  addButton: {
+  glassAddButton: {
+    flexDirection: 'row',
     marginHorizontal: 24,
     marginBottom: 12,
-    backgroundColor: '#6366f1',
+    backgroundColor: 'rgba(0,210,255,0.2)',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.35)',
+    shadowColor: '#00d2ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   addButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
   },
-  createForm: {
+  glassCreateForm: {
     marginHorizontal: 24,
     marginBottom: 12,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 14,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  input: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  glassInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
     borderRadius: 10,
     padding: 14,
     fontSize: 15,
-    color: '#333',
-    backgroundColor: '#fafafa',
+    color: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   createActions: {
     flexDirection: 'row',
@@ -372,26 +392,31 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 10,
   },
-  cancelButton: {
+  glassCancelButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   cancelButtonText: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
   },
-  createButton: {
+  glassCreateButton: {
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#6366f1',
+    backgroundColor: 'rgba(0,210,255,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.4)',
   },
-  createButtonDisabled: {
-    backgroundColor: '#b1b3f1',
-  },
+  glassCreateButtonDisabled: {
+    backgroundColor: 'rgba(0,210,255,0.1)',
+    borderColor: 'rgba(0,210,255,0.2)',
+    },
   createButtonText: {
     fontSize: 14,
     color: '#fff',
@@ -400,7 +425,7 @@ const styles = StyleSheet.create({
   hint: {
     textAlign: 'center',
     fontSize: 12,
-    color: '#ccc',
+    color: 'rgba(255,255,255,0.25)',
     paddingBottom: 20,
   },
 });

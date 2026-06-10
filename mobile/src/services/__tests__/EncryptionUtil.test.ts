@@ -92,10 +92,10 @@ describe('encryptBlock / decryptBlock', () => {
     expect(() => decryptBlock('short', 'password')).toThrow();
   });
 
-  it('should handle empty string', () => {
+  // 审计 E7：解密结果为空字符串可能是密码错误或密文损坏，应拖错而非返回空
+  it('should reject empty string as suspicious (审计 E7)', () => {
     const encrypted = encryptBlock('', 'Password123');
-    const decrypted = decryptBlock(encrypted, 'Password123');
-    expect(decrypted).toBe('');
+    expect(() => decryptBlock(encrypted, 'Password123')).toThrow(/密码错误|数据已损/);
   });
 
   it('should handle special characters', () => {
@@ -107,11 +107,12 @@ describe('encryptBlock / decryptBlock', () => {
 });
 
 describe('encryptData / decryptData (legacy compat)', () => {
-  it('should encrypt and decrypt with default key', () => {
-    const original = 'legacy data';
-    const encrypted = encryptData(original);
-    const decrypted = decryptData(encrypted);
-    expect(decrypted).toBe(original);
+  // 审计 S1/S2：encryptData/decryptData 已收紧为必须显式传入 key，不再支持隐式默认 key
+  it('should throw TypeError when key is missing (审计 S1/S2)', () => {
+    // @ts-expect-error - 故意传错参数验证类型收紧
+    expect(() => encryptData('legacy data')).toThrow();
+    // @ts-expect-error - 故意传错参数验证类型收紧
+    expect(() => decryptData('any')).toThrow();
   });
 
   it('should encrypt and decrypt with custom key', () => {
