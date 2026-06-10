@@ -12,17 +12,10 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { acceptInvitation, parseInviteLink, acceptEmployeeInvitation } from '../services/InvitationService';
 import { loadServerUrl } from '../services/AuthService';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppScreenProps } from '../types/navigation';
 
-interface InvitationHandlerScreenProps {
-  route: {
-    params?: {
-      code?: string;
-      host?: string;
-      type?: string;
-    };
-  };
-  navigation: any;
-}
+interface InvitationHandlerScreenProps extends AppScreenProps<'InvitePartner'> {}
 
 const DEFAULT_HOST = ''; // 审计 R2-S8：不再硬编码，由 loadServerUrl 动态提供
 
@@ -175,8 +168,8 @@ export const InvitationHandlerScreen: React.FC<InvitationHandlerScreenProps> = (
           Alert.alert('失败', (response as any).message || '接受邀请失败');
         }
       }
-    } catch (error: any) {
-      Alert.alert('错误', error.message || '接受邀请失败');
+    } catch (error) {
+      Alert.alert('错误', getErrorMessage(error, '接受邀请失败'));
     } finally {
       setLoading(false);
     }

@@ -16,6 +16,8 @@ export type AppPhase = 'loading' | 'profile_select' | 'ready' | 'error';
 // 审计 M4：合并 import/export 为单行
 export type { ConnectionMode } from '../services/ConnectionManager';
 import type { ConnectionMode as ConnectionModeType } from '../services/ConnectionManager';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface AppState {
   // 应用阶段
@@ -66,7 +68,7 @@ export const useAppStore = create<AppState>((set) => ({
 export const switchProfile = async (profile: Profile): Promise<void> => {
   // 审计 C1：原子检查 + 设置，使用 getState 直接读写避免竞态窗口
   if (useAppStore.getState().isSwitchingProfile) {
-    console.warn('[AppStore] Profile switch already in progress, ignoring');
+    logger.warn('[AppStore] Profile switch already in progress, ignoring');
     return;
   }
 
@@ -86,7 +88,7 @@ export const switchProfile = async (profile: Profile): Promise<void> => {
     try {
       await closeAllSyncConnections();
     } catch (e) {
-      console.warn('[AppStore] Failed to close sync connections:', e);
+      logger.warn('[AppStore] Failed to close sync connections:', e);
     }
 
     // 1. 关闭当前数据库
@@ -108,9 +110,9 @@ export const switchProfile = async (profile: Profile): Promise<void> => {
     // 6. 安装变更日志触发器
     try {
       await setupChangeLogTriggers(db);
-      console.log('[AppStore] ChangeLog triggers installed');
+      logger.log('[AppStore] ChangeLog triggers installed');
     } catch (e) {
-      console.warn('[AppStore] Failed to setup change log triggers:', e);
+      logger.warn('[AppStore] Failed to setup change log triggers:', e);
     }
 
     // 7. 更新状态
@@ -121,9 +123,9 @@ export const switchProfile = async (profile: Profile): Promise<void> => {
     try {
       const { getInstalledPlugins } = await import('../services/PluginRegistry');
       const installedPlugins = await getInstalledPlugins(db);
-      console.log('[AppStore] Loaded', installedPlugins.length, 'plugins for profile:', profile.name);
+      logger.log('[AppStore] Loaded', installedPlugins.length, 'plugins for profile:', profile.name);
     } catch (e) {
-      console.warn('[AppStore] Failed to load plugins:', e);
+      logger.warn('[AppStore] Failed to load plugins:', e);
     }
 
     useAppStore.setState({
@@ -133,13 +135,13 @@ export const switchProfile = async (profile: Profile): Promise<void> => {
       isSwitchingProfile: false,
     });
 
-    console.log('[AppStore] Switched to profile:', profile.name);
-  } catch (error: any) {
+    logger.log('[AppStore] Switched to profile:', profile.name);
+  } catch (error) {
     useAppStore.setState({
       phase: 'error',
-      error: `切换身份失败: ${error?.message || '未知错误'}`,
+      error: `切换身份失败: ${getErrorMessage(error, '未知错误')}`,
       isSwitchingProfile: false,
     });
-    console.error('[AppStore] Failed to switch profile:', error);
+    logger.error('[AppStore] Failed to switch profile:', error);
   }
 };

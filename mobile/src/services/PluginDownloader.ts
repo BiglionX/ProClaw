@@ -9,6 +9,7 @@ import { Platform } from 'react-native';
 import JSZip from 'jszip';
 import CryptoJS from 'crypto-js';
 import type { PluginManifest } from './PluginRegistry';
+import { logger } from '../utils/logger';
 
 /** FlowHub 插件元数据 */
 export interface FlowHubPluginInfo {
@@ -51,7 +52,7 @@ const getSigningKey = async (): Promise<CryptoJS.lib.WordArray | null> => {
     }
   } catch { /* 安全存储不可用 */ }
   // 无签名密钥则无法验证
-  console.warn('[PluginDownloader] No signing key configured, signature verification will fail');
+  logger.warn('[PluginDownloader] No signing key configured, signature verification will fail');
   return null;
 };
 
@@ -67,7 +68,7 @@ export const fetchAvailablePlugins = async (): Promise<FlowHubPluginInfo[]> => {
     const data = await response.json();
     return data.plugins || [];
   } catch (error) {
-    console.warn('[PluginDownloader] Failed to fetch plugins:', error);
+    logger.warn('[PluginDownloader] Failed to fetch plugins:', error);
     return getMockPlugins(); // 开发阶段返回模拟数据
   }
 };
@@ -84,7 +85,7 @@ export const fetchPluginDetail = async (
     if (!response.ok) return null;
     return await response.json();
   } catch {
-    console.warn('[PluginDownloader] Failed to fetch plugin detail');
+    logger.warn('[PluginDownloader] Failed to fetch plugin detail');
     const mock = getMockPlugins().find(p => p.id === pluginId);
     return mock || null;
   }
@@ -101,7 +102,7 @@ export const downloadAndInstall = async (
   targetDir: string
 ): Promise<boolean> => {
   try {
-    console.log(`[PluginDownloader] Downloading plugin: ${pluginInfo.name}`);
+    logger.log(`[PluginDownloader] Downloading plugin: ${pluginInfo.name}`);
 
     // 1. 下载 ZIP
     const response = await fetch(pluginInfo.downloadUrl);
@@ -114,7 +115,7 @@ export const downloadAndInstall = async (
     // 2. 校验签名
     const signatureValid = await verifySignature(pluginInfo, zipData);
     if (!signatureValid) {
-      console.warn('[PluginDownloader] Signature verification failed, rejecting plugin');
+      logger.warn('[PluginDownloader] Signature verification failed, rejecting plugin');
       return false;
     }
 
@@ -127,10 +128,10 @@ export const downloadAndInstall = async (
     // 4. 保存到文件系统
     await savePluginFiles(targetDir, pluginInfo, extracted);
 
-    console.log(`[PluginDownloader] Plugin installed: ${pluginInfo.name}`);
+    logger.log(`[PluginDownloader] Plugin installed: ${pluginInfo.name}`);
     return true;
   } catch (error) {
-    console.error('[PluginDownloader] Installation failed:', error);
+    logger.error('[PluginDownloader] Installation failed:', error);
     return false;
   }
 };
@@ -143,7 +144,7 @@ export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedP
     // 审计 W4：防御 zip bomb，限制解压前数据大小为 50MB
     const MAX_ZIP_SIZE = 50 * 1024 * 1024;
     if (zipData.byteLength > MAX_ZIP_SIZE) {
-      console.warn(`[PluginDownloader] ZIP too large: ${zipData.byteLength} bytes, max ${MAX_ZIP_SIZE}`);
+      logger.warn(`[PluginDownloader] ZIP too large: ${zipData.byteLength} bytes, max ${MAX_ZIP_SIZE}`);
       return null;
     }
 
@@ -152,7 +153,7 @@ export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedP
     // 读取 manifest.json
     const manifestFile = zip.file('manifest.json');
     if (!manifestFile) {
-      console.warn('[PluginDownloader] ZIP missing manifest.json');
+      logger.warn('[PluginDownloader] ZIP missing manifest.json');
       return null;
     }
     const manifestContent = await manifestFile.async('string');
@@ -161,7 +162,7 @@ export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedP
     // 读取 up.sql
     const upSqlFile = zip.file('up.sql');
     if (!upSqlFile) {
-      console.warn('[PluginDownloader] ZIP missing up.sql');
+      logger.warn('[PluginDownloader] ZIP missing up.sql');
       return null;
     }
     const upSql = await upSqlFile.async('string');
@@ -169,7 +170,7 @@ export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedP
     // 审计 D2：验证 upSql 只包含安全的 DDL/DML 语句（禁止 DROP DATABASE、ATTACH 等）
     const dangerousPatterns = /\b(DROP\s+DATABASE|ATTACH\s+DATABASE|DETACH\s+DATABASE|PRAGMA\s|VACUUM|REINDEX)\b/i;
     if (dangerousPatterns.test(upSql)) {
-      console.warn('[PluginDownloader] up.sql contains dangerous SQL, rejecting plugin');
+      logger.warn('[PluginDownloader] up.sql contains dangerous SQL, rejecting plugin');
       return null;
     }
 
@@ -180,15 +181,15 @@ export const extractPluginZip = async (zipData: ArrayBuffer): Promise<ExtractedP
       downSql = await downSqlFile.async('string');
       // 审计 W17：downSql 同样需校验危险 SQL，防止卸载时执行破坏性语句
       if (dangerousPatterns.test(downSql)) {
-        console.warn('[PluginDownloader] down.sql contains dangerous SQL, rejecting plugin');
+        logger.warn('[PluginDownloader] down.sql contains dangerous SQL, rejecting plugin');
         return null;
       }
     }
 
-    console.log(`[PluginDownloader] Extracted plugin: ${manifest.name} v${manifest.version}`);
+    logger.log(`[PluginDownloader] Extracted plugin: ${manifest.name} v${manifest.version}`);
     return { manifest, upSql, downSql };
   } catch (error) {
-    console.error('[PluginDownloader] ZIP extraction failed:', error);
+    logger.error('[PluginDownloader] ZIP extraction failed:', error);
     return null;
   }
 };
@@ -207,13 +208,13 @@ export const verifySignature = async (
     if (pluginInfo.signatureUrl) {
       const signingKey = await getSigningKey();
       if (!signingKey) {
-        console.error('[PluginDownloader] No signing key available, cannot verify signature');
+        logger.error('[PluginDownloader] No signing key available, cannot verify signature');
         return false;
       }
 
       const sigResponse = await fetch(pluginInfo.signatureUrl);
       if (!sigResponse.ok) {
-        console.error('[PluginDownloader] Failed to fetch signature, rejecting plugin');
+        logger.error('[PluginDownloader] Failed to fetch signature, rejecting plugin');
         return false; // 审计 S4：签名获取失败时拒绝
       }
       const signatureText = await sigResponse.text();
@@ -243,10 +244,10 @@ export const verifySignature = async (
     }
 
     // 审计 S5：无签名 URL 时拒绝插件
-    console.error('[PluginDownloader] No signature URL provided, rejecting unsigned plugin');
+    logger.error('[PluginDownloader] No signature URL provided, rejecting unsigned plugin');
     return false;
   } catch (error) {
-    console.error('[PluginDownloader] Signature verification error:', error);
+    logger.error('[PluginDownloader] Signature verification error:', error);
     return false;
   }
 };
@@ -272,40 +273,40 @@ const savePluginFiles = async (
         })
       );
     } catch (error) {
-      console.warn('[PluginDownloader] Web storage save failed:', error);
+      logger.warn('[PluginDownloader] Web storage save failed:', error);
     }
   } else {
     // 原生平台：使用 expo-file-system 写入各文件
     try {
       const FileSystem = await import('expo-file-system');
-      const pluginDir = `${FileSystem.documentDirectory}${targetDir}`;
+      const pluginDir = `${FileSystem.Paths.document.uri}${targetDir}`;
 
-      // 创建目录
-      await FileSystem.makeDirectoryAsync(pluginDir, { intermediates: true });
+      // 创建目录（expo-file-system v19 API：Directory 类）
+      const dir = new FileSystem.Directory(pluginDir);
+      if (!dir.exists) {
+        await dir.create({ intermediates: true });
+      }
 
       // 保存 manifest.json
-      await FileSystem.writeAsStringAsync(
-        `${pluginDir}manifest.json`,
-        JSON.stringify(extracted.manifest)
-      );
+      const manifestFile = new FileSystem.File(`${pluginDir}manifest.json`);
+      await manifestFile.create();
+      await manifestFile.write(JSON.stringify(extracted.manifest));
 
       // 保存 up.sql
-      await FileSystem.writeAsStringAsync(
-        `${pluginDir}up.sql`,
-        extracted.upSql
-      );
+      const upSqlFile = new FileSystem.File(`${pluginDir}up.sql`);
+      await upSqlFile.create();
+      await upSqlFile.write(extracted.upSql);
 
       // 保存 down.sql（如果有）
       if (extracted.downSql) {
-        await FileSystem.writeAsStringAsync(
-          `${pluginDir}down.sql`,
-          extracted.downSql
-        );
+        const downSqlFile = new FileSystem.File(`${pluginDir}down.sql`);
+        await downSqlFile.create();
+        await downSqlFile.write(extracted.downSql);
       }
 
-      console.log(`[PluginDownloader] Files saved to: ${pluginDir}`);
+      logger.log(`[PluginDownloader] Files saved to: ${pluginDir}`);
     } catch (error) {
-      console.error('[PluginDownloader] File save failed:', error);
+      logger.error('[PluginDownloader] File save failed:', error);
       throw error;
     }
   }

@@ -11,6 +11,8 @@ import {
 } from './WebRTC';
 import wsService from './WebSocketService';
 import { useCallStore, CallType } from '../stores/CallStore';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 // 审计 M6：明确类型定义
 // RTCSessionDescriptionInit 为 DOM lib 全局类型，type 字段约束为 RTCSdpType 字面量
@@ -84,7 +86,7 @@ class CallManager {
     try {
       await this.createPeerConnection(sessionId, callType, true);
     } catch (e) {
-      console.error('[Call] Failed to create peer connection:', e);
+      logger.error('[Call] Failed to create peer connection:', e);
       Alert.alert('错误', '无法初始化通话，请检查设备权限');
       return false;
     }
@@ -99,7 +101,7 @@ class CallManager {
 
     // 创建 SDP Offer（审计 H4：不使用非空断言，检查 rtcPeer 是否存在）
     if (!this.rtcPeer) {
-      console.error('[Call] PeerConnection is null after creation');
+      logger.error('[Call] PeerConnection is null after creation');
       this.cleanup();
       store.endCall();
       setTimeout(() => store.reset(), 500);
@@ -128,7 +130,7 @@ class CallManager {
 
       return true;
     } catch (offerError) {
-      console.error('[Call] Failed to create SDP offer:', offerError);
+      logger.error('[Call] Failed to create SDP offer:', offerError);
       this.cleanup();
       store.endCall();
       setTimeout(() => store.reset(), 500);
@@ -156,7 +158,7 @@ class CallManager {
     try {
       await this.createPeerConnection(call.sessionId, call.callType, false);
     } catch (e) {
-      console.error('[Call] Failed to create peer connection for answer:', e);
+      logger.error('[Call] Failed to create peer connection for answer:', e);
       wsService.send('call_reject', { sessionId: call.sessionId }, call.callerId);
       store.setIncomingCall(null);
       return;
@@ -164,7 +166,7 @@ class CallManager {
 
     // 审计 R5 修复：添加 rtcPeer null 检查，与非空断言保持一致
     if (!this.rtcPeer) {
-      console.error('[Call] PeerConnection is null after creation');
+      logger.error('[Call] PeerConnection is null after creation');
       wsService.send('call_reject', { sessionId: call.sessionId }, call.callerId);
       store.setIncomingCall(null);
       this.cleanup();
@@ -186,7 +188,7 @@ class CallManager {
       store.setIncomingCall(null);
       this.startDurationTimer();
     } catch (answerError) {
-      console.error('[Call] Failed to create SDP answer:', answerError);
+      logger.error('[Call] Failed to create SDP answer:', answerError);
       wsService.send('call_reject', { sessionId: call.sessionId }, call.callerId);
       store.setIncomingCall(null);
       this.cleanup();
@@ -294,7 +296,7 @@ class CallManager {
   }
 
   private handleOfferSent(_type: string, _data: any) {
-    console.log('[Call] Offer sent successfully');
+    logger.log('[Call] Offer sent successfully');
   }
 
   private async handleAnswer(_type: string, data: any) {
@@ -311,7 +313,7 @@ class CallManager {
       this.clearCallTimeout();
       this.startDurationTimer();
     } catch (e) {
-      console.error('[Call] Failed to set remote SDP:', e);
+      logger.error('[Call] Failed to set remote SDP:', e);
     }
   }
 
@@ -324,7 +326,7 @@ class CallManager {
     try {
       await this.rtcPeer.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (e) {
-      console.error('[Call] Failed to add ICE candidate:', e);
+      logger.error('[Call] Failed to add ICE candidate:', e);
     }
   }
 
@@ -417,13 +419,13 @@ class CallManager {
     this.rtcPeer.addEventListener('connectionstatechange', () => {
       if (this.rtcPeer?.connectionState === 'failed' ||
           this.rtcPeer?.connectionState === 'disconnected') {
-        console.warn('[Call] Connection state:', this.rtcPeer?.connectionState);
+        logger.warn('[Call] Connection state:', this.rtcPeer?.connectionState);
       }
     });
 
     // 远程媒体流
     this.rtcPeer.addEventListener('track', (event: any) => {
-      console.log('[Call] Remote track received');
+      logger.log('[Call] Remote track received');
       this.remoteStream = event.streams[0];
       this.onStreamChange?.();
     });
@@ -437,7 +439,7 @@ class CallManager {
     try {
       this.localStream = (await mediaDevices.getUserMedia(constraints)) as MediaStream;
     } catch (mediaError) {
-      console.error('[Call] Failed to get user media:', mediaError);
+      logger.error('[Call] Failed to get user media:', mediaError);
       this.rtcPeer.close();
       this.rtcPeer = null;
       throw mediaError;
@@ -540,8 +542,8 @@ class CallManager {
         });
         testStream.getTracks().forEach((t: any) => t.stop());
         return true;
-      } catch (e: any) {
-        console.warn('[Call] iOS permission check failed:', e?.message);
+      } catch (e) {
+        logger.warn('[Call] iOS permission check failed:', getErrorMessage(e));
         Alert.alert(
           '权限不足',
           '请在系统设置中允许 ProClaw 访问麦克风' + (callType === 'video' ? '和摄像头' : '')

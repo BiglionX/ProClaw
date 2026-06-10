@@ -23,6 +23,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { createProfile, listProfiles, type Profile } from '../services/ProfileManager';
 import { switchProfile, useAppStore } from '../stores/AppStore';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppNavigation } from '../types/navigation';
 
 // ============ 类型定义 ============
 
@@ -61,7 +63,7 @@ const getExistingNamesText = (profiles: Profile[], currentId?: string): string =
 // ============ 组件 ============
 
 export default function IdentityChatScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AppNavigation>();
   const flatListRef = useRef<FlatList>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -160,10 +162,10 @@ export default function IdentityChatScreen() {
       };
       setMessages((prev) => [...prev, done]);
       setStep('complete');
-    } catch (err: any) {
+    } catch (err) {
       const errMsg: ChatMessage = {
         id: 'err', role: 'system',
-        content: `切换失败：${err?.message || '请重试'}`,
+        content: `切换失败：${getErrorMessage(err, '请重试')}`,
       };
       setMessages((prev) => [...prev, errMsg]);
       setStep('show_options');
@@ -214,10 +216,10 @@ export default function IdentityChatScreen() {
       };
       setMessages((prev) => [...prev, done]);
       setStep('complete');
-    } catch (err: any) {
+    } catch (err) {
       const errMsg: ChatMessage = {
         id: 'err', role: 'system',
-        content: `创建失败：${err?.message || '请重试'}`,
+        content: `创建失败：${getErrorMessage(err, '请重试')}`,
       };
       setMessages((prev) => [...prev, errMsg]);
       setStep('typing_name');

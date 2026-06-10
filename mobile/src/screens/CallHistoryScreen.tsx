@@ -8,6 +8,7 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import {
   Text,
@@ -18,9 +19,13 @@ import {
   Chip,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
 import { showToast } from '../components/Toast';
-import callManager from '../services/CallManager';
 import AuthService from '../services/AuthService';
+import { useCallStore } from '../stores/CallStore';
+import { resolveCallBackTarget } from '../utils/callBack';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppNavigation } from '../types/navigation';
 
 // 临时类型定义
 interface CallRecord {
@@ -99,11 +104,33 @@ const DEMO_RECORDS: CallRecord[] = [
 ];
 
 const CallHistoryScreen: React.FC<{ contactId?: string }> = ({ contactId }) => {
+  const navigation = useNavigation<AppNavigation>();
   const { colors } = useTheme();
   const [records, setRecords] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'audio' | 'video' | 'missed'>('all');
+
+  // P2 项 3：回拨逻辑
+  // 复用 ContactsTab.handleCall 的现有路径（startOutgoingCall + navigate('Call')），
+  // 不直接走 CallManager.startCall，避免引入 ContactsTab 未启用的 offer 流程造成两条并行路径。
+  // 对端解析委托给 resolveCallBackTarget（纯函数，已单测覆盖）。
+  const handleCallBack = useCallback((item: CallRecord) => {
+    const store = useCallStore.getState();
+    if (store.status !== 'idle') {
+      Alert.alert('提示', '当前已在通话中');
+      return;
+    }
+    const { userId, userName, callType } = resolveCallBackTarget(item);
+    const sessionId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    store.startOutgoingCall({
+      sessionId,
+      remoteUserId: userId,
+      remoteUserName: userName,
+      callType,
+    });
+    navigation.navigate('Call');
+  }, [navigation]);
 
   const loadRecords = useCallback(async () => {
     try {
@@ -141,8 +168,8 @@ const CallHistoryScreen: React.FC<{ contactId?: string }> = ({ contactId }) => {
           setRecords(result);
         }
       }
-    } catch (err: any) {
-      showToast('error', '加载失败', err.message);
+    } catch (err) {
+      showToast('error', '加载失败', getErrorMessage(err));
       setRecords(DEMO_RECORDS);
     } finally {
       setLoading(false);
@@ -221,10 +248,7 @@ const CallHistoryScreen: React.FC<{ contactId?: string }> = ({ contactId }) => {
           {/* 回拨按钮 */}
           <TouchableOpacity
             style={styles.callBackBtn}
-            onPress={() => {
-              // TODO: 回拨功能
-              showToast('info', '提示', '回拨功能开发中');
-            }}
+            onPress={() => handleCallBack(item)}
           >
             <MaterialCommunityIcons name="phone" size={20} color={colors.primary} />
           </TouchableOpacity>

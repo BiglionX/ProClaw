@@ -9,6 +9,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { generateId } from '../utils/generateId';
+import { logger } from '../utils/logger';
 
 const PROFILES_KEY = '@proclaw_profiles';
 const CURRENT_PROFILE_KEY = '@proclaw_current_profile';
@@ -34,7 +35,7 @@ export const listProfiles = async (): Promise<Profile[]> => {
     const raw = await AsyncStorage.getItem(PROFILES_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch (error) {
-    console.warn('[ProfileManager] Failed to load profiles:', error);
+    logger.warn('[ProfileManager] Failed to load profiles:', error);
     return [];
   }
 };
@@ -46,7 +47,7 @@ const saveProfiles = async (profiles: Profile[]): Promise<void> => {
   try {
     await AsyncStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
   } catch (error) {
-    console.error('[ProfileManager] Failed to save profiles:', error);
+    logger.error('[ProfileManager] Failed to save profiles:', error);
     throw error;
   }
 };
@@ -77,12 +78,12 @@ export const createProfile = async (name: string, avatar: string = ''): Promise<
 
     profiles.push(newProfile);
     await saveProfiles(profiles);
-    console.log('[ProfileManager] Created profile:', newProfile.id, newProfile.name);
+    logger.log('[ProfileManager] Created profile:', newProfile.id, newProfile.name);
     return newProfile;
   } finally {
     // 审计 C5：try-catch release 防止异常导致互斥锁永久锁定
     try { release(); } catch (e) {
-      console.warn('[ProfileManager] Mutex release failed:', e);
+      logger.warn('[ProfileManager] Mutex release failed:', e);
     }
   }
 };
@@ -115,7 +116,7 @@ export const updateProfile = async (id: string, updates: Partial<Pick<Profile, '
     return profiles[index];
   } finally {
     try { release(); } catch (e) {
-      console.warn('[ProfileManager] Mutex release failed:', e);
+      logger.warn('[ProfileManager] Mutex release failed:', e);
     }
   }
 };
@@ -131,26 +132,26 @@ export const cleanupProfileFiles = async (profileId: string): Promise<void> => {
       const dbName = `proclaw_profiles_${profileId.replace(/[\/.]/g, '_')}_data_db`;
       try {
         indexedDB.deleteDatabase(dbName);
-        console.log('[ProfileManager] Deleted IndexedDB:', dbName);
+        logger.log('[ProfileManager] Deleted IndexedDB:', dbName);
       } catch (e) {
-        console.warn('[ProfileManager] Failed to delete IndexedDB:', e);
+        logger.warn('[ProfileManager] Failed to delete IndexedDB:', e);
       }
     } else {
       // 原生平台: 使用 expo-file-system 删除目录
       try {
         const FileSystem = await import('expo-file-system');
-        const profileDir = `${FileSystem.documentDirectory}profiles/${profileId}`;
-        const dirInfo = await FileSystem.getInfoAsync(profileDir);
-        if (dirInfo.exists) {
-          await FileSystem.deleteAsync(profileDir, { idempotent: true });
-          console.log('[ProfileManager] Deleted profile directory:', profileDir);
+        const profileDir = `${FileSystem.Paths.document.uri}profiles/${profileId}`;
+        const dir = new FileSystem.Directory(profileDir);
+        if (dir.exists) {
+          await dir.delete();
+          logger.log('[ProfileManager] Deleted profile directory:', profileDir);
         }
       } catch (e) {
-        console.warn('[ProfileManager] Failed to delete profile directory:', e);
+        logger.warn('[ProfileManager] Failed to delete profile directory:', e);
       }
     }
   } catch (error) {
-    console.warn('[ProfileManager] Failed to cleanup profile files:', error);
+    logger.warn('[ProfileManager] Failed to cleanup profile files:', error);
   }
 };
 
@@ -181,11 +182,11 @@ export const deleteProfile = async (id: string): Promise<boolean> => {
     // 清理数据库文件和插件目录
     await cleanupProfileFiles(id);
 
-    console.log('[ProfileManager] Deleted profile:', id);
+    logger.log('[ProfileManager] Deleted profile:', id);
     return true;
   } finally {
     try { release(); } catch (e) {
-      console.warn('[ProfileManager] Mutex release failed:', e);
+      logger.warn('[ProfileManager] Mutex release failed:', e);
     }
   }
 };
@@ -214,10 +215,10 @@ export const setCurrentProfile = async (id: string): Promise<void> => {
 
     // 保存当前身份ID
     await AsyncStorage.setItem(CURRENT_PROFILE_KEY, id);
-    console.log('[ProfileManager] Set current profile:', id);
+    logger.log('[ProfileManager] Set current profile:', id);
   } finally {
     try { release(); } catch (e) {
-      console.warn('[ProfileManager] Mutex release failed:', e);
+      logger.warn('[ProfileManager] Mutex release failed:', e);
     }
   }
 };

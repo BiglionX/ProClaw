@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 // WebSocket 服务 - 管理后端连接和通话信令
 // v4.1: 音视频通话信令处理
 
@@ -41,7 +42,7 @@ class WebSocketService {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log('[WS] Connected');
+        logger.log('[WS] Connected');
         this.isConnected = true;
         this.isConnecting = false;
         // 通过首条消息发送认证信息（审计 S7）
@@ -64,7 +65,7 @@ class WebSocketService {
       };
 
       this.ws.onclose = () => {
-        console.log('[WS] Disconnected');
+        logger.log('[WS] Disconnected');
         this.isConnected = false;
         this.isConnecting = false;
         this.stopHeartbeat();
@@ -76,11 +77,11 @@ class WebSocketService {
       };
 
       this.ws.onerror = (error) => {
-        console.error('[WS] Error:', error);
+        logger.error('[WS] Error:', error);
         this.isConnecting = false;
       };
     } catch (error) {
-      console.error('[WS] Connection failed:', error);
+      logger.error('[WS] Connection failed:', error);
       this.isConnecting = false;
       this.scheduleReconnect();
     }
@@ -118,7 +119,7 @@ class WebSocketService {
         try {
           handler(type, data);
         } catch (e) {
-          console.error(`[WS] Handler error for ${type}:`, e);
+          logger.error(`[WS] Handler error for ${type}:`, e);
         }
       });
     }
@@ -129,7 +130,7 @@ class WebSocketService {
         try {
           handler(type, data);
         } catch (e) {
-          console.error('[WS] Wildcard handler error:', e);
+          logger.error('[WS] Wildcard handler error:', e);
         }
       });
     }
@@ -138,7 +139,7 @@ class WebSocketService {
   /** 发送 JSON 消息 */
   send(type: string, payload?: any, toUserId?: string) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('[WS] Cannot send, not connected');
+      logger.warn('[WS] Cannot send, not connected');
       return false;
     }
     const msg: any = { type };

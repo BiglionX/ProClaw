@@ -6,6 +6,8 @@
 import { Platform } from 'react-native';
 import { wsService } from './WebSocketService';
 import * as ChatService from './ChatService';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 // ==================== 类型定义 ====================
 
@@ -338,7 +340,7 @@ class AgentRuntimeBridge {
       case 'getAgentDetail':
         return agent;
       case 'showNotification':
-        console.log(`[AgentBridge] Notification: ${request.params?.[0]} - ${request.params?.[1]}`);
+        logger.log(`[AgentBridge] Notification: ${request.params?.[0]} - ${request.params?.[1]}`);
         return { success: true };
       case 'sendMessage': {
         // PRD v11.2: Agent WebView 内调用 proclaw.sendMessage(to, content) 的桥接
@@ -352,13 +354,13 @@ class AgentRuntimeBridge {
           );
           const msg = await ChatService.sendMessage(session.id, content, 'other');
           return { success: true, message: msg };
-        } catch (e: any) {
-          console.warn(`[AgentBridge] sendMessage failed:`, e?.message);
-          return { success: false, error: e?.message || 'Failed to send message' };
+        } catch (e) {
+          logger.warn(`[AgentBridge] sendMessage failed:`, getErrorMessage(e));
+          return { success: false, error: getErrorMessage(e, 'Failed to send message') };
         }
       }
       default:
-        console.warn(`[AgentBridge] Unhandled RPC: ${method} for agent ${agentId}`);
+        logger.warn(`[AgentBridge] Unhandled RPC: ${method} for agent ${agentId}`);
         return null;
     }
   }
@@ -437,7 +439,7 @@ class AgentRuntimeBridge {
     for (const agentId of agentIds) {
       if (!this.agents.has(agentId)) {
         this.agents.set(agentId, this.createPluginAgent(agentId, pluginName));
-        console.log(`[AgentBridge] Registered plugin agent: ${agentId} for plugin ${pluginName}`);
+        logger.log(`[AgentBridge] Registered plugin agent: ${agentId} for plugin ${pluginName}`);
       }
     }
     if (agentIds.length > 0) {
@@ -456,7 +458,7 @@ class AgentRuntimeBridge {
         // 只清理非内置的插件推荐 Agent
         if (!agent.is_builtin && agent.manifest.author === 'ProClaw Plugin') {
           this.agents.delete(agentId);
-          console.log(`[AgentBridge] Unregistered plugin agent: ${agentId}`);
+          logger.log(`[AgentBridge] Unregistered plugin agent: ${agentId}`);
         }
       }
     }
@@ -490,7 +492,7 @@ class AgentRuntimeBridge {
 
     if (installed > 0) {
       this.notifyListeners();
-      console.log(`[AgentBridge] Installed ${installed} recommended agents for plugin ${pluginName}`);
+      logger.log(`[AgentBridge] Installed ${installed} recommended agents for plugin ${pluginName}`);
     }
 
     return { installed, skipped };

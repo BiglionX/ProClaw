@@ -3,9 +3,10 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Card, Text, Button, useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigation } from '../types/navigation';
 
 const SupplyChainScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AppNavigation>();
   const { colors } = useTheme();
 
   const menuCards = [
@@ -35,7 +36,7 @@ const SupplyChainScreen: React.FC = () => {
       description: '查看商品库存状态',
       icon: 'warehouse',
       color: '#f59e0b',
-      screen: null, // TODO: 库存页面
+      screen: 'Inventory',
     },
   ];
 
@@ -51,7 +52,7 @@ const SupplyChainScreen: React.FC = () => {
           style={styles.card}
           onPress={() => {
             if (item.screen) {
-              navigation.navigate(item.screen);
+              (navigation.navigate as any)(item.screen);
             }
           }}
         >

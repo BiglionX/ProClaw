@@ -8,6 +8,7 @@
 
 import { Platform } from 'react-native';
 import { getProfileDbPath, getProfilePluginPath } from './ProfileManager';
+import { logger } from '../utils/logger';
 
 // 数据库实例缓存
 const dbInstances: Map<string, any> = new Map();
@@ -76,10 +77,10 @@ export const openEncryptedDatabase = async (profileId: string, password?: string
       `INSERT OR REPLACE INTO sync_metadata (key, value) VALUES (?, ?)`,
       ['db_encryption_hash', passwordHash]
     );
-    console.log('[DatabaseFactory] Database encryption marker set for profile:', profileId);
+    logger.log('[DatabaseFactory] Database encryption marker set for profile:', profileId);
   } catch (e) {
     // 审计 H6：加密标记写入失败时抛出错误
-    console.error('[DatabaseFactory] Failed to set encryption marker:', e);
+    logger.error('[DatabaseFactory] Failed to set encryption marker:', e);
     throw new Error('数据库加密初始化失败：无法写入加密标记');
   }
 
@@ -217,12 +218,12 @@ export const openDatabase = async (profileId: string): Promise<IDatabase> => {
 
     dbInstances.set(profileId, db);
     currentProfileId = profileId;
-    console.log(`[DatabaseFactory] Opened database for profile: ${profileId}`);
+    logger.log(`[DatabaseFactory] Opened database for profile: ${profileId}`);
     return db;
   } finally {
     // 审计 R2-C6：try-catch release 防止异常导致互斥锁永久锁定
     try { releaseMutex(); } catch (e) {
-      console.warn('[DatabaseFactory] Mutex release failed:', e);
+      logger.warn('[DatabaseFactory] Mutex release failed:', e);
     }
   }
 };
@@ -238,7 +239,7 @@ export const closeDatabase = async (profileId: string): Promise<void> => {
   if (db) {
     await db.closeAsync();
     dbInstances.delete(profileId);
-    console.log(`[DatabaseFactory] Closed database for profile: ${profileId}`);
+    logger.log(`[DatabaseFactory] Closed database for profile: ${profileId}`);
   }
   if (currentProfileId === profileId) {
     currentProfileId = null;
@@ -254,7 +255,7 @@ export const closeAllDatabases = async (): Promise<void> => {
   }
   dbInstances.clear();
   currentProfileId = null;
-  console.log('[DatabaseFactory] All databases closed');
+  logger.log('[DatabaseFactory] All databases closed');
 };
 
 /**

@@ -9,6 +9,7 @@ import type { IDatabase } from './DatabaseFactory';
 import type { ChangeLogEntry } from './ChangeLogManager';
 import { getPendingChanges, markSynced } from './ChangeLogManager';
 import { getLastSyncTime, updateLastSyncTime } from './SyncMetadataManager';
+import { logger } from '../utils/logger';
 
 // 审计 S11：允许的表名白名单，防止 SQL 注入
 // 审计 M3：此白名单需与 SchemaManager 创建的表手动保持同步
@@ -238,7 +239,7 @@ export const applyRemoteChanges = async (
     try {
       // 审计 S11：校验表名是否在白名单中
       if (!isValidTableName(change.table_name)) {
-        console.warn(`[SyncEngine] Rejected change for invalid table: ${change.table_name}`);
+        logger.warn(`[SyncEngine] Rejected change for invalid table: ${change.table_name}`);
         continue;
       }
 
@@ -295,7 +296,7 @@ export const applyRemoteChanges = async (
                   ]
                 );
               } catch (e) {
-                console.warn('[SyncEngine] Failed to persist conflict record:', e);
+                logger.warn('[SyncEngine] Failed to persist conflict record:', e);
               }
             }
           } else {
@@ -307,7 +308,7 @@ export const applyRemoteChanges = async (
       }
     } catch (error) {
       failedCount++;
-      console.warn(`[SyncEngine] Failed to apply change to ${change.table_name}#${change.row_id}:`, error);
+      logger.warn(`[SyncEngine] Failed to apply change to ${change.table_name}#${change.row_id}:`, error);
     }
   }
 
@@ -315,7 +316,7 @@ export const applyRemoteChanges = async (
   if (failedCount > 0) {
     try {
       await db.execAsync('ROLLBACK');
-      console.warn(`[SyncEngine] Rolled back transaction due to ${failedCount} failed changes`);
+      logger.warn(`[SyncEngine] Rolled back transaction due to ${failedCount} failed changes`);
       // 审计 H3：回滚时返回空 conflicts，避免调用方基于已回滚的数据做后续处理
       return [];
     } catch {

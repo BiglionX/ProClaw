@@ -7,6 +7,8 @@
  */
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const SUPABASE_CONFIG_KEY = '@proclaw_supabase_config';
 
@@ -44,14 +46,14 @@ export const saveSupabaseConfig = async (url: string, apiKey: string): Promise<v
         const SecureStore = await import('expo-secure-store');
         await SecureStore.setItemAsync(SUPABASE_CONFIG_KEY, json);
       } catch {
-        console.warn('[SupabaseConfig] SecureStore not available, falling back to AsyncStorage');
+        logger.warn('[SupabaseConfig] SecureStore not available, falling back to AsyncStorage');
         await AsyncStorage.setItem(SUPABASE_CONFIG_KEY, json);
       }
     }
 
-    console.log('[SupabaseConfig] Configuration saved');
+    logger.log('[SupabaseConfig] Configuration saved');
   } catch (error) {
-    console.error('[SupabaseConfig] Failed to save config:', error);
+    logger.error('[SupabaseConfig] Failed to save config:', error);
     throw error;
   }
 };
@@ -77,7 +79,7 @@ export const loadSupabaseConfig = async (): Promise<SupabaseConnectionConfig | n
     if (!json) return null;
     return JSON.parse(json) as SupabaseConnectionConfig;
   } catch (error) {
-    console.warn('[SupabaseConfig] Failed to load config:', error);
+    logger.warn('[SupabaseConfig] Failed to load config:', error);
     return null;
   }
 };
@@ -98,9 +100,9 @@ export const clearSupabaseConfig = async (): Promise<void> => {
       }
     }
 
-    console.log('[SupabaseConfig] Configuration cleared');
+    logger.log('[SupabaseConfig] Configuration cleared');
   } catch (error) {
-    console.warn('[SupabaseConfig] Failed to clear config:', error);
+    logger.warn('[SupabaseConfig] Failed to clear config:', error);
   }
 };
 
@@ -169,12 +171,12 @@ export const testSupabaseConnection = async (
       message: `连接失败 (HTTP ${response.status})`,
       latencyMs,
     };
-  } catch (error: any) {
+  } catch (error) {
     const latencyMs = Date.now() - startTime;
     await updateTestResult('failed');
     return {
       success: false,
-      message: error?.message || '网络请求失败，请检查 URL 是否正确',
+      message: getErrorMessage(error, '网络请求失败，请检查 URL 是否正确'),
       latencyMs,
     };
   }

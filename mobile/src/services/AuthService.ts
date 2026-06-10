@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import axios, { AxiosInstance } from 'axios';
-import { secureGet, secureSet, secureDelete } from './SecureConfig'; // 审计 M1：统一安全存储实现
+import { secureGet, secureSet, secureDelete } from './SecureConfig';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const TOKEN_KEY = 'proclaw_auth_token';
 const REFRESH_TOKEN_KEY = 'proclaw_refresh_token';
@@ -10,7 +12,7 @@ let apiClient: AxiosInstance | null = null;
 
 export const saveToken = async (token: string): Promise<void> => {
   await secureSet(TOKEN_KEY, token);
-  console.log('Token saved');
+  logger.log('Token saved');
 };
 
 export const loadToken = async (): Promise<string | null> => {
@@ -28,7 +30,7 @@ export const loadRefreshToken = async (): Promise<string | null> => {
 export const clearTokens = async (): Promise<void> => {
   await secureDelete(TOKEN_KEY);
   await secureDelete(REFRESH_TOKEN_KEY);
-  console.log('Tokens cleared');
+  logger.log('Tokens cleared');
 };
 
 export const saveServerUrl = async (url: string): Promise<void> => {
@@ -48,7 +50,7 @@ export const getApiClient = async (): Promise<AxiosInstance> => {
   // 生产环境 localhost 可能被恶意进程监听，用户应显式配置服务器地址
   const baseURL = await loadServerUrl() || 'https://localhost:8888';
   if (!await loadServerUrl()) {
-    console.warn('[AuthService] No server URL configured, using default localhost:8888 (insecure in production)');
+    logger.warn('[AuthService] No server URL configured, using default localhost:8888 (insecure in production)');
   }
   const token = await loadToken();
 
@@ -97,12 +99,12 @@ export const getApiClient = async (): Promise<AxiosInstance> => {
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             // 审计 H1：添加 null 检查，防止并发 resetApiClient 导致崩溃
             if (!apiClient) {
-              console.warn('[AuthService] apiClient was reset during token refresh');
+              logger.warn('[AuthService] apiClient was reset during token refresh');
               return Promise.reject(error);
             }
             return apiClient.request(originalRequest);
           } catch (refreshError) {
-            console.warn('Token refresh failed');
+            logger.warn('Token refresh failed');
             await clearTokens();
           }
         }
@@ -123,7 +125,7 @@ export const pairDevice = async (
   pairingCode: string
 ): Promise<{ token: string; refresh_token: string; user: { name: string; roles?: string[] } }> => {
   try {
-    console.log('Pairing with server:', serverUrl); // 审计 S6：不输出配对码
+    logger.log('Pairing with server:', serverUrl); // 审计 S6：不输出配对码
     
     const response = await axios.post(
       `${serverUrl}/api/auth/pair`,
@@ -131,7 +133,7 @@ export const pairDevice = async (
       { timeout: 15000 }  // 15秒超时
     );
 
-    console.log('Pair response: token received, user:', response.data?.user?.name || 'unknown');
+    logger.log('Pair response: token received, user:', response.data?.user?.name || 'unknown');
 
     const { access_token, refresh_token } = response.data;
 
@@ -152,25 +154,27 @@ export const pairDevice = async (
         await saveRoles(roles);
       }
     } catch (e) {
-      console.warn('Failed to load roles after pairing:', e);
+      logger.warn('Failed to load roles after pairing:', e);
     }
 
-    console.log('Pairing successful, tokens saved, roles:', roles);
+    logger.log('Pairing successful, tokens saved, roles:', roles);
     // 审计 S4：优先使用服务器返回的真实用户名，回退到 "测试用户"
     const userName = response.data?.user?.name || '用户';
     return { token: access_token, refresh_token, user: { name: userName, roles } };
-  } catch (error: any) {
-    console.error('Device pairing failed:', error);
-    if (error.code === 'ECONNABORTED') {
+  } catch (error) {
+    logger.error('Device pairing failed:', error);
+    // axios 错误对象可能含 code（ECONNABORTED/ERR_NETWORK）和 response.data.error
+    const axiosErr = error as { code?: string; response?: { data?: { error?: string } } };
+    if (axiosErr.code === 'ECONNABORTED') {
       throw new Error('请求超时，请检查服务器是否可访问');
     }
-    if (error.code === 'ERR_NETWORK') {
+    if (axiosErr.code === 'ERR_NETWORK') {
       throw new Error('无法连接服务器，请检查服务器地址和网络');
     }
-    if (error.response?.data?.error) {
-      throw new Error(error.response.data.error);
+    if (axiosErr.response?.data?.error) {
+      throw new Error(axiosErr.response.data.error);
     }
-    throw new Error(error.message || '配对失败，请检查配对码');
+    throw new Error(getErrorMessage(error, '配对失败，请检查配对码'));
   }
 };
 
@@ -200,7 +204,7 @@ export const setDemoMode = async (): Promise<void> => {
   const randomToken = 'demo_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12);
   await saveToken(randomToken);
   await saveServerUrl('https://demo.local'); // 审计 S9：使用 HTTPS
-  console.log('Demo mode activated');
+  logger.log('Demo mode activated');
 };
 
 export const isDemoMode = async (): Promise<boolean> => {

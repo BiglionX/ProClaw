@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { logger } from './src/utils/logger';
 
 // Web 平台屏蔽不兼容的警告
 if (Platform.OS === 'web') {
@@ -20,10 +21,12 @@ if (Platform.OS === 'web') {
 
 import { theme } from './src/components/Theme';
 import { toastConfig } from './src/components/Toast';
+import type { RootStackParamList } from './src/types/navigation';
 import ConnectionScreen from './src/screens/ConnectionScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ProductsScreen from './src/screens/ProductsScreen';
 import SupplyChainScreen from './src/screens/SupplyChainScreen';
+import InventoryScreen from './src/screens/InventoryScreen';
 import SalesOrderScreen from './src/screens/SalesOrderScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -63,7 +66,7 @@ import { setupChangeLogTriggers } from './src/services/ChangeLogManager';
 import { initSyncMetadata, getOrCreateDeviceId } from './src/services/SyncMetadataManager';
 import { getInstalledPlugins, getDynamicRoutes, onRoutesChanged } from './src/services/PluginRegistry';
 
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
 /** 主 Tab 导航：固定 3 个 Tab，右下角浮动小如按钮 */
@@ -170,7 +173,7 @@ export default function App() {
       const targetProfile = lastProfile || profiles[0];
 
       // 3. 有身份直接进主界面（手机端已是独立产品，无需连接桌面端）
-      console.log('[App] Loading profile:', targetProfile.id, targetProfile.name);
+      logger.log('[App] Loading profile:', targetProfile.id, targetProfile.name);
 
       // 打开身份数据库并应用 Schema
       try {
@@ -185,26 +188,26 @@ export default function App() {
         // 安装变更日志触发器
         try {
           await setupChangeLogTriggers(db);
-          console.log('[App] ChangeLog triggers initialized');
+          logger.log('[App] ChangeLog triggers initialized');
         } catch (e) {
-          console.warn('[App] Failed to setup change log triggers:', e);
+          logger.warn('[App] Failed to setup change log triggers:', e);
         }
 
         // 加载已安装插件
         try {
           const installedPlugins = await getInstalledPlugins(db);
           const dynamicRoutes = getDynamicRoutes();
-          console.log('[App] Loaded', installedPlugins.length, 'installed plugins,', dynamicRoutes.length, 'dynamic routes');
+          logger.log('[App] Loaded', installedPlugins.length, 'installed plugins,', dynamicRoutes.length, 'dynamic routes');
         } catch (e) {
-          console.warn('[App] Failed to load plugins:', e);
+          logger.warn('[App] Failed to load plugins:', e);
         }
       } catch (e) {
-        console.warn('[App] DB init error, proceeding anyway:', e);
+        logger.warn('[App] DB init error, proceeding anyway:', e);
       }
 
       setInitialRoute('Main');
     } catch (error: any) {
-      console.warn('[App] Init error:', error?.message);
+      logger.warn('[App] Init error:', error?.message);
       setInitialRoute('ProfileSelect');
     } finally {
       setLoading(false);
@@ -327,6 +330,11 @@ export default function App() {
                 name="SupplyChain"
                 component={SupplyChainScreen}
                 options={{ title: '供应链' }}
+              />
+              <Stack.Screen
+                name="Inventory"
+                component={InventoryScreen}
+                options={{ title: '库存概览' }}
               />
               <Stack.Screen
                 name="SalesOrder"

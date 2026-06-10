@@ -7,6 +7,7 @@
  */
 import { cloudBackupProvider } from '../services/CloudBackupProvider';
 import { lanSyncProvider } from '../services/LanSyncProvider';
+import { logger } from '../utils/logger';
 
 /**
  * 关闭所有同步连接
@@ -18,7 +19,7 @@ export const closeAllSyncConnections = async (): Promise<void> => {
   // 关闭云备份连接
   try {
     await cloudBackupProvider.disconnect();
-    console.log('[SyncConnectionManager] Cloud backup disconnected');
+    logger.log('[SyncConnectionManager] Cloud backup disconnected');
   } catch (e) {
     errors.push(`CloudBackup: ${e}`);
   }
@@ -26,13 +27,13 @@ export const closeAllSyncConnections = async (): Promise<void> => {
   // 关闭局域网同步连接
   try {
     await lanSyncProvider.disconnect();
-    console.log('[SyncConnectionManager] LAN sync disconnected');
+    logger.log('[SyncConnectionManager] LAN sync disconnected');
   } catch (e) {
     errors.push(`LanSync: ${e}`);
   }
 
   if (errors.length > 0) {
-    console.warn('[SyncConnectionManager] Errors during disconnect:', errors.join('; '));
+    logger.warn('[SyncConnectionManager] Errors during disconnect:', errors.join('; '));
   }
 };
 

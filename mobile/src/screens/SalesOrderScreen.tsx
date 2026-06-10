@@ -5,6 +5,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { createSalesOrder } from '../services/ApiService';
 import { showToast } from '../components/Toast';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppNavigation } from '../types/navigation';
 
 interface OrderItem {
   product_id: string;
@@ -15,7 +17,7 @@ interface OrderItem {
 }
 
 const SalesOrderScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AppNavigation>();
   const route = useRoute<any>();
   const { colors } = useTheme();
 
@@ -81,11 +83,12 @@ const SalesOrderScreen: React.FC = () => {
       setCustomerId('');
       setItems([]);
       setNotes('');
-    } catch (err: any) {
-      if (err.message?.includes('同步队列')) {
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      if (msg.includes('同步队列')) {
         showToast('info', '已离线保存', '网络恢复后自动上传');
       } else {
-        showToast('error', '创建失败', err.message);
+        showToast('error', '创建失败', msg);
       }
     } finally {
       setLoading(false);

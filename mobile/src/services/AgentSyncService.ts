@@ -6,6 +6,7 @@
 import { wsService } from './WebSocketService';
 import type { AgentInfo } from './AgentRuntimeBridge';
 import { agentRuntimeBridge } from './AgentRuntimeBridge';
+import { logger } from '../utils/logger';
 
 type SyncCallback = (type: string, data: any) => void;
 
@@ -71,7 +72,7 @@ class AgentSyncService {
     );
 
     this.initialized = true;
-    console.log('[AgentSync] Service initialized');
+    logger.log('[AgentSync] Service initialized');
   }
 
   /** 请求完整 Agent 列表同步 */
@@ -156,7 +157,7 @@ class AgentSyncService {
         try {
           cb(type, data);
         } catch (e) {
-          console.warn(`[AgentSync] Handler error for ${type}:`, e);
+          logger.warn(`[AgentSync] Handler error for ${type}:`, e);
         }
       });
     }

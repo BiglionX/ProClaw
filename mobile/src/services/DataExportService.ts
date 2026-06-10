@@ -7,6 +7,8 @@
 
 import { openDatabase } from './DatabaseFactory';
 import type { IDatabase } from './DatabaseFactory';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 /** 导出数据包结构 */
 export interface ExportDataPackage {
@@ -71,22 +73,22 @@ export const exportProfileData = async (
   profileId: string,
   tableNames: string[] = DEFAULT_EXPORT_TABLE_NAMES
 ): Promise<ExportDataPackage> => {
-  console.log(`[DataExport] Exporting data from profile: ${profileId}`);
+  logger.log(`[DataExport] Exporting data from profile: ${profileId}`);
 
   const db = await openDatabase(profileId);
   const tables: Record<string, any[]> = {};
 
   for (const tableName of tableNames) {
     if (SYSTEM_TABLES.has(tableName)) {
-      console.warn(`[DataExport] Skipping system table: ${tableName}`);
+      logger.warn(`[DataExport] Skipping system table: ${tableName}`);
       continue;
     }
     try {
       const rows = await db.getAllAsync(`SELECT * FROM ${tableName}`);
       tables[tableName] = rows;
-      console.log(`[DataExport] Exported ${rows.length} rows from ${tableName}`);
+      logger.log(`[DataExport] Exported ${rows.length} rows from ${tableName}`);
     } catch (error) {
-      console.warn(`[DataExport] Failed to export table ${tableName}:`, error);
+      logger.warn(`[DataExport] Failed to export table ${tableName}:`, error);
     }
   }
 
@@ -110,7 +112,7 @@ export const importProfileData = async (
   data: ExportDataPackage,
   config: ImportConfig = { onConflict: 'skip', includeRelated: true, clearBeforeImport: false }
 ): Promise<{ imported: number; skipped: number; errors: string[] }> => {
-  console.log(`[DataExport] Importing data to profile: ${profileId}`);
+  logger.log(`[DataExport] Importing data to profile: ${profileId}`);
 
   const result = { imported: 0, skipped: 0, errors: [] as string[] };
   const db = await openDatabase(profileId);
@@ -128,20 +130,21 @@ export const importProfileData = async (
         try {
           await importRow(db, tableName, row, config);
           result.imported++;
-        } catch (error: any) {
-          if (config.onConflict === 'skip' && (error as any)?.message?.includes('UNIQUE')) {
+        } catch (error) {
+          const msg = getErrorMessage(error);
+          if (config.onConflict === 'skip' && msg.includes('UNIQUE')) {
             result.skipped++;
           } else {
-            result.errors.push(`[${tableName}] ${error?.message || 'Unknown error'}`);
+            result.errors.push(`[${tableName}] ${msg || 'Unknown error'}`);
           }
         }
       }
-    } catch (error: any) {
-      result.errors.push(`[${tableName}] ${error?.message || 'Table access error'}`);
+    } catch (error) {
+      result.errors.push(`[${tableName}] ${getErrorMessage(error, 'Table access error')}`);
     }
   }
 
-  console.log(`[DataExport] Import complete: ${result.imported} imported, ${result.skipped} skipped, ${result.errors.length} errors`);
+  logger.log(`[DataExport] Import complete: ${result.imported} imported, ${result.skipped} skipped, ${result.errors.length} errors`);
   return result;
 };
 
@@ -203,7 +206,7 @@ export const estimateRowCounts = async (
       }
     }
   } catch (error) {
-    console.warn('[DataExport] Failed to estimate row counts:', error);
+    logger.warn('[DataExport] Failed to estimate row counts:', error);
   }
 
   return counts;

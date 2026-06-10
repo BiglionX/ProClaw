@@ -10,6 +10,8 @@
  */
 
 import type { IDatabase } from './DatabaseFactory';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 // ============================================
 // Schema 版本管理
@@ -50,11 +52,11 @@ const setSchemaVersion = async (db: IDatabase, version: number): Promise<void> =
 export const applySchema = async (db: IDatabase): Promise<void> => {
   const currentVersion = await getSchemaVersion(db);
   if (currentVersion >= SCHEMA_VERSION) {
-    console.log('[SchemaManager] Schema is up to date (v' + currentVersion + ')');
+    logger.log('[SchemaManager] Schema is up to date (v' + currentVersion + ')');
     return;
   }
 
-  console.log('[SchemaManager] Applying schema from v' + currentVersion + ' to v' + SCHEMA_VERSION);
+  logger.log('[SchemaManager] Applying schema from v' + currentVersion + ' to v' + SCHEMA_VERSION);
 
   // 第一阶段：创建系统表
   await createSystemTables(db);
@@ -68,14 +70,14 @@ export const applySchema = async (db: IDatabase): Promise<void> => {
     try {
       await migrateToV2(db);
     } catch (migrationError) {
-      console.error('[SchemaManager] V2 migration failed, database may be in inconsistent state:', migrationError);
+      logger.error('[SchemaManager] V2 migration failed, database may be in inconsistent state:', migrationError);
       // 不更新 schema version，下次启动可重试迁移
       throw new Error('V2 migration failed: ' + (migrationError instanceof Error ? migrationError.message : String(migrationError)));
     }
   }
 
   await setSchemaVersion(db, SCHEMA_VERSION);
-  console.log('[SchemaManager] Schema applied successfully (v' + SCHEMA_VERSION + ')');
+  logger.log('[SchemaManager] Schema applied successfully (v' + SCHEMA_VERSION + ')');
 };
 
 // ============================================
@@ -156,7 +158,7 @@ const createSystemTables = async (db: IDatabase): Promise<void> => {
   for (const query of queries) {
     await db.execAsync(query);
   }
-  console.log('[SchemaManager] System tables created');
+  logger.log('[SchemaManager] System tables created');
 };
 
 // ============================================
@@ -414,7 +416,7 @@ const createV1Tables = async (db: IDatabase): Promise<void> => {
   for (const query of queries) {
     await db.execAsync(query);
   }
-  console.log('[SchemaManager] V1 business tables created');
+  logger.log('[SchemaManager] V1 business tables created');
 };
 
 // ============================================
@@ -423,7 +425,7 @@ const createV1Tables = async (db: IDatabase): Promise<void> => {
 // ============================================
 
 const migrateToV2 = async (db: IDatabase): Promise<void> => {
-  console.log('[SchemaManager] Migrating to V2: unified message tables');
+  logger.log('[SchemaManager] Migrating to V2: unified message tables');
 
   // 1. 创建新消息表（含 sync_status 字段）
   const newTables = [
@@ -460,7 +462,7 @@ const migrateToV2 = async (db: IDatabase): Promise<void> => {
   try {
     const oldRows = await db.getAllAsync(`SELECT * FROM messages ORDER BY created_at ASC`) as any[];
     if (oldRows && oldRows.length > 0) {
-      console.log(`[SchemaManager] Migrating ${oldRows.length} rows from old messages table...`);
+      logger.log(`[SchemaManager] Migrating ${oldRows.length} rows from old messages table...`);
       for (const row of oldRows) {
         const senderId = row.sender_id || 'unknown';
         const receiverId = row.receiver_id || 'unknown';
@@ -492,22 +494,22 @@ const migrateToV2 = async (db: IDatabase): Promise<void> => {
           ''
         )`
       );
-      console.log('[SchemaManager] V2 migration complete');
+      logger.log('[SchemaManager] V2 migration complete');
     }
   } catch (e) {
-    console.warn('[SchemaManager] Old messages table not found or migration skipped:', e);
+    logger.warn('[SchemaManager] Old messages table not found or migration skipped:', e);
     // 审计 H2：迁移失败时不删除旧表，防止数据永久丢失
-    console.error('[SchemaManager] Migration failed, keeping old messages table for data safety');
+    logger.error('[SchemaManager] Migration failed, keeping old messages table for data safety');
     // 审计 W5：throw 而非 return，防止 applySchema 仍然更新 schema version 导致数据被孤立
-    throw new Error('V2 migration failed: ' + (e instanceof Error ? e.message : String(e)));
+    throw new Error('V2 migration failed: ' + getErrorMessage(e));
   }
 
   // 3. 删除旧 messages 表（仅在迁移成功后执行）
   try {
     await db.execAsync(`DROP TABLE IF EXISTS messages`);
-    console.log('[SchemaManager] Old messages table dropped');
+    logger.log('[SchemaManager] Old messages table dropped');
   } catch (e) {
-    console.warn('[SchemaManager] Failed to drop old messages table:', e);
+    logger.warn('[SchemaManager] Failed to drop old messages table:', e);
   }
 };
 
@@ -527,10 +529,10 @@ export const dropAllTables = async (db: IDatabase): Promise<void> => {
     try {
       await db.execAsync(`DROP TABLE IF EXISTS ${table}`);
     } catch (e) {
-      console.warn(`[SchemaManager] Failed to drop table ${table}:`, e);
+      logger.warn(`[SchemaManager] Failed to drop table ${table}:`, e);
     }
   }
-  console.log('[SchemaManager] All tables dropped');
+  logger.log('[SchemaManager] All tables dropped');
 };
 
 export default {

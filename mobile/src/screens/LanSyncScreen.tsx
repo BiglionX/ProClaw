@@ -25,6 +25,7 @@ import { scanLanDevices, LanDevice, getDeviceDisplayName } from '../services/Lan
 import { lanSyncProvider } from '../services/LanSyncProvider';
 import type { SyncDirection, PairingStatus } from '../services/LanSyncProvider';
 import { getDatabase } from '../services/DatabaseFactory';
+import { getErrorMessage } from '../utils/errorUtils';
 
 type ScreenState = 'scanning' | 'devices' | 'pairing' | 'syncing' | 'complete';
 
@@ -58,8 +59,8 @@ const LanSyncScreen: React.FC = () => {
       if (foundDevices.length === 0) {
         setError('未发现可用的设备，请确保桌面端已开启同步服务');
       }
-    } catch (e: any) {
-      setError('扫描失败: ' + (e?.message || '未知错误'));
+    } catch (e) {
+      setError('扫描失败: ' + getErrorMessage(e, '未知错误'));
       setScreenState('devices');
     }
   }, []);
@@ -114,8 +115,8 @@ const LanSyncScreen: React.FC = () => {
         setError(result.errors.join('\n'));
         setScreenState('pairing');
       }
-    } catch (e: any) {
-      setError('同步失败: ' + (e?.message || '未知错误'));
+    } catch (e) {
+      setError('同步失败: ' + getErrorMessage(e, '未知错误'));
       setScreenState('pairing');
     }
   };
@@ -619,7 +620,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
   },

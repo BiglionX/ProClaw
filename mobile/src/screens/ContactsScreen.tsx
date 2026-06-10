@@ -9,6 +9,8 @@ import { getCustomers, Customer, ContactType, CONTACT_TYPE_LABELS } from '../ser
 import { isDemoMode } from '../services/AuthService';
 import { showToast } from '../components/Toast';
 import { useCallStore } from '../stores/CallStore';
+import type { AppNavigation } from '../types/navigation';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const TYPE_CONFIG: Record<ContactType, { icon: string; color: string; glow: string }> = {
   colleague:   { icon: 'account-tie',   color: '#00d2ff', glow: 'rgba(0,210,255,0.25)' },
@@ -35,7 +37,7 @@ const DEMO_CONTACTS: Customer[] = [
 type FilterType = 'all' | ContactType;
 
 const ContactsScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AppNavigation>();
   const { colors } = useTheme();
   const [contacts, setContacts] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,8 +69,8 @@ const ContactsScreen: React.FC = () => {
           : data;
         setContacts(result);
       }
-    } catch (err: any) {
-      showToast('error', '加载失败', err.message);
+    } catch (err) {
+      showToast('error', '加载失败', getErrorMessage(err));
     } finally {
       setLoading(false);
     }

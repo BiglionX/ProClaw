@@ -27,6 +27,8 @@ import {
   type Profile,
 } from '../services/ProfileManager';
 import { useAppStore, switchProfile } from '../stores/AppStore';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const ProfileSelectScreen: React.FC = () => {
   const [profiles, setProfilesLocal] = useState<Profile[]>([]);
@@ -45,7 +47,7 @@ const ProfileSelectScreen: React.FC = () => {
       setProfilesLocal(items);
       useAppStore.getState().setProfiles(items);
     } catch (error) {
-      console.error('[ProfileSelect] Failed to load profiles:', error);
+      logger.error('[ProfileSelect] Failed to load profiles:', error);
     } finally {
       setLoading(false);
     }
@@ -71,8 +73,8 @@ const ProfileSelectScreen: React.FC = () => {
       await loadProfiles();
       // 自动切换到新创建的身份
       await switchProfile(profile);
-    } catch (error: any) {
-      Alert.alert('创建失败', error?.message || '无法创建身份');
+    } catch (error) {
+      Alert.alert('创建失败', getErrorMessage(error, '无法创建身份'));
     } finally {
       setLoading(false);
     }
@@ -98,8 +100,8 @@ const ProfileSelectScreen: React.FC = () => {
               setDeletingId(profile.id);
               await deleteProfile(profile.id);
               await loadProfiles();
-            } catch (error: any) {
-              Alert.alert('删除失败', error?.message || '无法删除身份');
+            } catch (error) {
+              Alert.alert('删除失败', getErrorMessage(error, '无法删除身份'));
             } finally {
               setDeletingId(null);
             }

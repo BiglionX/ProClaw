@@ -36,6 +36,9 @@ import { agentRuntimeBridge, type AgentInfo } from '../services/AgentRuntimeBrid
 import { getDynamicRoutes } from '../services/PluginRegistry';
 import { useCallStore } from '../stores/CallStore';
 import { createOrGetSession } from '../services/ChatService';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppNavigation } from '../types/navigation';
 
 // ============ 类型定义 ============
 
@@ -114,7 +117,7 @@ const DEMO_CONTACTS: Customer[] = [
 // ============ 组件 ============
 
 export default function ContactsTab() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AppNavigation>();
   const { colors } = useTheme();
   const [personalContacts, setPersonalContacts] = useState<Customer[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>(BUILTIN_AGENTS);
@@ -142,8 +145,8 @@ export default function ContactsTab() {
         const data = await getCustomers({ search: searchQuery || undefined });
         setPersonalContacts(data);
       }
-    } catch (err: any) {
-      showToast('error', '加载失败', err.message);
+    } catch (err) {
+      showToast('error', '加载失败', getErrorMessage(err));
     }
   }, [searchQuery]);
 
@@ -315,8 +318,8 @@ export default function ContactsTab() {
         targetType: 'personal',
         targetIcon: '',
       });
-    } catch (e: any) {
-      console.warn('[ContactsTab] handlePersonalPress failed:', e?.message);
+    } catch (e) {
+      logger.warn('[ContactsTab] handlePersonalPress failed:', getErrorMessage(e));
       Alert.alert('错误', '无法打开会话，请稍后重试');
     }
   };

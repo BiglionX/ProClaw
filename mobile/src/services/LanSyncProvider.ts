@@ -12,6 +12,8 @@ import type { LanDevice } from './LanDiscoveryService';
 import { getPendingChanges, markSynced } from './ChangeLogManager';
 import { getDeviceId } from './SyncMetadataManager';
 import { serializeChanges, deserializeChanges, applyRemoteChanges, ConflictResolver } from './SyncEngine';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 /** 同步方向 */
 export type SyncDirection = 'merge' | 'send_only' | 'receive_only';
@@ -121,7 +123,7 @@ export class LanSyncProvider implements ISyncProvider {
         ws.onmessage = (event) => {
           // 审计 I3：检查 this.ws 是否已设置，防止在 onopen 完成前收到消息
           if (!this.ws) {
-            console.debug('[LanSync] Message received before WS ready, ignoring');
+            logger.debug('[LanSync] Message received before WS ready, ignoring');
             return;
           }
           try {
@@ -131,14 +133,14 @@ export class LanSyncProvider implements ISyncProvider {
                 // 验证身份匹配 (PRD 6.4)
                 const localProfileId = getCurrentProfileId();
                 if (localProfileId && device.profileId && localProfileId !== device.profileId) {
-                  console.warn(`[LanSync] Profile mismatch: local=${localProfileId}, remote=${device.profileId}`);
+                  logger.warn(`[LanSync] Profile mismatch: local=${localProfileId}, remote=${device.profileId}`);
                   this.setPairingStatus('error');
                   ws.close();
                   resolve(false);
                   return;
                 }
                 this.setPairingStatus('connected');
-                console.log('[LanSync] Paired with:', device.name);
+                logger.log('[LanSync] Paired with:', device.name);
                 resolve(true);
               } else {
                 this.setPairingStatus('error');
@@ -166,7 +168,7 @@ export class LanSyncProvider implements ISyncProvider {
                 this.pendingPushAcks.delete(ackSeq);
                 clearTimeout(pending.timer);
                 pending.resolve(msg.success !== false);
-                console.log(`[LanSync] Push acknowledged by remote (seq=${ackSeq})`);
+                logger.log(`[LanSync] Push acknowledged by remote (seq=${ackSeq})`);
               } else {
                 // 按旧协议兼容：查找任意 pending ack
                 const firstEntry = this.pendingPushAcks.entries().next();
@@ -175,7 +177,7 @@ export class LanSyncProvider implements ISyncProvider {
                   this.pendingPushAcks.delete(seq);
                   clearTimeout(pending.timer);
                   pending.resolve(msg.success !== false);
-                  console.log(`[LanSync] Push acknowledged by remote (fallback seq=${seq})`);
+                  logger.log(`[LanSync] Push acknowledged by remote (fallback seq=${seq})`);
                 }
               }
             }
@@ -196,7 +198,7 @@ export class LanSyncProvider implements ISyncProvider {
         };
       });
     } catch (error) {
-      console.error('[LanSync] Connection failed:', error);
+      logger.error('[LanSync] Connection failed:', error);
       this.setPairingStatus('error');
       return false;
     }
@@ -240,9 +242,9 @@ export class LanSyncProvider implements ISyncProvider {
           if (ackReceived) {
             await markSynced(db, pendingChanges.map(c => c.id));
             result.applied += pendingChanges.length;
-            console.log(`[LanSync] Sent ${pendingChanges.length} changes (acknowledged)`);
+            logger.log(`[LanSync] Sent ${pendingChanges.length} changes (acknowledged)`);
           } else {
-            console.warn(`[LanSync] Push ack not received, ${pendingChanges.length} changes will be retried on next sync`);
+            logger.warn(`[LanSync] Push ack not received, ${pendingChanges.length} changes will be retried on next sync`);
             result.errors.push('Push acknowledgment not received, changes will be retried');
             // 不标记 synced，让下次同步重新推送（服务器应幂等处理）
           }
@@ -258,14 +260,14 @@ export class LanSyncProvider implements ISyncProvider {
           const conflicts = await applyRemoteChanges(db, remotePkg.changes, resolver);
           result.applied += remotePkg.changes.length;
           result.conflicts = conflicts.length;
-          console.log(`[LanSync] Received ${remotePkg.changes.length} changes, ${conflicts.length} conflicts`);
+          logger.log(`[LanSync] Received ${remotePkg.changes.length} changes, ${conflicts.length} conflicts`);
         }
       }
 
       result.success = true;
-    } catch (error: any) {
-      result.errors.push(error?.message || 'Sync failed');
-      console.error('[LanSync] Sync failed:', error);
+    } catch (error) {
+      result.errors.push(getErrorMessage(error, 'Sync failed'));
+      logger.error('[LanSync] Sync failed:', error);
     }
 
     return result;
@@ -282,7 +284,7 @@ export class LanSyncProvider implements ISyncProvider {
         // 从队列中移除此请求
         const idx = this.pendingPullQueue.findIndex(p => p.resolve === resolve);
         if (idx >= 0) this.pendingPullQueue.splice(idx, 1);
-        console.warn('[LanSync] Pull timeout');
+        logger.warn('[LanSync] Pull timeout');
         resolve(null);
       }, timeoutMs);
 
@@ -309,7 +311,7 @@ export class LanSyncProvider implements ISyncProvider {
         if (this.pendingPushAcks.has(seq)) {
           this.pendingPushAcks.delete(seq);
         }
-        console.warn(`[LanSync] Push ack timeout (seq=${seq})`);
+        logger.warn(`[LanSync] Push ack timeout (seq=${seq})`);
         resolve(false);
       }, timeoutMs);
 
@@ -366,7 +368,7 @@ export class LanSyncProvider implements ISyncProvider {
     this.currentDevice = null;
     this.db = null;
     this.setPairingStatus('idle');
-    console.log('[LanSync] Disconnected');
+    logger.log('[LanSync] Disconnected');
   }
 }
 

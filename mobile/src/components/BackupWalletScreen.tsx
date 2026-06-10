@@ -37,6 +37,7 @@ import {
 import { getDatabase } from '../services/DatabaseFactory';
 import { cloudBackupProvider } from '../services/CloudBackupProvider';
 import { getPendingCount, getPendingChanges } from '../services/ChangeLogManager';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const BackupWalletScreen: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -132,8 +133,8 @@ const BackupWalletScreen: React.FC = () => {
         '备份已开启',
         '请务必妥善保管恢复密钥，密码丢失将无法恢复数据。'
       );
-    } catch (error: any) {
-      Alert.alert('设置失败', error?.message || '无法开启备份');
+    } catch (error) {
+      Alert.alert('设置失败', getErrorMessage(error, '无法开启备份'));
     } finally {
       setSaving(false);
     }
@@ -190,8 +191,8 @@ const BackupWalletScreen: React.FC = () => {
       } else {
         Alert.alert('同步失败', uploadResult.errors.join('\n') || '未知错误');
       }
-    } catch (error: any) {
-      Alert.alert('同步失败', error?.message || '同步过程中发生错误');
+    } catch (error) {
+      Alert.alert('同步失败', getErrorMessage(error, '同步过程中发生错误'));
     } finally {
       setSyncing(false);
     }

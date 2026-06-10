@@ -21,6 +21,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchAvailablePlugins, FlowHubPluginInfo } from '../services/PluginDownloader';
 import { getInstalledPlugins, InstalledPlugin } from '../services/PluginRegistry';
 import { getDatabase } from '../services/DatabaseFactory';
+import { logger } from '../utils/logger';
+import type { AppScreenProps } from '../types/navigation';
 
 type CategoryTab = 'all' | 'catering' | 'beauty' | 'pet';
 
@@ -37,7 +39,7 @@ const CATEGORY_MAP: Record<string, string> = {
   plugin_pet: 'pet',
 };
 
-const PluginStoreScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+const PluginStoreScreen: React.FC<AppScreenProps<'PluginStore'>> = ({ navigation }) => {
   const [plugins, setPlugins] = useState<FlowHubPluginInfo[]>([]);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -54,7 +56,7 @@ const PluginStoreScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setPlugins(available);
       setInstalledIds(new Set(installed.map(p => p.id)));
     } catch (error) {
-      console.warn('[PluginStore] Failed to load plugins:', error);
+      logger.warn('[PluginStore] Failed to load plugins:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

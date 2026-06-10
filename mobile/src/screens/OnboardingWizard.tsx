@@ -29,6 +29,8 @@ import { useNavigation } from '@react-navigation/native';
 import { createProfile } from '../services/ProfileManager';
 import { switchProfile } from '../stores/AppStore';
 import LinearGradient from 'react-native-linear-gradient';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppNavigation } from '../types/navigation';
 
 // ============ 类型定义 ============
 
@@ -65,7 +67,7 @@ const ORBS = [
 ];
 
 export default function OnboardingWizard() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AppNavigation>();
   const flatListRef = useRef<FlatList>(null);
   const [messages, setMessages] = useState<WizardMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -217,11 +219,11 @@ export default function OnboardingWizard() {
           setStep('complete');
           setLoading(false);
         }, 2500);
-      } catch (err: any) {
+      } catch (err) {
         const errMsg: WizardMessage = {
           id: 'err',
           role: 'system',
-          content: `创建失败：${err?.message || '请重试'}`,
+          content: `创建失败：${getErrorMessage(err, '请重试')}`,
         };
         setMessages((prev) => [...prev, errMsg]);
         setLoading(false);

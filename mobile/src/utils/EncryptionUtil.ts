@@ -1,4 +1,6 @@
 import CryptoJS from 'crypto-js';
+import { logger } from './logger';
+import { getErrorMessage } from './errorUtils';
 
 // 旧版硬编码密钥已移除（审计 S1/S2）
 // encryptData/decryptData 现在要求必须显式传入 key
@@ -45,7 +47,7 @@ export const encryptData = (data: string, key: string): string => {
     const encrypted = CryptoJS.AES.encrypt(data, key).toString();
     return encrypted;
   } catch (error) {
-    console.error('[EncryptionUtil] Encryption failed:', error);
+    logger.error('[EncryptionUtil] Encryption failed:', error);
     throw new Error('数据加密失败');
   }
 };
@@ -60,7 +62,7 @@ export const decryptData = (encryptedData: string, key: string): string => {
     const decrypted = bytes.toString(CryptoJS.enc.Utf8);
     return decrypted;
   } catch (error) {
-    console.error('[EncryptionUtil] Decryption failed:', error);
+    logger.error('[EncryptionUtil] Decryption failed:', error);
     throw new Error('数据解密失败');
   }
 };
@@ -97,7 +99,7 @@ export const encryptBlock = (data: string, password: string): string => {
 
     return `${salt}:${iv}:${ciphertext}:${authTag}`;
   } catch (error) {
-    console.error('[EncryptionUtil] Block encryption failed:', error);
+    logger.error('[EncryptionUtil] Block encryption failed:', error);
     throw new Error('数据加密失败');
   }
 };
@@ -160,9 +162,9 @@ export const decryptBlock = (encryptedBlock: string, password: string): string =
       throw new Error('解密失败：密码错误或数据已损坏');
     }
     return result;
-  } catch (error: any) {
-    console.error('[EncryptionUtil] Block decryption failed:', error);
-    throw new Error(error?.message || '数据解密失败');
+  } catch (error) {
+    logger.error('[EncryptionUtil] Block decryption failed:', error);
+    throw new Error(getErrorMessage(error, '数据解密失败'));
   }
 };
 

@@ -7,6 +7,7 @@
 
 import type { IDatabase } from './DatabaseFactory';
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 
 const DEVICE_ID_KEY = 'device_id';
 const DEVICE_NAME_KEY = 'device_name';
@@ -86,7 +87,7 @@ export const initSyncMetadata = async (
       [deviceId, await getDeviceName(), Platform.OS, now, now]
     );
   } catch (e) {
-    console.warn('[SyncMetadata] Failed to create device_info:', e);
+    logger.warn('[SyncMetadata] Failed to create device_info:', e);
   }
 };
 
@@ -175,9 +176,9 @@ export const clearSyncMetadata = async (db: IDatabase): Promise<void> => {
     await db.execAsync(`DELETE FROM sync_metadata`);
     await db.execAsync(`DELETE FROM device_info`);
     await db.execAsync(`DELETE FROM change_log`);
-    console.log('[SyncMetadata] Cleared all sync metadata');
+    logger.log('[SyncMetadata] Cleared all sync metadata');
   } catch (error) {
-    console.warn('[SyncMetadata] Failed to clear metadata:', error);
+    logger.warn('[SyncMetadata] Failed to clear metadata:', error);
   }
 };
 

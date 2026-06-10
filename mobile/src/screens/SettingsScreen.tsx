@@ -17,9 +17,9 @@ import { clearTokens } from '../services/AuthService';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { showToast } from '../components/Toast';
 import { hasBackupConfig } from '../services/BackupConfigStore';
+import type { AppNavigation } from '../types/navigation';
 
-export default function SettingsScreen() {
-  const navigation = useNavigation<any>();
+export default function SettingsScreen() {  const navigation = useNavigation<AppNavigation>();
   // theme removed for glassmorphism
 
   const [autoSync, setAutoSync] = useState(true);

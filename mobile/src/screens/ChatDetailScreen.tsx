@@ -21,20 +21,16 @@ import LinearGradient from 'react-native-linear-gradient';
 import { getMessages, sendMessage, createOrGetSession, type ChatMessage } from '../services/ChatService';
 import { chatWithAgentStream } from '../services/AIService';
 import { useChatStore } from '../stores/ChatStore';
+import { logger } from '../utils/logger';
+import type { AppNavigation, RootStackParamList } from '../types/navigation';
 
-type ChatParams = {
-  ChatDetail: {
-    sessionId?: string;
-    targetId: string;
-    targetName: string;
-    targetType: 'personal' | 'agent' | 'team' | 'group';
-    targetIcon?: string;
-  };
-};
+
+
+type ChatDetailRoute = RouteProp<RootStackParamList, 'ChatDetail'>;
 
 export default function ChatDetailScreen() {
-  const route = useRoute<RouteProp<ChatParams, 'ChatDetail'>>();
-  const navigation = useNavigation<any>();
+  const route = useRoute<ChatDetailRoute>();
+  const navigation = useNavigation<AppNavigation>();
   const { sessionId: initialSessionId, targetId, targetName, targetType, targetIcon } = route.params;
   const flatListRef = useRef<FlatList>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
@@ -78,7 +74,7 @@ export default function ChatDetailScreen() {
       // 标记该会话已读
       await markSessionRead(sid);
     } catch (err) {
-      console.warn('[ChatDetail] Failed to load messages:', err);
+      logger.warn('[ChatDetail] Failed to load messages:', err);
     } finally {
       setLoading(false);
     }
@@ -165,7 +161,7 @@ export default function ChatDetailScreen() {
             setMessages((prev) => prev.filter((m) => m.id !== streamPlaceholder.id));
           }
         } catch (aiErr: any) {
-          console.warn('[ChatDetail] AI stream failed:', aiErr?.message);
+          logger.warn('[ChatDetail] AI stream failed:', aiErr?.message);
           // 移除占位，改用 fallback 消息
           setMessages((prev) => prev.filter((m) => m.id !== streamPlaceholder.id));
           if (fullResponse.trim()) {
@@ -187,7 +183,7 @@ export default function ChatDetailScreen() {
       // 3. 刷新会话列表（让 MessagesTab 看到新消息）
       refreshSessions();
     } catch (err) {
-      console.warn('[ChatDetail] Failed to send:', err);
+      logger.warn('[ChatDetail] Failed to send:', err);
     } finally {
       setSending(false);
       scrollToBottom();

@@ -23,10 +23,12 @@ import { registerPlugin, unregisterPlugin, registerPluginRoutes, unregisterPlugi
 import { runPluginMigration, rollbackPluginMigration } from '../services/PluginMigration';
 import { getDatabase } from '../services/DatabaseFactory';
 import { getProfilePluginPath } from '../services/ProfileManager';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppScreenProps } from '../types/navigation';
 
 type OperationStatus = 'idle' | 'installing' | 'uninstalling' | 'updating';
 
-const PluginDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
+const PluginDetailScreen: React.FC<AppScreenProps<'PluginDetail'>> = ({ route, navigation }) => {
   const { pluginInfo: initialInfo, isInstalled: initiallyInstalled } = route.params;
   const [pluginInfo, setPluginInfo] = useState<FlowHubPluginInfo>(initialInfo);
   const [isInstalled, setIsInstalled] = useState(initiallyInstalled);
@@ -127,10 +129,10 @@ const PluginDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, 
       } else {
         Alert.alert('安装完成', `${pluginInfo.name} 已成功安装！`);
       }
-    } catch (error: any) {
+    } catch (error) {
       setOperationStatus('idle');
       setOperationProgress('');
-      Alert.alert('安装失败', error?.message || '插件安装过程中出现错误');
+      Alert.alert('安装失败', getErrorMessage(error, '插件安装过程中出现错误'));
     }
   };
 
@@ -171,10 +173,10 @@ const PluginDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, 
               setOperationProgress('');
               setShowAgentRecommend(false);
               Alert.alert('卸载完成', `${pluginInfo.name} 已成功卸载`);
-            } catch (error: any) {
+            } catch (error) {
               setOperationStatus('idle');
               setOperationProgress('');
-              Alert.alert('卸载失败', error?.message || '插件卸载过程中出现错误');
+              Alert.alert('卸载失败', getErrorMessage(error, '插件卸载过程中出现错误'));
             }
           },
         },
@@ -250,10 +252,10 @@ const PluginDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, 
       setOperationStatus('idle');
       setOperationProgress('');
       Alert.alert('更新完成', `${targetInfo.name} 已更新至 v${targetInfo.version}`);
-    } catch (error: any) {
+    } catch (error) {
       setOperationStatus('idle');
       setOperationProgress('');
-      Alert.alert('更新失败', error?.message || '插件更新过程中出现错误');
+      Alert.alert('更新失败', getErrorMessage(error, '插件更新过程中出现错误'));
     }
   };
 

@@ -13,14 +13,14 @@ import {
   Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigation } from '../types/navigation';
 
 interface Props {
   /** 未读消息数（预留） */
   unreadCount?: number;
 }
 
-export default function FloatingSecretaryButton({ unreadCount = 0 }: Props) {
-  const navigation = useNavigation<any>();
+export default function FloatingSecretaryButton({ unreadCount = 0 }: Props) {  const navigation = useNavigation<AppNavigation>();
 
   const handlePress = () => {
     navigation.navigate('ChatDetail', {

@@ -6,6 +6,7 @@
  */
 
 import type { IDatabase } from './DatabaseFactory';
+import { logger } from '../utils/logger';
 
 // 动态路由注册表（内存中，供 App.tsx 动态读取）
 interface DynamicRoute {
@@ -46,7 +47,7 @@ const notifyRoutesChanged = (): void => {
     try {
       cb(routes);
     } catch (e) {
-      console.warn('[PluginRegistry] Route change listener error:', e);
+      logger.warn('[PluginRegistry] Route change listener error:', e);
     }
   });
 };
@@ -76,7 +77,7 @@ export const registerPluginRoutes = (pluginId: string, routes: { path: string; t
       componentName: route.component,
     });
   }
-  console.log(`[PluginRegistry] Registered ${routes.length} routes for plugin: ${pluginId}`);
+  logger.log(`[PluginRegistry] Registered ${routes.length} routes for plugin: ${pluginId}`);
   notifyRoutesChanged();
 };
 
@@ -87,7 +88,7 @@ export const registerPluginRoutes = (pluginId: string, routes: { path: string; t
 export const unregisterPluginRoutes = (pluginId: string): void => {
   const removedCount = dynamicRoutes.filter(r => r.pluginId === pluginId).length;
   dynamicRoutes = dynamicRoutes.filter(r => r.pluginId !== pluginId);
-  console.log(`[PluginRegistry] Unregistered ${removedCount} routes for plugin: ${pluginId}`);
+  logger.log(`[PluginRegistry] Unregistered ${removedCount} routes for plugin: ${pluginId}`);
   notifyRoutesChanged();
 };
 
@@ -133,7 +134,7 @@ export const getInstalledPlugins = async (db: IDatabase): Promise<InstalledPlugi
     );
     return rows as InstalledPlugin[];
   } catch (error) {
-    console.warn('[PluginRegistry] Failed to get plugins:', error);
+    logger.warn('[PluginRegistry] Failed to get plugins:', error);
     return [];
   }
 };
@@ -169,7 +170,7 @@ export const registerPlugin = async (
      VALUES (?, ?, ?, 'installed', ?, ?, ?)`,
     [manifest.id, manifest.name, manifest.version, JSON.stringify(manifest), now, now]
   );
-  console.log(`[PluginRegistry] Registered plugin: ${manifest.name} v${manifest.version}`);
+  logger.log(`[PluginRegistry] Registered plugin: ${manifest.name} v${manifest.version}`);
 };
 
 /**
@@ -212,7 +213,7 @@ export const unregisterPlugin = async (
     `UPDATE plugin_registry SET status = 'uninstalled' WHERE id = ?`,
     [pluginId]
   );
-  console.log(`[PluginRegistry] Unregistered plugin: ${pluginId}`);
+  logger.log(`[PluginRegistry] Unregistered plugin: ${pluginId}`);
 };
 
 /**
@@ -248,7 +249,7 @@ export const isUpdateAvailable = (
   const currentParts = current.split('.').map(Number);
   const latestParts = latest.split('.').map(Number);
   if (currentParts.some(isNaN) || latestParts.some(isNaN)) {
-    console.warn(`[PluginRegistry] Invalid version format: ${current} vs ${latest}`);
+    logger.warn(`[PluginRegistry] Invalid version format: ${current} vs ${latest}`);
     return false;
   }
 

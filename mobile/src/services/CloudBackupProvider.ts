@@ -12,6 +12,8 @@ import { getDeviceId, updateLastSyncTime } from './SyncMetadataManager';
 import { encryptBlock, decryptBlock } from '../utils/EncryptionUtil';
 import { serializeChanges, deserializeChanges, applyRemoteChanges, ConflictResolver } from './SyncEngine';
 import { loadBackupConfig } from './BackupConfigStore';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 /** 云备份配置 */
 export interface CloudBackupConfig {
@@ -51,7 +53,7 @@ export class CloudBackupProvider implements ISyncProvider {
   async initialize(db: IDatabase, config: CloudBackupConfig): Promise<void> {
     this.db = db;
     this.config = config;
-    console.log('[CloudBackup] Provider initialized');
+    logger.log('[CloudBackup] Provider initialized');
   }
 
   /**
@@ -62,7 +64,7 @@ export class CloudBackupProvider implements ISyncProvider {
     try {
       const persistedConfig = await loadBackupConfig();
       if (!persistedConfig || !persistedConfig.enabled || !persistedConfig.backupPassword) {
-        console.warn('[CloudBackup] No valid persisted backup config found');
+        logger.warn('[CloudBackup] No valid persisted backup config found');
         return false;
       }
 
@@ -77,10 +79,10 @@ export class CloudBackupProvider implements ISyncProvider {
         enabled: true,
       };
 
-      console.log('[CloudBackup] Initialized from persisted config');
+      logger.log('[CloudBackup] Initialized from persisted config');
       return true;
     } catch (error) {
-      console.warn('[CloudBackup] Failed to initialize from store:', error);
+      logger.warn('[CloudBackup] Failed to initialize from store:', error);
       return false;
     }
   }
@@ -147,7 +149,7 @@ export class CloudBackupProvider implements ISyncProvider {
 
           result.success = true;
           result.applied = package_.changes.length;
-          console.log(`[CloudBackup] Uploaded ${package_.changes.length} changes (attempt ${attempt})`);
+          logger.log(`[CloudBackup] Uploaded ${package_.changes.length} changes (attempt ${attempt})`);
           return result;
         } else {
           lastError = `Upload attempt ${attempt} failed`;
@@ -156,9 +158,9 @@ export class CloudBackupProvider implements ISyncProvider {
             await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
           }
         }
-      } catch (error: any) {
-        lastError = error?.message || 'Upload error';
-        console.error(`[CloudBackup] Upload attempt ${attempt} failed:`, lastError);
+      } catch (error) {
+        lastError = getErrorMessage(error, 'Upload error');
+        logger.error(`[CloudBackup] Upload attempt ${attempt} failed:`, lastError);
         if (attempt < maxRetries) {
           await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
         }
@@ -192,7 +194,7 @@ export class CloudBackupProvider implements ISyncProvider {
       const files = await this.listRemoteFiles(userId, deviceId, sinceTimestamp);
 
       if (files.length === 0) {
-        console.log('[CloudBackup] No remote changes');
+        logger.log('[CloudBackup] No remote changes');
         return null;
       }
 
@@ -202,12 +204,12 @@ export class CloudBackupProvider implements ISyncProvider {
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        console.log(`[CloudBackup] Downloading file ${i + 1}/${files.length}: ${file.path}`);
+        logger.log(`[CloudBackup] Downloading file ${i + 1}/${files.length}: ${file.path}`);
 
         const encryptedContent = await this.downloadFromStorage(file.path);
 
         if (!encryptedContent) {
-          console.warn(`[CloudBackup] Failed to download: ${file.path}, skipping`);
+          logger.warn(`[CloudBackup] Failed to download: ${file.path}, skipping`);
           onProgress?.(i + 1, files.length);
           continue;
         }
@@ -222,32 +224,32 @@ export class CloudBackupProvider implements ISyncProvider {
             latestTimestamp = file.timestamp;
           }
 
-          console.log(`[CloudBackup] Extracted ${changes.length} changes from ${file.path}`);
+          logger.log(`[CloudBackup] Extracted ${changes.length} changes from ${file.path}`);
         } catch (decryptError) {
-          console.warn(`[CloudBackup] Failed to decrypt: ${file.path}, skipping`);
+          logger.warn(`[CloudBackup] Failed to decrypt: ${file.path}, skipping`);
         }
 
         onProgress?.(i + 1, files.length);
       }
 
       if (allChanges.length === 0) {
-        console.log('[CloudBackup] No decodable changes found in remote files');
+        logger.log('[CloudBackup] No decodable changes found in remote files');
         return null;
       }
 
       // 统一合并所有变更到本地数据库
-      console.log(`[CloudBackup] Merging ${allChanges.length} changes from ${files.length} files`);
+      logger.log(`[CloudBackup] Merging ${allChanges.length} changes from ${files.length} files`);
       const resolver = new ConflictResolver();
       const conflicts = await applyRemoteChanges(this.db!, allChanges, resolver);
 
       if (conflicts.length > 0) {
-        console.warn(`[CloudBackup] ${conflicts.length} conflicts detected during merge`);
+        logger.warn(`[CloudBackup] ${conflicts.length} conflicts detected during merge`);
       }
 
       // 更新同步时间戳为最新文件的时间
       await updateLastSyncTime(this.db!, latestTimestamp);
 
-      console.log(`[CloudBackup] Downloaded ${allChanges.length} changes, ${conflicts.length} conflicts from ${files.length} files`);
+      logger.log(`[CloudBackup] Downloaded ${allChanges.length} changes, ${conflicts.length} conflicts from ${files.length} files`);
 
       return {
         deviceId: deviceId,
@@ -256,7 +258,7 @@ export class CloudBackupProvider implements ISyncProvider {
         changes: allChanges,
       };
     } catch (error) {
-      console.error('[CloudBackup] Download failed:', error);
+      logger.error('[CloudBackup] Download failed:', error);
       return null;
     }
   }
@@ -284,7 +286,7 @@ export class CloudBackupProvider implements ISyncProvider {
   async disconnect(): Promise<void> {
     this.config = null;
     this.db = null;
-    console.log('[CloudBackup] Disconnected');
+    logger.log('[CloudBackup] Disconnected');
   }
 
   // ============================================
@@ -314,7 +316,7 @@ export class CloudBackupProvider implements ISyncProvider {
       );
       return response.ok;
     } catch (error) {
-      console.error('[CloudBackup] Storage upload error:', error);
+      logger.error('[CloudBackup] Storage upload error:', error);
       return false;
     }
   }
@@ -338,13 +340,13 @@ export class CloudBackupProvider implements ISyncProvider {
       );
 
       if (!response.ok) {
-        console.warn(`[CloudBackup] Download failed: ${response.status}`);
+        logger.warn(`[CloudBackup] Download failed: ${response.status}`);
         return null;
       }
 
       return await response.text();
     } catch (error) {
-      console.error('[CloudBackup] Storage download error:', error);
+      logger.error('[CloudBackup] Storage download error:', error);
       return null;
     }
   }

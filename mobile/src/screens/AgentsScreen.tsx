@@ -22,6 +22,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { agentRuntimeBridge, type AgentInfo } from '../services/AgentRuntimeBridge';
 import AgentView from '../components/AgentView';
+import { logger } from '../utils/logger';
 
 export default function AgentsScreen() {
   const { colors } = useTheme();
@@ -36,7 +37,7 @@ export default function AgentsScreen() {
       const list = agentRuntimeBridge.getInstalledAgents();
       setAgents(list);
     } catch (err) {
-      console.warn('[AgentsScreen] Failed to load agents:', err);
+      logger.warn('[AgentsScreen] Failed to load agents:', err);
     } finally {
       setLoading(false);
     }
@@ -74,7 +75,7 @@ export default function AgentsScreen() {
         ),
       );
     } catch (err) {
-      console.warn('[AgentsScreen] Toggle failed:', err);
+      logger.warn('[AgentsScreen] Toggle failed:', err);
     }
   };
 

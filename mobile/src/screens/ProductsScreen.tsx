@@ -6,6 +6,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { getProducts, Product } from '../services/ApiService';
 import { isDemoMode } from '../services/AuthService';
 import { showToast } from '../components/Toast';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const DEMO_PRODUCTS: Product[] = [
   { id: '1', name: 'iPhone 15 Pro', sku: 'SKU-001', price: 8999, stock_quantity: 120 },
@@ -35,8 +36,8 @@ const ProductsScreen: React.FC = () => {
         const data = await getProducts({ search: searchQuery || undefined });
         setProducts(data);
       }
-    } catch (err: any) {
-      showToast('error', '加载失败', err.message);
+    } catch (err) {
+      showToast('error', '加载失败', getErrorMessage(err));
     } finally {
       setLoading(false);
     }

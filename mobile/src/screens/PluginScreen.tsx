@@ -16,8 +16,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getDatabase } from '../services/DatabaseFactory';
 import { getPlugin, parseManifest } from '../services/PluginRegistry';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppScreenProps } from '../types/navigation';
 
-const PluginScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
+const PluginScreen: React.FC<AppScreenProps<'PluginPage'>> = ({ route, navigation }) => {
   const { pluginId, pluginTitle } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [tables, setTables] = useState<{ name: string; count: number }[]>([]);
@@ -44,8 +46,8 @@ const PluginScreen: React.FC<{ route: any; navigation: any }> = ({ route, naviga
       // 查询插件创建的表的行数
       const tableInfo = await queryPluginTables(db, pluginId);
       setTables(tableInfo);
-    } catch (e: any) {
-      setError(e?.message || '加载插件数据失败');
+    } catch (e) {
+      setError(getErrorMessage(e, '加载插件数据失败'));
     } finally {
       setLoading(false);
     }

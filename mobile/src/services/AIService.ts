@@ -8,6 +8,8 @@
  */
 import { getAIConfig, isAIConfigured, getAvailableProviders, type ProviderConfig } from '../config/ai';
 import { getDatabase, getCurrentProfileId } from './DatabaseFactory';
+import { logger } from '../utils/logger';
+import { getErrorMessage, toError } from '../utils/errorUtils';
 
 // ============ 类型定义 ============
 
@@ -85,7 +87,7 @@ async function buildBusinessContext(): Promise<string> {
     try {
       db = getDatabase();
     } catch (e) {
-      console.warn('[AIService] Database not ready (profile=', capturedProfileId, '), cannot build business context:', e);
+      logger.warn('[AIService] Database not ready (profile=', capturedProfileId, '), cannot build business context:', e);
       return '暂无可用业务数据';
     }
 
@@ -160,9 +162,9 @@ async function callLLM(messages: ChatMessage[]): Promise<string> {
   for (const provider of available) {
     try {
       return await callProvider(provider, messages);
-    } catch (err: any) {
-      console.warn(`[AIService] Provider ${provider.name} failed:`, err?.message);
-      lastError = err;
+    } catch (err) {
+      logger.warn(`[AIService] Provider ${provider.name} failed:`, getErrorMessage(err));
+      lastError = toError(err);
       // 继续尝试下一个供应商
     }
   }
@@ -177,7 +179,7 @@ async function callProvider(provider: ProviderConfig, messages: ChatMessage[]): 
   const config = await getAIConfig();
   const url = `${provider.apiBase}/chat/completions`;
 
-  console.log(`[AIService] Calling ${provider.name} (${provider.model}) at ${url}`);
+  logger.log(`[AIService] Calling ${provider.name} (${provider.model}) at ${url}`);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -209,7 +211,7 @@ async function callProvider(provider: ProviderConfig, messages: ChatMessage[]): 
   const content = data.choices?.[0]?.message?.content || '';
 
   if (data.usage) {
-    console.log(
+    logger.log(
       `[AIService] ${provider.name} tokens: ${data.usage.total_tokens} (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`
     );
   }
@@ -242,8 +244,8 @@ async function* callLLMStream(messages: ChatMessage[]): AsyncGenerator<string> {
         yield token;
       }
       if (hasYielded) return; // 流式成功
-    } catch (err: any) {
-      console.warn(`[AIService] Stream from ${provider.name} failed:`, err?.message);
+    } catch (err) {
+      logger.warn(`[AIService] Stream from ${provider.name} failed:`, getErrorMessage(err));
     }
   }
 
@@ -253,8 +255,8 @@ async function* callLLMStream(messages: ChatMessage[]): AsyncGenerator<string> {
     if (fullResponse) {
       yield fullResponse;
     }
-  } catch (fallbackErr: any) {
-    yield `抱歉，AI 服务暂时无法响应（${fallbackErr?.message || '未知错误'}）。`;
+  } catch (fallbackErr) {
+    yield `抱歉，AI 服务暂时无法响应（${getErrorMessage(fallbackErr, '未知错误')}）。`;
   }
 }
 

@@ -28,6 +28,7 @@ import {
   type ChatSession,
 } from '../services/ChatService';
 import { useChatStore } from '../stores/ChatStore';
+import type { AppNavigation } from '../types/navigation';
 
 function formatTime(ts: number): string {
   if (!ts) return '';
@@ -50,8 +51,7 @@ function formatTime(ts: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-export default function MessagesTab() {
-  const navigation = useNavigation<any>();
+export default function MessagesTab() {  const navigation = useNavigation<AppNavigation>();
   const {
     sessions: allSessions,
     loading,

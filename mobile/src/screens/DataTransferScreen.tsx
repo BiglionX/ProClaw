@@ -23,6 +23,7 @@ import { listProfiles, type Profile } from '../services/ProfileManager';
 import { exportProfileData, importProfileData, estimateRowCounts, DEFAULT_EXPORT_TABLES } from '../services/DataExportService';
 import type { ExportDataPackage, ImportConfig } from '../services/DataExportService';
 import { useAppStore } from '../stores/AppStore';
+import { getErrorMessage } from '../utils/errorUtils';
 
 type WizardStep = 'select_profile' | 'select_tables' | 'configure' | 'progress' | 'result';
 
@@ -112,8 +113,8 @@ const DataTransferScreen: React.FC = () => {
 
       setResult(importResult);
       setStep('result');
-    } catch (error: any) {
-      Alert.alert('传输失败', error?.message || '数据传输过程中发生错误');
+    } catch (error) {
+      Alert.alert('传输失败', getErrorMessage(error, '数据传输过程中发生错误'));
       setStep('select_profile');
     } finally {
       setExecuting(false);

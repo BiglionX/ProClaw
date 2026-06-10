@@ -18,6 +18,7 @@ import { isDemoMode } from '../services/AuthService';
 import { getInstalledPlugins, parseManifest, type InstalledPlugin } from '../services/PluginRegistry';
 import { getDatabase } from '../services/DatabaseFactory';
 import { useAppStore } from '../stores/AppStore';
+import type { AppNavigation, RootStackParamList } from '../types/navigation';
 
 const DEMO_PRODUCT_COUNT = 42;
 const DEMO_CONTACT_COUNT = 10;
@@ -30,8 +31,8 @@ interface QuickAction {
   icon: string;
   color: string;
   glow: string;
-  navigateTo: string;
-  params?: any;
+  navigateTo: keyof RootStackParamList;
+  params?: RootStackParamList[keyof RootStackParamList];
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -46,7 +47,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 // ============ 组件 ============
 
 export default function ProfileScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<AppNavigation>();
   // theme removed for glassmorphism
 
   // 看板数据
@@ -195,7 +196,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             key={action.id}
             style={styles.glassActionItem}
-            onPress={() => navigation.navigate(action.navigateTo, action.params)}
+            onPress={() => (navigation.navigate as any)(action.navigateTo, action.params)}
             activeOpacity={0.7}
           >
             <View style={[styles.glassActionIcon, { backgroundColor: action.glow }]}>

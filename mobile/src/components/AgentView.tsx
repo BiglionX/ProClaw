@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { agentRuntimeBridge, type AgentInfo } from '../services/AgentRuntimeBridge';
+import { logger } from '../utils/logger';
 
 // 仅在原生平台导入 WebView
 let WebView: any = null;
@@ -119,7 +120,7 @@ const PROCLAW_API_INJECTION = `
       }
     },
   };
-  console.log('[ProClaw] Agent API bridge injected');
+  logger.log('[ProClaw] Agent API bridge injected');
 })();
 true;
 `;
@@ -162,7 +163,7 @@ export default function AgentView({ agent, visible, onClose }: AgentViewProps) {
         webViewRef.current?.postMessage(JSON.stringify(errorResponse));
       }
     } catch (e) {
-      console.warn('[AgentView] Failed to parse message:', e);
+      logger.warn('[AgentView] Failed to parse message:', e);
     }
   };
 
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loadingContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f8f8f8',

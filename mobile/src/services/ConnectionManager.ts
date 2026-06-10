@@ -1,8 +1,15 @@
 import { Platform } from 'react-native';
 import { loadServerUrl, getApiClient } from './AuthService';
+import { logger } from '../utils/logger';
 
 // 审计 M4：统一 ConnectionMode 类型定义，与 AppStore 保持一致
 export type ConnectionMode = 'direct' | 'cloud_relay' | 'lan' | 'offline' | 'checking';
+
+/** P2 项 1：二维码扫码解析后的连接信息 */
+export interface ParsedConnectionPayload {
+  serverUrl: string;
+  code: string;
+}
 
 interface ConnectionStatus {
   mode: ConnectionMode;
@@ -75,7 +82,7 @@ export const checkConnection = async (): Promise<ConnectionStatus> => {
     notifyModeChange('offline');
     return { mode: 'offline', isConnected: false };
   } catch (error) {
-    console.warn('Connection check failed:', error);
+    logger.warn('Connection check failed:', error);
     currentMode = 'offline';
     notifyModeChange('offline');
     return { mode: 'offline', isConnected: false };
@@ -129,9 +136,38 @@ export const getLocalIPAddress = async (): Promise<string | null> => {
   }
 };
 
-export const scanQRCode = async (): Promise<string> => {
-  // TODO: implement QR code scanning
-  return '';
+/**
+ * P2 项 1：解析二维码扫码原始字符串为连接信息。
+ * 输入格式：JSON 对象 { serverUrl: string, code: string }
+ * 校验：
+ *  - 必须是合法 JSON
+ *  - serverUrl 必须以 http:// 或 https:// 开头
+ *  - code 必须为 6 位数字字符串
+ * 返回 null 表示解析失败，调用方负责提示用户重新扫描。
+ */
+export const parseQRCodeData = (rawData: string): ParsedConnectionPayload | null => {
+  if (!rawData || typeof rawData !== 'string') return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawData);
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== 'object') return null;
+  const obj = parsed as Record<string, unknown>;
+
+  const serverUrl = typeof obj.serverUrl === 'string' ? obj.serverUrl.trim() : '';
+  const codeRaw = obj.code;
+  const code = typeof codeRaw === 'string'
+    ? codeRaw.trim()
+    : (typeof codeRaw === 'number' ? String(codeRaw) : '');
+
+  if (!/^https?:\/\//i.test(serverUrl)) return null;
+  if (!/^\d{6}$/.test(code)) return null;
+
+  return { serverUrl, code };
 };
 
 /**
@@ -180,4 +216,5 @@ export default {
   onConnectionModeChange,
   getLocalIPAddress,
   isLanSyncAvailable,
+  parseQRCodeData,
 };

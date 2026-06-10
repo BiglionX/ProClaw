@@ -10,13 +10,14 @@ import {
   getDatabase,
   getCurrentProfileId,
 } from './DatabaseFactory';
+import { logger } from '../utils/logger';
 
 /**
  * 初始化数据库（兼容旧接口）
  * 注意：在新架构下，请在选择身份后调用 openDatabase()
  */
 export const initDatabase = async (): Promise<void> => {
-  console.log('[DatabaseService] initDatabase() called - use openDatabase(profileId) instead');
+  logger.log('[DatabaseService] initDatabase() called - use openDatabase(profileId) instead');
 };
 
 export { getDatabase, closeAllDatabases as closeDatabase };

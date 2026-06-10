@@ -6,6 +6,7 @@
  */
 
 import { getLocalIPAddress } from './ConnectionManager';
+import { logger } from '../utils/logger';
 
 export interface LanDevice {
   id: string;
@@ -131,9 +132,9 @@ export const scanLanDevices = async (
       }
     }
 
-    console.log(`[LanDiscovery] Found ${devices.length} devices`);
+    logger.log(`[LanDiscovery] Found ${devices.length} devices`);
   } catch (error) {
-    console.warn('[LanDiscovery] Scan failed:', error);
+    logger.warn('[LanDiscovery] Scan failed:', error);
   }
 
   return devices;

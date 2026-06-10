@@ -6,6 +6,8 @@
  */
 
 import type { IDatabase } from './DatabaseFactory';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 /** 迁移状态 */
 export type MigrationStatus = 'success' | 'failed' | 'already_applied';
@@ -129,9 +131,9 @@ export const runPluginMigration = async (
         try {
           await db.execAsync(stmt);
           appliedCount++;
-        } catch (error: any) {
-          console.error(`[PluginMigration] Statement failed for ${pluginId}:`, stmt, error);
-          throw new Error(`迁移语句执行失败: ${error?.message || '未知错误'}`);
+        } catch (error) {
+          logger.error(`[PluginMigration] Statement failed for ${pluginId}:`, stmt, error);
+          throw new Error(`迁移语句执行失败: ${getErrorMessage(error, '未知错误')}`);
         }
       }
 
@@ -148,16 +150,16 @@ export const runPluginMigration = async (
       throw txError;
     }
 
-    console.log(`[PluginMigration] Applied migration v${version} for plugin ${pluginId} (${appliedCount} statements)`);
+    logger.log(`[PluginMigration] Applied migration v${version} for plugin ${pluginId} (${appliedCount} statements)`);
 
     return {
       status: 'success',
       version,
       appliedStatements: appliedCount,
     };
-  } catch (error: any) {
-    const errMsg = error?.message || '未知迁移错误';
-    console.error(`[PluginMigration] Migration failed for ${pluginId}:`, errMsg);
+  } catch (error) {
+    const errMsg = getErrorMessage(error, '未知迁移错误');
+    logger.error(`[PluginMigration] Migration failed for ${pluginId}:`, errMsg);
     return {
       status: 'failed',
       version: parseVersionFromSql(upSql),
@@ -192,7 +194,7 @@ export const rollbackPluginMigration = async (
 
     if (!existing) {
       // 没有迁移记录仍然执行回滚（幂等）
-      console.warn(`[PluginMigration] No migration record found for ${pluginId} v${version}, executing anyway`);
+      logger.warn(`[PluginMigration] No migration record found for ${pluginId} v${version}, executing anyway`);
     }
 
     // 执行回滚 SQL
@@ -206,8 +208,8 @@ export const rollbackPluginMigration = async (
         try {
           await db.execAsync(stmt);
           appliedCount++;
-        } catch (error: any) {
-          console.error(`[PluginMigration] Rollback statement failed for ${pluginId}:`, stmt, error);
+        } catch (error) {
+          logger.error(`[PluginMigration] Rollback statement failed for ${pluginId}:`, stmt, error);
           // 回滚中允许单个语句失败（表可能已被其他操作删除）
         }
       }
@@ -223,16 +225,16 @@ export const rollbackPluginMigration = async (
       [pluginId, version]
     );
 
-    console.log(`[PluginMigration] Rolled back v${version} for plugin ${pluginId} (${appliedCount} statements)`);
+    logger.log(`[PluginMigration] Rolled back v${version} for plugin ${pluginId} (${appliedCount} statements)`);
 
     return {
       status: 'success',
       version,
       appliedStatements: appliedCount,
     };
-  } catch (error: any) {
-    const errMsg = error?.message || '未知回滚错误';
-    console.error(`[PluginMigration] Rollback failed for ${pluginId}:`, errMsg);
+  } catch (error) {
+    const errMsg = getErrorMessage(error, '未知回滚错误');
+    logger.error(`[PluginMigration] Rollback failed for ${pluginId}:`, errMsg);
     return {
       status: 'failed',
       version: parseVersionFromSql(downSql),

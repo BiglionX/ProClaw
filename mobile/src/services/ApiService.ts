@@ -10,6 +10,8 @@ import { getConnectionMode } from './ConnectionManager';
 import { getDatabase } from './DatabaseFactory';
 import { writeChangeLog } from './ChangeLogManager';
 import { generateId } from '../utils/generateId';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 export interface Product {
   id: string;
@@ -106,8 +108,8 @@ export const getProducts = async (params?: {
     await syncProductsToLocal(response.data);
 
     return response.data;
-  } catch (error: any) {
-    console.warn('[ApiService] Failed to get products from server, using local DB:', error?.message);
+  } catch (error) {
+    logger.warn('[ApiService] Failed to get products from server, using local DB:', getErrorMessage(error));
     return await getProductsFromLocal(params);
   }
 };
@@ -142,7 +144,7 @@ const getProductsFromLocal = async (params?: any): Promise<Product[]> => {
     const results = await db.getAllAsync(query, args);
     return results as Product[];
   } catch (error) {
-    console.warn('[ApiService] Failed to get products from local:', error);
+    logger.warn('[ApiService] Failed to get products from local:', error);
     return [];
   }
 };
@@ -172,7 +174,7 @@ const syncProductsToLocal = async (products: Product[]): Promise<void> => {
       );
     }
   } catch (error) {
-    console.warn('[ApiService] Failed to sync products to local:', error);
+    logger.warn('[ApiService] Failed to sync products to local:', error);
   }
 };
 
@@ -197,8 +199,8 @@ export const getCustomers = async (params?: {
     await syncCustomersToLocal(response.data);
 
     return response.data;
-  } catch (error: any) {
-    console.warn('[ApiService] Failed to get customers from server, using local DB:', error?.message);
+  } catch (error) {
+    logger.warn('[ApiService] Failed to get customers from server, using local DB:', getErrorMessage(error));
     return await getCustomersFromLocal(params);
   }
 };
@@ -223,7 +225,7 @@ const getCustomersFromLocal = async (params?: any): Promise<Customer[]> => {
     const results = await db.getAllAsync(query, args);
     return results as Customer[];
   } catch (error) {
-    console.warn('[ApiService] Failed to get customers from local:', error);
+    logger.warn('[ApiService] Failed to get customers from local:', error);
     return [];
   }
 };
@@ -246,7 +248,7 @@ const syncCustomersToLocal = async (customers: Customer[]): Promise<void> => {
       );
     }
   } catch (error) {
-    console.warn('[ApiService] Failed to sync customers to local:', error);
+    logger.warn('[ApiService] Failed to sync customers to local:', error);
   }
 };
 
@@ -278,8 +280,8 @@ export const createSalesOrder = async (orderData: {
     await syncOrderToLocal(response.data);
 
     return response.data;
-  } catch (error: any) {
-    console.warn('[ApiService] Failed to create order, writing to local DB:', error?.message);
+  } catch (error) {
+    logger.warn('[ApiService] Failed to create order, writing to local DB:', getErrorMessage(error));
 
     // 网络失败时写入本地
     const localOrder = await createLocalSalesOrder(orderData);
@@ -329,7 +331,7 @@ const createLocalSalesOrder = async (orderData: {
     status: 'draft',
   }));
 
-  console.log('[ApiService] Created local sales order:', orderNumber);
+  logger.log('[ApiService] Created local sales order:', orderNumber);
 
   return {
     id: orderId,
@@ -371,7 +373,7 @@ const syncOrderToLocal = async (order: Order): Promise<void> => {
       }
     }
   } catch (error) {
-    console.warn('[ApiService] Failed to sync order to local:', error);
+    logger.warn('[ApiService] Failed to sync order to local:', error);
   }
 };
 
@@ -390,9 +392,9 @@ const addToOfflineQueue = async (
       'INSERT INTO offline_queue (endpoint, method, payload, created_at) VALUES (?, ?, ?, ?)',
       [endpoint, method, JSON.stringify(payload), Math.floor(Date.now() / 1000)]
     );
-    console.log('[ApiService] Added to offline queue:', endpoint);
+    logger.log('[ApiService] Added to offline queue:', endpoint);
   } catch (error) {
-    console.warn('[ApiService] Failed to add to offline queue:', error);
+    logger.warn('[ApiService] Failed to add to offline queue:', error);
     throw error;
   }
 };
@@ -408,7 +410,7 @@ export const syncOfflineQueue = async (): Promise<void> => {
     const mode = getConnectionMode();
 
     if (mode === 'offline') {
-      console.log('[ApiService] Cannot sync in offline mode');
+      logger.log('[ApiService] Cannot sync in offline mode');
       return;
     }
 
@@ -435,7 +437,7 @@ export const syncOfflineQueue = async (): Promise<void> => {
         await db.runAsync('DELETE FROM offline_queue WHERE id = ?', [row.id]);
         // 审计 W2 修复：同步成功后清理内存中的重试计数器，避免内存泄漏
         retryAttempts.delete(row.id);
-        console.log('[ApiService] Synced offline item:', row.id);
+        logger.log('[ApiService] Synced offline item:', row.id);
       } catch (error) {
         // 审计 R3 修复：offline_queue 表无 retry_count 列，使用内存 Map 记录重试次数
         const itemId = row.id;
@@ -443,11 +445,11 @@ export const syncOfflineQueue = async (): Promise<void> => {
         const newAttempts = currentAttempts + 1;
         retryAttempts.set(itemId, newAttempts);
         if (newAttempts >= 5) {
-          console.warn('[ApiService] Offline item exceeded max retries, removing:', itemId);
+          logger.warn('[ApiService] Offline item exceeded max retries, removing:', itemId);
           await db.runAsync('DELETE FROM offline_queue WHERE id = ?', [itemId]);
           retryAttempts.delete(itemId);
         } else {
-          console.warn(`[ApiService] Failed to sync item ${itemId} (attempt ${newAttempts}):`, error);
+          logger.warn(`[ApiService] Failed to sync item ${itemId} (attempt ${newAttempts}):`, error);
         }
         // 审计 E5：continue 而非 break，一个临时失败不应阻塞整个队列
         // 重试次数通过 retryAttempts Map 跟踪，超出阈值后跳过
@@ -455,7 +457,7 @@ export const syncOfflineQueue = async (): Promise<void> => {
       }
     }
   } catch (error) {
-    console.warn('[ApiService] Failed to sync offline queue:', error);
+    logger.warn('[ApiService] Failed to sync offline queue:', error);
   }
 };
 

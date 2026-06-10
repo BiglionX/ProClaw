@@ -10,6 +10,7 @@
  */
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../utils/logger';
 
 // ============ 存储键名 ============
 
@@ -29,7 +30,7 @@ export async function secureGet(key: string): Promise<string | null> {
   if (Platform.OS === 'web') {
     // 审计 S1：Web 平台 AsyncStorage（localStorage）无 OS 级加密
     // 仅用于开发调试，生产环境应使用原生平台（iOS Keychain/Android Keystore）
-    console.debug('[SecureConfig] Web platform: using AsyncStorage (no OS-level encryption for', key, ')');
+    logger.debug('[SecureConfig] Web platform: using AsyncStorage (no OS-level encryption for', key, ')');
     return await AsyncStorage.getItem(key);
   }
   try {
@@ -43,7 +44,7 @@ export async function secureGet(key: string): Promise<string | null> {
 export async function secureSet(key: string, value: string): Promise<void> {
   if (Platform.OS === 'web') {
     // 审计 S1：Web 平台明文存储，仅用于开发环境
-    console.debug('[SecureConfig] Web platform: storing in AsyncStorage without encryption for', key);
+    logger.debug('[SecureConfig] Web platform: storing in AsyncStorage without encryption for', key);
     await AsyncStorage.setItem(key, value);
     return;
   }
@@ -51,7 +52,7 @@ export async function secureSet(key: string, value: string): Promise<void> {
     const SecureStore = await import('expo-secure-store');
     await SecureStore.setItemAsync(key, value);
   } catch (e) {
-    console.warn('[SecureConfig] Failed to save:', key, e);
+    logger.warn('[SecureConfig] Failed to save:', key, e);
   }
 }
 
@@ -64,6 +65,6 @@ export async function secureDelete(key: string): Promise<void> {
     const SecureStore = await import('expo-secure-store');
     await SecureStore.deleteItemAsync(key);
   } catch (e) {
-    console.warn('[SecureConfig] Failed to delete:', key, e);
+    logger.warn('[SecureConfig] Failed to delete:', key, e);
   }
 }

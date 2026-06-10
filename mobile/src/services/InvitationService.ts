@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 // 邀请服务 (PRD v4.2 + v4.3)
 // 移动端邀请相关 API 调用
 
@@ -63,7 +64,7 @@ export async function acceptInvitation(
 
     return await response.json();
   } catch (error) {
-    console.error('接受邀请失败:', error);
+    logger.error('接受邀请失败:', error);
     throw error;
   }
 }
@@ -93,7 +94,7 @@ export async function acceptEmployeeInvitation(
 
     return await response.json();
   } catch (error) {
-    console.error('接受员工邀请失败:', error);
+    logger.error('接受员工邀请失败:', error);
     throw error;
   }
 }

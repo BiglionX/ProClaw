@@ -7,6 +7,7 @@
  */
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../utils/logger';
 
 const BACKUP_CONFIG_KEY = '@proclaw_backup_config';
 
@@ -45,14 +46,14 @@ export const saveBackupConfig = async (config: PersistedBackupConfig): Promise<v
         await SecureStore.setItemAsync(BACKUP_CONFIG_KEY, json);
       } catch {
         // Fallback: expo-secure-store 不可用
-        console.warn('[BackupConfig] SecureStore not available, falling back to AsyncStorage');
+        logger.warn('[BackupConfig] SecureStore not available, falling back to AsyncStorage');
         await AsyncStorage.setItem(BACKUP_CONFIG_KEY, json);
       }
     }
 
-    console.log('[BackupConfig] Configuration saved');
+    logger.log('[BackupConfig] Configuration saved');
   } catch (error) {
-    console.error('[BackupConfig] Failed to save config:', error);
+    logger.error('[BackupConfig] Failed to save config:', error);
     throw error;
   }
 };
@@ -78,7 +79,7 @@ export const loadBackupConfig = async (): Promise<PersistedBackupConfig | null> 
     if (!json) return null;
     return JSON.parse(json) as PersistedBackupConfig;
   } catch (error) {
-    console.warn('[BackupConfig] Failed to load config:', error);
+    logger.warn('[BackupConfig] Failed to load config:', error);
     return null;
   }
 };
@@ -99,9 +100,9 @@ export const clearBackupConfig = async (): Promise<void> => {
       }
     }
 
-    console.log('[BackupConfig] Configuration cleared');
+    logger.log('[BackupConfig] Configuration cleared');
   } catch (error) {
-    console.warn('[BackupConfig] Failed to clear config:', error);
+    logger.warn('[BackupConfig] Failed to clear config:', error);
   }
 };
 

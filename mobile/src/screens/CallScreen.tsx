@@ -15,6 +15,7 @@ import VideoView from '../components/VideoView';
 import { useCallStore } from '../stores/CallStore';
 import callManager from '../services/CallManager';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigation } from '../types/navigation';
 
 const formatDuration = (seconds: number): string => {
   const m = Math.floor(seconds / 60);
@@ -23,7 +24,7 @@ const formatDuration = (seconds: number): string => {
 };
 
 const CallScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<AppNavigation>();
   const { colors } = useTheme();
 
   const status = useCallStore((s) => s.status);
@@ -37,7 +38,7 @@ const CallScreen: React.FC = () => {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [showControls, setShowControls] = useState(true);
-  const controlsTimer = useRef<ReturnType<typeof setTimeout>>();
+  const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // stream version 用于触发 RTCView 重新渲染
   const [streamVer, setStreamVer] = useState(0);
 
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   remoteVideo: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   userInfo: {
     alignItems: 'center',
@@ -351,4 +352,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CallScreen;
+export default CallScreen;

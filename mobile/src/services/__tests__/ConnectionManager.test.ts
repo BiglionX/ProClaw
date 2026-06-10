@@ -28,6 +28,7 @@ import {
   setConnectionMode,
   getLocalIPAddress,
   isLanSyncAvailable,
+  parseQRCodeData,
 } from '../ConnectionManager';
 
 describe('ConnectionManager', () => {
@@ -198,6 +199,73 @@ describe('ConnectionManager', () => {
 
       const result = await isLanSyncAvailable();
       expect(result).toBe(false);
+    });
+  });
+
+  // P2 项 1：二维码解析纯函数
+  describe('parseQRCodeData', () => {
+    it('有效 JSON 格式应解析出 serverUrl 与 6 位 code', () => {
+      const payload = parseQRCodeData('{"serverUrl":"http://192.168.1.100:8888","code":"123456"}');
+      expect(payload).toEqual({
+        serverUrl: 'http://192.168.1.100:8888',
+        code: '123456',
+      });
+    });
+
+    it('https 协议也应接受', () => {
+      const payload = parseQRCodeData('{"serverUrl":"https://proclaw.example.com","code":"888888"}');
+      expect(payload).toEqual({
+        serverUrl: 'https://proclaw.example.com',
+        code: '888888',
+      });
+    });
+
+    it('code 为数字类型时也应接受（强转为字符串）', () => {
+      const payload = parseQRCodeData('{"serverUrl":"http://192.168.1.100:8888","code":654321}');
+      expect(payload).toEqual({
+        serverUrl: 'http://192.168.1.100:8888',
+        code: '654321',
+      });
+    });
+
+    it('serverUrl 缺少协议时返回 null', () => {
+      const payload = parseQRCodeData('{"serverUrl":"192.168.1.100:8888","code":"123456"}');
+      expect(payload).toBeNull();
+    });
+
+    it('code 不是 6 位数字时返回 null', () => {
+      expect(parseQRCodeData('{"serverUrl":"http://x.com","code":"12345"}')).toBeNull();
+      expect(parseQRCodeData('{"serverUrl":"http://x.com","code":"1234567"}')).toBeNull();
+      expect(parseQRCodeData('{"serverUrl":"http://x.com","code":"abcdef"}')).toBeNull();
+    });
+
+    it('缺少 serverUrl 字段时返回 null', () => {
+      expect(parseQRCodeData('{"code":"123456"}')).toBeNull();
+    });
+
+    it('缺少 code 字段时返回 null', () => {
+      expect(parseQRCodeData('{"serverUrl":"http://x.com"}')).toBeNull();
+    });
+
+    it('损坏的 JSON 应返回 null', () => {
+      expect(parseQRCodeData('{not valid json')).toBeNull();
+    });
+
+    it('非 JSON 纯文本应返回 null', () => {
+      expect(parseQRCodeData('hello world')).toBeNull();
+      expect(parseQRCodeData('123456')).toBeNull();
+    });
+
+    it('空字符串 / null / 非字符串应返回 null', () => {
+      expect(parseQRCodeData('')).toBeNull();
+      // @ts-expect-error 故意测试非字符串输入
+      expect(parseQRCodeData(null)).toBeNull();
+      // @ts-expect-error 故意测试非字符串输入
+      expect(parseQRCodeData(undefined)).toBeNull();
+    });
+
+    it('JSON 数组（而非对象）应返回 null', () => {
+      expect(parseQRCodeData('["http://x.com","123456"]')).toBeNull();
     });
   });
 });

@@ -7,6 +7,7 @@
  */
 
 import type { IDatabase } from './DatabaseFactory';
+import { logger } from '../utils/logger';
 
 // 需要追踪变更的业务表列表
 // 审计 I5：添加 chat_sessions、chat_messages、product_spu_attributes
@@ -88,7 +89,7 @@ export const setupChangeLogTriggers = async (db: IDatabase): Promise<void> => {
   for (const table of TRACKED_TABLES) {
     await createTriggersForTable(db, table);
   }
-  console.log(`[ChangeLog] Installed triggers for ${TRACKED_TABLES.length} tables`);
+  logger.log(`[ChangeLog] Installed triggers for ${TRACKED_TABLES.length} tables`);
 };
 
 /**
@@ -133,7 +134,7 @@ export const wrapWithChangeLog = (db: IDatabase): IDatabase => {
               oldValueJson = JSON.stringify(oldRow);
             }
           } catch (e) {
-            console.warn('[ChangeLog] Failed to query old value:', e);
+            logger.warn('[ChangeLog] Failed to query old value:', e);
           }
         }
       }
@@ -163,7 +164,7 @@ export const wrapWithChangeLog = (db: IDatabase): IDatabase => {
               newValueJson = JSON.stringify(newRow);
             }
           } catch (e) {
-            console.warn('[ChangeLog] Failed to query new value:', e);
+            logger.warn('[ChangeLog] Failed to query new value:', e);
           }
         }
       }
@@ -178,7 +179,7 @@ export const wrapWithChangeLog = (db: IDatabase): IDatabase => {
             [parsed.tableName, rowId, parsed.operation, oldValueJson, newValueJson, now]
           );
         } catch (e) {
-          console.warn('[ChangeLog] Failed to write change log:', e);
+          logger.warn('[ChangeLog] Failed to write change log:', e);
         }
       }
 
@@ -278,11 +279,11 @@ export const removeChangeLogTriggers = async (db: IDatabase): Promise<void> => {
       try {
         await db.execAsync(`DROP TRIGGER IF EXISTS ${triggerName}`);
       } catch (e) {
-        console.warn(`[ChangeLog] Failed to drop trigger ${triggerName}:`, e);
+        logger.warn(`[ChangeLog] Failed to drop trigger ${triggerName}:`, e);
       }
     }
   }
-  console.log('[ChangeLog] Removed all triggers');
+  logger.log('[ChangeLog] Removed all triggers');
 };
 
 /**
@@ -351,7 +352,7 @@ export const getPendingChanges = async (
     );
     return rows as ChangeLogEntry[];
   } catch (error) {
-    console.warn('[ChangeLog] Failed to get pending changes:', error);
+    logger.warn('[ChangeLog] Failed to get pending changes:', error);
     return [];
   }
 };
@@ -404,9 +405,9 @@ export const markSynced = async (
       `UPDATE change_log SET sync_status = 'synced' WHERE id IN (${placeholders})`,
       changeIds
     );
-    console.log(`[ChangeLog] Marked ${changeIds.length} changes as synced`);
+    logger.log(`[ChangeLog] Marked ${changeIds.length} changes as synced`);
   } catch (error) {
-    console.warn('[ChangeLog] Failed to mark synced:', error);
+    logger.warn('[ChangeLog] Failed to mark synced:', error);
   }
 };
 
@@ -425,10 +426,10 @@ export const clearSyncedChanges = async (
       `DELETE FROM change_log WHERE sync_status = 'synced' AND timestamp < ?`,
       [olderThanSeconds]
     );
-    console.log(`[ChangeLog] Cleared ${result.rowsAffected} synced changes`);
+    logger.log(`[ChangeLog] Cleared ${result.rowsAffected} synced changes`);
     return result.rowsAffected;
   } catch (error) {
-    console.warn('[ChangeLog] Failed to clear synced changes:', error);
+    logger.warn('[ChangeLog] Failed to clear synced changes:', error);
     return 0;
   }
 };

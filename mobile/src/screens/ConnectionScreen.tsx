@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, ScrollView, Modal, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput, Button, Card, useTheme, HelperText, ActivityIndicator } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { pairDevice, setDemoMode } from '../services/AuthService';
-import { getLocalIPAddress, isLanSyncAvailable } from '../services/ConnectionManager';
+import { getLocalIPAddress, isLanSyncAvailable, parseQRCodeData } from '../services/ConnectionManager';
 import { showToast } from '../components/Toast';
 import { createProfile, setCurrentProfile } from '../services/ProfileManager';
 import { openDatabase } from '../services/DatabaseFactory';
 import { applySchema } from '../services/SchemaManager';
 import { useAppStore } from '../stores/AppStore';
+import { logger } from '../utils/logger';
+import { getErrorMessage } from '../utils/errorUtils';
+import type { AppScreenProps } from '../types/navigation';
 
-const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+const ConnectionScreen: React.FC<AppScreenProps<'Connection'>> = ({ navigation }) => {
   const { colors } = useTheme();
   const [serverUrl, setServerUrl] = useState('http://localhost:8888');
   const [pairingCode, setPairingCode] = useState('');
@@ -18,6 +23,10 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [demoLoading, setDemoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [localIP, setLocalIP] = useState('');
+  // P2 项 1：扫码状态
+  const [showScanner, setShowScanner] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const scannedRef = useRef(false);
 
   useEffect(() => {
     loadLocalIP();
@@ -53,13 +62,13 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         await applySchema(await (await import('../services/DatabaseFactory')).getDatabase());
         useAppStore.getState().setProfiles([profile]);
         useAppStore.getState().setPhase('ready');
-        console.log('[Connection] Created default profile:', profile.id);
+        logger.log('[Connection] Created default profile:', profile.id);
       }
 
       showToast('success', '配对成功', '正在跳转...');
       navigation.replace('Main');
-    } catch (err: any) {
-      setErrorMsg(err.message || '配对失败，请检查地址和配对码');
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, '配对失败，请检查地址和配对码'));
     } finally {
       setLoading(false);
     }
@@ -81,7 +90,7 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         await applySchema(await (await import('../services/DatabaseFactory')).getDatabase());
         useAppStore.getState().setProfiles([profile]);
         useAppStore.getState().setPhase('ready');
-        console.log('[Connection] Created demo profile:', profile.id);
+        logger.log('[Connection] Created demo profile:', profile.id);
       }
 
       showToast('success', '已进入演示模式', '可以浏览所有功能界面');
@@ -97,6 +106,36 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     if (localIP && localIP !== '无法获取') {
       setServerUrl(`http://${localIP}:8888`);
     }
+  };
+
+  // P2 项 1：扫码入口。请求权限后打开 Modal，由 CameraView 触发 onBarcodeScanned。
+  const handleOpenScanner = async () => {
+    if (!cameraPermission?.granted) {
+      const result = await requestCameraPermission();
+      if (!result.granted) {
+        showToast('error', '需要相机权限才能扫码');
+        return;
+      }
+    }
+    scannedRef.current = false;
+    setShowScanner(true);
+  };
+
+  // P2 项 1：扫码回调。解析原始数据，填充表单后关闭 Modal。
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (scannedRef.current) return;
+    scannedRef.current = true;
+    setShowScanner(false);
+
+    const payload = parseQRCodeData(data);
+    if (!payload) {
+      setErrorMsg('二维码内容无效，应为 { serverUrl, code } JSON 格式');
+      return;
+    }
+    setServerUrl(payload.serverUrl);
+    setPairingCode(payload.code);
+    setErrorMsg('');
+    showToast('success', '已识别', '请确认信息后点击配对');
   };
 
   return (
@@ -181,7 +220,7 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Button
             mode="outlined"
             icon="qrcode-scan"
-            onPress={() => showToast('info', '扫码连接', '二维码扫描功能即将上线')}
+            onPress={handleOpenScanner}
             style={styles.scanBtn}
           >
             扫码连接
@@ -217,6 +256,29 @@ const ConnectionScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </Button>
         </Card.Content>
       </Card>
+
+      {/* P2 项 1：扫码 Modal（仿 LanSyncScreen 模式） */}
+      <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
+        <SafeAreaView style={styles.scannerContainer}>
+          <View style={styles.scannerHeader}>
+            <TouchableOpacity onPress={() => setShowScanner(false)}>
+              <MaterialCommunityIcons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.scannerTitle}>扫描桌面端二维码</Text>
+            <View style={{ width: 28 }} />
+          </View>
+          <CameraView
+            style={styles.cameraPreview}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            onBarcodeScanned={handleBarcodeScanned}
+          />
+          <View style={styles.scannerOverlay}>
+            <View style={styles.scanFrame} />
+            <Text style={styles.scannerHint}>将桌面端显示的二维码放入框内</Text>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       {/* 帮助指南 */}
       <Card style={styles.helpCard}>
@@ -329,6 +391,46 @@ const styles = StyleSheet.create({
   helpTitle: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // P2 项 1：扫码 Modal 样式
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  scannerTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cameraPreview: {
+    flex: 1,
+  },
+  scannerOverlay: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 220,
+    height: 220,
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+  },
+  scannerHint: {
+    color: '#fff',
+    marginTop: 16,
+    fontSize: 14,
   },
   helpStep: {
     flexDirection: 'row',
