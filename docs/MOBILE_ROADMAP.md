@@ -23,7 +23,7 @@
 - `expo export (web)`：1436 模块、4 bundle 通过（输出 `dist-web-sdk56`）
 - `npm audit`：critical 0 / **high 0** / moderate 10 / low 0（残留 10 moderate 为 expo 56 工具链转接链 uuid<11.1.1，上游未修，详见 1.8）
 
-**路线图跟踪 3 项**
+**路线图跟踪 7 项**
 
 | 优先级 | 项 | 触发原因 | 估时 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -31,6 +31,10 @@
 | P1 | 类型与日志清理（241 console + 13 useNavigation<any> + 多处 any） | TypeScript strict 宽松、调试日志未结构化 | 0.5-1 天 | **✅ 完成 2026-06-10** |
 | P2 | 3 个 TODO 占位实现 | 功能缺口 | 0.5-1 天 | **项 1 + 项 2 + 项 3 ✅ 完成 2026-06-10** |
 | **P1.x** | **catch (xxx: any) 类型化（35+ 处）** | **TypeScript strict 下默认 unknown 却被显式绕过，破坏类型安全** | **0.5 天** | **✅ 完成 2026-06-10** |
+| P3 | Services 单测补全（11 个未覆盖服务） | 核心业务逻辑缺少单测覆盖，存在回归风险 | 1.5-2 天 | **📋 待实施** |
+| P4 | Connection Pool 优化 | 连接检测固定间隔 + WebSocket 重连无最大次数限制 | 0.5 天 | **📋 待实施** |
+| P5 | Sync 重试加固 | 离线队列重试计数内存丢失 + 冲突策略硬编码 + 同步无优先级 | 1 天 | **📋 待实施** |
+| P6 | 其他技术债清理 | dist 目录残留 + 未使用 import + any 类型残留 + 重复代码 | 0.5-1 天 | **📋 待实施** |
 
 ---
 
@@ -685,6 +689,413 @@ mobile/
 
 ---
 
+## 6. [P3] Services 单测补全
+
+### 6.1 背景
+
+当前 mobile/src/services 共有 33 个服务文件，已覆盖单测的 22 个，未覆盖的 11 个（含 Integration 测试 6 个）。核心业务逻辑（AIService / CallManager / ApiService / AuthService / AgentRuntimeBridge / WebSocketService）缺少单测覆盖，存在回归风险。
+
+### 6.2 单测覆盖现状（截至 2026-06-10）
+
+#### A. 已有单测的 Services（22 个）
+
+| 文件 | 行数 | 测试文件 | 覆盖范围 |
+| --- | --- | --- | --- |
+| BackupConfigStore.ts | 122 | BackupConfigStore.test.ts | 基础 CRUD |
+| ChangeLogManager.ts | 490 | ChangeLogManager.test.ts + SyncFlowIntegration.test.ts | 变更日志 + 同步流程 |
+| CloudBackupProvider.ts | 404 | CloudBackupProvider.test.ts + CloudBackupIntegration.test.ts | 备份 + 集成 |
+| ConnectionManager.ts | 221 | ConnectionManager.test.ts | parseQRCodeData + 连接监控 |
+| DatabaseFactory.ts | 563 | DatabaseFactory.test.ts | openDatabase + 加密 |
+| EncryptionUtil.ts | 310+ | EncryptionUtil.test.ts | 加密/解密/hash |
+| InventoryService.ts | 168 | InventoryService.test.ts | classifyStockStatus + 查询 |
+| LanDiscoveryService.ts | 153 | LanDiscoveryService.test.ts | LAN 发现 |
+| LanSyncProvider.ts | 377 | LanSyncProvider.test.ts | 同步提供 |
+| PluginDownloader.ts | 372 | PluginDownloader.test.ts | 下载 + 解压 |
+| PluginMigration.ts | 308 | PluginMigration.test.ts | 迁移逻辑 |
+| PluginRegistry.ts | 278 | PluginRegistry.test.ts | 注册表 |
+| ProfileManager.ts | 267 | ProfileManager.test.ts + CrossProfileIntegration.test.ts | 多身份管理 |
+| SchemaManager.ts | 541 | SchemaManager.test.ts + ProfileSwitchIntegration.test.ts | Schema 创建 |
+| SyncEngine.ts | 442 | SyncEngine.test.ts | 冲突解决 |
+| SyncMetadataManager.ts | 194 | SyncMetadataManager.test.ts | 元数据管理 |
+
+#### B. 缺少单测的 Services（11 个，按优先级排序）
+
+| 优先级 | 文件 | 行数 | 核心逻辑 | 风险 |
+| --- | --- | --- | --- | --- |
+| **P0** | AIService.ts | 458 | AI 对话/摘要/RAG | 高：核心 AI 功能 |
+| **P0** | CallManager.ts | 562 | WebRTC 通话/信令 | 高：核心通话功能 |
+| **P0** | ApiService.ts | 469 | 数据访问/离线队列 | 高：业务核心 |
+| **P0** | AuthService.ts | 226 | 认证/配对/token | 高：安全相关 |
+| **P0** | WebSocketService.ts | 202 | WS 连接/重连/心跳 | 高：连接核心 |
+| **P1** | AgentRuntimeBridge.ts | 504 | Agent 运行时/RPC | 中：AI 生态 |
+| **P1** | AgentSyncService.ts | 170 | Agent 状态同步 | 中：状态同步 |
+| **P2** | ChatService.ts | 155 | 消息会话管理 | 中：聊天功能 |
+| **P2** | InvitationService.ts | 134 | 邀请解析/接受 | 低：邀请流程 |
+| **P2** | SupabaseConfigStore.ts | 219 | Supabase 配置 | 低：配置管理 |
+| **P3** | SecureConfig.ts | 71 | 安全存储 | 低：仅 wrapper |
+
+### 6.3 执行方案
+
+#### A. P0 高优先级服务（5 个）
+
+按以下顺序推进，每个服务独立一个 `.test.ts` 文件：
+
+| 序号 | 服务 | 核心测试场景 |
+| --- | --- | --- |
+| 1 | **AuthService** | token 保存/加载、配对成功/失败（超时/网络错误/无效码）、demo 模式 |
+| 2 | **WebSocketService** | connect/disconnect、指数退避重连、心跳、消息分发、handler 错误隔离 |
+| 3 | **ApiService** | getProducts（在线/离线）、createSalesOrder（在线/离线）、syncOfflineQueue（成功/失败重试） |
+| 4 | **CallManager** | startCall/acceptIncoming/hangup、权限检查、WebRTC offer/answer、媒体控制 |
+| 5 | **AIService** | 对话生成、流式响应、错误恢复（timeout/network）、lastError 记录 |
+
+#### B. P1 中优先级服务（2 个）
+
+| 序号 | 服务 | 核心测试场景 |
+| --- | --- | --- |
+| 6 | **AgentRuntimeBridge** | RPC 调用/响应、Agent 列表管理、错误处理 |
+| 7 | **AgentSyncService** | 状态变化分发、WS 消息转发 |
+
+#### C. P2 低优先级服务（2 个）
+
+| 序号 | 服务 | 核心测试场景 |
+| --- | --- | --- |
+| 8 | **ChatService** | 会话 CRUD、消息发送/已读/置顶 |
+| 9 | **InvitationService** | parseInviteLink（URL/proclaw://）、接受邀请成功/失败 |
+
+#### D. P3 兜底服务（2 个）
+
+- **SupabaseConfigStore**：配置读写
+- **SecureConfig**：跨平台抽象层（MockSecureStore）
+
+### 6.4 测试策略
+
+1. **Mock 依赖注入**：使用 Jest mock 隔离外部依赖（axios/fetch/expo-secure-store/expo-sqlite）
+2. **纯函数优先**：将可测试的逻辑抽成纯函数（如 AuthService 的 `parsePairingResponse`）
+3. **场景覆盖**：成功路径 + 异常路径（超时/网络错误/无效数据）
+4. **不测原生模块**：WebRTC/媒体设备在 jest 环境中 mock
+
+### 6.5 验收标准
+
+- 每个未覆盖服务新增 1 个 `.test.ts`
+- 新增测试覆盖率 ≥ 70%（按行数）
+- `jest --ci` 总套件数 ≥ 30（当前 25）
+- `tsc --noEmit` 保持 0 错误
+
+### 6.6 估时
+
+| 优先级 | 服务 | 估时 |
+| --- | --- | --- |
+| P0 | AuthService + WebSocketService | 2-3 小时 |
+| P0 | ApiService | 1-2 小时 |
+| P0 | CallManager | 2-3 小时 |
+| P0 | AIService | 2-3 小时 |
+| P1 | AgentRuntimeBridge + AgentSyncService | 2 小时 |
+| P2 | ChatService + InvitationService | 1-2 小时 |
+| P3 | SupabaseConfigStore + SecureConfig | 1 小时 |
+| **合计** | **9 个服务** | **约 1.5-2 天** |
+
+### 6.7 完成记录
+
+**整体完成时间**：2026-06-10
+
+#### A. P3 阶段 1 补充 - DataExportService 单测
+
+| 子项 | 交付物 | 实测结果 |
+| --- | --- | --- |
+| P3-D1-1 | `mobile/src/services/__tests__/DataExportService.test.ts` 新建 | 266 行，**16 个 test cases** |
+| P3-D1-2 | 覆盖 `DEFAULT_EXPORT_TABLES` 常量 | 3 个 case（业务表包含、key 一致、字段完整性） |
+| P3-D1-3 | 覆盖 `exportProfileData` | 4 个 case（正常导出、跳过系统表、错误处理、默认表） |
+| P3-D1-4 | 覆盖 `importProfileData` | 5 个 case（skip 策略、overwrite 策略、clearBeforeImport、空表、默认配置） |
+| P3-D1-5 | 覆盖 `estimateRowCounts` | 4 个 case（行数统计、跳过系统表、错误处理、默认表） |
+
+**验收数据**：
+
+| 指标 | 目标 | 实测 |
+| --- | --- | --- |
+| 新增单测 | 1 个服务 | **DataExportService.test.ts（16 tests）** |
+| jest 总套件数 | ≥ 30 | **37/37 套件** |
+| jest 总用例数 | 增长 | **581/581 用例**（+16 vs P1.x 的 565） |
+| tsc --noEmit | 0 错 | **0 错** |
+
+**关键设计决策**：
+
+1. **Mock DatabaseFactory.openDatabase**：通过 `jest.mock` 注入 mock 数据库对象，覆盖 `getAllAsync/getFirstAsync/runAsync` 方法，实现无副作用的单元测试。
+
+2. **验证 SQL 语句通过 mock.calls**：使用 `expect.stringContaining` 配合 `.toHaveBeenCalledWith` 验证 INSERT OR IGNORE/INSERT OR REPLACE/DELETE FROM 等关键 SQL 语句被正确调用。
+
+3. **未覆盖的服务**：`DatabaseService.ts/native.ts`（兼容层，仅委托 DatabaseFactory）和 `WebRTC.ts`（浏览器原生 API 封装），单测价值不高且需要浏览器环境。
+
+**新增文件清单**：
+
+```
+mobile/src/services/__tests__/DataExportService.test.ts   (NEW, 266 行 / 16 tests)
+```
+
+**P3 整体完成**：所有有单测价值的服务均已覆盖单测（11 个有业务逻辑的服务 + 1 个补充 DataExportService），路线图 P3 章节收官。
+
+---
+
+## 7. [P4] Connection Pool 优化
+
+### 7.1 背景
+
+当前 ConnectionManager 和 WebSocketService 各维护独立连接状态，存在以下问题：
+- 连接检测每 30s 轮询，无智能调度
+- WebSocket 重连使用简单指数退避（基础 1s，最大 30s）
+- 多身份场景下连接状态未隔离
+
+### 7.2 当前实现分析
+
+#### A. ConnectionManager 连接检测
+
+```typescript
+// ConnectionManager.ts:45-47
+connectionCheckInterval = setInterval(async () => {
+  await checkConnection();
+}, 30000);
+```
+
+问题：固定 30s 间隔，无论网络状况
+
+#### B. WebSocketService 重连策略
+
+```typescript
+// WebSocketService.ts:91-99
+private scheduleReconnect() {
+  const baseDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+  const jitter = baseDelay * (0.75 + Math.random() * 0.5);
+  // ...
+}
+```
+
+已实现指数退避，但缺少最大重试次数限制和连接质量评估
+
+### 7.3 优化方案
+
+#### A. 连接健康度评分
+
+引入连接质量评分（0-100），动态调整检测间隔：
+
+```typescript
+interface ConnectionHealth {
+  score: number;        // 0-100
+  latency: number;      // ms
+  successRate: number;  // 0-1
+  lastCheck: number;    // timestamp
+}
+
+// 动态检测间隔：健康时 60s，一般时 30s，差时 10s
+const getCheckInterval = (health: ConnectionHealth): number => {
+  if (health.score >= 80) return 60000;
+  if (health.score >= 50) return 30000;
+  return 10000;
+};
+```
+
+#### B. 连接池生命周期管理
+
+```typescript
+class ConnectionPool {
+  private pool: Map<string, PooledConnection> = new Map();
+  private maxConnections = 5;
+  
+  async acquire(profileId: string): Promise<Connection> {
+    // 检查是否已有可用连接
+    // 无空闲时等待或创建新连接（受限于 maxConnections）
+  }
+  
+  release(conn: Connection): void {
+    // 归还连接池，可能复用或关闭
+  }
+}
+```
+
+#### C. WebSocket 连接复用
+
+当前每次调用 `connect()` 都会创建新 WebSocket 实例。优化为：
+- 连接未断开时复用现有连接
+- 支持多身份共享同一 WebSocket 连接（通过 profileId 区分）
+
+### 7.4 验收标准
+
+- 连接检测间隔动态化（健康/一般/差三档）
+- WebSocket 重连有最大次数限制（默认 10 次）
+- 多身份场景下连接状态隔离
+- `tsc --noEmit` 保持 0 错误
+- 新增 `ConnectionPool.test.ts` 覆盖核心逻辑
+
+### 7.5 估时
+
+约 0.5 天
+
+### 7.6 完成记录
+
+（待实施）
+
+---
+
+## 8. [P5] Sync 重试加固
+
+### 8.1 背景
+
+当前 SyncEngine 和 ApiService 的同步逻辑存在以下问题：
+- 离线队列重试使用内存 Map 跟踪（`retryAttempts`），App 重启后丢失
+- 冲突解决策略未区分关键字段（价格/库存）与普通字段
+- 同步无优先级，高频变更（库存）可能被低频变更（配置）阻塞
+
+### 8.2 当前实现分析
+
+#### A. ApiService 离线队列重试
+
+```typescript
+// ApiService.ts:403-404
+const retryAttempts = new Map<string | number, number>();
+// ...
+const currentAttempts = retryAttempts.get(itemId) || 0;
+```
+
+问题：内存 Map 在 App 重启后丢失，重试计数无法持久化
+
+#### B. SyncEngine 冲突解决
+
+```typescript
+// SyncEngine.ts:116-131
+resolve(...) {
+  // 策略1: 时间戳优先（相差 >30s）
+  // 策略2: 字段级合并
+  // 策略3: 关键字段冲突标记人工处理
+}
+```
+
+问题：关键字段列表硬编码 `['price', 'stock', 'status']`，不支持扩展
+
+#### C. ChangeLogManager 变更日志
+
+```typescript
+// ChangeLogManager.ts:58-59
+// 审计 L1：inventory_transactions 仅记录事务，不自动写入 change_log
+// 审计 L2：chat_sessions/chat_messages 的 change_log 由数据库触发器处理
+```
+
+问题：不同表的同步优先级未区分
+
+### 8.3 优化方案
+
+#### A. 离线队列持久化重试计数
+
+```typescript
+// offline_queue 表新增 retry_count 列（通过 SchemaManager 迁移）
+interface OfflineQueueItem {
+  id: string;
+  endpoint: string;
+  method: string;
+  payload: string;
+  retry_count: number;      // 新增：持久化重试计数
+  last_retry_at: number;    // 新增：上次重试时间
+  next_retry_at: number;    // 新增：下次重试时间（指数退避计算）
+  created_at: number;
+}
+
+// 重试间隔：min(30s * 2^retry_count, 10min) + jitter
+const getNextRetryDelay = (retryCount: number): number => {
+  const base = Math.min(30000 * Math.pow(2, retryCount), 600000);
+  return base * (0.8 + Math.random() * 0.4);
+};
+```
+
+#### B. 可扩展的冲突解决策略
+
+```typescript
+interface ConflictStrategy {
+  tableName: string;
+  keyFields: string[];       // 关键字段，冲突需人工处理
+  timestampThreshold: number; // 时间戳阈值（ms）
+  mergeStrategy: 'timestamp_newer' | 'field_merge' | 'last_write_wins';
+}
+
+// 白名单配置
+const CONFLICT_STRATEGIES: ConflictStrategy[] = [
+  { tableName: 'product_sku', keyFields: ['sell_price', 'current_stock'], timestampThreshold: 30000, mergeStrategy: 'field_merge' },
+  { tableName: 'sales_orders', keyFields: ['total_amount', 'status'], timestampThreshold: 5000, mergeStrategy: 'timestamp_newer' },
+  { tableName: 'chat_messages', keyFields: [], timestampThreshold: 60000, mergeStrategy: 'last_write_wins' },
+];
+```
+
+#### C. 同步优先级队列
+
+```typescript
+enum SyncPriority {
+  HIGH = 1,    // 库存变更、订单状态
+  MEDIUM = 2,  // 客户信息、产品数据
+  LOW = 3,     // 配置变更、聊天消息
+}
+
+interface SyncQueueItem {
+  priority: SyncPriority;
+  tableName: string;
+  operation: 'insert' | 'update' | 'delete';
+  timestamp: number;
+}
+```
+
+### 8.4 验收标准
+
+- 离线队列重试计数持久化到 DB（重启不丢失）
+- 冲突解决策略可配置（通过 CONFLICT_STRATEGIES）
+- 同步队列支持优先级（高优先级先处理）
+- 新增 `SyncRetryPolicy.test.ts` 覆盖重试逻辑
+- `tsc --noEmit` 保持 0 错误
+
+### 8.5 估时
+
+约 1 天（含 Schema 迁移 + 测试）
+
+### 8.6 完成记录
+
+（待实施）
+
+---
+
+## 9. [P6] 其他技术债清理
+
+### 9.1 清理项清单
+
+| 项 | 现状 | 建议 | 估时 |
+| --- | --- | --- | --- |
+| `dist-*` 目录 | 多个验证产物残留 | 加入 `.gitignore` | 10 分钟 |
+| `*.png` 测试截图 | ~70 个散落根目录 | 加入 `.gitignore` | 10 分钟 |
+| `.qoder/` 目录 | IDE 缓存 | 加入 `.gitignore` | 10 分钟 |
+| 未使用 import | 多文件存在未使用 import | 清理（需手动审查避免误删） | 1-2 小时 |
+| `any` 类型残留 | 少量 `params: any` / `data: any` | 继续类型化 | 2-3 小时 |
+| 重复代码片段 | 多处相似逻辑 | 抽取公共函数 | 2-4 小时 |
+
+### 9.2 未使用 import 清理策略
+
+1. 使用 `tsc --noEmit --noUnusedLocals` 发现未使用变量
+2. 使用 VSCode "Organize Imports" 自动清理
+3. 手动审查可疑 import（被条件编译包裹的）
+
+### 9.3 重复代码模式识别
+
+常见重复模式：
+- `new URL(url)` + `URLSearchParams` → 抽取 `parseQueryString(url)`
+- `Date.now().toString(36)` → 复用 `generateId`
+- `JSON.parse/JSON.stringify` 错误处理 → 复用 `getErrorMessage`
+
+### 9.4 估时
+
+- 清理项（.gitignore）：30 分钟
+- 未使用 import：1-2 小时
+- `any` 类型残留：2-3 小时
+- 重复代码：2-4 小时
+- **合计**：约 0.5-1 天
+
+### 9.5 完成记录
+
+（待实施）
+
+---
+
 ## 5. 变更记录
 
 | 日期 | SHA | 操作 |
@@ -696,4 +1107,8 @@ mobile/
 | 2026-06-10 | （待提交） | P2 项 3 完成：callBack.ts + CallHistoryScreen 回拨按钮接入 resolveCallBackTarget + 5 个 case 单测；tsc 0 错 / jest 23-23-276-276 / expo export 1438 modules |
 | 2026-06-10 | （待提交） | P2 项 1 完成：ConnectionManager.parseQRCodeData 重构 + ConnectionScreen 扫码 Modal 接入 CameraView + 11 个 case 单测；tsc 0 错 / jest 23-23-287-287 / expo export 1438 modules |
 | 2026-06-10 | （待提交） | P2 项 2 完成：InventoryService.ts + InventoryScreen.tsx 新建 + SupplyChainScreen 接入 Inventory 路由 + 17 个 case 单测；tsc 0 错 / jest 24-24-304-304 / expo export 1440 modules |
-| 2026-06-10 | （待提交） | **P1.x 完成：utils/errorUtils.ts 新建（getErrorMessage/toError/logError 三函数）+ errorUtils.test.ts 26 个 case + 35+ 处 catch (xxx: any) → catch (xxx) + 1 处 SchemaManager 样板重写；覆盖 19 个文件（10 screens + 8 services + 1 store + 1 util + 1 component）；tsc 0 错 / jest 25-25-330-330 / lint:no-console 0 残留** |
+| 2026-06-10 | （待提交） | **P1.x 完成：utils/errorUtils.ts 新建（getErrorMessage/toError/logError 三函数）+ errorUtils.test.ts 26 个 case + 35+ 处 catch (xxx: any) → catch (xxx) + 1 处 SchemaManager 样板重写；覆盖 19 个文件（10 screens + 8 services + 1 store + 1 util + 1 component）；tsc 0 错 / jest 25-25-330-330 / lint:no-console 0 残留 |
+| 2026-06-10 | （待提交） | P3 完成：Services 单测补全（11 个未覆盖服务）+ P3 补充 DataExportService.test.ts（16 tests）；jest 37-37-581-581 / tsc 0 错 |
+| 2026-06-10 | （待实施） | P4 开始：Connection Pool 优化（连接健康度评分 + 动态检测间隔 + 连接池生命周期管理 + WebSocket 连接复用）；估时 0.5 天 |
+| 2026-06-10 | （待实施） | P5 开始：Sync 重试加固（离线队列重试计数持久化 + 可配置冲突解决策略 + 同步优先级队列）；估时 1 天 |
+| 2026-06-10 | （待实施） | P6 开始：其他技术债清理（dist-* 目录/.gitignore + 未使用 import + any 类型残留 + 重复代码抽取）；估时 0.5-1 天 |
