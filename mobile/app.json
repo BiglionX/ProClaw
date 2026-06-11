@@ -28,7 +28,6 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
       "package": "com.proclaw.mobile",
       "permissions": [
         "android.permission.CAMERA",
@@ -37,10 +36,11 @@
       ]
     },
     "web": {
-      "favicon": "./assets/proclaw-logo.png",
-      "bundler": "metro"
+      "favicon": "./assets/proclaw-logo.png"
     },
-    "plugins": [],
+    "plugins": [
+      "expo-sqlite"
+    ],
     "extra": {
       "eas": {
         "projectId": "09c592c9-01be-4eb0-bf85-25b804ea67e7"
