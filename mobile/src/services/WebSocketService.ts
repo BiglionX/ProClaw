@@ -1,6 +1,10 @@
 import { logger } from '../utils/logger';
 // WebSocket 服务 - 管理后端连接和通话信令
 // v4.1: 音视频通话信令处理
+// v4.2: P4 优化 - 添加最大重试次数限制
+
+// P4: WebSocket 最大重试次数（默认 10 次）
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 type MessageHandler = (type: string, data: any) => void;
 
@@ -16,7 +20,9 @@ class WebSocketService {
   private isConnecting: boolean = false;
   private isIntentionalDisconnect: boolean = false; // 审计 H5：区分主动/被动断开
   private reconnectAttempts: number = 0; // 审计 E10：指数退避计数器
+  private maxReconnectAttempts: number = MAX_RECONNECT_ATTEMPTS; // P4: 可配置最大重试次数
   private onStatusChange: ((connected: boolean) => void) | null = null;
+  private onReconnectFailed: (() => void) | null = null; // P4: 重连失败回调
 
   /** 连接到 WebSocket 服务器 */
   async connect(serverUrl: string, userId: string, token: string): Promise<void> {
@@ -87,9 +93,17 @@ class WebSocketService {
     }
   }
 
-  // 审计 E10：指数退避重连（基础 1s，最大 30s，抖动 ±25%）
+  // P4: 指数退避重连（基础 1s，最大 30s，抖动 ±25%）+ 最大重试次数限制
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
+    
+    // P4: 检查是否超过最大重试次数
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      logger.warn('[WS] Max reconnect attempts reached, giving up');
+      this.onReconnectFailed?.();
+      return;
+    }
+    
     const baseDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
     const jitter = baseDelay * (0.75 + Math.random() * 0.5);
     this.reconnectTimer = setTimeout(() => {
@@ -170,6 +184,16 @@ class WebSocketService {
   /** 设置连接状态回调 */
   setStatusCallback(callback: (connected: boolean) => void) {
     this.onStatusChange = callback;
+  }
+
+  // P4: 设置最大重试次数（可配置，默认 10）
+  setMaxReconnectAttempts(max: number) {
+    this.maxReconnectAttempts = max;
+  }
+
+  // P4: 设置重连失败回调
+  setReconnectFailedCallback(callback: () => void) {
+    this.onReconnectFailed = callback;
   }
 
   /** 断开连接 */
