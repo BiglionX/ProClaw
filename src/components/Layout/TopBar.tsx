@@ -128,22 +128,16 @@ export default function TopBar() {
           onClick={() => navigate('/')}
         >
           <Box
+            component="img"
+            src="/proclaw-logo.png"
+            alt="ProClaw Logo"
             sx={{
               width: 32,
               height: 32,
-              borderRadius: 1,
-              background: 'linear-gradient(135deg, #FF3B30 0%, #6366F1 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: '1rem',
+              objectFit: 'contain',
               flexShrink: 0,
             }}
-          >
-            P
-          </Box>
+          />
           <Typography
             sx={{
               fontWeight: 800,

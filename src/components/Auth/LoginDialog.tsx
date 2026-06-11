@@ -76,22 +76,16 @@ export default function LoginDialog() {
         {/* Logo + 标题 */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
           <Box
+            component="img"
+            src="/proclaw-logo.png"
+            alt="ProClaw Logo"
             sx={{
               width: 40,
               height: 40,
-              borderRadius: 1,
-              bgcolor: '#ff3b30',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              objectFit: 'contain',
               mr: 1.5,
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: '1.2rem',
             }}
-          >
-            P
-          </Box>
+          />
           <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff' }}>
             ProClaw
           </Typography>
