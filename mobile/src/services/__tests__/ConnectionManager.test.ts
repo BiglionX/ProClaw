@@ -29,6 +29,9 @@ import {
   getLocalIPAddress,
   isLanSyncAvailable,
   parseQRCodeData,
+  calculateHealthScore,
+  getCheckInterval,
+  getConnectionHealth,
 } from '../ConnectionManager';
 
 describe('ConnectionManager', () => {
@@ -266,6 +269,62 @@ describe('ConnectionManager', () => {
 
     it('JSON 数组（而非对象）应返回 null', () => {
       expect(parseQRCodeData('["http://x.com","123456"]')).toBeNull();
+    });
+  });
+
+  // P4: 连接健康度评分测试
+  describe('calculateHealthScore', () => {
+    it('连续成功应提高健康分', () => {
+      const health = { score: 0, latency: 100, successCount: 5, failCount: 0, lastCheck: Date.now() };
+      expect(calculateHealthScore(health)).toBeGreaterThan(50);
+    });
+
+    it('连续失败应降低健康分', () => {
+      const health = { score: 0, latency: -1, successCount: 0, failCount: 5, lastCheck: Date.now() };
+      expect(calculateHealthScore(health)).toBeLessThan(50);
+    });
+
+
+    it('高延迟应惩罚健康分', () => {
+      const healthLow = { score: 0, latency: 100, successCount: 2, failCount: 0, lastCheck: Date.now() };
+      const healthHigh = { score: 0, latency: 2000, successCount: 2, failCount: 0, lastCheck: Date.now() };
+      expect(calculateHealthScore(healthHigh)).toBeLessThan(calculateHealthScore(healthLow));
+    });
+
+    it('健康分应在 0-100 范围内', () => {
+      const health = { score: 0, latency: -1, successCount: 0, failCount: 0, lastCheck: Date.now() };
+      const score = calculateHealthScore(health);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe('getCheckInterval', () => {
+    it('健康分 >= 80 应返回 60s 间隔（HEALTHY）', () => {
+      const healthy = { score: 80, latency: 100, successCount: 5, failCount: 0, lastCheck: Date.now() };
+      expect(getCheckInterval(healthy)).toBe(60000);
+    });
+
+    it('健康分 >= 50 且 < 80 应返回 30s 间隔（FAIR）', () => {
+      const fair = { score: 50, latency: 100, successCount: 2, failCount: 0, lastCheck: Date.now() };
+      expect(getCheckInterval(fair)).toBe(30000);
+    });
+
+
+    it('健康分 < 50 应返回 10s 间隔（POOR）', () => {
+      const poor = { score: 30, latency: -1, successCount: 0, failCount: 3, lastCheck: Date.now() };
+      expect(getCheckInterval(poor)).toBe(10000);
+    });
+  });
+
+  describe('getConnectionHealth', () => {
+    it('应返回当前健康度状态的副本', () => {
+      const health = getConnectionHealth();
+      expect(health).toHaveProperty('score');
+      expect(health).toHaveProperty('latency');
+      expect(health).toHaveProperty('successCount');
+      expect(health).toHaveProperty('failCount');
+      expect(health).toHaveProperty('lastCheck');
     });
   });
 });
