@@ -63,17 +63,24 @@
 - [用户中心同步](features/USER_CENTER_SYNC.md)
 
 ### 📕 发布文档 (Releases)
-- [Beta 发布就绪](releases/BETA_RELEASE_READY.md)
 - [发布说明](releases/RELEASE_NOTES.md)
-- [v0.1.0 Beta1 发布说明](releases/RELEASE_NOTES_v0.1.0_BETA1.md)
 - [GitHub 发布说明](releases/GITHUB_RELEASE_NOTES.md)
-- [发布检查清单](releases/RELEASE_CHECKLIST.md)
-- [测试交付检查清单](releases/TEST_DELIVERY_CHECKLIST.md)
+- ~~Beta 发布相关文档~~ (已归档至 archive/)
+- ~~测试交付检查清单~~ (已归档至 archive/)
 
 ### 📔 项目管理 (Project)
 - [项目定位](PROJECT_POSITIONING.md) - 项目愿景与定位
 - [实施计划](IMPLEMENTATION_PLAN.md) - 详细开发计划
 - [超级管理员账户](features/SUPER_ADMIN_ACCOUNT.md) - 演示凭证
+
+### 📦 归档文档 (Archive)
+历史文档已归档至 [archive/](archive/) 目录:
+- 旧版审计报告 (audit-report-plus-2026-r*.md)
+- 旧版移动端审计报告 (mobile-audit-report-v*.md)
+- Beta v0.1.0 发布相关文档 (BETA_RELEASE_READY.md等)
+- 测试框架交付清单 (TEST_DELIVERY_CHECKLIST.md)
+- Light版修复验证文档 (PRD v13.0相关)
+- 仅保留最新版本: [mobile-audit-report-v14.md](mobile-audit-report-v14.md)
 
 ### 🔗 根目录文档
 - [README](../README.md) - 项目主页

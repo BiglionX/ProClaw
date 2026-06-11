@@ -33,8 +33,30 @@ check_err.txt
 .codebuddy/
 .qoder/
 
-# Mobile build output
+# Test screenshots (root level only)
+test-*.png
+test_*.png
+cloud-store-*.png
+homepage-*.png
+tauri-test-*.png
+
+# Mobile build artifacts
 mobile/dist-web*/
+mobile/*.log
+
+# EAS build outputs
+dist-eas-build/
+dist-eas-log/
+
+# Temporary test scripts
+test-*.js
+test-cloud-store.js
+
+# Temporary text files
+check_output*.txt
+test_output*.txt
+final_check*.txt
+check_err*.txt
 
 # Database
 *.db
@@ -53,6 +75,3 @@ playwright/.cache/
 
 # Vitest
 vitest.config.ts.timestamp-*
-
-# Test screenshots
-*.png
