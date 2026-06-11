@@ -61,7 +61,8 @@ type MainTabParamList = {
 
 import { useAppStore } from './src/stores/AppStore';
 import { listProfiles, getCurrentProfile, setCurrentProfile } from './src/services/ProfileManager';
-import { openDatabase } from './src/services/DatabaseFactory';
+import { openDatabase, getDatabase } from './src/services/DatabaseFactory';
+import { applySchema } from './src/services/SchemaManager';
 import { setupChangeLogTriggers } from './src/services/ChangeLogManager';
 import { initSyncMetadata, getOrCreateDeviceId } from './src/services/SyncMetadataManager';
 import { getInstalledPlugins, getDynamicRoutes, onRoutesChanged } from './src/services/PluginRegistry';
@@ -178,10 +179,13 @@ export default function App() {
       // 打开身份数据库并应用 Schema
       try {
         await openDatabase(targetProfile.id);
+        const db = getDatabase();
+        // 关键修复：先 applySchema 创建业务表，再调用 initSyncMetadata/triggers/getInstalledPlugins
+        // 否则这些调用会因表不存在而抛错
+        await applySchema(db);
         await setCurrentProfile(targetProfile.id);
 
         // 初始化同步元数据
-        const db = (await import('./src/services/DatabaseFactory')).getDatabase();
         const deviceId = await getOrCreateDeviceId();
         await initSyncMetadata(db, deviceId);
 

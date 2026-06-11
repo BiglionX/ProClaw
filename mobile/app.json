@@ -6,10 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/proclaw-logo.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "backgroundColor": "#6366f1"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -23,10 +19,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/proclaw-logo.png",
+        "backgroundColor": "#6366f1",
+        "monochromeImage": "./assets/proclaw-logo.png"
       },
       "package": "com.proclaw.mobile",
       "permissions": [
@@ -36,10 +31,17 @@
       ]
     },
     "web": {
-      "favicon": "./assets/proclaw-logo.png"
+      "favicon": "./assets/proclaw-logo.png",
+      "splash": {
+        "image": "./assets/proclaw-logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#6366f1"
+      }
     },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-secure-store",
+      "./plugins/withReactNativeVectorIconsFonts"
     ],
     "extra": {
       "eas": {

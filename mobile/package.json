@@ -31,6 +31,7 @@
     "expo-secure-store": "~56.0.4",
     "expo-sqlite": "~56.0.5",
     "expo-status-bar": "~56.0.4",
+    "expo-system-ui": "~56.0.5",
     "jszip": "^3.10.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -91,13 +92,8 @@
     "slug": "proclaw-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/proclaw-logo.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#6366f1"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -111,8 +107,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#6366f1"
+        "foregroundImage": "./assets/proclaw-logo.png",
+        "backgroundColor": "#6366f1",
+        "monochromeImage": "./assets/proclaw-logo.png"
       },
       "package": "com.proclaw.mobile",
       "permissions": [
@@ -128,11 +125,16 @@
           "cameraPermission": "ProClaw 需要使用摄像头进行视频通话",
           "microphonePermission": "ProClaw 需要使用麦克风进行语音通话"
         }
-      ]
+      ],
+      "./plugins/withReactNativeVectorIconsFonts"
     ],
     "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "favicon": "./assets/proclaw-logo.png",
+      "splash": {
+        "image": "./assets/proclaw-logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#6366f1"
+      }
     }
   }
 }
