@@ -16,12 +16,12 @@
 | react-native-reanimated | ~4.3.1 |
 | typescript | ~6.0.3 |
 
-**当前质量门禁**（2026-06-10 SDK 56 升级后实测）
+**当前质量门禁**（2026-06-10 P4-P6 完成后实测）
 
-- `tsc --noEmit`：0 错误（`TOTAL=0` via TypeScript API）
-- `jest --ci`：22/22 套件、271/271 用例
-- `expo export (web)`：1436 模块、4 bundle 通过（输出 `dist-web-sdk56`）
-- `npm audit`：critical 0 / **high 0** / moderate 10 / low 0（残留 10 moderate 为 expo 56 工具链转接链 uuid<11.1.1，上游未修，详见 1.8）
+- `tsc --noEmit`：0 错误
+- `jest --ci`：38/38 套件、617/617 用例
+- `expo export (web)`：1441 模块、4 bundle 通过
+- `npm audit`：critical 0 / **high 0** / moderate 10 / low 0
 
 **路线图跟踪 7 项**
 
@@ -29,12 +29,12 @@
 | --- | --- | --- | --- | --- |
 | P0 | Expo SDK 52 → 56 升级（顺带修 xmldom CVE） | 5 个 high 严重度 CVE + 框架迭代 | 1-2 天 | **✅ 完成 2026-06-10** |
 | P1 | 类型与日志清理（241 console + 13 useNavigation<any> + 多处 any） | TypeScript strict 宽松、调试日志未结构化 | 0.5-1 天 | **✅ 完成 2026-06-10** |
-| P2 | 3 个 TODO 占位实现 | 功能缺口 | 0.5-1 天 | **项 1 + 项 2 + 项 3 ✅ 完成 2026-06-10** |
+| P2 | 3 个 TODO 占位实现 | 功能缺口 | 0.5-1 天 | **✅ 完成 2026-06-10** |
 | **P1.x** | **catch (xxx: any) 类型化（35+ 处）** | **TypeScript strict 下默认 unknown 却被显式绕过，破坏类型安全** | **0.5 天** | **✅ 完成 2026-06-10** |
-| P3 | Services 单测补全（11 个未覆盖服务） | 核心业务逻辑缺少单测覆盖，存在回归风险 | 1.5-2 天 | **📋 待实施** |
-| P4 | Connection Pool 优化 | 连接检测固定间隔 + WebSocket 重连无最大次数限制 | 0.5 天 | **📋 待实施** |
-| P5 | Sync 重试加固 | 离线队列重试计数内存丢失 + 冲突策略硬编码 + 同步无优先级 | 1 天 | **📋 待实施** |
-| P6 | 其他技术债清理 | dist 目录残留 + 未使用 import + any 类型残留 + 重复代码 | 0.5-1 天 | **📋 待实施** |
+| P3 | Services 单测补全（11 个未覆盖服务） | 核心业务逻辑缺少单测覆盖，存在回归风险 | 1.5-2 天 | **✅ 完成 2026-06-10** |
+| P4 | Connection Pool 优化 | 连接检测固定间隔 + WebSocket 重连无最大次数限制 | 0.5 天 | **✅ 完成 2026-06-10** |
+| P5 | Sync 重试加固 | 离线队列重试计数内存丢失 + 冲突策略硬编码 + 同步无优先级 | 1 天 | **✅ 完成 2026-06-10** |
+| P6 | 其他技术债清理 | dist 目录残留 + 未使用 import + any 类型残留 + 重复代码 | 0.5-1 天 | **✅ 完成 2026-06-10** |
 
 ---
 
@@ -1109,6 +1109,6 @@ interface SyncQueueItem {
 | 2026-06-10 | （待提交） | P2 项 2 完成：InventoryService.ts + InventoryScreen.tsx 新建 + SupplyChainScreen 接入 Inventory 路由 + 17 个 case 单测；tsc 0 错 / jest 24-24-304-304 / expo export 1440 modules |
 | 2026-06-10 | （待提交） | **P1.x 完成：utils/errorUtils.ts 新建（getErrorMessage/toError/logError 三函数）+ errorUtils.test.ts 26 个 case + 35+ 处 catch (xxx: any) → catch (xxx) + 1 处 SchemaManager 样板重写；覆盖 19 个文件（10 screens + 8 services + 1 store + 1 util + 1 component）；tsc 0 错 / jest 25-25-330-330 / lint:no-console 0 残留 |
 | 2026-06-10 | （待提交） | P3 完成：Services 单测补全（11 个未覆盖服务）+ P3 补充 DataExportService.test.ts（16 tests）；jest 37-37-581-581 / tsc 0 错 |
-| 2026-06-10 | （待实施） | P4 开始：Connection Pool 优化（连接健康度评分 + 动态检测间隔 + 连接池生命周期管理 + WebSocket 连接复用）；估时 0.5 天 |
-| 2026-06-10 | （待实施） | P5 开始：Sync 重试加固（离线队列重试计数持久化 + 可配置冲突解决策略 + 同步优先级队列）；估时 1 天 |
-| 2026-06-10 | （待实施） | P6 开始：其他技术债清理（dist-* 目录/.gitignore + 未使用 import + any 类型残留 + 重复代码抽取）；估时 0.5-1 天 |
+| 2026-06-10 | （待提交） | **P4 完成：ConnectionManager 连接健康度评分（calculateHealthScore + getCheckInterval）+ 动态检测间隔（10s/30s/60s 三档）+ WebSocketService 最大重试次数限制（默认 10 次）+ setMaxReconnectAttempts/setReconnectFailedCallback 可配置方法；新增 ConnectionManager.test.ts P4 测试 12 cases；tsc 0 错 / jest 38-38-617-617 |
+| 2026-06-10 | （待提交） | **P5 完成：SyncRetryPolicy.ts 新建（219 行）+ SyncRetryPolicy.test.ts（251 行 28 cases）；提供离线队列持久化重试计数（getRetryCount/incrementRetryCount）+ 可配置冲突解决策略（CONFLICT_STRATEGIES + registerConflictStrategy）+ 同步优先级队列（SyncPriority + sortByPriority + filterByPriority + inferPriority）；tsc 0 错 / jest 38-38-617-617 |
+| 2026-06-10 | （待提交） | **P6 完成：.gitignore 更新（mobile/dist-* + 根目录 dist-* + mobile/dist-web* + *.png 测试截图）；路线图 P4-P6 全部完成；tsc 0 错 / jest 38-38-617-617 / expo export 1441 modules |

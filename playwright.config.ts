@@ -14,7 +14,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          executablePath: 'E:\\DevData\\ms-playwright\\chromium-1208\\chrome-win64\\chrome.exe',
+        },
+      },
     },
   ],
   webServer: {
