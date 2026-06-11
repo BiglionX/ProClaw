@@ -40,8 +40,7 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-secure-store",
-      "./plugins/withReactNativeVectorIconsFonts"
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {
