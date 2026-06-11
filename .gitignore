@@ -4,6 +4,7 @@ node_modules/
 # Build outputs
 dist/
 src-tauri/target/
+dist-*/
 
 # Environment files
 .env.local
@@ -30,9 +31,10 @@ check_err.txt
 
 # IDE artifacts
 .codebuddy/
+.qoder/
 
 # Mobile build output
-mobile/dist-web/
+mobile/dist-web*/
 
 # Database
 *.db
@@ -51,3 +53,6 @@ playwright/.cache/
 
 # Vitest
 vitest.config.ts.timestamp-*
+
+# Test screenshots
+*.png

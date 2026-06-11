@@ -1,0 +1,18 @@
+# EAS Build archive 阶段忽略规则
+# 语法同 .gitignore，参考 https://docs.expo.dev/build-reference/easignore/
+
+# Qoder IDE 缓存（包含中文路径，Windows 上大小写不一致会让 EAS archive 中止）
+.qoder/
+../.qoder/
+
+# 本地调试日志与解压中间产物（不应上传到云端）
+dist-*/
+dist-eas-log*.txt
+dist-eas-log*.gz
+
+# EAS Build archive 不需要的内容
+node_modules/
+.expo/
+*.log
+*.tmp
+.cache/
