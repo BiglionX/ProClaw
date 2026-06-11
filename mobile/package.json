@@ -12,7 +12,8 @@
     "test": "jest --forceExit --detectOpenHandles",
     "typecheck": "tsc --noEmit",
     "lint:no-console": "node scripts/lint-no-console.js",
-    "lint:check": "npm run typecheck && npm run lint:no-console"
+    "lint:check": "npm run typecheck && npm run lint:no-console",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.14",
@@ -26,6 +27,7 @@
     "expo-camera": "~56.0.7",
     "expo-file-system": "~56.0.7",
     "expo-image-picker": "~56.0.16",
+    "expo-modules-autolinking": "^56.0.15",
     "expo-network": "~56.0.5",
     "expo-secure-store": "~56.0.4",
     "expo-sqlite": "~56.0.4",
@@ -56,6 +58,7 @@
     "@types/react": "~19.2.14",
     "@types/react-native-vector-icons": "^6.4.18",
     "jest": "^29.7.0",
+    "patch-package": "^8.0.0",
     "ts-jest": "^29.4.11",
     "typescript": "~6.0.3"
   },
