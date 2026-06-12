@@ -36,6 +36,12 @@ export interface StoreTheme {
   banner_images: string[];
   theme_data: Record<string, unknown>;
   updated_at: string;
+  /** 预览编辑器扩展字段（可选，存储在 theme_data 中） */
+  accent_color?: string;
+  border_radius?: 'none' | 'small' | 'medium' | 'large';
+  product_display?: 'image_focus' | 'info_focus' | 'balanced';
+  banner_style?: 'carousel' | 'grid' | 'fullwidth';
+  style?: 'modern' | 'classic' | 'minimal';
 }
 
 export interface CloudSyncLog {
