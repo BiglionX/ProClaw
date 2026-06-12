@@ -39,6 +39,8 @@ test_*.png
 cloud-store-*.png
 homepage-*.png
 tauri-test-*.png
+screenshot*.png
+screenshot-*.png
 
 # Mobile build artifacts
 mobile/dist-web*/
@@ -50,6 +52,9 @@ dist-eas-log/
 
 # Temporary test scripts
 test-*.js
+test-*.html
+test-*.png
+test_*.png
 test-cloud-store.js
 
 # Temporary text files
