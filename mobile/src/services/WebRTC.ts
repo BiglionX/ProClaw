@@ -20,3 +20,9 @@ export type MediaStream = any;
 
 // mediaDevices: 浏览器 navigator.mediaDevices
 export const mediaDevices = (globalThis as any).navigator?.mediaDevices || null;
+
+// 检测 WebRTC 原生模块是否可用
+// Web 平台：基于 RTCPeerConnection 是否定义判断
+export const isWebRTCNativeAvailable = (): boolean => {
+  return typeof RTCPeerConnection === 'function';
+};

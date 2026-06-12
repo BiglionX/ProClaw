@@ -8,6 +8,7 @@ import {
   RTCIceCandidate,
   MediaStream,
   mediaDevices,
+  isWebRTCNativeAvailable,
 } from './WebRTC';
 import wsService from './WebSocketService';
 import { useCallStore, CallType } from '../stores/CallStore';
@@ -19,8 +20,10 @@ import { getErrorMessage } from '../utils/errorUtils';
 type OfferPayload = RTCSessionDescriptionInit;
 
 // 审计 D5：Web 平台不支持 WebRTC，提前检测
+// v20: 同时检测 native 模块是否可用（v20 已移除 react-native-webrtc）
 const isWebRTCSupported = (): boolean => {
-  return Platform.OS !== 'web' && typeof RTCPeerConnection === 'function';
+  if (Platform.OS === 'web') return typeof RTCPeerConnection === 'function';
+  return isWebRTCNativeAvailable() && typeof RTCPeerConnection === 'function';
 };
 
 class CallManager {
