@@ -1,7 +1,9 @@
 // 来电弹窗组件
 // v4.1: 音视频通话 - 来电通知
+// v16: 懒加载 callManager/WebRTC，避免在 App 启动时同步加载 react-native-webrtc
+//      (如果 WebRTC 原生模块未注册或权限配置错误，同步 import 会导致 App 闪退)
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,7 +15,31 @@ import {
 import { Text, Avatar, IconButton, Surface, useTheme } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useCallStore } from '../stores/CallStore';
-import callManager from '../services/CallManager';
+import { logger } from '../utils/logger';
+
+type CallManager = {
+  rejectIncoming(): void;
+  acceptIncoming(): void;
+};
+
+let cachedCallManager: CallManager | null = null;
+
+/**
+ * 按需懒加载 callManager（在用户接听/拒绝时才加载）。
+ * 第一次 require 失败会缓存 null，避免每次都重新尝试。
+ */
+const getCallManager = (): CallManager | null => {
+  if (cachedCallManager) return cachedCallManager;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('../services/CallManager');
+    cachedCallManager = (mod.default || mod) as CallManager;
+    return cachedCallManager;
+  } catch (e) {
+    logger.warn('[IncomingCallModal] Failed to load CallManager:', e);
+    return null;
+  }
+};
 
 const IncomingCallModal: React.FC = () => {
   const { colors } = useTheme();
@@ -60,6 +86,20 @@ const IncomingCallModal: React.FC = () => {
   const isVideoCall = incomingCall.callType === 'video';
   const callerInitial = incomingCall.callerName.charAt(0).toUpperCase();
 
+  // 懒加载包装：用户点击时才尝试加载 callManager
+  const handleCallAction = (action: 'accept' | 'reject') => {
+    const cm = getCallManager();
+    if (!cm) {
+      logger.warn('[IncomingCallModal] CallManager unavailable, ignoring action:', action);
+      return;
+    }
+    if (action === 'accept') {
+      cm.acceptIncoming();
+    } else {
+      cm.rejectIncoming();
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -101,7 +141,7 @@ const IncomingCallModal: React.FC = () => {
               {/* 拒绝 */}
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={() => callManager.rejectIncoming()}
+                onPress={() => handleCallAction('reject')}
                 activeOpacity={0.7}
               >
                 <View style={[styles.btnCircle, styles.rejectBtn]}>
@@ -113,7 +153,7 @@ const IncomingCallModal: React.FC = () => {
               {/* 接听 */}
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={() => callManager.acceptIncoming()}
+                onPress={() => handleCallAction('accept')}
                 activeOpacity={0.7}
               >
                 <View style={[styles.btnCircle, styles.acceptBtn]}>
@@ -127,7 +167,7 @@ const IncomingCallModal: React.FC = () => {
             <IconButton
               icon="close"
               size={22}
-              onPress={() => callManager.rejectIncoming()}
+              onPress={() => handleCallAction('reject')}
               style={styles.closeBtn}
               iconColor="#999"
             />

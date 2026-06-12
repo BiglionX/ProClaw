@@ -12,6 +12,9 @@ import Toast from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { logger } from './src/utils/logger';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { useCallStore } from './src/stores/CallStore';
+// 懒加载 IncomingCallModal（避免在 App 启动时同步加载 react-native-webrtc）
+const IncomingCallModal = React.lazy(() => import('./src/components/IncomingCallModal'));
 
 // Web 平台屏蔽不兼容的警告
 if (Platform.OS === 'web') {
@@ -42,7 +45,6 @@ import PluginScreen from './src/screens/PluginScreen';
 import LanSyncScreen from './src/screens/LanSyncScreen';
 import DataTransferScreen from './src/screens/DataTransferScreen';
 import BackupWalletScreen from './src/components/BackupWalletScreen';
-import IncomingCallModal from './src/components/IncomingCallModal';
 
 // 新页面
 import ContactsTab from './src/screens/ContactsTab';
@@ -144,6 +146,8 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState<'Onboarding' | 'ProfileSelect' | 'Connection' | 'Main'>('Onboarding');
   const [showProfileSelect, setShowProfileSelect] = useState(false);
   const [dynamicRoutes, setDynamicRoutes] = useState(getDynamicRoutes());
+  // 只有存在来电时才挂载 IncomingCallModal，避免 App 启动时同步加载 react-native-webrtc
+  const hasIncomingCall = useCallStore((s) => s.incomingCall !== null);
 
   // 监听插件动态路由变化（安装/卸载时刷新）
   useEffect(() => {
@@ -403,7 +407,11 @@ export default function App() {
               />
             </Stack.Navigator>
           </NavigationContainer>
-          <IncomingCallModal />
+          {hasIncomingCall ? (
+            <React.Suspense fallback={null}>
+              <IncomingCallModal />
+            </React.Suspense>
+          ) : null}
           <Toast config={toastConfig} />
           <StatusBar style="auto" />
         </PaperProvider>
