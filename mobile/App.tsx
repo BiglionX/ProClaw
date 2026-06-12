@@ -392,7 +392,11 @@ export default function App() {
                 name="ChatDetail"
                 component={ChatDetailScreen}
                 options={({ route }: any) => ({
+                  headerShown: true,
                   title: route.params?.targetName || '聊天',
+                  headerStyle: { backgroundColor: '#302b63' },
+                  headerTintColor: '#fff',
+                  headerTitleStyle: { fontWeight: '700' },
                 })}
               />
               <Stack.Screen

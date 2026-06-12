@@ -1,12 +1,17 @@
 /**
  * SearchHeaderTitle - 可滑入搜索框的 Header 标题组件
  *
- * 标题文字始终固定可见，搜索框以覆盖层形式从右侧滑入盖住标题行。
- * 收起时搜索 DOM 完全移除，标题不受任何挤压或位移。
- * 3 秒无输入自动收回的逻辑由父组件控制。
+ * v21 简化：去掉 position:absolute + Animated.Text 复杂定位，改用条件渲染
+ * - isSearching=false：纯文字标题"消息/联系人"
+ * - isSearching=true：搜索输入框（带 250ms 淡入动画）
+ *
+ * 为什么重写：
+ *   旧版用 absolute + translateX，导致在 Tab header 容器中 width 撑不开，
+ *   "消息/联系人" 标题文字渲染后被裁剪为不可见。
+ *   ContactsTab 和 MessagesTab 两个屏幕都受影响。
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, TextInput, Animated, StyleSheet } from 'react-native';
+import { View, TextInput, Animated, StyleSheet, Text } from 'react-native';
 
 interface SearchHeaderTitleProps {
   title: string;
@@ -25,64 +30,57 @@ export default function SearchHeaderTitle({
   onSubmitEditing,
   isSearching,
 }: SearchHeaderTitleProps) {
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
-  const [renderSearch, setRenderSearch] = useState(false);
 
+  // 250ms 淡入 / 淡出
   useEffect(() => {
-    if (isSearching) {
-      setRenderSearch(true);
-      const raf = requestAnimationFrame(() => {
-        Animated.timing(slideAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }).start(() => {
-          inputRef.current?.focus();
-        });
-      });
-      return () => cancelAnimationFrame(raf);
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => {
-        setRenderSearch(false);
-      });
-    }
-  }, [isSearching, slideAnim]);
-
-  const translateX = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [300, 0],
-  });
+    Animated.timing(fadeAnim, {
+      toValue: isSearching ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      if (isSearching) inputRef.current?.focus();
+    });
+  }, [isSearching, fadeAnim]);
 
   return (
     <View style={styles.container}>
-      {/* 标题文字：始终渲染，固定在原位，不受搜索框影响 */}
-      <View style={styles.titleContainer}>
-        <Animated.Text style={styles.titleText}>{title}</Animated.Text>
-      </View>
+      {/* 标题：isSearching=false 时完全不透明显示 */}
+      <Animated.View
+        style={[
+          styles.layer,
+          styles.titleLayer,
+          { opacity: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) },
+        ]}
+        pointerEvents={isSearching ? 'none' : 'auto'}
+      >
+        <Text style={styles.titleText} numberOfLines={1}>
+          {title}
+        </Text>
+      </Animated.View>
 
-      {/* 搜索框覆盖层：展开时才渲染，从右侧滑入盖住标题 */}
-      {renderSearch && (
-        <Animated.View
-          style={[styles.searchOverlay, { transform: [{ translateX }] }]}
-        >
-          <TextInput
-            ref={inputRef}
-            style={styles.searchInput}
-            placeholder={placeholder}
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            value={value}
-            onChangeText={onChangeText}
-            onSubmitEditing={onSubmitEditing}
-            returnKeyType="search"
-            selectionColor="#fff"
-          />
-        </Animated.View>
-      )}
+      {/* 搜索框：isSearching=true 时淡入 */}
+      <Animated.View
+        style={[
+          styles.layer,
+          styles.searchLayer,
+          { opacity: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) },
+        ]}
+        pointerEvents={isSearching ? 'auto' : 'none'}
+      >
+        <TextInput
+          ref={inputRef}
+          style={styles.searchInput}
+          placeholder={placeholder}
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={value}
+          onChangeText={onChangeText}
+          onSubmitEditing={onSubmitEditing}
+          returnKeyType="search"
+          selectionColor="#fff"
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -90,34 +88,30 @@ export default function SearchHeaderTitle({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    overflow: 'hidden',
-    marginLeft: -8,
+    justifyContent: 'center',
+    // 关键：让 header 容器给它分配实际宽度
   },
-  titleContainer: {
+  layer: {
     position: 'absolute',
-    left: 8,
     top: 0,
+    left: 0,
+    right: 0,
     bottom: 0,
     justifyContent: 'center',
+  },
+  titleLayer: {
+    alignItems: 'flex-start',
   },
   titleText: {
     color: '#fff',
     fontWeight: 'bold' as const,
     fontSize: 18,
   },
-  searchOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    paddingLeft: 8,
+  searchLayer: {
     paddingRight: 4,
-    backgroundColor: '#6366f1',
   },
   searchInput: {
-    flex: 1,
+    width: '100%',
     color: '#fff',
     fontSize: 16,
     paddingVertical: 4,

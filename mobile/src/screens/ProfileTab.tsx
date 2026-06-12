@@ -180,10 +180,10 @@ export default function ProfileTab() {
             <Text style={styles.statLabel}>联系人</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('SalesOrder')} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('PluginStore')} activeOpacity={0.7}>
           <View style={styles.statContent}>
             <View style={[styles.glassStatIcon, { backgroundColor: 'rgba(123,47,247,0.15)' }]}>
-              <MaterialCommunityIcons name="receipt" size={22} color="#7b2ff7" />
+              <MaterialCommunityIcons name="puzzle" size={22} color="#7b2ff7" />
             </View>
             <Text variant="headlineSmall" style={styles.statValue}>{installedPlugins.length}</Text>
             <Text style={styles.statLabel}>插件</Text>
@@ -224,11 +224,11 @@ export default function ProfileTab() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.glassActionItem}
-          onPress={() => navigation.navigate('LanSync')}
+          onPress={() => navigation.navigate('Settings')}
           activeOpacity={0.7}
         >
           <View style={[styles.glassActionIcon, { backgroundColor: 'rgba(0,210,255,0.2)' }]}>
-            <MaterialCommunityIcons name="sync" size={24} color="#00d2ff" />
+            <MaterialCommunityIcons name="cloud-sync-outline" size={24} color="#00d2ff" />
           </View>
           <Text style={styles.actionLabel}>数据同步</Text>
         </TouchableOpacity>

@@ -29,13 +29,15 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import SearchHeaderTitle from '../components/SearchHeaderTitle';
+import AgentAvatar from '../components/AgentAvatar';
 import { getCustomers, Customer, ContactType, CONTACT_TYPE_LABELS } from '../services/ApiService';
 import { isDemoMode } from '../services/AuthService';
 import { showToast } from '../components/Toast';
 import { agentRuntimeBridge, type AgentInfo } from '../services/AgentRuntimeBridge';
-import { getDynamicRoutes } from '../services/PluginRegistry';
+import { getDynamicRoutes, onRoutesChanged } from '../services/PluginRegistry';
 import { useCallStore } from '../stores/CallStore';
 import { createOrGetSession } from '../services/ChatService';
+import { BUILTIN_AI_TEAMS, type BuiltinAiTeam } from '../data/builtinAiTeams';
 import { logger } from '../utils/logger';
 import { getErrorMessage } from '../utils/errorUtils';
 import type { AppNavigation } from '../types/navigation';
@@ -46,7 +48,7 @@ import type { AppNavigation } from '../types/navigation';
 type ContactEntry =
   | { type: 'personal'; data: Customer }
   | { type: 'agent'; data: AgentInfo }
-  | { type: 'team'; data: { id: string; name: string; description?: string } };
+  | { type: 'team'; data: { id: string; name: string; description?: string; agentId?: string } };
 
 /** SectionList 分区数据结构 */
 interface ContactSection {
@@ -231,17 +233,35 @@ export default function ContactsTab() {
     });
   }, [navigation, isSearching, searchQuery, onSearch, toggleSearch]);
 
-  // AI Team 数据：从动态路由中识别 AI 团队
+  // AI Team 数据：优先使用内置预置团队 + 动态路由合并
+  // v21-W2 修复：订阅 onRoutesChanged，安装/卸载插件后 AI Team 列表能自动刷新
+  const [dynamicRoutes, setDynamicRoutes] = useState(() => getDynamicRoutes());
+  useEffect(() => {
+    const unsubscribe = onRoutesChanged((routes) => {
+      setDynamicRoutes([...routes]);
+    });
+    return unsubscribe;
+  }, []);
+
   const aiTeams = useMemo(() => {
-    const routes = getDynamicRoutes();
-    return routes
+    // 把预置团队映射为 aiTeams 格式
+    const builtinTeams = BUILTIN_AI_TEAMS.map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      agentId: t.agentId,
+    }));
+    // 从动态路由识别插件推荐的团队
+    const dynamicTeams = dynamicRoutes
       .filter((r) => r.title.includes('AI') || r.title.includes('Team') || r.title.includes('团队'))
       .map((r) => ({
         id: r.pluginId,
         name: r.title,
         description: `${r.path} 路由`,
+        agentId: r.pluginId, // 插件团队使用 pluginId 作为头像 key
       }));
-  }, []);
+    return [...builtinTeams, ...dynamicTeams];
+  }, [dynamicRoutes]);
 
   // 搜索过滤
   const filteredAgents = useMemo(() => {
@@ -423,20 +443,7 @@ export default function ContactsTab() {
       <TouchableOpacity activeOpacity={0.7} onPress={() => handleAgentPress(agent)} style={styles.glassCard}>
         <View style={styles.cardContent}>
           <View style={styles.agentAvatarWrap}>
-            {isSecretary ? (
-              <Image
-                source={require('../../assets/avatars/secretary/default.png')}
-                style={styles.agentAvatarImage}
-                resizeMode="contain"
-              />
-            ) : (
-              <Avatar.Text
-                size={40}
-                label={agent.name.charAt(0)}
-                color="#fff"
-                style={{ backgroundColor: isOnline ? '#00d2ff' : '#555' }}
-              />
-            )}
+            <AgentAvatar agentId={agent.id} size={44} useSecretaryImage={isSecretary} />
             <View style={[styles.statusDot, { backgroundColor: isOnline ? '#00f5d4' : '#666', shadowColor: isOnline ? '#00f5d4' : 'transparent' }]} />
           </View>
           <View style={styles.info}>
@@ -451,16 +458,11 @@ export default function ContactsTab() {
     );
   };
 
-  const renderTeamItem = (team: { id: string; name: string; description?: string }) => (
+  const renderTeamItem = (team: { id: string; name: string; description?: string; agentId?: string }) => (
     <TouchableOpacity activeOpacity={0.7} onPress={() => handleTeamPress(team)} style={styles.glassCard}>
       <View style={styles.cardContent}>
         <View style={[styles.glassAvatarWrap, { borderColor: 'rgba(123,47,247,0.4)' }]}>
-          <Avatar.Text
-            size={40}
-            label={team.name.charAt(0)}
-            color="#fff"
-            style={{ backgroundColor: '#7b2ff7' }}
-          />
+          <AgentAvatar agentId={team.agentId || team.id} size={44} useSecretaryImage={false} />
         </View>
         <View style={styles.info}>
           <Text variant="titleSmall" style={styles.name}>{team.name}</Text>

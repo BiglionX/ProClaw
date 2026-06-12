@@ -9,6 +9,9 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "assets": [
+      "./assets/fonts"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.proclaw.mobile",
@@ -40,7 +43,33 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/AntDesign.ttf",
+            "./assets/fonts/Entypo.ttf",
+            "./assets/fonts/EvilIcons.ttf",
+            "./assets/fonts/Feather.ttf",
+            "./assets/fonts/FontAwesome.ttf",
+            "./assets/fonts/FontAwesome5_Brands.ttf",
+            "./assets/fonts/FontAwesome5_Regular.ttf",
+            "./assets/fonts/FontAwesome5_Solid.ttf",
+            "./assets/fonts/FontAwesome6_Brands.ttf",
+            "./assets/fonts/FontAwesome6_Regular.ttf",
+            "./assets/fonts/FontAwesome6_Solid.ttf",
+            "./assets/fonts/Fontisto.ttf",
+            "./assets/fonts/Foundation.ttf",
+            "./assets/fonts/Ionicons.ttf",
+            "./assets/fonts/MaterialCommunityIcons.ttf",
+            "./assets/fonts/MaterialIcons.ttf",
+            "./assets/fonts/Octicons.ttf",
+            "./assets/fonts/SimpleLineIcons.ttf",
+            "./assets/fonts/Zocial.ttf"
+          ]
+        }
+      ]
     ],
     "extra": {
       "eas": {

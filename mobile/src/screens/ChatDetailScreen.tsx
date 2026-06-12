@@ -21,6 +21,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { getMessages, sendMessage, createOrGetSession, type ChatMessage } from '../services/ChatService';
 import { chatWithAgentStream } from '../services/AIService';
 import { useChatStore } from '../stores/ChatStore';
+import { getAgentGreeting } from '../data/agentGreetings';
 import { logger } from '../utils/logger';
 import type { AppNavigation, RootStackParamList } from '../types/navigation';
 
@@ -70,6 +71,17 @@ export default function ChatDetailScreen() {
       const msgs = await getMessages(sid);
       setMessages(msgs);
       messagesRef.current = msgs;
+
+      // v21: Agent/Team 会话首次进入（消息为空）→ 自动发一条主动问候语
+      if ((targetType === 'agent' || targetType === 'team') && msgs.length === 0) {
+        const greeting = getAgentGreeting(targetId);
+        const greetingMsg = await sendMessage(sid, greeting, 'other');
+        setMessages((prev) => [...prev, greetingMsg]);
+        messagesRef.current = [...msgs, greetingMsg];
+        logger.log('[ChatDetail] Greeting sent:', targetType, targetId, greeting);
+        // 通知 MessagesTab 会话列表更新（last_message / last_message_time）
+        refreshSessions();
+      }
 
       // 标记该会话已读
       await markSessionRead(sid);
