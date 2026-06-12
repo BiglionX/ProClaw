@@ -6,10 +6,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { logger } from './src/utils/logger';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 // Web 平台屏蔽不兼容的警告
 if (Platform.OS === 'web') {
@@ -151,6 +153,13 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // 初始化系统 UI 背景色（修复 userInterfaceStyle 警告并防止渲染异常）
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync('#f8f9ff').catch((e) => {
+      logger.warn('[App] SystemUI.setBackgroundColorAsync failed:', e);
+    });
+  }, []);
+
   // 初始化：加载身份和认证状态
   useEffect(() => {
     initializeApp();
@@ -226,6 +235,7 @@ export default function App() {
   // Loading 视图
   if (loading) {
     return (
+      <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <PaperProvider theme={theme}>
@@ -241,23 +251,27 @@ export default function App() {
           </PaperProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
+      </ErrorBoundary>
     );
   }
 
   // 身份选择模态
   if (showProfileSelect) {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <PaperProvider theme={theme}>
-            <ProfileSelectScreen />
-          </PaperProvider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+      <ErrorBoundary>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <PaperProvider theme={theme}>
+              <ProfileSelectScreen />
+            </PaperProvider>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </ErrorBoundary>
     );
   }
 
   return (
+    <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <PaperProvider theme={theme}>
@@ -395,5 +409,6 @@ export default function App() {
         </PaperProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
