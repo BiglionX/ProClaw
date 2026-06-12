@@ -118,15 +118,7 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
-    "plugins": [
-      [
-        "react-native-webrtc",
-        {
-          "cameraPermission": "ProClaw 需要使用摄像头进行视频通话",
-          "microphonePermission": "ProClaw 需要使用麦克风进行语音通话"
-        }
-      ]
-    ],
+    "plugins": [],
     "web": {
       "favicon": "./assets/proclaw-logo.png",
       "splash": {
