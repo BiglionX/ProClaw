@@ -14,6 +14,7 @@ import {
   Refresh as RefreshIcon,
   Visibility as PreviewIcon,
   OpenInNew as TokenIcon,
+  Smartphone as PhonePreviewIcon,
 } from '@mui/icons-material';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -216,6 +217,15 @@ export default function StoreDashboard({
                 color="secondary"
               >
                 预览商城
+              </Button>
+              <Button 
+                size="small" 
+                variant="outlined" 
+                startIcon={<PhonePreviewIcon />}
+                onClick={() => navigate('/shop/preview')}
+                color="primary"
+              >
+                预览编辑器
               </Button>
             </Box>
           </Box>

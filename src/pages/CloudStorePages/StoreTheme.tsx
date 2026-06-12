@@ -3,6 +3,7 @@ import {
   Refresh as RefreshIcon,
   Upload as UploadIcon,
   DesktopWindows as PreviewIcon,
+  Smartphone as PhoneEditorIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -17,6 +18,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getCloudStore, getStoreTheme, updateStoreTheme, generateThemeWithAI, StoreTheme as StoreThemeType, CloudStore, getSyncableProducts } from '../../lib/cloudStoreService';
 import { isTauri } from '../../lib/tauri';
 import { generateLogo, generateBanner, dataURLtoBlob } from '../../lib/brandAssetGenerator';
@@ -32,6 +34,7 @@ interface StoreThemeProps {
 export default function StoreTheme({
   loading, setLoading, setError, setSuccessMessage,
 }: StoreThemeProps) {
+  const navigate = useNavigate();
   const [store, setStore] = useState<CloudStore | null>(null);
   const [theme, setTheme] = useState<StoreThemeType | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -350,6 +353,15 @@ export default function StoreTheme({
     <Box>
       <Alert severity="info" sx={{ mb: 3 }}>
         配置商城外观主题，支持 AI 自动生成配色方案。
+        <Button
+          size="small"
+          variant="text"
+          startIcon={<PhoneEditorIcon sx={{ fontSize: 16 }} />}
+          onClick={() => navigate('/shop/preview')}
+          sx={{ ml: 1, fontSize: 12 }}
+        >
+          打开预览编辑器
+        </Button>
       </Alert>
 
       <Grid container spacing={3}>

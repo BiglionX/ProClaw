@@ -6,6 +6,7 @@ import {
   Receipt as OrdersIcon,
   RateReview as ReviewsIcon,
   LocalOffer as CouponIcon,
+  Smartphone as PreviewIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -25,6 +26,7 @@ import StoreSettings from './CloudStorePages/StoreSettings';
 import StoreTheme from './CloudStorePages/StoreTheme';
 import StoreReviews from './CloudStorePages/StoreReviews';
 import StoreCoupons from './CloudStorePages/StoreCoupons';
+import StorePreviewEditor from './CloudStorePages/StorePreviewEditor';
 
 /**
  * 云商城管理主页面
@@ -48,12 +50,13 @@ export default function CloudStorePage() {
     else if (path.includes('/orders')) setTabValue(4);
     else if (path.includes('/reviews')) setTabValue(5);
     else if (path.includes('/coupons')) setTabValue(6);
+    else if (path.includes('/preview')) setTabValue(7);
     else setTabValue(0);
   }, [location.pathname]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-    const paths = ['/shop', '/shop/products', '/shop/theme', '/shop/settings', '/shop/orders', '/shop/reviews', '/shop/coupons'];
+    const paths = ['/shop', '/shop/products', '/shop/theme', '/shop/settings', '/shop/orders', '/shop/reviews', '/shop/coupons', '/shop/preview'];
     navigate(paths[newValue]);
   };
 
@@ -88,6 +91,7 @@ export default function CloudStorePage() {
           <Tab icon={<OrdersIcon />} label="订单管理" />
           <Tab icon={<ReviewsIcon />} label="评价管理" />
           <Tab icon={<CouponIcon />} label="优惠券管理" />
+          <Tab icon={<PreviewIcon />} label="预览编辑" />
         </Tabs>
       </Paper>
 
@@ -99,6 +103,7 @@ export default function CloudStorePage() {
       {tabValue === 4 && <StoreOrders {...tabProps} />}
       {tabValue === 5 && <StoreReviews {...tabProps} />}
       {tabValue === 6 && <StoreCoupons {...tabProps} />}
+      {tabValue === 7 && <StorePreviewEditor {...tabProps} />}
 
       {/* 错误提示 */}
       <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
