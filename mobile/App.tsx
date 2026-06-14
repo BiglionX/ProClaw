@@ -55,6 +55,7 @@ import IdentityChatScreen from './src/screens/IdentityChatScreen';
 import OnboardingWizard from './src/screens/OnboardingWizard';
 import SettingsScreen from './src/screens/SettingsScreen';
 import FloatingSecretaryButton from './src/components/FloatingSecretaryButton';
+import AgentProfileScreen from './src/screens/AgentProfileScreen';
 
 type MainTabParamList = {
   ContactsTab: undefined;
@@ -408,6 +409,18 @@ export default function App() {
                 name="Settings"
                 component={SettingsScreen}
                 options={{ title: '设置' }}
+              />
+              {/* Task 8：Agent 介绍页（与桌面端 /agent-profile/:agentId 一致） */}
+              <Stack.Screen
+                name="AgentProfile"
+                component={AgentProfileScreen}
+                options={({ route }: any) => ({
+                  headerShown: true,
+                  title: 'Agent 介绍',
+                  headerStyle: { backgroundColor: '#302b63' },
+                  headerTintColor: '#fff',
+                  headerTitleStyle: { fontWeight: '700' },
+                })}
               />
             </Stack.Navigator>
           </NavigationContainer>

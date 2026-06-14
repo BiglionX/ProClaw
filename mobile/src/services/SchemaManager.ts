@@ -17,7 +17,7 @@ import { getErrorMessage } from '../utils/errorUtils';
 // Schema 版本管理
 // ============================================
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 /**
@@ -73,6 +73,16 @@ export const applySchema = async (db: IDatabase): Promise<void> => {
       logger.error('[SchemaManager] V2 migration failed, database may be in inconsistent state:', migrationError);
       // 不更新 schema version，下次启动可重试迁移
       throw new Error('V2 migration failed: ' + (migrationError instanceof Error ? migrationError.message : String(migrationError)));
+    }
+  }
+
+  if (currentVersion < 3) {
+    // V3 迁移：Agent 个性化配置表（与桌面端 Rust 端 agent_profile_overrides 表结构 100% 一致）
+    try {
+      await migrateToV3(db);
+    } catch (migrationError) {
+      logger.error('[SchemaManager] V3 migration failed:', migrationError);
+      throw new Error('V3 migration failed: ' + (migrationError instanceof Error ? migrationError.message : String(migrationError)));
     }
   }
 
@@ -513,6 +523,36 @@ const migrateToV2 = async (db: IDatabase): Promise<void> => {
   }
 };
 
+// ============================================
+// V3 迁移 — Agent 个性化配置（联系人体验平迁）
+// 对应桌面端 Tauri Rust 端 `agent_profile_overrides` 表
+// 字段命名 100% 一致，确保未来跨端数据互通
+// ============================================
+
+const migrateToV3 = async (db: IDatabase): Promise<void> => {
+  logger.log('[SchemaManager] Migrating to V3: agent_profile_overrides');
+
+  const queries = [
+    // Agent 个性化配置表（存储头像/昵称覆盖）
+    // agent_id 为主键；avatar_key 指向 agentAvatarLibrary 的 30 个预设；
+    // custom_avatar_path 存储 expo-file-system 中的相对路径（web 平台为 dataUrl）。
+    `CREATE TABLE IF NOT EXISTS agent_profile_overrides (
+      agent_id TEXT PRIMARY KEY,
+      display_name TEXT,
+      avatar_key TEXT,
+      custom_avatar_path TEXT,
+      updated_at INTEGER NOT NULL
+    )`,
+    // 索引：按 updated_at 便于启动时按时间排序预热
+    `CREATE INDEX IF NOT EXISTS idx_agent_profile_updated_at ON agent_profile_overrides(updated_at)`,
+  ];
+
+  for (const query of queries) {
+    await db.execAsync(query);
+  }
+  logger.log('[SchemaManager] V3 migration complete');
+};
+
 /**
  * 删除身份数据库中的所有表（用于身份删除或重置）
  */
@@ -523,6 +563,7 @@ export const dropAllTables = async (db: IDatabase): Promise<void> => {
     'sales_order_items', 'sales_orders', 'purchase_order_items', 'purchase_orders',
     'inventory_transactions', 'chat_messages', 'chat_sessions', 'messages',
     'plugin_registry', 'change_log', 'conflict_records', 'offline_queue', 'sync_metadata', 'device_info',
+    'agent_profile_overrides',
   ];
 
   for (const table of tableNames) {

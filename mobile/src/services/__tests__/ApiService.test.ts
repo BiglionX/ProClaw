@@ -40,6 +40,12 @@ jest.mock('../DatabaseFactory', () => ({
   getDatabase: jest.fn(),
 }));
 
+// Toast 通过 jest moduleNameMapper 映射到 __mocks__/Toast.ts
+const ToastModule = require('../components/Toast');
+const mockShowToast = ToastModule.showToast as jest.Mock;
+
+// fetchWithTimeout 使用真实模块，在测试中通过 jest.spyOn 拦截
+
 // Mock 数据库
 const mockDb = {
   getAllAsync: jest.fn(),
@@ -329,6 +335,130 @@ describe('ApiService', () => {
         expect.stringContaining('LIMIT ?'),
         [100]
       );
+    });
+  });
+
+  // ============================================================
+  // 统一错误处理（OUTBOUND_ERROR_MESSAGE + normalizeOutboundError）
+  // ============================================================
+
+  describe('统一错误处理', () => {
+    let spyNormalize: jest.SpyInstance;
+
+    beforeEach(() => {
+      mockShowToast.mockClear();
+      // spyOn 真实 fetchWithTimeout 模块中的 normalizeOutboundError
+      // （不需 mock 路径，只需要跟踪调用并返回预期文案）
+      const fetchModule = require('../lib/fetchWithTimeout');
+      spyNormalize = jest.spyOn(fetchModule, 'normalizeOutboundError');
+    });
+
+    afterEach(() => {
+      spyNormalize.mockRestore();
+    });
+
+    it('getProducts 服务器异常时应调用 normalizeOutboundError + showToast', async () => {
+      mockDb.getAllAsync.mockResolvedValueOnce([]);
+      const mockClient = {
+        get: jest.fn().mockRejectedValue({ code: 'ERR_NETWORK', message: 'Network Error' }),
+      };
+      getApiClient.mockResolvedValue(mockClient);
+      getConnectionMode.mockReturnValue('direct');
+
+      await getProducts();
+
+      // 应调用 normalizeOutboundError 归一化错误
+      expect(spyNormalize).toHaveBeenCalled();
+      // 应调用 showToast 提示服务器访问失败
+      expect(mockShowToast).toHaveBeenCalledTimes(1);
+      expect(mockShowToast).toHaveBeenCalledWith(
+        'error',
+        '服务器访问失败',
+        expect.stringContaining('服务器有问题，请稍候再试'),
+      );
+    });
+
+    it('getCustomers 服务器异常时应调用 normalizeOutboundError + showToast', async () => {
+      mockDb.getAllAsync.mockResolvedValueOnce([]);
+      const mockClient = {
+        get: jest.fn().mockRejectedValue(new Error('Network request failed')),
+      };
+      getApiClient.mockResolvedValue(mockClient);
+      getConnectionMode.mockReturnValue('direct');
+
+      await getCustomers();
+
+      expect(spyNormalize).toHaveBeenCalled();
+      expect(mockShowToast).toHaveBeenCalledWith(
+        'error',
+        '服务器访问失败',
+        expect.stringContaining('服务器有问题，请稍候再试'),
+      );
+    });
+
+    it('createSalesOrder 服务器异常时应调用 normalizeOutboundError + showToast', async () => {
+      mockDb.runAsync.mockResolvedValue({ rowsAffected: 1 });
+      const mockClient = {
+        post: jest.fn().mockRejectedValue({ code: 'ECONNABORTED', message: 'timeout' }),
+      };
+      getApiClient.mockResolvedValue(mockClient);
+      getConnectionMode.mockReturnValue('direct');
+
+      const order = await createSalesOrder({
+        customer_id: 'c1',
+        items: [{ product_id: 'p1', product_name: '产品', quantity: 1, unit_price: 100, subtotal: 100 }],
+      });
+
+      // 仍应返回本地创建的订单
+      expect(order.id).toBeDefined();
+      expect(spyNormalize).toHaveBeenCalled();
+      // showToast 应被调用，提示订单已保存到本地
+      expect(mockShowToast).toHaveBeenCalledTimes(1);
+      const toastArgs = mockShowToast.mock.calls[0];
+      expect(toastArgs[2]).toContain('服务器有问题，请稍候再试');
+      expect(toastArgs[2]).toContain('订单已保存到本地');
+    });
+
+    it('服务器返回业务错误（非网络）时应调用 normalizeOutboundError 返回 fallback', async () => {
+      mockDb.getAllAsync.mockResolvedValueOnce([]);
+      const mockClient = {
+        get: jest.fn().mockRejectedValue(new Error('ValidationError: 无效参数')),
+      };
+      getApiClient.mockResolvedValue(mockClient);
+      getConnectionMode.mockReturnValue('direct');
+
+      await getProducts();
+
+      expect(spyNormalize).toHaveBeenCalled();
+      expect(mockShowToast).toHaveBeenCalledWith(
+        'error',
+        '服务器访问失败',
+        expect.stringContaining('服务器有问题，请稍候再试'),
+      );
+    });
+
+    it('showToast 文案中必须使用统一的 OUTBOUND_ERROR_MESSAGE 字面量（跨端一致）', async () => {
+      mockDb.getAllAsync.mockResolvedValueOnce([]);
+      const mockClient = {
+        get: jest.fn().mockRejectedValue({ code: 'ERR_NETWORK' }),
+      };
+      getApiClient.mockResolvedValue(mockClient);
+      getConnectionMode.mockReturnValue('direct');
+
+      await getProducts();
+
+      expect(mockShowToast).toHaveBeenCalled();
+      const message = mockShowToast.mock.calls[0][2] as string;
+      // 验证文案字面量与桌面端 100% 一致
+      expect(message).toContain('服务器有问题，请稍候再试');
+    });
+
+    it('normalizeOutboundError 返回的网络异常文案应包含前缀', async () => {
+      // 直接测试 normalizeOutboundError 的真实行为
+      const { normalizeOutboundError, OUTBOUND_ERROR_MESSAGE } = require('../lib/fetchWithTimeout');
+      const msg = normalizeOutboundError({ code: 'ERR_NETWORK' });
+      expect(msg).toContain('⚠️ 网络异常');
+      expect(msg).toContain(OUTBOUND_ERROR_MESSAGE);
     });
   });
 });

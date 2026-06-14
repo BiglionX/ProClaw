@@ -70,6 +70,9 @@ export type RootStackParamList = {
 
   // 邀请（深链）
   InvitePartner: { code?: string; host?: string; type?: string } | undefined;
+
+  // Task 8：Agent 介绍页（与桌面端 /agent-profile/:agentId 一致）
+  AgentProfile: { agentId: string };
 };
 
 /** 通用 Navigation 快捷类型 */

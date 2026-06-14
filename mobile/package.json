@@ -78,7 +78,9 @@
     ],
     "moduleNameMapper": {
       "^@react-native-async-storage/async-storage$": "<rootDir>/node_modules/@react-native-async-storage/async-storage",
-      "^react-native$": "<rootDir>/__mocks__/react-native.ts"
+      "^react-native$": "<rootDir>/__mocks__/react-native.ts",
+      "^(.*[/\\\\])components/Toast$": "<rootDir>/__mocks__/Toast.ts",
+      "../lib/fetchWithTimeout$": "<rootDir>/src/lib/fetchWithTimeout.ts"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(react-native|@react-native|expo|@expo)/)"

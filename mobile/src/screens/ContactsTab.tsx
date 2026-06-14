@@ -30,6 +30,8 @@ import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import SearchHeaderTitle from '../components/SearchHeaderTitle';
 import AgentAvatar from '../components/AgentAvatar';
+import { TeamAvatar } from '../components/TeamAvatar';
+import { TeamMembersDialog } from '../components/TeamMembersDialog';
 import { getCustomers, Customer, ContactType, CONTACT_TYPE_LABELS } from '../services/ApiService';
 import { isDemoMode } from '../services/AuthService';
 import { showToast } from '../components/Toast';
@@ -38,6 +40,18 @@ import { getDynamicRoutes, onRoutesChanged } from '../services/PluginRegistry';
 import { useCallStore } from '../stores/CallStore';
 import { createOrGetSession } from '../services/ChatService';
 import { BUILTIN_AI_TEAMS, type BuiltinAiTeam } from '../data/builtinAiTeams';
+import {
+  AI_TEAM_GROUPS,
+  syncBuiltinTeams,
+  type AITeamGroupConfig,
+} from '../data/aiTeamGroups';
+import {
+  getAgentProfileOverride,
+  resolveAgentDisplay,
+  readCustomAvatarFileUri,
+  onProfileChanged,
+  type AgentProfileOverride,
+} from '../services/agentProfileService';
 import { logger } from '../utils/logger';
 import { getErrorMessage } from '../utils/errorUtils';
 import type { AppNavigation } from '../types/navigation';
@@ -128,6 +142,18 @@ export default function ContactsTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
+  // Task 7：成员对话框与 Agent 个性化缓存
+  const [membersDialogGroup, setMembersDialogGroup] = useState<AITeamGroupConfig | null>(null);
+  // Agent 个性化显示信息缓存（agentId -> { displayName, avatarKey, customAvatarUri }）
+  const [agentDisplayCache, setAgentDisplayCache] = useState<
+    Record<string, { displayName: string; avatarKey: string | null; customAvatarUri: string | null }>
+  >({});
+
+  // 一次性同步 AI Team 群组注册表
+  useEffect(() => {
+    syncBuiltinTeams();
+  }, []);
+
   // 加载个人联系人
   const loadPersonalContacts = useCallback(async () => {
     try {
@@ -177,6 +203,35 @@ export default function ContactsTab() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Task 7：加载 Agent 个性化显示信息缓存 + 订阅变更
+  const loadAgentDisplayCache = useCallback(async () => {
+    const cache: Record<string, { displayName: string; avatarKey: string | null; customAvatarUri: string | null }> = {};
+    for (const agent of agents) {
+      try {
+        const override: AgentProfileOverride | null = await getAgentProfileOverride(agent.id);
+        const resolved = resolveAgentDisplay(agent.id, agent.name, '🤖', override);
+        let customUri: string | null = null;
+        if (override?.custom_avatar_path) {
+          customUri = await readCustomAvatarFileUri(override.custom_avatar_path);
+        }
+        cache[agent.id] = {
+          displayName: resolved.displayName,
+          avatarKey: resolved.activeAvatarKey,
+          customAvatarUri: customUri,
+        };
+      } catch (err) {
+        logger.warn('[ContactsTab] loadAgentDisplayCache failed for', agent.id, err);
+      }
+    }
+    setAgentDisplayCache(cache);
+  }, [agents]);
+
+  useEffect(() => {
+    loadAgentDisplayCache();
+    const unsubscribe = onProfileChanged(() => loadAgentDisplayCache());
+    return () => unsubscribe();
+  }, [loadAgentDisplayCache]);
 
   // 搜索框展开后 3 秒无输入自动收回
   useEffect(() => {
@@ -371,6 +426,14 @@ export default function ContactsTab() {
     });
   };
 
+  /** Task 7：点击 Agent 头像 -> 跳转到 Agent 介绍页 */
+  const handleAgentAvatarPress = useCallback(
+    (agent: AgentInfo) => {
+      navigation.navigate('AgentProfile', { agentId: agent.id });
+    },
+    [navigation],
+  );
+
   /** 点击 AI Team */
   const handleTeamPress = (team: { id: string; name: string }) => {
     navigation.navigate('ChatDetail', {
@@ -380,6 +443,30 @@ export default function ContactsTab() {
       targetIcon: 'account-group',
     });
   };
+
+  /** Task 7：点击 AI Team 头像 -> 弹出成员对话框 */
+  const handleTeamAvatarPress = useCallback(
+    (team: { id: string }) => {
+      // 查找 AI_TEAM_GROUPS 中的对应群组配置
+      const groupId = `ai-team-group-${team.id}`;
+      const groupConfig = AI_TEAM_GROUPS[groupId];
+      if (groupConfig) {
+        setMembersDialogGroup(groupConfig);
+      } else {
+        // 没找到就临时构造一个（兜底）
+        showToast('info', '提示', '该团队暂未配置成员列表');
+      }
+    },
+    [],
+  );
+
+  /** Task 7：成员对话框点击成员 -> 跳转到 Agent 介绍页 */
+  const handleMemberClick = useCallback(
+    (agentId: string) => {
+      navigation.navigate('AgentProfile', { agentId });
+    },
+    [navigation],
+  );
 
   // ============ 渲染函数 ============
 
@@ -439,42 +526,79 @@ export default function ContactsTab() {
   const renderAgentItem = (agent: AgentInfo) => {
     const isOnline = agent.enabled;
     const isSecretary = agent.id === 'secretary';
+    const display = agentDisplayCache[agent.id];
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={() => handleAgentPress(agent)} style={styles.glassCard}>
+      <View style={styles.glassCard}>
         <View style={styles.cardContent}>
-          <View style={styles.agentAvatarWrap}>
-            <AgentAvatar agentId={agent.id} size={44} useSecretaryImage={isSecretary} />
+          {/* Task 7：头像可点击 -> Agent 介绍页 */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleAgentAvatarPress(agent)}
+            style={styles.agentAvatarWrap}
+            accessibilityLabel={`查看 ${display?.displayName || agent.name} 介绍`}
+          >
+            {display?.customAvatarUri ? (
+              <Image source={{ uri: display.customAvatarUri }} style={styles.agentAvatarImage} />
+            ) : display?.avatarKey ? (
+              <TeamAvatar presetKey={display.avatarKey} size={44} />
+            ) : (
+              <AgentAvatar agentId={agent.id} size={44} useSecretaryImage={isSecretary} />
+            )}
             <View style={[styles.statusDot, { backgroundColor: isOnline ? '#00f5d4' : '#666', shadowColor: isOnline ? '#00f5d4' : 'transparent' }]} />
-          </View>
-          <View style={styles.info}>
-            <Text variant="titleSmall" style={styles.name}>{agent.name}</Text>
-            <Text variant="bodySmall" style={styles.subtitle} numberOfLines={1}>
-              {agent.manifest.description || (isOnline ? '在线' : '离线')}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.2)" />
+          </TouchableOpacity>
+
+          {/* 卡片信息区可点击 -> ChatDetail */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleAgentPress(agent)}
+            style={styles.infoTouchArea}
+          >
+            <View style={styles.info}>
+              <Text variant="titleSmall" style={styles.name}>
+                {display?.displayName || agent.name}
+              </Text>
+              <Text variant="bodySmall" style={styles.subtitle} numberOfLines={1}>
+                {agent.manifest.description || (isOnline ? '在线' : '离线')}
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.2)" />
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
   const renderTeamItem = (team: { id: string; name: string; description?: string; agentId?: string }) => (
-    <TouchableOpacity activeOpacity={0.7} onPress={() => handleTeamPress(team)} style={styles.glassCard}>
+    <View style={styles.glassCard}>
       <View style={styles.cardContent}>
-        <View style={[styles.glassAvatarWrap, { borderColor: 'rgba(123,47,247,0.4)' }]}>
+        {/* Task 7：头像可点击 -> 弹出成员对话框 */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => handleTeamAvatarPress(team)}
+          style={[styles.glassAvatarWrap, { borderColor: 'rgba(123,47,247,0.4)' }]}
+          accessibilityLabel={`查看 ${team.name} 成员`}
+        >
           <AgentAvatar agentId={team.agentId || team.id} size={44} useSecretaryImage={false} />
-        </View>
-        <View style={styles.info}>
-          <Text variant="titleSmall" style={styles.name}>{team.name}</Text>
-          {team.description ? (
-            <Text variant="bodySmall" style={styles.subtitle} numberOfLines={1}>
-              {team.description}
-            </Text>
-          ) : null}
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.2)" />
+        </TouchableOpacity>
+
+        {/* 卡片信息区可点击 -> ChatDetail */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => handleTeamPress(team)}
+          style={styles.infoTouchArea}
+        >
+          <View style={styles.info}>
+            <Text variant="titleSmall" style={styles.name}>{team.name}</Text>
+            {team.description ? (
+              <Text variant="bodySmall" style={styles.subtitle} numberOfLines={1}>
+                {team.description}
+              </Text>
+            ) : null}
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color="rgba(255,255,255,0.2)" />
+        </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   const renderItem = ({ item }: { item: ContactEntry }) => {
@@ -541,6 +665,14 @@ export default function ContactsTab() {
           }
         />
       )}
+
+      {/* Task 7：团队成员对话框（受控渲染） */}
+      <TeamMembersDialog
+        open={!!membersDialogGroup}
+        groupConfig={membersDialogGroup}
+        onClose={() => setMembersDialogGroup(null)}
+        onMemberClick={handleMemberClick}
+      />
     </View>
   );
 }
@@ -626,12 +758,20 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 46,
     height: 46,
-  justifyContent: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   agentAvatarImage: {
     width: 44,
     height: 44,
+    borderRadius: 22,
+  },
+  // Task 7：信息区可点击区域
+  infoTouchArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
   },
   statusDot: {
     position: 'absolute',

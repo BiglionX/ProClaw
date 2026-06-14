@@ -12,6 +12,8 @@ import { writeChangeLog } from './ChangeLogManager';
 import { generateId } from '../utils/generateId';
 import { logger } from '../utils/logger';
 import { getErrorMessage } from '../utils/errorUtils';
+import { showToast } from '../components/Toast';
+import { normalizeOutboundError, OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
 
 export interface Product {
   id: string;
@@ -109,7 +111,9 @@ export const getProducts = async (params?: {
 
     return response.data;
   } catch (error) {
+    const normalized = normalizeOutboundError(error);
     logger.warn('[ApiService] Failed to get products from server, using local DB:', getErrorMessage(error));
+    showToast('error', '服务器访问失败', `${normalized}\n已切换到本地数据`);
     return await getProductsFromLocal(params);
   }
 };
@@ -200,7 +204,9 @@ export const getCustomers = async (params?: {
 
     return response.data;
   } catch (error) {
+    const normalized = normalizeOutboundError(error);
     logger.warn('[ApiService] Failed to get customers from server, using local DB:', getErrorMessage(error));
+    showToast('error', '服务器访问失败', `${normalized}\n已切换到本地数据`);
     return await getCustomersFromLocal(params);
   }
 };
@@ -281,7 +287,9 @@ export const createSalesOrder = async (orderData: {
 
     return response.data;
   } catch (error) {
+    const normalized = normalizeOutboundError(error);
     logger.warn('[ApiService] Failed to create order, writing to local DB:', getErrorMessage(error));
+    showToast('error', '服务器访问失败', `${normalized}\n订单已保存到本地，将在网络恢复后同步`);
 
     // 网络失败时写入本地
     const localOrder = await createLocalSalesOrder(orderData);

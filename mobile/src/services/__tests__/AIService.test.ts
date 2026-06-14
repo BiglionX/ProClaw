@@ -303,7 +303,29 @@ describe('AIService', () => {
         tokens.push(token);
       }
 
-      expect(tokens.join('')).toContain('抱歉');
+      const joined = tokens.join('');
+      expect(joined).toContain('抱歉');
+      // 验证与桌面端一致的统一错误文案
+      expect(joined).toContain('服务器有问题，请稍候再试');
+    });
+
+    it('所有供应商失败 + 流式回退失败时应 yield OUTBOUND_ERROR_MESSAGE 兏底', async () => {
+      // 所有 fetch 调用都 reject，模拟网络异常 + 流式失败 + 非流式回退失败
+      mockFetch.mockRejectedValue(new Error('Network request failed'));
+
+      const tokens: string[] = [];
+      for await (const token of chatWithAgentStream({
+        agentId: 'secretary',
+        userMessage: '测试错误',
+      })) {
+        tokens.push(token);
+      }
+
+      const joined = tokens.join('');
+      // 必须包含桌面端统一的 OUTBOUND_ERROR_MESSAGE
+      expect(joined).toContain('服务器有问题，请稍候再试');
+      // 不能出现其他未知错误（应该是统一文案）
+      expect(joined).not.toContain('Network request failed');
     });
   });
 

@@ -3,6 +3,7 @@ import axios, { AxiosInstance } from 'axios';
 import { secureGet, secureSet, secureDelete } from './SecureConfig';
 import { logger } from '../utils/logger';
 import { getErrorMessage } from '../utils/errorUtils';
+import { OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
 
 const TOKEN_KEY = 'proclaw_auth_token';
 const REFRESH_TOKEN_KEY = 'proclaw_refresh_token';
@@ -174,7 +175,8 @@ export const pairDevice = async (
     if (axiosErr.response?.data?.error) {
       throw new Error(axiosErr.response.data.error);
     }
-    throw new Error(getErrorMessage(error, '配对失败，请检查配对码'));
+    // 其他异常使用统一兜底文案（与桌面端一致）
+    throw new Error(OUTBOUND_ERROR_MESSAGE);
   }
 };
 

@@ -10,6 +10,12 @@ import { getAIConfig, isAIConfigured, getAvailableProviders, type ProviderConfig
 import { getDatabase, getCurrentProfileId } from './DatabaseFactory';
 import { logger } from '../utils/logger';
 import { getErrorMessage, toError } from '../utils/errorUtils';
+import {
+  withTimeoutPromise,
+  DEFAULT_OUTBOUND_TIMEOUT_MS,
+  LONG_OUTBOUND_TIMEOUT_MS,
+  OUTBOUND_ERROR_MESSAGE,
+} from '../lib/fetchWithTimeout';
 
 // ============ 类型定义 ============
 
@@ -190,17 +196,22 @@ async function callProvider(provider: ProviderConfig, messages: ChatMessage[]): 
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: provider.model,
-      messages,
-      max_tokens: config.maxTokens,
-      temperature: config.temperature,
-      stream: false,
-    }),
-  });
+  const response = await withTimeoutPromise(
+    (signal) =>
+      fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: provider.model,
+          messages,
+          max_tokens: config.maxTokens,
+          temperature: config.temperature,
+          stream: false,
+        }),
+        signal,
+      }),
+    DEFAULT_OUTBOUND_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -256,7 +267,8 @@ async function* callLLMStream(messages: ChatMessage[]): AsyncGenerator<string> {
       yield fullResponse;
     }
   } catch (fallbackErr) {
-    yield `抱歉，AI 服务暂时无法响应（${getErrorMessage(fallbackErr, '未知错误')}）。`;
+    // 与桌面端一致：使用 OUTBOUND_ERROR_MESSAGE 作为最终兜底
+    yield `抱歉，AI 服务暂时无法响应。\n\n⚠️ ${OUTBOUND_ERROR_MESSAGE}`;
   }
 }
 
@@ -277,17 +289,22 @@ async function* streamProvider(
     headers['Authorization'] = `Bearer ${provider.apiKey}`;
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: provider.model,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-      stream: true,
-    }),
-  });
+  const response = await withTimeoutPromise(
+    (signal) =>
+      fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: provider.model,
+          messages,
+          max_tokens: maxTokens,
+          temperature,
+          stream: true,
+        }),
+        signal,
+      }),
+    LONG_OUTBOUND_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const errorText = await response.text();

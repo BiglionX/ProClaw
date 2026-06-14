@@ -10,6 +10,12 @@ import JSZip from 'jszip';
 import CryptoJS from 'crypto-js';
 import type { PluginManifest } from './PluginRegistry';
 import { logger } from '../utils/logger';
+import {
+  withTimeoutPromise,
+  LONG_OUTBOUND_TIMEOUT_MS,
+  normalizeOutboundError,
+} from '../lib/fetchWithTimeout';
+import { showToast } from '../components/Toast';
 
 /** FlowHub 插件元数据 */
 export interface FlowHubPluginInfo {
@@ -61,14 +67,19 @@ const getSigningKey = async (): Promise<CryptoJS.lib.WordArray | null> => {
  */
 export const fetchAvailablePlugins = async (): Promise<FlowHubPluginInfo[]> => {
   try {
-    const response = await fetch(`${FLOWHUB_API_BASE}/plugins`);
+    const response = await withTimeoutPromise(
+      (signal) => fetch(`${FLOWHUB_API_BASE}/plugins`, { signal }),
+      LONG_OUTBOUND_TIMEOUT_MS,
+    );
     if (!response.ok) {
       throw new Error(`FlowHub API error: ${response.status}`);
     }
     const data = await response.json();
     return data.plugins || [];
   } catch (error) {
+    const normalized = normalizeOutboundError(error);
     logger.warn('[PluginDownloader] Failed to fetch plugins:', error);
+    showToast('error', '插件列表加载失败', `${normalized}\n已切换到演示数据`);
     return getMockPlugins(); // 开发阶段返回模拟数据
   }
 };
@@ -81,7 +92,10 @@ export const fetchPluginDetail = async (
 ): Promise<FlowHubPluginInfo | null> => {
   try {
     // 审计 V4 修复：编码 pluginId 防止路径遍历
-    const response = await fetch(`${FLOWHUB_API_BASE}/plugins/${encodeURIComponent(pluginId)}`);
+    const response = await withTimeoutPromise(
+      (signal) => fetch(`${FLOWHUB_API_BASE}/plugins/${encodeURIComponent(pluginId)}`, { signal }),
+      LONG_OUTBOUND_TIMEOUT_MS,
+    );
     if (!response.ok) return null;
     return await response.json();
   } catch {

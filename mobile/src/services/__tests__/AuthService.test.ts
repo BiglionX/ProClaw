@@ -301,11 +301,11 @@ describe('AuthService', () => {
         .rejects.toThrow('配对码无效');
     });
 
-    it('其他错误使用 getErrorMessage 兜底（error.message 为 "Unknown error"）', async () => {
+    it('其他错误使用 OUTBOUND_ERROR_MESSAGE 兑底（与桌面端一致）', async () => {
       mockAxiosPost.mockRejectedValueOnce(new Error('Unknown error'));
-    
+
       await expect(pairDevice(mockServerUrl, mockPairingCode))
-        .rejects.toThrow('Unknown error');
+        .rejects.toThrow('服务器有问题，请稍候再试');
     });
   });
 
