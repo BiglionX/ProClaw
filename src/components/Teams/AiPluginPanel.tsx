@@ -1,4 +1,203 @@
 /**
+ * 插件详情 Dialog - 展示 IndustryPluginManifest 全部字段
+ * 入口：点击已使用 Tab 任意 PluginCard → setDetailPlugin(pl) → 弹此 Dialog
+ */
+function PluginDetailDialog(props: {
+  plugin: InstalledPluginInfo | null;
+  onClose: () => void;
+}) {
+  const pl = props.plugin;
+  if (!pl) return null;
+  const m: any = pl.manifest || {};
+  const color = INDUSTRY_COLORS[m.category || pl.plugin_id] || '#1976d2';
+  const displayIcon = m.icon || '\u{1F50C}';
+  const installDate = pl.installed_at ? new Date(pl.installed_at) : null;
+  const updateDate = m.updated_at || m.updatedAt ? new Date(m.updated_at || m.updatedAt) : null;
+
+  // features 字段兼容多种 manifest schema (modules / commands / pages)
+  const modules: string[] = m.features?.modules || [];
+  const commands: any[] = m.features?.commands || [];
+  const pages: any[] = m.features?.pages || [];
+  const permissions: string[] = m.permissions || [];
+  const navEntries: any[] = m.navigation || m.nav || [];
+
+  return (
+    <Dialog open={!!pl} onClose={props.onClose} maxWidth="md" fullWidth
+      PaperProps={{ sx: { borderRadius: 2, maxHeight: '88vh' } }}>
+      <DialogTitle sx={{ p: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5,
+          background: 'linear-gradient(135deg, ' + color + '15 0%, ' + color + '05 100%)',
+          borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ width: 64, height: 64, borderRadius: 2, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: '2.2rem', backgroundColor: color + '20', flexShrink: 0 }}>
+            {displayIcon}
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Typography variant="h6" fontWeight={700} noWrap>{pl.name || m.name || pl.plugin_id}</Typography>
+              {pl.builtin && (
+                <Chip label="内置" size="small" color="primary" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+              )}
+              {m.category && (
+                <Chip label={m.category} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+              )}
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
+              {pl.plugin_id} · v{pl.version}
+            </Typography>
+            {m.author && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {'作者：' + (typeof m.author === 'string' ? m.author : m.author?.name || '-')}
+              </Typography>
+            )}
+          </Box>
+          <IconButton onClick={props.onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ p: 0 }}>
+        <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="subtitle2" fontWeight={600} gutterBottom>{'\u63D2\u4EF6\u63CF\u8FF0'}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+            {m.description || '\u6682\u65E0\u63CF\u8FF0'}
+          </Typography>
+        </Box>
+
+        {(modules.length > 0 || commands.length > 0 || pages.length > 0) && (
+          <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <StarIcon fontSize="small" sx={{ color }} />{'\u529F\u80FD\u7279\u6027'}
+            </Typography>
+            {modules.length > 0 && (
+              <Box sx={{ mb: 1.5 }}>
+                <Typography variant="caption" color="text.secondary">{'\u529F\u80FD\u6A21\u5757'}</Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                  {modules.map((mod) => (
+                    <Chip key={mod} label={mod} size="small" sx={{ backgroundColor: color + '15', color, fontWeight: 500 }} />
+                  ))}
+                </Box>
+              </Box>
+            )}
+            {commands.length > 0 && (
+              <Box sx={{ mb: 1.5 }}>
+                <Typography variant="caption" color="text.secondary">{'\u547D\u4EE4\u5217\u8868\uFF08' + commands.length + '\uFF09'}</Typography>
+                <List dense disablePadding>
+                  {commands.slice(0, 8).map((cmd: any, idx: number) => (
+                    <ListItem key={idx} sx={{ px: 0, py: 0.25 }}>
+                      <ListItemIcon sx={{ minWidth: 28 }}>
+                        <LaunchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={cmd.name || cmd.id || 'command-' + idx}
+                        secondary={cmd.description || ''}
+                        primaryTypographyProps={{ variant: 'body2', sx: { fontFamily: 'monospace' } }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                    </ListItem>
+                  ))}
+                  {commands.length > 8 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ pl: 4 }}>
+                      {'...还\u6709 ' + (commands.length - 8) + ' \u6761\u547D\u4EE4'}
+                    </Typography>
+                  )}
+                </List>
+              </Box>
+            )}
+            {pages.length > 0 && (
+              <Box>
+                <Typography variant="caption" color="text.secondary">{'\u5185\u7F6E\u9875\u9762\uFF08' + pages.length + '\uFF09'}</Typography>
+                <List dense disablePadding>
+                  {pages.slice(0, 6).map((pg: any, idx: number) => (
+                    <ListItem key={idx} sx={{ px: 0, py: 0.25 }}>
+                      <ListItemIcon sx={{ minWidth: 28 }}>
+                        <StorageIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={pg.title || pg.path || pg.name || 'page-' + idx}
+                        secondary={pg.path || ''}
+                        primaryTypographyProps={{ variant: 'body2' }}
+                        secondaryTypographyProps={{ variant: 'caption', sx: { fontFamily: 'monospace' } }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {navEntries.length > 0 && (
+          <Box sx={{ p: 2.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CategoryIcon fontSize="small" sx={{ color }} />{'\u6CE8\u518C\u8DEF\u7531'}
+            </Typography>
+            <List dense disablePadding>
+              {navEntries.map((nav: any, idx: number) => (
+                <ListItem key={idx} sx={{ px: 0, py: 0.25 }}>
+                  <ListItemIcon sx={{ minWidth: 28 }}>
+                    <BusinessIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={(typeof nav === 'string' ? nav : nav.label || nav.title) + '  \u2192  ' + (typeof nav === 'string' ? '' : nav.path || '')}
+                    primaryTypographyProps={{ variant: 'body2' }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        )}
+
+        <Box sx={{ p: 2.5, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+          {permissions.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <SecurityIcon fontSize="small" sx={{ color: 'warning.main' }} />{'\u6743\u9650\u8981\u6C42'}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                {permissions.map((p) => (
+                  <Chip key={p} label={p} size="small" color="warning" variant="outlined" sx={{ fontFamily: 'monospace', fontSize: '0.7rem' }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <HistoryIcon fontSize="small" sx={{ color: 'text.secondary' }} />{'\u5B89\u88C5\u4FE1\u606F'}
+            </Typography>
+            {installDate && (
+              <Typography variant="body2" color="text.secondary">
+                {'\u5B89\u88C5\u65F6\u95F4\uFF1A' + installDate.toLocaleString('zh-CN')}
+              </Typography>
+            )}
+            {updateDate && (
+              <Typography variant="body2" color="text.secondary">
+                {'\u6700\u540E\u66F4\u65B0\uFF1A' + updateDate.toLocaleString('zh-CN')}
+              </Typography>
+            )}
+            {pl.path && (
+              <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', mt: 0.5, wordBreak: 'break-all' }}>
+                {'\u8DEF\u5F84\uFF1A' + pl.path}
+              </Typography>
+            )}
+            {pl.size != null && (
+              <Typography variant="body2" color="text.secondary">
+                {'\u5927\u5C0F\uFF1A' + (pl.size > 1024 * 1024 ? (pl.size / 1024 / 1024).toFixed(2) + ' MB' : (pl.size / 1024).toFixed(1) + ' KB')}
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Button onClick={props.onClose} variant="contained" sx={{ textTransform: 'none' }}>{'\u5173\u95ED'}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/**
  * AI 插件面板 - 内置浏览器双Tab容器
  *
  * Tab1: 已使用 - 已安装插件卡片网格
@@ -11,7 +210,7 @@ import {
   Divider, IconButton, Switch, Tab, Tabs, TextField, Typography,
   alpha, InputAdornment, Select, MenuItem, FormControl,
   Snackbar, Alert, Dialog, DialogTitle, DialogContent,
-  DialogContentText, DialogActions,
+  DialogContentText, DialogActions, List, ListItem, ListItemText, ListItemIcon,
 } from '@mui/material';
 import {
   Extension as ExtensionIcon,
@@ -19,6 +218,14 @@ import {
   Download as DownloadIcon,
   CheckCircle as CheckCircleIcon,
   DeleteOutline as DeleteIcon,
+  Close as CloseIcon,
+  Business as BusinessIcon,
+  Category as CategoryIcon,
+  Star as StarIcon,
+  History as HistoryIcon,
+  Storage as StorageIcon,
+  Security as SecurityIcon,
+  Launch as LaunchIcon,
 } from '@mui/icons-material';
 import { PluginManager, IndustryPluginManifest } from '../../config/appMode';
 import { pluginLoader } from '../../lib/pluginLoader';
@@ -56,11 +263,82 @@ const INDUSTRY_COLORS: Record<string, string> = {
 
 const STORE_API_URL = 'https://flowhub.proclaw.cc';
 
+/**
+ * 本地兜底商店列表（云端 API 不可达时使用）
+ * 包含内置插件 + 行业推荐插件,保证商店 Tab 永远有内容
+ */
+function getLocalStoreFallback(): StoreCard[] {
+  const now = new Date().toISOString();
+  // 内置插件在「已使用」中会显示,商店中只显示推荐插件
+  // （避免重复;用户切换 Tab 时看到一致数据）
+  const recommended: StoreCard[] = [
+    {
+      id: 'retail-pos',
+      name: '零售收银 POS',
+      version: '1.0.0',
+      description: '完整的零售门店收银、扫码、打印小票、库存联动一体化方案',
+      icon: '🛒',
+      downloads: 1280,
+      tags: ['零售', 'POS', '进销存'],
+      published_at: now,
+    },
+    {
+      id: 'beauty-booking',
+      name: '美业预约系统',
+      version: '1.2.0',
+      description: '美容院、美发、美甲等服务的预约、会员卡、技师排班一站式管理',
+      icon: '💇',
+      downloads: 856,
+      tags: ['美业', '预约', '会员'],
+      published_at: now,
+    },
+    {
+      id: 'catering-kds',
+      name: '餐饮 KDS 后厨显示',
+      version: '2.0.0',
+      description: '后厨实时显示订单状态,出餐提醒,出品顺序智能调度',
+      icon: '🍳',
+      downloads: 2103,
+      tags: ['餐饮', '后厨', '出餐'],
+      published_at: now,
+    },
+    {
+      id: 'pet-medical',
+      name: '宠物医院管理',
+      version: '1.5.0',
+      description: '宠物诊疗档案、疫苗提醒、寄养预约、商品销售一站式',
+      icon: '🐶',
+      downloads: 654,
+      tags: ['宠物', '医疗', '寄养'],
+      published_at: now,
+    },
+    {
+      id: 'cloud-backup-pro',
+      name: '云端备份 Pro',
+      version: '3.1.0',
+      description: 'ProClaw 业务数据云端加密备份,7 天循环,一键恢复',
+      icon: '☁️',
+      downloads: 3210,
+      tags: ['云服务', '备份', '安全'],
+      published_at: now,
+    },
+  ];
+  // 内置插件在「已使用」中,所以商店中只显示推荐插件
+  return recommended;
+}
+
 interface InstalledPluginInfo {
   plugin_id: string;
   name: string;
   version: string;
   install_path: string;
+  // 可选扩展字段 (pluginLoader 可能返回)
+  installed_at?: string;
+  builtin?: boolean;
+  /** 兼容 Tauri 端 list_installed_plugins 返回的 path 字段 */
+  path?: string;
+  /** 插件大小（字节） */
+  size?: number;
   manifest: IndustryPluginManifest;
 }
 
@@ -79,6 +357,8 @@ export default function AiPluginPanel() {
   const [loadingInstalled, setLoadingInstalled] = useState(false);
   const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
   const [uninstallConfirm, setUninstallConfirm] = useState<string | null>(null);
+  // 详情弹窗状态：点击插件卡片后弹出，显示 manifest 完整字段
+  const [detailPlugin, setDetailPlugin] = useState<InstalledPluginInfo | null>(null);
 
   // store state
   const [storeItems, setStoreItems] = useState<StoreCard[]>([]);
@@ -148,8 +428,15 @@ export default function AiPluginPanel() {
       }
       setInstalledIds(installed);
 
+      // 商店 API 不可达时使用本地兜底列表,保证 UI 永远有内容
+      const sourceList = rawStore.length > 0 ? rawStore : getLocalStoreFallback();
+      const isFallback = rawStore.length === 0;
+      if (isFallback) {
+        console.info('[AiPluginPanel] 商店 API 不可达,使用本地推荐列表');
+      }
+
       const cards: StoreCard[] = [];
-      for (const item of rawStore) {
+      for (const item of sourceList) {
         let manifest: IndustryPluginManifest | null = null;
         if ((item as any).manifest) manifest = (item as any).manifest;
         else if ((item as any).manifest_json) {
@@ -169,6 +456,8 @@ export default function AiPluginPanel() {
       setStoreItems(cards);
     } catch (err) {
       console.error('load store error:', err);
+      // 极端情况:连 try 都失败时,直接兜底
+      setStoreItems(getLocalStoreFallback());
     } finally {
       setLoadingStore(false);
     }
@@ -208,12 +497,26 @@ export default function AiPluginPanel() {
     return list;
   }, [storeItems, installedIds, category, search, sortBy]);
 
-  function PluginCard(p: { id: string; name: string; version: string; description: string; icon: string; tags: string[]; installed: boolean }) {
+  function PluginCard(p: {
+    id: string;
+    name: string;
+    version: string;
+    description: string;
+    icon: string;
+    tags: string[];
+    installed: boolean;
+    onShowDetail?: () => void;
+  }) {
     const color = INDUSTRY_COLORS[p.id] || '#6b7280';
     const displayIcon = p.icon || '\u{1F50C}';
     return (
-      <Card key={p.id} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', transition: 'all 0.2s',
-        '&:hover': { transform: 'translateY(-2px)', boxShadow: (t) => '0 6px 20px ' + alpha(t.palette.common.black, 0.08), borderColor: color } }}>
+      <Card key={p.id}
+        onClick={p.onShowDetail}
+        sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', transition: 'all 0.2s',
+          cursor: p.onShowDetail ? 'pointer' : 'default',
+          '&:hover': p.onShowDetail
+            ? { transform: 'translateY(-2px)', boxShadow: (t) => '0 6px 20px ' + alpha(t.palette.common.black, 0.08), borderColor: color }
+            : {} }}>
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
             <Box sx={{ width: 44, height: 44, borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0, backgroundColor: color + '15' }}>
@@ -295,10 +598,17 @@ export default function AiPluginPanel() {
           )}
           {!loadingInstalled && installedPlugins.length > 0 && (
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2 }}>
-              {installedPlugins.map((pl) => {
+              {/* UI 层防御去重:即使 pluginLoader 返回了重复的 plugin_id（比如 BUILTIN + dynamic 双注册），
+                  仍然只渲染 1 张 PluginCard 避免看到 2 个一样的"外贸柜台运营助手" */}
+              {Array.from(
+                new Map(
+                  installedPlugins.map((p: any) => [p.plugin_id || p.id || '', p] as const)
+                ).values()
+              ).map((pl) => {
                 const m = pl.manifest || ({} as IndustryPluginManifest);
                 return <PluginCard key={pl.plugin_id} id={pl.plugin_id} name={pl.name} version={pl.version}
-                  description={m.description || ''} icon={m.icon || ''} tags={extractTags(m)} installed={true} />;
+                  description={m.description || ''} icon={m.icon || ''} tags={extractTags(m)} installed={true}
+                  onShowDetail={() => setDetailPlugin(pl)} />;
               })}
             </Box>
           )}
@@ -372,6 +682,9 @@ export default function AiPluginPanel() {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {snackbar ? <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>{snackbar.message}</Alert> : undefined}
       </Snackbar>
+
+      {/* 插件详情弹窗：点击任意已使用 Tab 卡片触发 */}
+      <PluginDetailDialog plugin={detailPlugin} onClose={() => setDetailPlugin(null)} />
     </Box>
   );
 }

@@ -48,6 +48,7 @@ import { getLLMForTask } from '../../lib/llmProvider';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { isDemoAccount, getTokenBalance, deductTokens } from '../../lib/aiTeamTokenService';
 import { estimateTokens } from '../../lib/aiTools';
+import { DEFAULT_OUTBOUND_TIMEOUT_MS, OUTBOUND_ERROR_MESSAGE, isAbortError, isNetworkError, withTimeout } from '../../lib/fetchWithTimeout';
 import SecretaryAvatarSelector from './SecretaryAvatarSelector';
 import SecretaryNameDialog from './SecretaryNameDialog';
 import BapSettingsPanel from './BapSettingsPanel';
@@ -183,7 +184,12 @@ function TypewriterText({ text, speed = 35, onComplete }: {
 
 export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgentChatProps = {}) {
   const mode = useAppModeStore(state => state.mode);
-  const [isOpen, setIsOpen] = useState(false);
+  // v1.0.0+tray+db+contacts+msgs+safety+view+demo:
+  //   新用户首次启动时自动展开窗口，避免隐藏后用户找不到入口
+  //   （老用户已手动关闭过，保留关闭状态）
+  const [isOpen, setIsOpen] = useState<boolean>(() => {
+    return localStorage.getItem('proclaw:chat-guide-shown') !== 'true';
+  });
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   
@@ -329,9 +335,18 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
   };
 
   // 检查LLM连接状态
+  // v1.0.0+tray+db+contacts+msgs+safety+view+demo:
+  //   触发条件改为基于 localStorage 标志，不再依赖 messages.length
+  //   原条件 messages.length === 1 在用户发送过消息后失效，导致
+  //   重启应用或重新打开窗口时不再显示引导
+  //   现在只在首次打开时显示一次（PROCLAW_CHAT_GUIDE_SHOWN_KEY）
   useEffect(() => {
-    if (isOpen && messages.length === 1) {
-      checkLLMAndGuide();
+    if (isOpen) {
+      const hasShown = localStorage.getItem('proclaw:chat-guide-shown') === 'true';
+      if (!hasShown) {
+        checkLLMAndGuide();
+        localStorage.setItem('proclaw:chat-guide-shown', 'true');
+      }
     }
   }, [isOpen]);
 
@@ -502,42 +517,47 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
 
           try {
             abortControllerRef.current = new AbortController();
-            const llm = await getLLMForTask('business_insight');
-            const systemPrompt = SECRETARY_SYSTEM_PROMPT.replace('{name}', secretaryName);
-            const systemMsg = new SystemMessage({ content: systemPrompt });
-            const userMsg = new HumanMessage({ content: userInput });
-            const llmResponse = await llm.invoke([systemMsg, userMsg], { signal: abortControllerRef.current.signal });
-            const replyContent = typeof llmResponse.content === 'string'
-              ? llmResponse.content
-              : JSON.stringify(llmResponse.content);
+            const userSignal = abortControllerRef.current.signal;
+            // 合并用户取消信号与 30s 超时信号
+            const { signal: timedSignal, dispose } = withTimeout(userSignal, DEFAULT_OUTBOUND_TIMEOUT_MS);
+            try {
+              const llm = await getLLMForTask('business_insight');
+              const systemPrompt = SECRETARY_SYSTEM_PROMPT.replace('{name}', secretaryName);
+              const systemMsg = new SystemMessage({ content: systemPrompt });
+              const userMsg = new HumanMessage({ content: userInput });
+              const llmResponse = await llm.invoke([systemMsg, userMsg], { signal: timedSignal });
+              const replyContent = typeof llmResponse.content === 'string'
+                ? llmResponse.content
+                : JSON.stringify(llmResponse.content);
 
-            // 演示账号扣减 Token
-            let finalContent = replyContent;
-            if (isDemoAccount()) {
-              const outputTokens = (llmResponse.response_metadata as any)?.tokenUsage?.completionTokens
-                ?? estimateTokens(replyContent);
-              const totalUsed = estimateTokens(userInput + systemPrompt) + outputTokens;
-              try {
-                const remaining = deductTokens(totalUsed);
-                finalContent += `\n\n---\n💳 本次消耗 ${totalUsed} PT，剩余 ${remaining} PT`;
-              } catch {
-                finalContent += `\n\n---\n⚠️ Token 余额不足（剩余 ${getTokenBalance()} PT），部分额度可能超支。`;
+              // 演示账号扣减 Token
+              let finalContent = replyContent;
+              if (isDemoAccount()) {
+                const outputTokens = (llmResponse.response_metadata as any)?.tokenUsage?.completionTokens
+                  ?? estimateTokens(replyContent);
+                const totalUsed = estimateTokens(userInput + systemPrompt) + outputTokens;
+                try {
+                  const remaining = deductTokens(totalUsed);
+                  finalContent += `\n\n---\n💳 本次消耗 ${totalUsed} PT，剩余 ${remaining} PT`;
+                } catch {
+                  finalContent += `\n\n---\n⚠️ Token 余额不足（剩余 ${getTokenBalance()} PT），部分额度可能超支。`;
+                }
               }
+
+              const assistantMessage: Message = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: finalContent,
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, assistantMessage]);
+            } finally {
+              dispose();
             }
-
-            const assistantMessage: Message = {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: finalContent,
-              timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, assistantMessage]);
           } catch (_llmErr) {
-            // 用户取消或 LLM 调用失败
-            const isAborted = _llmErr instanceof Error &&
-              (_llmErr.name === 'AbortError' || String(_llmErr.message).toLowerCase().includes('abort'));
-
-            if (isAborted) {
+            // 用户主动取消
+            const userAborted = abortControllerRef.current?.signal.aborted;
+            if (isAbortError(_llmErr) && userAborted) {
               abortControllerRef.current = null;
               const assistantMessage: Message = {
                 id: crypto.randomUUID(),
@@ -546,40 +566,34 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
                 timestamp: new Date(),
               };
               setMessages(prev => [...prev, assistantMessage]);
+            } else if (isNetworkError(_llmErr)) {
+              // 网络/DNS/连接类错误
+              const assistantMessage: Message = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: `⚠️ ${OUTBOUND_ERROR_MESSAGE}\n\n请前往 **设置 → AI 设置** 配置大模型（如 DeepSeek API），配置后秘书即可使用智能对话。`,
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, assistantMessage]);
+            } else if (isAbortError(_llmErr)) {
+              // 超时（未在用户取消时）
+              const assistantMessage: Message = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: `⏱️ ${OUTBOUND_ERROR_MESSAGE}\n\n可能是网络抖动或 AI 服务暂时不可达，请稍后重试。`,
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, assistantMessage]);
             } else {
-              // 网络/连接类错误（DNS 解析失败、连接被拒绝等）
-              const errMsg = _llmErr instanceof Error ? _llmErr.message.toLowerCase() : '';
-              const errCause = (_llmErr as any)?.cause;
-              const isNetworkError = errMsg.includes('fetch') ||
-                errMsg.includes('network') ||
-                errMsg.includes('dns') ||
-                errMsg.includes('name_not_resolved') ||
-                errMsg.includes('enotfound') ||
-                errMsg.includes('econnrefused') ||
-                errMsg.includes('getaddrinfo') ||
-                errCause?.code === 'ECONNREFUSED' ||
-                errCause?.code === 'ENOTFOUND' ||
-                errCause?.code === 'EAI_AGAIN';
-
-              if (isNetworkError) {
-                const assistantMessage: Message = {
-                  id: crypto.randomUUID(),
-                  role: 'assistant',
-                  content: '⚠️ 无法连接到 ProClaw 云 LLM 服务。\n\n请前往 **设置 → AI 设置** 配置你自己的大模型（如 DeepSeek API），配置后秘书即可使用智能对话。',
-                  timestamp: new Date(),
-                };
-                setMessages(prev => [...prev, assistantMessage]);
-              } else {
-                // 其他 LLM 错误，回退到 commandParser 的提示
-                const fallbackResponse = await executeCommand(command);
-                const assistantMessage: Message = {
-                  id: crypto.randomUUID(),
-                  role: 'assistant',
-                  content: fallbackResponse,
-                  timestamp: new Date(),
-                };
-                setMessages(prev => [...prev, assistantMessage]);
-              }
+              // 其他 LLM 错误，回退到 commandParser 的提示
+              const fallbackResponse = await executeCommand(command);
+              const assistantMessage: Message = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: fallbackResponse,
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, assistantMessage]);
             }
           }
         } else {
@@ -629,7 +643,15 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
   };
 
   const toggleChat = () => {
-    setIsOpen(prev => !prev);
+    setIsOpen(prev => {
+      const next = !prev;
+      // v1.0.0+tray+db+contacts+msgs+safety+view+demo:
+      //   用户主动关闭聊天后，标记引导已完成，下次启动不再自动弹出
+      if (!next) {
+        localStorage.setItem('proclaw:chat-guide-shown', 'true');
+      }
+      return next;
+    });
     setUnreadCount(0); // 打开时清除未读计数
   };
 

@@ -93,19 +93,23 @@ export function SetupWizard() {
   const handleIndustrySelected = useCallback(async (industryId: string) => {
     const pm = PluginManager.getInstance();
 
-    // 在 Tauri 环境中自动下载并安装对应行业插件
+    // Phase 1: 仅在提供有效下载 URL 时才尝试远程插件安装
+    // 当前行业模式通过内置 manifest 激活，无需远程下载
     if (isTauri()) {
-      // 显示加载状态（通过 IndustrySelector 的 loading prop）
-      try {
-        // 注册进度回调，显示下载进度
-        pluginLoader.onProgress((progress) => {
-          console.log(`[PluginLoader] ${progress.phase}: ${progress.message}`);
-        });
-        await pluginLoader.downloadAndInstall(industryId, '1.0.0', '');
-        await pluginLoader.switchIndustry(industryId);
-      } catch (err) {
-        console.error('[SetupWizard] Plugin download failed, using default mode:', err);
-        // 插件下载失败不阻塞安装流程，使用默认模式继续
+      const storeUrl = import.meta.env.VITE_PLUGIN_STORE_URL || '';
+      if (storeUrl) {
+        try {
+          pluginLoader.onProgress((progress) => {
+            console.log(`[PluginLoader] ${progress.phase}: ${progress.message}`);
+          });
+          await pluginLoader.downloadAndInstall(industryId, '1.0.0', storeUrl);
+          await pluginLoader.switchIndustry(industryId);
+        } catch (err) {
+          console.warn('[SetupWizard] Plugin download skipped (non-critical):', err);
+        }
+      } else {
+        // 无远程商店 URL，直接通过 PluginManager 激活内置行业模式
+        console.log('[SetupWizard] No plugin store URL, using built-in industry mode');
       }
     }
 
