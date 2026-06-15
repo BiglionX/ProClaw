@@ -519,8 +519,12 @@ CREATE TABLE IF NOT EXISTS messages (
     is_offline BOOLEAN DEFAULT 0,
     is_read BOOLEAN DEFAULT 0,
     created_at INTEGER NOT NULL,  -- Unix 时间戳（毫秒）
-    updated_at INTEGER
+    updated_at INTEGER,
+    deleted_at TIMESTAMP  -- v1.0.0+tray+db+contacts+msgs: 软删除字段（原生定义，确保新安装数据库有此列）
 );
+
+-- v1.0.0+tray+db+contacts+msgs+safety+view: 旧库兜底 ALTER（如用户在老版本已创建过此表）
+-- 错误被静默吞掉（重复列名时不影响后续迁移）
 
 CREATE INDEX IF NOT EXISTS idx_messages_from ON messages(from_user);
 CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_user);

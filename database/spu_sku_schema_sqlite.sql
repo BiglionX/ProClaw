@@ -116,21 +116,35 @@ END;
 -- ============================================
 -- 注意: SQLite不支持CREATE VIEW IF NOT EXISTS,需要先DROP再CREATE
 DROP VIEW IF EXISTS v_spu_inventory;
+-- v1.0.0+tray+db+contacts+msgs+safety+view: 视图扩展为 16 列完整版
+-- 修复 get_product_spus / get_product_spu_by_id 查询时报
+-- "no such column: description / category_id / brand_id / unit / is_on_sale
+--  / metadata / created_at / updated_at" 的问题
+-- 与 Rust product_commands.rs 第 608-611 行 SELECT 列序一一对应
 CREATE VIEW v_spu_inventory AS
-SELECT 
+SELECT
     spu.id,
     spu.spu_code,
     spu.name,
+    spu.description,
+    spu.category_id,
+    spu.brand_id,
+    spu.unit,
+    spu.is_on_sale,
     spu.status,
+    spu.metadata,
     COUNT(sku.id) as sku_count,
     COALESCE(SUM(sku.current_stock), 0) as total_stock,
-    COALESCE(SUM(sku.min_stock), 0) as total_min_stock,
     COALESCE(MIN(sku.sell_price), 0) as min_price,
-    COALESCE(MAX(sku.sell_price), 0) as max_price
+    COALESCE(MAX(sku.sell_price), 0) as max_price,
+    spu.created_at,
+    spu.updated_at
 FROM product_spus spu
 LEFT JOIN product_skus sku ON spu.id = sku.spu_id AND sku.deleted_at IS NULL
 WHERE spu.deleted_at IS NULL
-GROUP BY spu.id, spu.spu_code, spu.name, spu.status;
+GROUP BY spu.id, spu.spu_code, spu.name, spu.description, spu.category_id,
+         spu.brand_id, spu.unit, spu.is_on_sale, spu.status, spu.metadata,
+         spu.created_at, spu.updated_at;
 
 -- ============================================
 -- 创建视图: SPU详情 (含SKU和库存)
