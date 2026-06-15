@@ -124,6 +124,12 @@ const AGENT_TEMPLATES: Record<string, TeamMember> = {
     responsibilities: '根据商品名称和描述自动搜索高质量产品图片，支持 Pexels/Pixabay 双源搜索，单商品精搜和批量匹配双模式，智能关键词优化以提升命中率。',
     sort_order: 6,
   },
+  contentCreator: {
+    agent_id: 'builtin-content-creator',
+    role: '自媒体运营官',
+    responsibilities: '策划并生成社交媒体内容（小红书/抖音/微信公众号），撰写营销文案、产品种草文、短视频脚本，分析内容传播效果并优化发布策略。',
+    sort_order: 7,
+  },
 };
 
 // ============================================================
@@ -326,12 +332,22 @@ function ruleBasedRecommend(profile: BusinessProfile): TeamRecommendation {
     reasons.push(`${profile.totalProducts} 个产品需要配图，AI智能找图可自动搜索高质量商品图片`);
   }
 
-  // 如果没有触发任何规则，至少给一个基础模板
-  if (members.length === 0) {
-    members.push({ ...AGENT_TEMPLATES.businessAnalyst, sort_order: 0 });
-    tags.push('基础经营');
-    reasons.push('刚起步的小微商户，从基础经营分析入手逐步扩展');
-    category = '小微经营';
+  // --- 自媒体运营 Agent ---
+  // 对所有商户都推荐：自媒体运营是线上获客的核心渠道
+  members.push({ ...AGENT_TEMPLATES.contentCreator, sort_order: members.length });
+  tags.push('自媒体运营');
+  if (profile.totalProducts > 0) {
+    reasons.push(`${profile.totalProducts} 个产品可通过自媒体内容营销扩大曝光，自动生成小红书/抖音/公众号文案`);
+  } else {
+    reasons.push('自媒体运营官帮您策划社交媒体内容，通过内容营销快速获客');
+  }
+
+  // 如果除了自媒体运营官之外没有其他 Agent，补充基础配置
+  if (members.length === 1 && members[0].role === '自媒体运营官') {
+    members.push({ ...AGENT_TEMPLATES.businessAnalyst, sort_order: members.length });
+    tags.push('内容营销');
+    reasons.push('推荐自媒体运营 AI 团队，帮助您通过社交媒体内容营销快速获客');
+    category = '自媒体运营';
   }
 
   // --- 生成团队名称 ---
@@ -462,9 +478,14 @@ export async function createRecommendedTeam(
 
 /**
  * 共享密钥 — 用于生成跨服务预授权 Token
- * ProClaw 和 NvwaX 均需配置此密钥
+ * 审计修复 SEC-P0-04: 从环境变量读取，不再硬编码在源码中
+ * 必须通过 VITE_CROSS_AUTH_SECRET 环境变量配置
  */
-const CROSS_AUTH_SECRET = 'proclaw-nvwax-bridge-2026';
+const CROSS_AUTH_SECRET = import.meta.env.VITE_CROSS_AUTH_SECRET || '';
+
+if (!CROSS_AUTH_SECRET && import.meta.env.PROD) {
+  console.warn('[Security] VITE_CROSS_AUTH_SECRET is not configured. Cross-service auth will not work.');
+}
 
 /**
  * 生成跨服务一次性预授权 Token
@@ -538,6 +559,10 @@ export function buildNvwaXUrl(recommendation: TeamRecommendation, userEmail?: st
 // ============================================================
 function generateTeamName(profile: BusinessProfile, tags: string[]): string {
   const scale = profile.skuCount > 50 ? '全能' : profile.skuCount > 20 ? '专业' : '基础';
+  // 优先使用自媒体运营作为团队名称（最普适的场景）
+  if (tags.includes('自媒体运营')) {
+    return `自媒体运营AI团队`;
+  }
   const primaryTag = tags[0] || '经营';
   return `${primaryTag}${scale}助手`;
 }

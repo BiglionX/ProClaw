@@ -30,11 +30,15 @@ import {
   Info as InfoIcon,
 } from '@mui/icons-material';
 
+import apiClient from '../lib/apiClient';
+
 interface OrderItem {
   product_name: string;
   quantity: number;
   unit_price: number;
   subtotal: number;
+  // 后端 OrderItem 字段兼容（ai.rs 中结构体使用 total_price 而非 subtotal）
+  total_price?: number;
   confidence?: number;
 }
 
@@ -44,6 +48,8 @@ interface RecognitionResult {
   total_amount: number;
   confidence: number;
   message?: string;
+  provider_used?: string;
+  tokens_used?: number;
 }
 
 const AISalesOrderPage: React.FC = () => {
@@ -113,51 +119,48 @@ const AISalesOrderPage: React.FC = () => {
       // 将图片转换为 base64
       const reader = new FileReader();
       reader.readAsDataURL(imageFile);
-      
+
       reader.onload = async () => {
-        // const base64 = reader.result as string;
-
         try {
-          // 模拟API调用
-          // const base64Data = base64.split(',')[1];
-          // const response = await apiClient.post('/api/ai/recognize_order', {
-          //   image_base64: base64Data,
-          //   image_type: imageFile.type.split('/')[1],
-          // });
+          const base64 = reader.result as string;
+          // 去除 data:image/...;base64, 前缀，只保留纯 base64 数据
+          const base64Data = base64.split(',')[1] || base64;
 
-          // 模拟数据
-          const mockResponse: RecognitionResult = {
-            draft_id: 'draft_' + Date.now(),
-            items: [
-              {
-                product_name: '红富士苹果',
-                quantity: 10,
-                unit_price: 5.5,
-                subtotal: 55,
-                confidence: 0.92,
-              },
-              {
-                product_name: '香蕉',
-                quantity: 5,
-                unit_price: 3.5,
-                subtotal: 17.5,
-                confidence: 0.85,
-              },
-            ],
-            total_amount: 72.5,
-            confidence: 0.88,
-            message: '识别成功',
-          };
+          // 调用后端 AI 识别接口（云端 DeepSeek）
+          // 后端实现位于 src-tauri/src/api/ai.rs (recognize_order 端点)
+          const response = await apiClient.post<RecognitionResult>(
+            '/api/ai/recognize_order',
+            {
+              image_base64: base64Data,
+              image_type: imageFile.type.split('/')[1] || 'jpg',
+              provider: 'cloud',
+            }
+          );
 
-          setOrderItems(mockResponse.items);
-          setTotalAmount(mockResponse.total_amount);
-          setConfidence(mockResponse.confidence);
-          setDraftId(mockResponse.draft_id);
-          
-          showSnackbar('AI 识别完成', 'success');
-        } catch (error) {
+          // 兼容后端返回的字段名：total_price (后端) / subtotal (前端)
+          const normalizedItems: OrderItem[] = (response.items || []).map((it) => ({
+            product_name: it.product_name,
+            quantity: it.quantity,
+            unit_price: it.unit_price,
+            subtotal: (it as any).subtotal ?? it.total_price ?? it.quantity * it.unit_price,
+            confidence: it.confidence ?? response.confidence,
+          }));
+
+          setOrderItems(normalizedItems);
+          setTotalAmount(response.total_amount ?? calculateTotal(normalizedItems));
+          setConfidence(response.confidence ?? 0);
+          setDraftId(response.draft_id);
+
+          showSnackbar(
+            response.message
+              ? `AI 识别完成：${response.message}`
+              : 'AI 识别完成',
+            'success'
+          );
+        } catch (error: any) {
           console.error('AI recognition failed:', error);
-          showSnackbar('AI 识别失败', 'error');
+          const msg = error?.response?.data?.error || error?.message || 'AI 识别失败';
+          showSnackbar(msg, 'error');
         } finally {
           setRecognizing(false);
         }
@@ -224,14 +227,29 @@ const AISalesOrderPage: React.FC = () => {
 
     setLoading(true);
     try {
-      // 模拟API调用
-      // await apiClient.post('/api/sales_orders/draft/${draftId}/submit', {
-      //   items: orderItems,
-      //   notes,
-      // });
+      // 调用后端提交订单草稿接口
+      // /api/sales_orders/draft/:id/submit 端点位于 src-tauri/src/api/ai.rs
+      if (_draftId) {
+        await apiClient.post(`/api/sales_orders/draft/${_draftId}/submit`, {
+          items: orderItems.map(it => ({
+            product_name: it.product_name,
+            quantity: it.quantity,
+            unit_price: it.unit_price,
+            total_price: it.subtotal,
+          })),
+          notes,
+        });
+      } else {
+        // 没有草稿ID时退化为直接创建订单
+        await apiClient.post('/api/sales_orders', {
+          items: orderItems,
+          notes,
+          status: 'submitted',
+        });
+      }
 
       showSnackbar('订单提交成功', 'success');
-      
+
       // 清空表单
       setOrderItems([]);
       setTotalAmount(0);
@@ -239,9 +257,10 @@ const AISalesOrderPage: React.FC = () => {
       setImageFile(null);
       setImagePreview(null);
       setNotes('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to submit order:', error);
-      showSnackbar('订单提交失败', 'error');
+      const msg = error?.response?.data?.error || error?.message || '订单提交失败';
+      showSnackbar(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -256,16 +275,23 @@ const AISalesOrderPage: React.FC = () => {
 
     setLoading(true);
     try {
-      // 模拟API调用
-      // await apiClient.post('/api/sales_orders/draft', {
-      //   items: orderItems,
-      //   notes,
-      // });
+      // 调用后端保存订单草稿接口
+      // /api/sales_orders/draft 端点位于 src-tauri/src/api/ai.rs (save_order_draft)
+      await apiClient.post('/api/sales_orders/draft', {
+        items: orderItems.map(it => ({
+          product_name: it.product_name,
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          total_price: it.subtotal,
+        })),
+        notes,
+      });
 
       showSnackbar('草稿保存成功', 'success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save draft:', error);
-      showSnackbar('草稿保存失败', 'error');
+      const msg = error?.response?.data?.error || error?.message || '草稿保存失败';
+      showSnackbar(msg, 'error');
     } finally {
       setLoading(false);
     }

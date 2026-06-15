@@ -495,6 +495,25 @@ describe('cloudStoreService', () => {
       expect(getStoreUrl(MOCK_STORE).startsWith('https://')).toBe(true);
       expect(getStoreUrl({ ...MOCK_STORE, custom_domain: 'x.com' }).startsWith('https://')).toBe(true);
     });
+
+    it('演示账号（subdomain=demo）应返回路径模式 URL：https://proclaw.cc/demo', () => {
+      // 与 cloud-store 的 /shop/[store] 路由对齐
+      const demoStore: CloudStore = { ...MOCK_STORE, subdomain: 'demo', custom_domain: undefined };
+      const url = getStoreUrl(demoStore);
+      expect(url).toBe('https://proclaw.cc/demo');
+      // 演示账号不能用子域名模式（避免 demo.proclaw.cc 被错误指向）
+      expect(url).not.toMatch(/^https:\/\/demo\./);
+    });
+
+    it('演示账号有 custom_domain 时优先使用 custom_domain', () => {
+      const demoStore: CloudStore = {
+        ...MOCK_STORE,
+        subdomain: 'demo',
+        custom_domain: 'demo-shop.example.com',
+      };
+      const url = getStoreUrl(demoStore);
+      expect(url).toBe('https://demo-shop.example.com');
+    });
   });
 
   // ---------- 套件 20: formatPrice ----------

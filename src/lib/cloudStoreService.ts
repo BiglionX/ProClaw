@@ -428,11 +428,26 @@ export const PLAN_INFO: Record<PlanType, PlanInfo> = {
 // ========== 工具函数 ==========
 
 /**
+ * 演示账号专用的 URL 模板（路径模式而非子域名模式）。
+ * - 普通账号：`{subdomain}.proclaw.cc`（子域名）
+ * - 演示账号：`proclaw.cc/demo`（与 cloud-store/src/middleware.ts 的 /shop/[store] 路由对齐）
+ *
+ * 仅在 store.subdomain === 'demo' 且无 custom_domain 时触发，便于
+ * 演示账号（boss@proclaw.demo）使用统一路径访问云商城。
+ */
+const DEMO_PATH_SUBDOMAIN = 'demo';
+const DEMO_PATH_URL = 'https://proclaw.cc/demo';
+
+/**
  * 获取商城访问 URL
  */
 export function getStoreUrl(store: CloudStore): string {
   if (store.custom_domain) {
     return `https://${store.custom_domain}`;
+  }
+  // 演示账号走路径模式（proclaw.cc/demo），与 cloud-store 中间件 /shop/[store] 路由对齐
+  if (store.subdomain === DEMO_PATH_SUBDOMAIN) {
+    return DEMO_PATH_URL;
   }
   return `https://${store.subdomain}.proclaw.cc`;
 }

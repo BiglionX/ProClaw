@@ -10,6 +10,13 @@ import { deductTokens, getTokenBalance, isDemoAccount } from './aiTeamTokenServi
 import type { AITeamGroupConfig } from './contactService';
 import { getLLMProviderManager } from './llmProvider';
 import { getAIConfig, type AIProvider } from './aiConfig';
+import {
+  DEFAULT_OUTBOUND_TIMEOUT_MS,
+  OUTBOUND_ERROR_MESSAGE,
+  isAbortError,
+  isNetworkError,
+  withTimeout,
+} from './fetchWithTimeout';
 
 /** 兜底 LLM 配置（从 VITE_ 环境变量读取，用户可在 AI 设置页覆盖） */
 const FALLBACK_API_KEY = import.meta.env.VITE_LLM_API_KEY as string | undefined;
@@ -167,9 +174,12 @@ export async function generateGroupChatResponse(
   const historyMsgs = buildMessageHistory(chatHistory, 10);
   const userMsg = new HumanMessage({ content: `Boss 👑: ${userMessage}` });
 
+  // 合并用户取消信号与 30 秒超时信号
+  const { signal: timedSignal, dispose } = withTimeout(signal, DEFAULT_OUTBOUND_TIMEOUT_MS);
+
   try {
     const llm = await getLLM();
-    const response = await llm.invoke([systemMsg, ...historyMsgs, userMsg], { signal });
+    const response = await llm.invoke([systemMsg, ...historyMsgs, userMsg], { signal: timedSignal });
     const replyContent = typeof response.content === 'string'
       ? response.content
       : JSON.stringify(response.content);
@@ -195,8 +205,8 @@ export async function generateGroupChatResponse(
       remainingTokens,
     };
   } catch (error: any) {
-    // 用户手动取消
-    if (error?.name === 'AbortError' || signal?.aborted) {
+    // 用户主动取消
+    if (isAbortError(error, signal) && signal?.aborted) {
       return {
         replyContent: '',
         tokensUsed: 0,
@@ -205,15 +215,21 @@ export async function generateGroupChatResponse(
       };
     }
     console.error('[AI Team Chat] LLM 调用失败:', error);
-    // LLM 调用失败时返回友好提示
-    let errorMsg = '抱歉，CEO Agent 暂时无法响应。请稍后重试。';
-    if (error?.message?.includes('fetch') || error?.message?.includes('network') || error?.cause?.code === 'ECONNREFUSED') {
-      errorMsg = '⚠️ 无法连接到 AI 服务，请检查网络连接或 AI 设置中的 API 配置。';
+    // 出站连接失败（超时或网络）→ 统一提示
+    let errorMsg = OUTBOUND_ERROR_MESSAGE;
+    if (isAbortError(error)) {
+      // LLM 调用超时
+      errorMsg = `⏱️ ${OUTBOUND_ERROR_MESSAGE}`;
+    } else if (isNetworkError(error)) {
+      // 网络/DNS/连接类错误
+      errorMsg = `⚠️ 无法连接到 AI 服务，${OUTBOUND_ERROR_MESSAGE}`;
     }
     return {
       replyContent: errorMsg,
       tokensUsed: 0,
       remainingTokens: isDemoAccount() ? getTokenBalance() : -1,
     };
+  } finally {
+    dispose();
   }
 }

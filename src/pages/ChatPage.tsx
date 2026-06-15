@@ -13,10 +13,12 @@ import {
   Groups as GroupIcon,
   Campaign as CampaignIcon,
   Stop as StopIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import {
   Avatar,
   Box,
+  Button,
   Chip,
   CircularProgress,
   IconButton,
@@ -31,16 +33,24 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Contact, Message, getContacts, getMessages, sendMessage, isAITeamGroupId, getAITeamGroupConfig, type AITeamGroupConfig } from '../lib/contactService';
+import { Contact, Message, getContacts, getMessages, sendMessage, isAITeamGroupId, getAITeamGroupConfig, getAgentGreeting, parseTeamId, type AITeamGroupConfig } from '../lib/contactService';
 import { generateGroupChatResponse, type ChatHistoryItem } from '../lib/aiTeamChatService';
+import { OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
 import { getTokenBalance, isDemoAccount } from '../lib/aiTeamTokenService';
 import { agentRuntime } from '../lib/agentRuntime';
 import desktopCallManager from '../services/CallManager';
+import {
+  getAgentProfileOverride,
+  resolveAgentDisplay,
+  onProfileChanged,
+  type AgentProfileOverride,
+} from '../lib/agentProfileService';
 import ContextIndicator from '../components/CEO/ContextIndicator';
 import TaskCard, { TaskCardData } from '../components/CEO/TaskCard';
 import ConfirmationCard, { ConfirmationData } from '../components/CEO/ConfirmationCard';
 import DecisionHistoryPanel from '../components/CEO/DecisionHistoryPanel';
 import { proclawDecision } from '../lib/ceoController';
+import { safeNumber } from '../lib/format';
 
 const CEO_AGENT_ID = 'ceo-agent';
 
@@ -68,9 +78,12 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [aiResponding, setAiResponding] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [lastUserInput, setLastUserInput] = useState<string | null>(null);
   const [tokenBalance, setTokenBalance] = useState(isDemoAccount() ? getTokenBalance() : -1);
   const [actionAnchor, setActionAnchor] = useState<HTMLElement | null>(null);
   const [showDecisionHistory, setShowDecisionHistory] = useState(false);
+  const [profileOverride, setProfileOverride] = useState<AgentProfileOverride | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -89,6 +102,32 @@ export default function ChatPage() {
     loadData();
   }, [contactId]);
 
+  // 加载 Agent 个性化 override（仅对 team 类型联系人有意义）
+  useEffect(() => {
+    if (!contactId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ovr = await getAgentProfileOverride(contactId);
+        if (!cancelled) setProfileOverride(ovr);
+      } catch (e) {
+        console.warn('[ChatPage] 读取 profile override 失败:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [contactId]);
+
+  // 监听 override 变更事件 → 重新读取
+  useEffect(() => {
+    const unsubscribe = onProfileChanged(async (changedId) => {
+      if (!contactId) return;
+      if (changedId && changedId !== contactId) return;
+      const ovr = await getAgentProfileOverride(contactId);
+      setProfileOverride(ovr);
+    });
+    return () => unsubscribe();
+  }, [contactId]);
+
   const loadData = async () => {
     if (!contactId) return;
     setLoading(true);
@@ -99,6 +138,21 @@ export default function ChatPage() {
 
       const msgs = await getMessages('self', contactId);
       setMessages(msgs);
+
+      // Agent 主动问候：首次进入 Agent/AI Team 群聊且无历史消息时，
+      // Agent 会主动发一条消息：“老板，有啥吩咐？”
+      if (msgs.length === 0) {
+        const greeting = getAgentGreeting(contactId);
+        if (greeting) {
+          try {
+            const greetingMsg = await sendMessage(greeting.fromUser, contactId, greeting.content);
+            greetingMsg.from_user_name = greeting.fromUserName;
+            setMessages([greetingMsg]);
+          } catch (e) {
+            console.error('发送 Agent 问候失败:', e);
+          }
+        }
+      }
     } catch (e) {
       console.error('加载对话失败:', e);
     } finally {
@@ -119,6 +173,7 @@ export default function ChatPage() {
     const content = input.trim();
     setInput('');
     setSending(true);
+    setAiError(null);
     try {
       // 群聊模式：from_user_name 显示为 "Boss 👑"
       const fromUser = isGroupChat ? 'self' : 'self';
@@ -134,6 +189,7 @@ export default function ChatPage() {
       if (isGroupChat && groupConfig) {
         setSending(false); // 释放发送按钮
         setAiResponding(true);
+        setLastUserInput(content);
         try {
           // 创建 AbortController 以便用户可取消 AI 思考
           const controller = new AbortController();
@@ -160,6 +216,17 @@ export default function ChatPage() {
           // 用户取消：不需要显示任何内容
           if (aiResponse.aborted) return;
 
+          // 检测是否是出站连接失败的回复，如果是则设置 aiError 供顶部红色提示
+          const isOutboundFailure =
+            aiResponse.replyContent.includes(OUTBOUND_ERROR_MESSAGE) ||
+            aiResponse.replyContent.includes('无法连接到 AI 服务') ||
+            aiResponse.replyContent.includes('网络异常');
+          if (isOutboundFailure) {
+            setAiError(aiResponse.replyContent);
+          } else {
+            setAiError(null);
+          }
+
           // 将 AI 回复作为 ceo-agent 的消息写入
           const aiMsg = await sendMessage('ceo-agent', contactId, aiResponse.replyContent);
           aiMsg.from_user_name = 'CEO Agent';
@@ -173,6 +240,8 @@ export default function ChatPage() {
           scrollToBottom();
         } catch (aiErr) {
           console.error('AI 响应失败:', aiErr);
+          // 兜底：LLM 本身抛错（被 aiTeamChatService 包装为友好消息）但这里仍有理论上可能的额外错误
+          setAiError(OUTBOUND_ERROR_MESSAGE);
         } finally {
           abortControllerRef.current = null;
           setAiResponding(false);
@@ -185,6 +254,17 @@ export default function ChatPage() {
         setSending(false);
       }
     }
+  };
+
+  /**
+   * 重试上一次 LLM 调用：重新提交 lastUserInput
+   */
+  const handleRetryAi = () => {
+    if (!lastUserInput || sending || aiResponding) return;
+    setInput(lastUserInput);
+    setAiError(null);
+    // 利用 setTimeout 确保 setInput 生效后再发送
+    setTimeout(() => handleSend(), 0);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -375,13 +455,65 @@ export default function ChatPage() {
         <IconButton onClick={() => navigate('/contacts')} size="small">
           <BackIcon />
         </IconButton>
-        <Avatar sx={{ bgcolor: isGroupChat ? (groupConfig?.color || '#ff6d00') : isCEO ? '#7c4dff' : '#1976d2', width: 40, height: 40 }}>
-          {isGroupChat ? groupConfig?.icon || <GroupIcon /> : contact.name.charAt(0)}
-        </Avatar>
+        {(() => {
+          // 解析显示用头像和昵称（override 优先）
+          const resolved = !isGroupChat && contact
+            ? resolveAgentDisplay(contact.id, contact.name, contact.name.charAt(0), profileOverride)
+            : null;
+          const avatarSrc = resolved?.isCustomAvatar
+            ? profileOverride?.custom_avatar_path
+            : resolved?.avatarUrl;
+          // 头像点击跳转规则:
+          // 1) AI Team 群聊 (isGroupChat) → /team-profile/:teamId (类似 QQ 群资料)
+          // 2) CEO Agent → 不响应(老板特殊身份保留)
+          // 3) 单 Agent 联系人 (contact_type: team/internal/external) → /agent-profile/:agentId
+          // 4) data.联系 human group → 暂不响应(预留)
+          const handleHeadAvatarClick = () => {
+            if (!contactId) return;
+            // AI Team 群聊 → 跳到 AI Team 小组详情页(类似 QQ 群资料)
+            if (isGroupChat) {
+              const teamId = parseTeamId(contactId);
+              navigate(`/team-profile/${teamId}`);
+              return;
+            }
+            // CEO Agent: 不响应
+            if (isCEO) return;
+            // 传统"群组"联系人: 暂不响应
+            if (contact?.contact_type === 'group') return;
+            // 单 Agent / 内部 / 外部联系人 → 跳 Agent 资料页
+            navigate(`/agent-profile/${contactId}`);
+          };
+          return (
+            <Tooltip
+              title={isGroupChat || isCEO ? '' : '点击查看 Agent 介绍 / 能力配置'}
+              placement="bottom"
+              arrow
+            >
+              <Avatar
+                src={isGroupChat ? undefined : (avatarSrc || undefined)}
+                onClick={isGroupChat || isCEO ? undefined : handleHeadAvatarClick}
+                sx={{
+                  bgcolor: isGroupChat ? (groupConfig?.color || '#ff6d00') : isCEO ? '#7c4dff' : '#1976d2',
+                  width: 40,
+                  height: 40,
+                  cursor: isGroupChat || isCEO ? 'default' : 'pointer',
+                  '&:hover': isGroupChat || isCEO ? {} : { boxShadow: '0 0 0 3px rgba(25,118,210,0.25)' },
+                }}
+              >
+                {isGroupChat ? (groupConfig?.icon || <GroupIcon />) : (resolved?.avatarFallback || contact?.name?.charAt(0) || '?')}
+              </Avatar>
+            </Tooltip>
+          );
+        })()}
         <Box sx={{ flex: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography fontWeight={600} fontSize="0.95rem" component="span">
-            {isGroupChat ? (groupConfig?.name || 'AI Team 工作群') : contact.name}
+            {(() => {
+              const resolved = !isGroupChat && contact
+                ? resolveAgentDisplay(contact.id, contact.name, contact.name.charAt(0), profileOverride)
+                : null;
+              return resolved?.displayName || (isGroupChat ? (groupConfig?.name || 'AI Team 工作群') : contact?.name || '');
+            })()}
             {isGroupChat && (
               <Chip
                 label={`${groupMemberCount}人`}
@@ -389,9 +521,9 @@ export default function ChatPage() {
                 sx={{ ml: 1, height: 18, fontSize: '0.6rem', bgcolor: groupConfig?.color || '#ff6d00', color: 'white' }}
               />
             )}
-            {isGroupChat && isDemoAccount() && tokenBalance >= 0 && (
+            {isGroupChat && isDemoAccount() && tokenBalance !== undefined && tokenBalance >= 0 && (
               <Chip
-                label={`${tokenBalance.toLocaleString()} PT`}
+                label={`${safeNumber(tokenBalance)} PT`}
                 size="small"
                 sx={{
                   ml: 0.5, height: 18, fontSize: '0.6rem',
@@ -742,6 +874,55 @@ export default function ChatPage() {
               title="停止 AI 思考"
             >
               <StopIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
+
+        {/* AI 调用失败提示（出站连接错误） */}
+        {isGroupChat && aiError && !aiResponding && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mb: 1,
+              px: 1.5,
+              py: 0.75,
+              bgcolor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: 1.5,
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{ color: '#dc2626', fontWeight: 500, flex: 1, fontSize: '0.75rem' }}
+            >
+              {aiError}（30s 未响应已自动超时）
+            </Typography>
+            <Button
+              size="small"
+              onClick={handleRetryAi}
+              disabled={sending || !lastUserInput}
+              sx={{
+                minWidth: 'auto',
+                px: 1.5,
+                py: 0.25,
+                color: '#dc2626',
+                textTransform: 'none',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                '&:hover': { bgcolor: 'rgba(220, 38, 38, 0.08)' },
+              }}
+            >
+              重试
+            </Button>
+            <IconButton
+              size="small"
+              onClick={() => setAiError(null)}
+              sx={{ p: 0.25, color: '#dc2626' }}
+              title="关闭提示"
+            >
+              <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
         )}

@@ -4,8 +4,14 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Grid,
   Paper,
+  Stack,
   Typography,
 } from '@mui/material';
 import {
@@ -15,12 +21,18 @@ import {
   Visibility as PreviewIcon,
   OpenInNew as TokenIcon,
   Smartphone as PhonePreviewIcon,
+  Science as DemoIcon,
+  RestartAlt as ResetIcon,
 } from '@mui/icons-material';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCloudStore, getStoreStats, CloudStore, StoreStats } from '../../lib/cloudStoreService';
-import { isTauri } from '../../lib/tauri';
+import { getCloudStore, getStoreStats, getStoreUrl, CloudStore, StoreStats } from '../../lib/cloudStoreService';
+import { safeNumber, safeFixed } from '../../lib/format';
 import CloudStoreSetupWizard from './StoreSetupWizard';
+import { isDemoAccount } from '../../lib/aiTeamTokenService';
+import { readDemoFlag, isDemoResource } from '../../lib/demoFlag';
+import { resetDemoData } from '../../lib/demoBootstrap';
+import StoreMobilePreviewDialog from '../../components/CloudPreview/StoreMobilePreviewDialog';
 
 interface StoreDashboardProps {
   loading: boolean;
@@ -38,7 +50,11 @@ export default function StoreDashboard({
   const [stats, setStats] = useState<StoreStats | null>(null);
   const [openWizard, setOpenWizard] = useState(false);
   const [wizardSubdomain, setWizardSubdomain] = useState('');
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+  // 手机预览 Dialog
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   const loadData = async () => {
     try {
@@ -58,7 +74,23 @@ export default function StoreDashboard({
 
   useEffect(() => {
     loadData();
+    setIsDemo(isDemoAccount() && !!readDemoFlag());
   }, []);
+
+  const handleResetDemoData = async () => {
+    setResetting(true);
+    try {
+      await resetDemoData();
+      setSuccessMessage('演示数据已重置，请稍候刷新页面查看效果。');
+      setResetDialogOpen(false);
+      // 刷新当前数据
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      setError('重置失败：' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // 处理开通商城
   const handleOpenSetupWizard = (subdomainValue: string) => {
@@ -87,35 +119,8 @@ export default function StoreDashboard({
       setError('请先开通云商城');
       return;
     }
-    
-    setPreviewLoading(true);
-    try {
-      // 优先使用 /shop/ 路径格式
-      const storeUrl = `/shop/${store.subdomain}`;
-      
-      if (isTauri()) {
-        // 在 Tauri 环境中，使用 Tauri API 打开新窗口
-        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-        new WebviewWindow(`store-preview-${Date.now()}`, {
-          url: storeUrl,
-          title: `预览商城 - ${store.subdomain}`,
-          width: 1200,
-          height: 800,
-          center: true,
-          decorations: true,
-          visible: true,
-        });
-      } else {
-        // 在浏览器环境中，直接打开新标签页
-        window.open(storeUrl, '_blank');
-      }
-      
-      setSuccessMessage('正在打开商城预览...');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '预览失败');
-    } finally {
-      setPreviewLoading(false);
-    }
+    // 弹出手机模拟器预览 Dialog（使用真实域名 https://${subdomain}.proclaw.cc）
+    setMobilePreviewOpen(true);
   };
 
   // 未开通状态 - 显示开通引导
@@ -188,35 +193,64 @@ export default function StoreDashboard({
   }
 
   // 已开通状态 - 显示概览
-  const storeUrl = `https://${store.subdomain}.proclaw.cc`;
+  // 使用 getStoreUrl 而非硬编码，演示账号会自动走 proclaw.cc/demo 路径
+  const storeUrl = getStoreUrl(store);
 
   return (
     <Box>
+      {/* 演示数据提示（仅演示账号下显示） */}
+      {isDemo && store && isDemoResource('cloudStore', store.subdomain) && (
+        <Alert
+          severity="warning"
+          icon={<DemoIcon />}
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              size="small"
+              color="warning"
+              startIcon={<ResetIcon />}
+              onClick={() => setResetDialogOpen(true)}
+            >
+              重置演示数据
+            </Button>
+          }
+        >
+          当前为 <strong>演示账号</strong>，云商城（{storeUrl.replace('https://', '')}）已预置开通，可点击「预览商城」查看效果。
+        </Alert>
+      )}
+
       {/* 状态栏 */}
       <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: store.status === 'active' ? 'success.50' : 'warning.50' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Typography variant="h6">商城状态：</Typography>
               <Chip
                 label={store.status === 'active' ? '已开通' : store.status === 'expired' ? '已过期' : '已停用'}
                 color={store.status === 'active' ? 'success' : 'error'}
               />
               <Chip label="Token 计费" variant="outlined" color="warning" />
-            </Box>
+              {isDemo && isDemoResource('cloudStore', store.subdomain) && (
+                <Chip
+                  label="🧪 演示数据"
+                  color="warning"
+                  size="small"
+                  icon={<DemoIcon sx={{ fontSize: 16 }} />}
+                />
+              )}
+            </Stack>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body1" color="primary.main" sx={{ fontWeight: 600 }}>{storeUrl}</Typography>
               <Button size="small" onClick={() => navigator.clipboard.writeText(storeUrl)}>复制</Button>
               <Button size="small" endIcon={<LaunchIcon />} onClick={() => window.open(storeUrl, '_blank')}>访问</Button>
-              <Button 
-                size="small" 
-                variant="contained" 
-                startIcon={previewLoading ? <CircularProgress size={16} /> : <PreviewIcon />} 
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<PreviewIcon />}
                 onClick={handlePreviewStore}
-                disabled={previewLoading}
                 color="secondary"
               >
-                预览商城
+                手机预览
               </Button>
               <Button 
                 size="small" 
@@ -239,9 +273,9 @@ export default function StoreDashboard({
       {stats && (
         <Grid container spacing={3} sx={{ mb: 3 }}>
           {[
-            { label: '访问量', value: stats.total_visits.toLocaleString(), unit: '次', color: '#6366f1' },
-            { label: '订单数', value: stats.total_orders.toLocaleString(), unit: '单', color: '#10b981' },
-            { label: '总收入', value: `¥${stats.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, unit: '', color: '#f59e0b' },
+            { label: '访问量', value: safeNumber(stats.total_visits), unit: '次', color: '#6366f1' },
+            { label: '订单数', value: safeNumber(stats.total_orders), unit: '单', color: '#10b981' },
+            { label: '总收入', value: `¥${safeFixed(stats.total_revenue, 2)}`, unit: '', color: '#f59e0b' },
           ].map(item => (
             <Grid item xs={12} sm={4} key={item.label}>
               <Paper elevation={0} sx={{ p: 3, height: '100%', minHeight: 120, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -262,6 +296,41 @@ export default function StoreDashboard({
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
+      )}
+
+      {/* 重置演示数据确认对话框 */}
+      <Dialog
+        open={resetDialogOpen}
+        onClose={() => !resetting && setResetDialogOpen(false)}
+      >
+        <DialogTitle>重置演示数据？</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            将重置演示账号的所有预置数据（20 个产品 / 云商城 / 3 个 AI Team / 外贸柜台插件），然后重新注入。
+            此操作不可撤销，请确认后继续。
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResetDialogOpen(false)} disabled={resetting}>取消</Button>
+          <Button
+            onClick={handleResetDemoData}
+            color="warning"
+            variant="contained"
+            disabled={resetting}
+            startIcon={resetting ? <CircularProgress size={16} /> : <ResetIcon />}
+          >
+            {resetting ? '重置中...' : '确认重置'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 手机模拟器预览 Dialog（使用真实域名 https://${subdomain}.proclaw.cc） */}
+      {store && (
+        <StoreMobilePreviewDialog
+          open={mobilePreviewOpen}
+          onClose={() => setMobilePreviewOpen(false)}
+          subdomain={store.subdomain}
+        />
       )}
 
     </Box>

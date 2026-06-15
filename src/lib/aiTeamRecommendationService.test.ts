@@ -220,9 +220,11 @@ describe('AI 团队推荐服务 - AI智能找图 Agent', () => {
 
       expect(result.tags).not.toContain('智能找图');
 
-      // 没有产品时，应该只有业务分析师兜底
-      expect(result.members.length).toBe(1);
-      expect(result.members[0].agent_id).toBe('builtin-business-analyst');
+      // 没有产品时，推荐自媒体运营 AI 团队（自媒体运营官 + 业务分析师）
+      expect(result.members.length).toBe(2);
+      expect(result.members.some(m => m.agent_id === 'builtin-content-creator')).toBe(true);
+      expect(result.members.some(m => m.agent_id === 'builtin-business-analyst')).toBe(true);
+      expect(result.tags).toContain('自媒体运营');
     });
 
     it('analysis 中应包含产品配图理由', async () => {
