@@ -26,6 +26,7 @@ import {
   ActivityIndicator,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import SearchHeaderTitle from '../components/SearchHeaderTitle';
@@ -78,6 +79,7 @@ const PERSONAL_TYPE_CONFIG: Record<ContactType, { icon: string; color: string; g
   colleague: { icon: 'account-tie',   color: '#00d2ff', glow: 'rgba(0,210,255,0.25)' },
   customer:  { icon: 'account-star',   color: '#00f5d4', glow: 'rgba(0,245,212,0.25)' },
   supplier:  { icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.25)' },
+  friend:    { icon: 'account-heart',  color: '#f472b6', glow: 'rgba(244,114,182,0.25)' },
 };
 
 /** 内置 AI Agent 兜底数据 */
@@ -128,6 +130,8 @@ const DEMO_CONTACTS: Customer[] = [
   { id: 's1', name: '周建国', phone: '137****3111', email: 'zhoujg@supply.com',     contact_type: 'supplier', company: '鼎丰电子材料有限公司', position: '销售总监' },
   { id: 's2', name: '吴丽华', phone: '137****3222', email: 'wulh@supply.com',       contact_type: 'supplier', company: '华远工业原料供应', position: '大客户经理' },
   { id: 's3', name: '郑海龙', phone: '137****3333', email: 'zhenghl@supply.com',    contact_type: 'supplier', company: '鑫达包装制品厂',     position: '法人代表' },
+  { id: 'f1', name: '王思琪', phone: '136****4111', email: 'wangsiqi@example.com',  contact_type: 'friend', position: '自由设计师' },
+  { id: 'f2', name: '陈浩然', phone: '136****4222', email: 'chenhr@example.com',    contact_type: 'friend', position: '独立开发者' },
 ];
 
 // ============ 组件 ============
@@ -144,6 +148,7 @@ export default function ContactsTab() {
 
   // Task 7：成员对话框与 Agent 个性化缓存
   const [membersDialogGroup, setMembersDialogGroup] = useState<AITeamGroupConfig | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   // Agent 个性化显示信息缓存（agentId -> { displayName, avatarKey, customAvatarUri }）
   const [agentDisplayCache, setAgentDisplayCache] = useState<
     Record<string, { displayName: string; avatarKey: string | null; customAvatarUri: string | null }>
@@ -344,7 +349,8 @@ export default function ContactsTab() {
       result.push({
         title: '个人联系人',
         icon: 'account-group',
-        data: personalEntries,
+        data: collapsedSections['个人联系人'] ? [] : personalEntries,
+        collapsible: true,
       });
     }
 
@@ -357,7 +363,8 @@ export default function ContactsTab() {
       result.push({
         title: 'AI Agent',
         icon: 'robot',
-        data: agentEntries,
+        data: collapsedSections['AI Agent'] ? [] : agentEntries,
+        collapsible: true,
       });
     }
 
@@ -369,11 +376,12 @@ export default function ContactsTab() {
     result.push({
       title: 'AI Team',
       icon: 'brain',
-      data: teamEntries,
+      data: collapsedSections['AI Team'] ? [] : teamEntries,
+      collapsible: true,
     });
 
     return result;
-  }, [personalContacts, filteredAgents, filteredTeams, searchQuery]);
+  }, [personalContacts, filteredAgents, filteredTeams, searchQuery, collapsedSections]);
 
   // ============ 事件处理 ============
 
@@ -468,17 +476,40 @@ export default function ContactsTab() {
     [navigation],
   );
 
+  /** 切换分区折叠状态 */
+  const toggleSectionCollapse = useCallback((title: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [title]: !prev[title] }));
+  }, []);
+
   // ============ 渲染函数 ============
 
-  const renderSectionHeader = ({ section }: { section: ContactSection }) => (
-    <View style={styles.sectionHeader}>
-      <MaterialCommunityIcons name={section.icon} size={18} color="#00d2ff" />
-      <Text style={styles.sectionTitle}>{section.title}</Text>
-      <View style={styles.sectionCountBadge}>
-        <Text style={styles.sectionCount}>{section.data.length}</Text>
-      </View>
-    </View>
-  );
+  const renderSectionHeader = ({ section }: { section: ContactSection }) => {
+    const isCollapsed = collapsedSections[section.title];
+    const count = section.collapsible && isCollapsed ? '…' : section.data.length;
+    return (
+      <TouchableOpacity
+        style={styles.sectionHeader}
+        onPress={() => section.collapsible && toggleSectionCollapse(section.title)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: !isCollapsed }}
+      >
+        <MaterialCommunityIcons name={section.icon} size={18} color="#00d2ff" />
+        <Text style={styles.sectionTitle}>{section.title}</Text>
+        <View style={styles.sectionCountBadge}>
+          <Text style={styles.sectionCount}>{count}</Text>
+        </View>
+        {section.collapsible && (
+          <MaterialCommunityIcons
+            name={isCollapsed ? 'chevron-down' : 'chevron-up'}
+            size={18}
+            color="rgba(255,255,255,0.4)"
+            style={{ marginLeft: 4 }}
+          />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderPersonalItem = (item: Customer) => {
     const typeCfg = item.contact_type ? PERSONAL_TYPE_CONFIG[item.contact_type] : null;
@@ -488,6 +519,31 @@ export default function ContactsTab() {
       : item.position || '';
 
     return (
+      <Swipeable
+        renderRightActions={() => (
+          <View style={styles.swipeActions}>
+            <TouchableOpacity
+              style={[styles.swipeAction, { backgroundColor: 'rgba(0,210,255,0.25)' }]}
+              onPress={() => handlePersonalPress(item)}
+              accessibilityRole="button"
+              accessibilityLabel="发送消息"
+            >
+              <MaterialCommunityIcons name="chat-processing" size={20} color="#00d2ff" />
+              <Text style={styles.swipeActionText}>消息</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.swipeAction, { backgroundColor: `${avatarColor}40` }]}
+              onPress={() => handleCall(item, 'audio')}
+              accessibilityRole="button"
+              accessibilityLabel="拨打电话"
+            >
+              <MaterialCommunityIcons name="phone" size={20} color={avatarColor} />
+              <Text style={styles.swipeActionText}>通话</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        rightThreshold={80}
+      >
       <TouchableOpacity activeOpacity={0.7} onPress={() => handlePersonalPress(item)} style={styles.glassCard}>
         <View style={styles.cardContent}>
           <View style={[styles.glassAvatarWrap, { borderColor: `${avatarColor}66` }]}>
@@ -520,6 +576,7 @@ export default function ContactsTab() {
           </View>
         </View>
       </TouchableOpacity>
+      </Swipeable>
     );
   };
 
@@ -535,6 +592,7 @@ export default function ContactsTab() {
             activeOpacity={0.7}
             onPress={() => handleAgentAvatarPress(agent)}
             style={styles.agentAvatarWrap}
+            accessibilityRole="button"
             accessibilityLabel={`查看 ${display?.displayName || agent.name} 介绍`}
           >
             {display?.customAvatarUri ? (
@@ -552,6 +610,8 @@ export default function ContactsTab() {
             activeOpacity={0.7}
             onPress={() => handleAgentPress(agent)}
             style={styles.infoTouchArea}
+            accessibilityRole="button"
+            accessibilityLabel={`与 ${display?.displayName || agent.name} 对话`}
           >
             <View style={styles.info}>
               <Text variant="titleSmall" style={styles.name}>
@@ -576,6 +636,7 @@ export default function ContactsTab() {
           activeOpacity={0.7}
           onPress={() => handleTeamAvatarPress(team)}
           style={[styles.glassAvatarWrap, { borderColor: 'rgba(123,47,247,0.4)' }]}
+          accessibilityRole="button"
           accessibilityLabel={`查看 ${team.name} 成员`}
         >
           <AgentAvatar agentId={team.agentId || team.id} size={44} useSecretaryImage={false} />
@@ -586,6 +647,8 @@ export default function ContactsTab() {
           activeOpacity={0.7}
           onPress={() => handleTeamPress(team)}
           style={styles.infoTouchArea}
+          accessibilityRole="button"
+          accessibilityLabel={`与 ${team.name} 对话`}
         >
           <View style={styles.info}>
             <Text variant="titleSmall" style={styles.name}>{team.name}</Text>
@@ -852,6 +915,26 @@ const styles = StyleSheet.create({
     color: '#00d2ff',
     fontWeight: '500',
     marginLeft: 6,
+  },
+
+  // ---- 滑动操作 ----
+  swipeActions: {
+    flexDirection: 'row',
+    marginVertical: 3,
+    marginHorizontal: 4,
+  },
+  swipeAction: {
+    width: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    marginHorizontal: 2,
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
   },
 
   // ---- 空状态 ----

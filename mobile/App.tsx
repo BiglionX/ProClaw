@@ -65,6 +65,7 @@ type MainTabParamList = {
 
 
 import { useAppStore } from './src/stores/AppStore';
+import { useChatStore } from './src/stores/ChatStore';
 import { listProfiles, getCurrentProfile, setCurrentProfile } from './src/services/ProfileManager';
 import { openDatabase, getDatabase } from './src/services/DatabaseFactory';
 import { applySchema } from './src/services/SchemaManager';
@@ -77,6 +78,15 @@ const Tab = createBottomTabNavigator();
 
 /** 主 Tab 导航：固定 3 个 Tab，右下角浮动小如按钮 */
 function MainTabs() {
+  // P0: 从 ChatStore 计算总未读数，用于消息 Tab 角标
+  const totalUnread = useChatStore((s) =>
+    s.sessions.reduce((sum, sess) => sum + (sess.unread_count || 0), 0)
+  );
+
+  // 确保会话列表在 Tab 挂载时加载
+  const loadSessions = useChatStore((s) => s.loadSessions);
+  React.useEffect(() => { loadSessions(); }, [loadSessions]);
+
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
@@ -118,7 +128,11 @@ function MainTabs() {
       <Tab.Screen
         name="MessagesTab"
         component={MessagesTab}
-        options={{ title: '消息', tabBarLabel: '消息' }}
+        options={{
+          title: '消息',
+          tabBarLabel: '消息',
+          tabBarBadge: totalUnread > 0 ? (totalUnread > 99 ? '99+' : totalUnread) : undefined,
+        }}
       />
       <Tab.Screen
         name="ProfileTab"

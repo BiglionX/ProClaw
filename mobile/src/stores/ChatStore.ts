@@ -26,6 +26,8 @@ export interface ChatStoreState {
   refreshSessions: () => Promise<void>;
   /** 标记某会话已读（同步更新 store） */
   markSessionRead: (sessionId: string) => Promise<void>;
+  /** 切换会话已读/未读（同步更新 store） */
+  toggleSessionRead: (sessionId: string, targetUnread: number) => Promise<void>;
   /** 重置状态（切换身份时调用） */
   reset: () => void;
 }
@@ -64,6 +66,17 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     set((state) => ({
       sessions: state.sessions.map((s) =>
         s.id === sessionId ? { ...s, unread_count: 0 } : s
+      ),
+    }));
+  },
+
+  toggleSessionRead: async (sessionId: string, targetUnread: number) => {
+    const { getDatabase } = require('../services/DatabaseFactory');
+    const db = getDatabase();
+    await db.runAsync('UPDATE chat_sessions SET unread_count = ? WHERE id = ?', [targetUnread, sessionId]);
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, unread_count: targetUnread } : s
       ),
     }));
   },

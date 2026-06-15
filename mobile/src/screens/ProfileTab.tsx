@@ -4,7 +4,7 @@
  * 设置通过右上角齿轮图标进入独立 SettingsScreen
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import {
   Text,
   Avatar,
@@ -13,10 +13,12 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { getProducts, getCustomers } from '../services/ApiService';
-import { isDemoMode } from '../services/AuthService';
+import { isDemoMode, clearTokens } from '../services/AuthService';
 import { showToast } from '../components/Toast';
+import { useChatStore } from '../stores/ChatStore';
 import { getInstalledPlugins, parseManifest, type InstalledPlugin } from '../services/PluginRegistry';
 import { getDatabase } from '../services/DatabaseFactory';
 import { useAppStore } from '../stores/AppStore';
@@ -24,6 +26,7 @@ import type { AppNavigation, RootStackParamList } from '../types/navigation';
 
 const DEMO_PRODUCT_COUNT = 42;
 const DEMO_CONTACT_COUNT = 10;
+const DEMO_ORDER_COUNT = 9;
 
 // ============ 快捷操作配置 ============
 
@@ -57,6 +60,7 @@ export default function ProfileTab() {
   const [latency, setLatency] = useState(0);
   const [productCount, setProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [demo, setDemo] = useState(false);
 
@@ -76,6 +80,7 @@ export default function ProfileTab() {
         setConnectionStatus('checking');
         setProductCount(DEMO_PRODUCT_COUNT);
         setCustomerCount(DEMO_CONTACT_COUNT);
+        setOrderCount(DEMO_ORDER_COUNT);
         setLoading(false);
         return;
       }
@@ -90,6 +95,12 @@ export default function ProfileTab() {
       catch { setProductCount(0); }
       try { const allCustomers = await getCustomers(); setCustomerCount(allCustomers.length); }
       catch { setCustomerCount(0); }
+      // P0: 查询订单总数（PRD §5.2 数据看板要求）
+      try {
+        const db = getDatabase();
+        const result = await db.getFirstAsync('SELECT COUNT(*) as cnt FROM sales_orders') as { cnt: number } | undefined;
+        setOrderCount(result?.cnt || 0);
+      } catch { setOrderCount(0); }
     } catch { setConnectionStatus('offline'); }
     finally { setLoading(false); }
   }, []);
@@ -105,6 +116,29 @@ export default function ProfileTab() {
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
   useFocusEffect(useCallback(() => { loadPlugins(); }, []));
+
+  const handleLogout = async () => {
+    Alert.alert('退出登录', '确定退出当前账号？', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '退出', style: 'destructive',
+        onPress: async () => {
+          try {
+            await clearTokens();
+            // 清除身份状态，防止重启后自动进入主界面
+            AsyncStorage.removeItem('@proclaw_current_profile');
+            // 重置会话 store
+            useChatStore.getState().reset();
+            // 重置导航栈到根路由
+            navigation.reset({ index: 0, routes: [{ name: 'Connection' as never }] });
+            showToast('success', '已退出');
+          } catch {
+            showToast('error', '退出失败');
+          }
+        },
+      },
+    ]);
+  };
 
   const getStatusCfg = (): { label: string; color: string; icon: string } => {
     if (demo) return { label: '演示', color: '#8b5cf6', icon: 'play-circle' };
@@ -161,6 +195,7 @@ export default function ProfileTab() {
       </View>
 
       {/* ============ 数据概览 ============ */}
+      <Text style={styles.sectionLabel}>数据概览</Text>
       <View style={styles.statsGrid}>
         <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('Products')} activeOpacity={0.7}>
           <View style={styles.statContent}>
@@ -180,13 +215,13 @@ export default function ProfileTab() {
             <Text style={styles.statLabel}>联系人</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('PluginStore')} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.glassStatCard} onPress={() => navigation.navigate('SalesOrder')} activeOpacity={0.7}>
           <View style={styles.statContent}>
             <View style={[styles.glassStatIcon, { backgroundColor: 'rgba(123,47,247,0.15)' }]}>
-              <MaterialCommunityIcons name="puzzle" size={22} color="#7b2ff7" />
+              <MaterialCommunityIcons name="receipt" size={22} color="#7b2ff7" />
             </View>
-            <Text variant="headlineSmall" style={styles.statValue}>{installedPlugins.length}</Text>
-            <Text style={styles.statLabel}>插件</Text>
+            <Text variant="headlineSmall" style={styles.statValue}>{orderCount}</Text>
+            <Text style={styles.statLabel}>订单</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -267,6 +302,12 @@ export default function ProfileTab() {
           </View>
         </>
       )}
+
+      {/* ============ 退出登录 ============ */}
+      <TouchableOpacity style={styles.glassLogoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+        <MaterialCommunityIcons name="logout" size={20} color="#ff6b9d" />
+        <Text style={styles.logoutText}>退出登录</Text>
+      </TouchableOpacity>
 
       {/* ============ 底部版本 ============ */}
       <View style={styles.footer}>
@@ -355,7 +396,7 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 4,
     gap: 10,
   },
   glassStatCard: {
@@ -478,8 +519,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   logoutBtn: {
-    borderRadius: 10,
-    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,107,157,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,157,0.25)',
+  },
+  glassLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,107,157,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,157,0.25)',
+  },
+  logoutText: {
+    color: '#ff6b9d',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   versionText: {
     textAlign: 'center',

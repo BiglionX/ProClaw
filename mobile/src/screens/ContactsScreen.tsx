@@ -16,6 +16,7 @@ const TYPE_CONFIG: Record<ContactType, { icon: string; color: string; glow: stri
   colleague:   { icon: 'account-tie',   color: '#00d2ff', glow: 'rgba(0,210,255,0.25)' },
   customer:    { icon: 'account-star',   color: '#00f5d4', glow: 'rgba(0,245,212,0.25)' },
   supplier:    { icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.25)' },
+  friend:      { icon: 'account-heart',  color: '#f472b6', glow: 'rgba(244,114,182,0.25)' },
 };
 
 const DEMO_CONTACTS: Customer[] = [

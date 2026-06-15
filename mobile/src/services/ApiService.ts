@@ -26,7 +26,7 @@ export interface Product {
   image_url?: string;
 }
 
-export type ContactType = 'customer' | 'supplier' | 'colleague';
+export type ContactType = 'customer' | 'supplier' | 'colleague' | 'friend';
 
 export interface Customer {
   id: string;
@@ -44,6 +44,7 @@ export const CONTACT_TYPE_LABELS: Record<ContactType, string> = {
   customer: '客户',
   supplier: '供应商',
   colleague: '同事',
+  friend: '朋友',
 };
 
 export interface OrderItem {

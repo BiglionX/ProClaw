@@ -8,17 +8,18 @@ import React, { useEffect, useState, useCallback, useLayoutEffect, useMemo } fro
 import {
   View,
   StyleSheet,
-  FlatList,
+  SectionList,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import {
   Text,
   Avatar,
   ActivityIndicator,
-  Badge,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import SearchHeaderTitle from '../components/SearchHeaderTitle';
@@ -28,6 +29,7 @@ import {
   type ChatSession,
 } from '../services/ChatService';
 import { useChatStore } from '../stores/ChatStore';
+import { showToast } from '../components/Toast';
 import type { AppNavigation } from '../types/navigation';
 
 function formatTime(ts: number): string {
@@ -51,7 +53,8 @@ function formatTime(ts: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-export default function MessagesTab() {  const navigation = useNavigation<AppNavigation>();
+export default function MessagesTab() {
+  const navigation = useNavigation<AppNavigation>();
   const {
     sessions: allSessions,
     loading,
@@ -72,6 +75,20 @@ export default function MessagesTab() {  const navigation = useNavigation<AppNa
         s.last_message.toLowerCase().includes(q)
     );
   }, [allSessions, searchQuery]);
+
+  // 置顶/未置顶 双分区
+  const sections = useMemo(() => {
+    const pinned = sessions.filter((s) => s.is_pinned === 1);
+    const unpinned = sessions.filter((s) => s.is_pinned !== 1);
+    const result: { title: string; icon: string; data: ChatSession[] }[] = [];
+    if (pinned.length > 0) {
+      result.push({ title: '置顶会话', icon: 'pin', data: pinned });
+    }
+    if (unpinned.length > 0 || pinned.length === 0) {
+      result.push({ title: '全部会话', icon: 'chat-processing', data: unpinned });
+    }
+    return result;
+  }, [sessions]);
 
   // 页面聚焦时刷新
   useFocusEffect(
@@ -149,67 +166,132 @@ export default function MessagesTab() {  const navigation = useNavigation<AppNa
   };
 
   const handleDelete = async (sessionId: string) => {
-    await deleteSession(sessionId);
-    await refreshSessions();
+    Alert.alert('删除会话', '确定删除该会话？此操作不可恢复。', [
+      { text: '取消', style: 'cancel' },
+      { text: '删除', style: 'destructive', onPress: async () => { await deleteSession(sessionId); await refreshSessions(); } },
+    ]);
   };
 
-  const renderSession = ({ item }: { item: ChatSession }) => (
-    <TouchableOpacity
-      style={[styles.sessionItem, item.is_pinned === 1 && styles.sessionItemPinned]}
-      onPress={() => handleSessionPress(item)}
-      onLongPress={() => handleTogglePin(item.id)}
-      activeOpacity={0.7}
-    >
-      {/* 头像 */}
-      <View style={styles.avatarContainer}>
-        <View style={[
-          styles.glassAvatarWrap,
-          {
-            borderColor: item.session_type === 'agent' ? 'rgba(0,210,255,0.5)'
-              : item.session_type === 'team' ? 'rgba(123,47,247,0.5)'
-              : 'rgba(0,245,212,0.5)',
-          },
-        ]}>
-          <Avatar.Text
-            size={42}
-            label={item.target_name.charAt(0)}
-            color="#fff"
-            style={{
-              backgroundColor: item.session_type === 'agent' ? '#00d2ff'
-                : item.session_type === 'team' ? '#7b2ff7'
-                : '#00f5d4',
-            }}
-          />
-        </View>
-        {item.unread_count > 0 && (
-          <View style={styles.unreadBadgeWrap}>
-            <Text style={styles.unreadBadgeText}>
-              {item.unread_count > 99 ? '99+' : item.unread_count}
-            </Text>
-          </View>
-        )}
-      </View>
+  const handleMarkUnread = async (session: ChatSession) => {
+    try {
+      const target = session.unread_count > 0 ? 0 : 1;
+      await useChatStore.getState().toggleSessionRead(session.id, target);
+    } catch {
+      showToast('error', '操作失败');
+    }
+  };
 
-      {/* 内容 */}
-      <View style={styles.sessionContent}>
-        <View style={styles.sessionHeader}>
-          <Text style={styles.sessionName} numberOfLines={1}>
-            {item.target_name}
-          </Text>
-          <Text style={styles.sessionTime}>
-            {formatTime(item.last_message_time)}
-          </Text>
-        </View>
-        <View style={styles.sessionPreview}>
-          <Text style={styles.previewText} numberOfLines={1}>
-            {item.last_message || '暂无消息'}
-          </Text>
-          {item.is_pinned === 1 && (
-            <MaterialCommunityIcons name="pin" size={14} color="#00d2ff" style={styles.pinIcon} />
+  const renderSectionHeader = ({ section }: { section: { title: string; icon: string; data: ChatSession[] } }) => (
+    <View style={styles.sectionHeader}>
+      <MaterialCommunityIcons name={section.icon} size={16} color="#00d2ff" />
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+      <View style={styles.sectionCountBadge}>
+        <Text style={styles.sectionCount}>{section.data.length}</Text>
+      </View>
+    </View>
+  );
+
+  const renderRightActions = (session: ChatSession) => (
+    <View style={styles.swipeActions}>
+      <TouchableOpacity
+        style={[styles.swipeAction, { backgroundColor: 'rgba(0,210,255,0.25)' }]}
+        onPress={() => handleTogglePin(session.id)}
+      >
+        <MaterialCommunityIcons name={session.is_pinned === 1 ? 'pin-off' : 'pin'} size={20} color="#00d2ff" />
+        <Text style={styles.swipeActionText}>{session.is_pinned === 1 ? '取消置顶' : '置顶'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.swipeAction, { backgroundColor: 'rgba(255,107,157,0.25)' }]}
+        onPress={() => handleDelete(session.id)}
+      >
+        <MaterialCommunityIcons name="delete" size={20} color="#ff6b9d" />
+        <Text style={styles.swipeActionText}>删除</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderLeftActions = (session: ChatSession) => (
+    <View style={styles.swipeActions}>
+      <TouchableOpacity
+        style={[styles.swipeAction, { backgroundColor: 'rgba(0,245,212,0.25)' }]}
+        onPress={() => handleMarkUnread(session)}
+      >
+        <MaterialCommunityIcons
+          name={session.unread_count > 0 ? 'email-marked' : 'email-outline'}
+          size={20}
+          color="#00f5d4"
+        />
+        <Text style={styles.swipeActionText}>
+          {session.unread_count > 0 ? '标记已读' : '标记未读'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderSession = ({ item }: { item: ChatSession }) => (
+    <Swipeable
+      renderLeftActions={() => renderLeftActions(item)}
+      renderRightActions={() => renderRightActions(item)}
+      leftThreshold={80}
+      rightThreshold={80}
+    >
+      <TouchableOpacity
+        style={[styles.sessionItem, item.is_pinned === 1 && styles.sessionItemPinned, item.unread_count > 0 && styles.sessionItemUnread]}
+        onPress={() => handleSessionPress(item)}
+        onLongPress={() => handleTogglePin(item.id)}
+        activeOpacity={0.7}
+      >
+        {/* 头像 */}
+        <View style={styles.avatarContainer}>
+          <View style={[
+            styles.glassAvatarWrap,
+            {
+              borderColor: item.session_type === 'agent' ? 'rgba(0,210,255,0.5)'
+                : item.session_type === 'team' ? 'rgba(123,47,247,0.5)'
+                : 'rgba(0,245,212,0.5)',
+            },
+          ]}>
+            <Avatar.Text
+              size={42}
+              label={item.target_name.charAt(0)}
+              color="#fff"
+              style={{
+                backgroundColor: item.session_type === 'agent' ? '#00d2ff'
+                  : item.session_type === 'team' ? '#7b2ff7'
+                  : '#00f5d4',
+              }}
+            />
+          </View>
+          {item.unread_count > 0 && (
+            <View style={styles.unreadBadgeWrap}>
+              <Text style={styles.unreadBadgeText}>
+                {item.unread_count > 99 ? '99+' : item.unread_count}
+              </Text>
+            </View>
           )}
         </View>
-      </View>
-    </TouchableOpacity>
+
+        {/* 内容 */}
+        <View style={styles.sessionContent}>
+          <View style={styles.sessionHeader}>
+            <Text style={styles.sessionName} numberOfLines={1}>
+              {item.target_name}
+            </Text>
+            <Text style={styles.sessionTime}>
+              {formatTime(item.last_message_time)}
+            </Text>
+          </View>
+          <View style={styles.sessionPreview}>
+            <Text style={styles.previewText} numberOfLines={1}>
+              {item.last_message || '暂无消息'}
+            </Text>
+            {item.is_pinned === 1 && (
+              <MaterialCommunityIcons name="pin" size={14} color="#00d2ff" style={styles.pinIcon} />
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Swipeable>
   );
 
   return (
@@ -228,11 +310,13 @@ export default function MessagesTab() {  const navigation = useNavigation<AppNa
           <ActivityIndicator size="large" color="#00d2ff" />
         </View>
       ) : (
-        <FlatList
-          data={sessions}
+        <SectionList
+          sections={sections}
           renderItem={renderSession}
+          renderSectionHeader={renderSectionHeader}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00d2ff" />
           }
@@ -267,6 +351,55 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
 
+  // ---- 分区头 ----
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    marginLeft: 6,
+    flex: 1,
+  },
+  sectionCountBadge: {
+    backgroundColor: 'rgba(0,210,255,0.12)',
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,255,0.2)',
+  },
+  sectionCount: {
+    fontSize: 11,
+    color: '#00d2ff',
+    fontWeight: '600',
+  },
+
+  // ---- 滑动操作 ----
+  swipeActions: {
+    flexDirection: 'row',
+    marginVertical: 3,
+    marginHorizontal: 8,
+  },
+  swipeAction: {
+    width: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    marginHorizontal: 2,
+  },
+  swipeActionText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
   // ---- 会话项 ----
   sessionItem: {
     flexDirection: 'row',
@@ -283,6 +416,11 @@ const styles = StyleSheet.create({
   sessionItemPinned: {
     backgroundColor: 'rgba(0,210,255,0.06)',
     borderColor: 'rgba(0,210,255,0.15)',
+  },
+  sessionItemUnread: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#00d2ff',
+    paddingLeft: 13,
   },
 
   // ---- 头像 ----
