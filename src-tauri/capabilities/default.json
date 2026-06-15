@@ -1,7 +1,7 @@
 {
   "identifier": "default",
-  "description": "Default capabilities for ProClaw",
-  "windows": ["main", "setup-wizard"],
+  "description": "Capabilities for ProClaw main window. Setup-wizard uses a separate restricted capability set.",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:default",

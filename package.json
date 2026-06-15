@@ -42,7 +42,6 @@
     "postcss": "^8.4.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
-    "react-countup": "^6.5.3",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0",
     "recharts": "^3.8.1",

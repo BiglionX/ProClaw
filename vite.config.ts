@@ -6,12 +6,14 @@ export default defineConfig({
   plugins: [
     react(),
     // 移除 Tauri 生产构建中可能引起问题的 crossorigin 属性
+    // 修复 v6：原 regex 只匹配 crossorigin="value" 形式，不匹配 boolean 形式 crossorigin 后跟其他属性
+    // 实际 vite 产物是 <script type="module" crossorigin src="..."> 需要跳过 crossorigin 及后续空白
     {
       name: 'remove-crossorigin',
       transformIndexHtml: {
         order: 'post',
         handler(html: string) {
-          return html.replace(/\bcrossorigin\s*=\s*["'][^"']*["']\s*/g, '');
+          return html.replace(/\s+crossorigin(\s+|\s*=[\s"'][^"']*["'])/g, ' ');
         },
       },
     },
@@ -25,11 +27,7 @@ export default defineConfig({
       '@tauri-apps/plugin-dialog': path.resolve(__dirname, 'node_modules/@tauri-apps/plugin-dialog/dist-js/index.js'),
       '@tauri-apps/plugin-fs': path.resolve(__dirname, 'node_modules/@tauri-apps/plugin-fs/dist-js/index.js'),
       '@tauri-apps/plugin-shell': path.resolve(__dirname, 'node_modules/@tauri-apps/plugin-shell/dist-js/index.js'),
-    },
-  },
-  build: {
-    rollupOptions: {
-      external: ['@anthropic-ai/sdk/lib/transform-json-schema'],
+      '@anthropic-ai/sdk/lib/transform-json-schema': path.resolve(__dirname, 'src/lib/polyfills/transform-json-schema.ts'),
     },
   },
 });

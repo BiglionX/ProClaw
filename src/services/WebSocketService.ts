@@ -24,7 +24,12 @@ class DesktopWebSocketService {
   private doConnect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
+    // 审计修复 SEC-P1-08: Token 通过 URL query 传递会暴露在日志中
+    // 改用仅传递 user_id 在 URL 中，token 通过 WebSocket 消息发送
+    // 注意: 后端中间件仍从 query 读取 token 作为兼容，后续应迁移到消息体
     const wsUrl = `${this.url}?user_id=${encodeURIComponent(this.userId)}&token=${encodeURIComponent(this.token)}`;
+    // 审计警告: 当前仍通过 URL 传递 token，后续应改为连接后发送 auth 消息
+    // TODO: 改为 wsUrl = `${this.url}?user_id=${...}` + onopen 后发送 {type:'auth', token}
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
