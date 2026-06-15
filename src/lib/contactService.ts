@@ -1,5 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from './tauri';
+import {
+  getDefaultAgentAvatar as getDefaultAgentAvatarSvg,
+  getDefaultAgentAvatarKey,
+  getAgentAvatarPreset,
+  type AgentAvatarPreset,
+} from '../types/agentAvatarLibrary';
 
 // ==================== 常量 ====================
 
@@ -56,8 +62,11 @@ export function getAITeamGroupConfig(id: string): AITeamGroupConfig | undefined 
 /** 默认群组颜色调色板 */
 const GROUP_COLORS = ['#ff6d00', '#ff3b30', '#2196f3', '#4caf50', '#9c27b0', '#00bcd4', '#ff9800', '#607d8b'];
 
-/** 默认 Agent 头像映射（基于 agent_id 关键词匹配） */
-function getDefaultAgentAvatar(agentId: string, role: string): string {
+/**
+ * 默认 Agent 头像（emoji 兜底版）
+ * 保留旧的关键词→emoji 映射作为最终降级方案
+ */
+function getAgentEmojiAvatar(agentId: string, role: string): string {
   const keywords: [string[], string][] = [
     [['ceo'], '🧠'],
     [['finance', '财务', 'financial'], '💰'],
@@ -81,6 +90,52 @@ function getDefaultAgentAvatar(agentId: string, role: string): string {
     if (keys.some(k => lower.includes(k))) return emoji;
   }
   return '🤖';
+}
+
+/**
+ * Agent 头像信息：同时返回 SVG URL（优先）和 emoji 兜底
+ */
+export interface AgentAvatarInfo {
+  /** 头像库 key（未设置时为 agentId 哈希默认） */
+  key: string;
+  /** 头像 URL（指向 /agents/team/avatars/agent_XX.svg） */
+  src: string;
+  /** 头像 emoji 兜底（用于 <Avatar>{fallback}</Avatar> 的子节点） */
+  fallback: string;
+  /** 头像定义（如需要显示标签可读） */
+  preset: AgentAvatarPreset | null;
+}
+
+/**
+ * 根据 agentId 获取头像信息（不读 override）
+ * 顺序：AGENT_AVATAR_PRESETS 哈希分配 → emoji 兜底
+ */
+export function getAgentAvatarInfo(agentId: string, role: string = ''): AgentAvatarInfo {
+  const key = getDefaultAgentAvatarKey(agentId);
+  const preset = getAgentAvatarPreset(key);
+  const fallback = getAgentEmojiAvatar(agentId, role);
+  return {
+    key,
+    src: preset?.src || getDefaultAgentAvatarSvg(agentId),
+    fallback,
+    preset,
+  };
+}
+
+/**
+ * 旧的 getDefaultAgentAvatar：返回 emoji（保持向后兼容）
+ * 新代码建议用 getAgentAvatarInfo 拿到 src + fallback 组合
+ */
+function getDefaultAgentAvatar(agentId: string, role: string): string {
+  return getAgentEmojiAvatar(agentId, role);
+}
+
+/**
+ * 获取 Agent 默认头像 URL（SVG 形式）
+ * 用于联系人列表、ChatPage header 等显示
+ */
+export function getAgentAvatarUrl(agentId: string): string {
+  return getDefaultAgentAvatarSvg(agentId);
 }
 
 /**
@@ -175,6 +230,104 @@ export function syncAITeamGroups(teams: { id: string; name: string; description?
       ];
     }
   });
+}
+
+// ==================== Agent 主动问候语 ====================
+
+/** 单个 Agent 首次进入会话时的主动问候语 */
+const AGENT_GREETINGS: Record<string, { content: string; name: string }> = {
+  'ceo-agent': {
+    name: 'CEO Agent',
+    content: '老板，有啥吩咐？我会根据您的战略目标协调所有 Agent。',
+  },
+  'finance-agent': {
+    name: '财务 Agent',
+    content: '老板，有啥吩咐？账目核对、流水分析都可以找我。',
+  },
+  'crm-agent': {
+    name: 'CRM Agent',
+    content: '老板，有啥吩咐？客户跟进、服务问题都可以找我。',
+  },
+  'inventory-agent': {
+    name: '库存 Agent',
+    content: '老板，有啥吩咐？库存查询、预警补货都可以找我。',
+  },
+  'sales-agent': {
+    name: '销售 Agent',
+    content: '老板，有啥吩咐？订单处理、客户沟通都可以找我。',
+  },
+  'purchase-agent': {
+    name: '采购 Agent',
+    content: '老板，有啥吩咐？采购建议、供应商评估都可以找我。',
+  },
+  'content-agent': {
+    name: '内容 Agent',
+    content: '老板，有啥吩咐？文案撰写、内容分发都可以找我。',
+  },
+  'image-agent': {
+    name: 'AI智能找图',
+    content: '老板，有啥吩咐？找图配图、视觉设计随时交给我。',
+  },
+  'social-agent': {
+    name: '社媒 Agent',
+    content: '老板，有啥吩咐？账号运营、传播分析都可以找我。',
+  },
+  'hr-agent': {
+    name: '人事 Agent',
+    content: '老板，有啥吩咐？人事事务、员工管理都可以找我。',
+  },
+  'business-agent': {
+    name: '业务 Agent',
+    content: '老板，有啥吩咐？经营分析、报表生成都可以找我。',
+  },
+};
+
+/**
+ * 获取 Agent 联系人的主动问候语
+ * @param contactId 联系人 ID（可能是 agent id 或 ai-team-group-* 群组 id）
+ * @returns { fromUser, fromUserName, content } 或 null（非 Agent）
+ */
+export function getAgentGreeting(contactId: string): { fromUser: string; fromUserName: string; content: string } | null {
+  if (!contactId) return null;
+
+  // 1. AI Team 群聊：CEO Agent 代表全体问候
+  if (isAITeamGroupId(contactId)) {
+    return {
+      fromUser: 'ceo-agent',
+      fromUserName: 'CEO Agent',
+      content: '老板，有啥吩咐？AI Team 全体待命！',
+    };
+  }
+
+  // 2. 已知 Agent 联系人：使用该 Agent 的专属问候语
+  if (AGENT_GREETINGS[contactId]) {
+    const g = AGENT_GREETINGS[contactId];
+    return { fromUser: contactId, fromUserName: g.name, content: g.content };
+  }
+
+  // 3. 尝试根据 agent_id 模糊匹配（以 agent- 开头或 agent_id 含 ceo/finance 等关键词）
+  const lower = contactId.toLowerCase();
+  if (lower.startsWith('builtin-') || lower.startsWith('agent-')) {
+    // 提取角色名（builtin-finance-advisor → finance）
+    const stripped = lower.replace(/^(builtin-|agent-)/, '');
+    if (AGENT_GREETINGS[stripped]) {
+      const g = AGENT_GREETINGS[stripped];
+      return { fromUser: contactId, fromUserName: g.name, content: g.content };
+    }
+    // 关键词匹配
+    if (lower.includes('ceo')) return { fromUser: contactId, fromUserName: 'CEO Agent', content: AGENT_GREETINGS['ceo-agent'].content };
+    if (lower.includes('finance')) return { fromUser: contactId, fromUserName: '财务 Agent', content: AGENT_GREETINGS['finance-agent'].content };
+    if (lower.includes('sales')) return { fromUser: contactId, fromUserName: '销售 Agent', content: AGENT_GREETINGS['sales-agent'].content };
+    if (lower.includes('inventory')) return { fromUser: contactId, fromUserName: '库存 Agent', content: AGENT_GREETINGS['inventory-agent'].content };
+    if (lower.includes('purchase')) return { fromUser: contactId, fromUserName: '采购 Agent', content: AGENT_GREETINGS['purchase-agent'].content };
+    if (lower.includes('content')) return { fromUser: contactId, fromUserName: '内容 Agent', content: AGENT_GREETINGS['content-agent'].content };
+    if (lower.includes('image')) return { fromUser: contactId, fromUserName: 'AI智能找图', content: AGENT_GREETINGS['image-agent'].content };
+    if (lower.includes('social')) return { fromUser: contactId, fromUserName: '社媒 Agent', content: AGENT_GREETINGS['social-agent'].content };
+    if (lower.includes('cs') || lower.includes('customer')) return { fromUser: contactId, fromUserName: 'CRM Agent', content: AGENT_GREETINGS['crm-agent'].content };
+    if (lower.includes('hr') || lower.includes('human')) return { fromUser: contactId, fromUserName: '人事 Agent', content: AGENT_GREETINGS['hr-agent'].content };
+  }
+
+  return null;
 }
 
 // ==================== 类型定义 ====================
@@ -302,10 +455,38 @@ const MOCK_MESSAGES: Record<string, Message[]> = {
 
 // ==================== API 方法 ====================
 
+/**
+ * 从 AI_TEAM_GROUPS 提取所有群聊联系人
+ * 用于在 Tauri 模式下注入 AI Team 群聊到联系人列表
+ */
+function extractAITeamGroupContacts(): Contact[] {
+  const groups: Contact[] = [];
+  for (const groupId in AI_TEAM_GROUPS) {
+    const group = AI_TEAM_GROUPS[groupId];
+    const memberCount = Object.keys(group.members).length;
+    groups.push({
+      id: groupId,
+      name: `${group.icon} ${group.name}`,
+      phone: '',
+      contact_type: 'group',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_message: `👥 ${memberCount + 1}人 · CEO Agent 协调中`,
+      last_message_time: Date.now(),
+      last_is_read: false,
+      last_from: 'system',
+      last_from_name: '📢 系统',
+      unread_count: 0,
+    });
+  }
+  return groups;
+}
+
 /** 获取所有联系人 */
 export async function getContacts(options?: { search?: string; current_user_id?: string }): Promise<Contact[]> {
   if (!isTauri()) {
-    let contacts = [...MOCK_CONTACTS];
+    let contacts = [...MOCK_CONTACTS, ...extractAITeamGroupContacts()];
     if (options?.search) {
       const s = options.search.toLowerCase();
       contacts = contacts.filter(c => c.name.toLowerCase().includes(s) || c.phone?.includes(s));
@@ -313,7 +494,10 @@ export async function getContacts(options?: { search?: string; current_user_id?:
     return contacts;
   }
   const res: any = await invoke('get_contacts', { options: options || null });
-  return res?.data || [];
+  const dbContacts: Contact[] = res?.data || [];
+  // Tauri 模式下也注入 AI Team 群聊联系人（QQ 群组风格）
+  const groupContacts = extractAITeamGroupContacts();
+  return [...groupContacts, ...dbContacts];
 }
 
 /** 获取最近联系人（带消息预览） */
@@ -321,7 +505,7 @@ export async function getRecentContacts(currentUserId: string): Promise<Contact[
   if (!isTauri()) {
     return MOCK_CONTACTS.filter(c => c.last_message).sort((a, b) => (b.last_message_time || 0) - (a.last_message_time || 0));
   }
-  const res: any = await invoke('get_recent_contacts', { user_id: currentUserId });
+  const res: any = await invoke('get_recent_contacts', { params: { user_id: currentUserId } });
   return res?.data || [];
 }
 
@@ -335,7 +519,7 @@ export async function getMessages(fromUser: string, toUser: string, limit = 50):
     }
     return [...(MOCK_MESSAGES[toUser] || MOCK_MESSAGES[fromUser] || [])];
   }
-  const res: any = await invoke('get_messages', { from_user: fromUser, to_user: toUser, limit });
+  const res: any = await invoke('get_messages', { params: { from_user: fromUser, to_user: toUser, limit } });
   return res?.data || [];
 }
 
@@ -419,13 +603,13 @@ export async function sendMessage(fromUser: string, toUser: string, content: str
 /** 标记消息已读 */
 export async function markMessageRead(messageId: string): Promise<void> {
   if (!isTauri()) return;
-  await invoke('mark_message_read', { message_id: messageId });
+  await invoke('mark_message_read', { params: { message_id: messageId } });
 }
 
 /** 标记整个对话已读 */
 export async function markConversationRead(fromUser: string, toUser: string): Promise<void> {
   if (!isTauri()) return;
-  await invoke('mark_conversation_read', { from_user: fromUser, to_user: toUser });
+  await invoke('mark_conversation_read', { params: { from_user: fromUser, to_user: toUser } });
 }
 
 /** 添加联系人 */
@@ -453,6 +637,6 @@ export async function getUnreadCount(userId: string): Promise<number> {
   if (!isTauri()) {
     return MOCK_CONTACTS.reduce((sum, c) => sum + (c.unread_count || 0), 0);
   }
-  const res: any = await invoke('get_unread_count', { user_id: userId });
+  const res: any = await invoke('get_unread_count', { params: { user_id: userId } });
   return res?.count || 0;
 }

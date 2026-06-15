@@ -43,6 +43,7 @@ import {
 import { pluginLoader } from '../../lib/pluginLoader';
 import type { IndustryPluginManifest } from '../../config/appMode';
 import { openExternalUrl } from '../../lib/tauri';
+import { listPluginManifests } from '../../lib/manifestRegistry';
 
 /** 插件信息（来自 Tauri 后端） */
 interface InstalledPluginInfo {
@@ -51,6 +52,8 @@ interface InstalledPluginInfo {
   version: string;
   install_path: string;
   manifest: IndustryPluginManifest;
+  /** 是否为内置插件（仅前端 manifestRegistry 中的预装插件，不可卸载） */
+  isBuiltin?: boolean;
 }
 
 export default function PluginSettings() {
@@ -77,12 +80,30 @@ export default function PluginSettings() {
     setLoading(true);
     try {
       const installed = await pluginLoader.getInstalledPlugins();
-      setPlugins(installed || []);
+      // 合并 manifestRegistry 中的内置插件（演示预装：外贸柜台）
+      // builtin 插件不需要"安装"步骤，但应出现在列表中
+      const builtinManifests = listPluginManifests().filter(m => m.builtin);
+      const builtinItems: InstalledPluginInfo[] = builtinManifests
+        .filter(m => !(installed || []).some((p: any) => p.plugin_id === m.id))
+        .map(m => ({
+          plugin_id: m.id,
+          name: m.name,
+          version: m.version,
+          install_path: 'builtin',
+          manifest: m as unknown as IndustryPluginManifest,
+          isBuiltin: true,
+        }));
+      const merged: InstalledPluginInfo[] = [...(installed || []), ...builtinItems];
+      setPlugins(merged);
       // 加载持久化的启用状态
       const statuses = await pluginLoader.getAllPluginEnabledStatuses();
       const map: Record<string, boolean> = {};
       for (const s of statuses) {
         map[s.plugin_id] = s.enabled;
+      }
+      // builtin 插件默认启用
+      for (const b of builtinItems) {
+        if (map[b.plugin_id] === undefined) map[b.plugin_id] = true;
       }
       setEnabledMap(map);
     } catch (err) {
@@ -246,12 +267,12 @@ export default function PluginSettings() {
                         >
                           <InfoIcon fontSize="small" />
                         </IconButton>
-                        {checkingUpdates[plugin.plugin_id] ? (
-                          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 40 }}>
-                            检查中...
-                          </Typography>
-                        ) : updateInfo[plugin.plugin_id]?.has_update ? (
-                          <>
+                        {!plugin.isBuiltin && (
+                          checkingUpdates[plugin.plugin_id] ? (
+                            <Typography variant="caption" color="text.secondary" sx={{ minWidth: 40 }}>
+                              检查中...
+                            </Typography>
+                          ) : updateInfo[plugin.plugin_id]?.has_update ? (
                             <Chip
                               label={`v${updateInfo[plugin.plugin_id].latest_version} 可用`}
                               size="small"
@@ -260,26 +281,28 @@ export default function PluginSettings() {
                               sx={{ height: 20, fontSize: '0.7rem', cursor: 'pointer' }}
                               onClick={() => handleApplyUpdate(plugin.plugin_id)}
                             />
-                          </>
-                        ) : (
+                          ) : (
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              onClick={() => handleCheckUpdate(plugin.plugin_id, plugin.version)}
+                              title="检查更新"
+                            >
+                              <UpdateIcon fontSize="small" />
+                            </IconButton>
+                          )
+                        )}
+                        {!plugin.isBuiltin && (
                           <IconButton
                             edge="end"
                             size="small"
-                            onClick={() => handleCheckUpdate(plugin.plugin_id, plugin.version)}
-                            title="检查更新"
+                            onClick={() => setUninstallConfirm(plugin.plugin_id)}
+                            title="卸载"
+                            color="error"
                           >
-                            <UpdateIcon fontSize="small" />
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         )}
-                        <IconButton
-                          edge="end"
-                          size="small"
-                          onClick={() => setUninstallConfirm(plugin.plugin_id)}
-                          title="卸载"
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
                         <Switch
                           checked={enabledMap[plugin.plugin_id] !== false}
                           size="small"
@@ -295,8 +318,17 @@ export default function PluginSettings() {
                     </ListItemAvatar>
                     <ListItemText
                       primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                           <Typography variant="subtitle2">{plugin.name}</Typography>
+                          {plugin.isBuiltin && (
+                            <Chip
+                              label="内置"
+                              size="small"
+                              color="primary"
+                              variant="filled"
+                              sx={{ height: 20, fontSize: '0.7rem' }}
+                            />
+                          )}
                           <Chip
                             label={`v${plugin.version}`}
                             size="small"

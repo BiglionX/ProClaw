@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import { NvwaXService } from '../../lib/nvwaxClient';
 import type { UsageStats, TokenBalance } from '../../types/nvwax';
+import { safeNumber } from '../../lib/format';
 
 /** 用量看板对话框属性 */
 interface UsageDashboardProps {
@@ -238,7 +239,8 @@ export default function UsageDashboard({ open, onClose }: UsageDashboardProps) {
     }
   };
 
-  const formatNumber = (n: number) => n.toLocaleString();
+  // 审计修复：使用 safeNumber 代替裸 toLocaleString，防止 undefined/NaN 崩溃
+  const formatNumber = (n: number | string | null | undefined) => safeNumber(n);
 
   return (
     <>

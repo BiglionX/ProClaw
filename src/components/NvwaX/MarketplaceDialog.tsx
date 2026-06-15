@@ -22,6 +22,7 @@ import {
   IconButton,
   InputAdornment,
   Paper,
+  Stack,
   Tab,
   Tabs,
   TextField,
@@ -47,9 +48,12 @@ import type {
   Category,
   Industry,
 } from '../../types/nvwax';
+import { AgentMarketService } from '../../lib/agentMarketService';
+import { listPluginManifests } from '../../lib/manifestRegistry';
+import { readDemoFlag } from '../../lib/demoFlag';
 
 /** 市场模式 */
-type MarketMode = 'agents' | 'aiteams';
+type MarketMode = 'agents' | 'aiteams' | 'plugins';
 
 /** 市场对话框属性 */
 interface MarketplaceDialogProps {
@@ -389,6 +393,13 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
   const [configured, setConfigured] = useState(false);
   const [configChecked, setConfigChecked] = useState(false);
 
+  // 已安装 AI Team Skill 列表（用于显示「已安装」标记）
+  const [installedTeamSkillIds, setInstalledTeamSkillIds] = useState<string[]>([]);
+
+  // 插件商店数据（本地 + Nvwax 合并）
+  const [pluginManifests, setPluginManifests] = useState(() => listPluginManifests());
+  const [installingPluginId, setInstallingPluginId] = useState<string | null>(null);
+
   // 分页
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -409,7 +420,7 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
         if (result.pagination) {
           setTotalPages(result.pagination.total_pages);
         }
-      } else {
+      } else if (mode === 'aiteams') {
         const result = await NvwaXService.searchAiTeams({
           q: searchQuery || undefined,
           industry: selectedIndustry || undefined,
@@ -420,6 +431,19 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
         if (result.pagination) {
           setTotalPages(result.pagination.total_pages);
         }
+        // 同步已安装 Team Skill 列表（用于显示「已安装」标记）
+        try {
+          const teams = (await AgentMarketService.getAgents?.()) ?? [];
+          const installed = (teams as unknown as Array<{ id?: string; skill_id?: string }>)
+            .map(t => t.skill_id || t.id || '')
+            .filter(Boolean);
+          setInstalledTeamSkillIds(installed);
+        } catch {
+          /* ignore */
+        }
+      } else if (mode === 'plugins') {
+        // 插件商店：合并本地已注册 manifest + 演示数据 flag 中的 pluginIds
+        setPluginManifests(listPluginManifests());
       }
     } catch (err: any) {
       setSnackbar('加载失败: ' + (err.message || '未知错误'));
@@ -512,7 +536,8 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
             sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab label="Agent 市场" value="agents" />
-            <Tab label="AiTeam 市场" value="aiteams" />
+            <Tab label="AI Team 市场" value="aiteams" />
+            <Tab label="插件商店" value="plugins" />
           </Tabs>
 
           {/* 搜索栏 */}
@@ -586,18 +611,106 @@ export default function MarketplaceDialog({ open, onClose, onImportAgent, onImpo
                     ))}
                   </Grid>
                 )
-              ) : (
+              ) : mode === 'aiteams' ? (
                 aiteams.length === 0 ? (
                   <Paper sx={{ p: 4, textAlign: 'center' }}>
                     <Typography color="text.secondary">暂无 AiTeam 数据</Typography>
                   </Paper>
                 ) : (
                   <Grid container spacing={2}>
-                    {aiteams.map((aiteam) => (
-                      <Grid item xs={12} sm={6} md={4} key={aiteam.id}>
-                        <AiTeamCard aiteam={aiteam} onViewDetail={setDetailAiTeamId} />
-                      </Grid>
-                    ))}
+                    {aiteams.map((aiteam) => {
+                      const skillId = (aiteam as unknown as { skill_id?: string }).skill_id;
+                      const isInstalled =
+                        installedTeamSkillIds.includes(aiteam.id) ||
+                        (!!skillId && installedTeamSkillIds.includes(skillId));
+                      return (
+                        <Grid item xs={12} sm={6} md={4} key={aiteam.id}>
+                          <Box sx={{ position: 'relative' }}>
+                            <AiTeamCard aiteam={aiteam} onViewDetail={setDetailAiTeamId} />
+                            {isInstalled && (
+                              <Chip
+                                label="已安装"
+                                color="success"
+                                size="small"
+                                sx={{ position: 'absolute', top: 8, right: 8, fontWeight: 600 }}
+                              />
+                            )}
+                          </Box>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                )
+              ) : (
+                pluginManifests.length === 0 ? (
+                  <Paper sx={{ p: 4, textAlign: 'center' }}>
+                    <Typography color="text.secondary">暂无插件数据</Typography>
+                  </Paper>
+                ) : (
+                  <Grid container spacing={2}>
+                    {pluginManifests.map((plugin) => {
+                      const flag = readDemoFlag();
+                      const isInstalled = flag?.pluginIds.includes(plugin.id) ?? false;
+                      return (
+                        <Grid item xs={12} sm={6} md={4} key={plugin.id}>
+                          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                            <CardContent sx={{ flexGrow: 1 }}>
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                                <Typography variant="h4">{plugin.icon}</Typography>
+                                <Box sx={{ flexGrow: 1 }}>
+                                  <Typography variant="subtitle1" fontWeight={600}>
+                                    {plugin.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    v{plugin.version} · {plugin.author || 'ProClaw 官方'}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                              <Typography variant="body2" color="text.secondary" sx={{
+                                overflow: 'hidden', textOverflow: 'ellipsis',
+                                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                                minHeight: 40,
+                              }}>
+                                {plugin.description}
+                              </Typography>
+                              <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                {plugin.tags?.slice(0, 3).map(tag => (
+                                  <Chip key={tag} label={tag} size="small" variant="outlined" />
+                                ))}
+                              </Box>
+                            </CardContent>
+                            <CardActions>
+                              <Box sx={{ position: 'relative', width: '100%' }}>
+                                {isInstalled && (
+                                  <Chip
+                                    label="已安装"
+                                    color="success"
+                                    size="small"
+                                    sx={{ position: 'absolute', top: -4, right: 8, fontWeight: 600 }}
+                                  />
+                                )}
+                                <Button
+                                  size="small"
+                                  startIcon={installingPluginId === plugin.id ? <CircularProgress size={12} /> : <DownloadIcon />}
+                                  disabled={installingPluginId === plugin.id}
+                                  onClick={() => {
+                                    setInstallingPluginId(plugin.id);
+                                    // 注册插件 manifest 到 registry；演示模式下已经注册
+                                    setTimeout(() => {
+                                      setInstallingPluginId(null);
+                                      setSnackbar(`已启用插件：${plugin.name}`);
+                                      loadData();
+                                    }, 500);
+                                  }}
+                                >
+                                  {isInstalled ? '已启用' : '启用插件'}
+                                </Button>
+                              </Box>
+                            </CardActions>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
                   </Grid>
                 )
               )}

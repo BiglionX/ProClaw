@@ -329,12 +329,27 @@ const pluginApi: ProClawPluginAPI = {
 /**
  * 初始化插件 API 并注入到 window 对象
  *
- * 在应用启动时调用一次（通常在 App.tsx 的 useEffect 中）。
+ * 审计修复 SEC-P1-09: 限制全局暴露，使用 Object.defineProperty
+ * 将插件 API 设为不可枚举、不可删除，并冻结对象防止篡改。
  */
 export function initPluginAPI(): void {
   if (typeof window !== 'undefined') {
-    (window as any).ProClawPlugin = pluginApi;
-    console.log('[ProClawPlugin] 插件 API 已初始化并注入到 window.ProClawPlugin');
+    // 审计修复 SEC-P1-09: 使用 defineProperty 代替直接赋值
+    // 设为不可枚举（减少发现概率）+ 不可配置（防止删除）
+    Object.defineProperty(window, 'ProClawPlugin', {
+      value: Object.freeze(pluginApi),
+      writable: false,
+      configurable: false,
+      enumerable: false,
+    });
+    console.log('[ProClawPlugin] 插件 API 已初始化（受限模式）');
+    if (import.meta.env.DEV) {
+      console.warn(
+        '[Security] ProClawPlugin API is exposed on window object. ' +
+        'This is required for plugin functionality but poses a risk if XSS occurs. ' +
+        'Consider using Tauri capability scoping in production.'
+      );
+    }
   }
 }
 

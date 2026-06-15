@@ -4,6 +4,20 @@ import { createTheme } from '@mui/material/styles';
 // ProClaw Design Token System (PRD v11.0)
 // ============================================================
 
+// 扩展 MUI TypographyVariants 接口，添加 Stat 字体变体
+declare module '@mui/material/styles' {
+  interface TypographyVariants {
+    statLarge: React.CSSProperties;
+    statMedium: React.CSSProperties;
+    statSmall: React.CSSProperties;
+  }
+  interface TypographyVariantsOptions {
+    statLarge?: React.CSSProperties;
+    statMedium?: React.CSSProperties;
+    statSmall?: React.CSSProperties;
+  }
+}
+
 // 品牌色
 const proclaw = {
   primary: '#FF3B30',
@@ -116,6 +130,30 @@ const proClawTheme = createTheme({
     caption: {
       fontSize: '0.75rem',
       lineHeight: 1.5,
+    },
+    // ============================================================
+    // 数字展示专用样式（PRD v11.0 §3.3 Stat 字体系统）
+    // 使用：<Typography variant="statLarge">128.5</Typography>
+    // ============================================================
+    statLarge: {
+      fontSize: '2rem',         // 32px
+      fontWeight: 800,
+      lineHeight: 1.1,
+      letterSpacing: '-0.02em',
+      fontFeatureSettings: '"tnum"', // 等宽数字
+    },
+    statMedium: {
+      fontSize: '1.5rem',       // 24px
+      fontWeight: 700,
+      lineHeight: 1.2,
+      letterSpacing: '-0.01em',
+      fontFeatureSettings: '"tnum"',
+    },
+    statSmall: {
+      fontSize: '1.125rem',     // 18px
+      fontWeight: 600,
+      lineHeight: 1.3,
+      fontFeatureSettings: '"tnum"',
     },
   },
 
@@ -246,6 +284,12 @@ export const designTokens = {
     xl: 24,
     xxl: 32,
     xxxl: 48,
+  },
+  // 数字字体（PRD v11.0 §3.3 Stat 字号系统）
+  stat: {
+    large: { fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.02em' },
+    medium: { fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.01em' },
+    small: { fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.3 },
   },
 };
 

@@ -11,9 +11,10 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Close as CloseIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Refresh as RefreshIcon, Search as SearchIcon } from '@mui/icons-material';
 import { AgentMarketService, type MarketAgentItem } from '../../lib/agentMarketService';
 import { useAgentManagerStore } from '../../lib/agentManagerStore';
+import { LONG_OUTBOUND_TIMEOUT_MS, OUTBOUND_ERROR_MESSAGE, withTimeoutPromise } from '../../lib/fetchWithTimeout';
 import PermissionConfirmDialog from './PermissionConfirmDialog';
 
 interface MarketDialogProps {
@@ -34,6 +35,8 @@ export default function MarketDialog({ open, onClose, onAgentInstalled }: Market
   const [permDialogOpen, setPermDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
   const pageSize = 20;
   const installedAgents = useAgentManagerStore(s => s.agents);
   const installedIds = new Set(installedAgents.map(a => a.manifest.id));
@@ -73,8 +76,12 @@ export default function MarketDialog({ open, onClose, onAgentInstalled }: Market
     }
     setLoading(currentPage === 1);
     setLoadingMore(currentPage > 1);
+    setLoadError(null);
     try {
-      const result = await AgentMarketService.getAgents(selectedCategory, searchText || undefined, currentPage, pageSize);
+      const result = await withTimeoutPromise(
+        () => AgentMarketService.getAgents(selectedCategory, searchText || undefined, currentPage, pageSize),
+        LONG_OUTBOUND_TIMEOUT_MS,
+      );
       if (resetPage) {
         setAgents(result.agents);
       } else {
@@ -82,7 +89,8 @@ export default function MarketDialog({ open, onClose, onAgentInstalled }: Market
       }
       setTotal(result.total);
     } catch (err) {
-      console.error(err);
+      console.error('[MarketDialog] 加载 Agent 列表失败:', err);
+      setLoadError(OUTBOUND_ERROR_MESSAGE);
     }
     setLoading(false);
     setLoadingMore(false);
@@ -93,10 +101,14 @@ export default function MarketDialog({ open, onClose, onAgentInstalled }: Market
     setPage(nextPage);
     setLoadingMore(true);
     try {
-      const result = await AgentMarketService.getAgents(selectedCategory, searchText || undefined, nextPage, pageSize);
+      const result = await withTimeoutPromise(
+        () => AgentMarketService.getAgents(selectedCategory, searchText || undefined, nextPage, pageSize),
+        LONG_OUTBOUND_TIMEOUT_MS,
+      );
       setAgents(prev => [...prev, ...result.agents]);
     } catch (err) {
-      console.error(err);
+      console.error('[MarketDialog] 加载更多失败:', err);
+      setLoadError(OUTBOUND_ERROR_MESSAGE);
     }
     setLoadingMore(false);
   }
@@ -111,17 +123,24 @@ export default function MarketDialog({ open, onClose, onAgentInstalled }: Market
   async function handleConfirmInstall() {
     if (!installingAgent) return;
     setInstalling(true);
+    setInstallError(null);
     try {
-      const result = await AgentMarketService.installAgent(installingAgent.id);
+      const result = await withTimeoutPromise(
+        () => AgentMarketService.installAgent(installingAgent.id),
+        LONG_OUTBOUND_TIMEOUT_MS,
+      );
       if (result.success) {
         setPermDialogOpen(false);
         setInstallingAgent(null);
         // 刷新已安装列表
         await useAgentManagerStore.getState().fetchAgents();
         onAgentInstalled();
+      } else {
+        setInstallError('安装失败，请重试');
       }
     } catch (err) {
-      console.error('Install failed:', err);
+      console.error('[MarketDialog] 安装失败:', err);
+      setInstallError(OUTBOUND_ERROR_MESSAGE);
     }
     setInstalling(false);
   }
@@ -137,6 +156,65 @@ export default function MarketDialog({ open, onClose, onAgentInstalled }: Market
         </DialogTitle>
 
         <DialogContent>
+          {/* 加载错误提示 */}
+          {loadError && (
+            <Box
+              sx={{
+                mb: 2,
+                p: 1.5,
+                bgcolor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#dc2626', flex: 1 }}>
+                {loadError}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<RefreshIcon />}
+                onClick={() => loadAgents(true)}
+                sx={{ textTransform: 'none' }}
+              >
+                重试
+              </Button>
+            </Box>
+          )}
+
+          {/* 安装错误提示 */}
+          {installError && (
+            <Box
+              sx={{
+                mb: 2,
+                p: 1.5,
+                bgcolor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#dc2626', flex: 1 }}>
+                {installError}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                onClick={() => setInstallError(null)}
+                sx={{ textTransform: 'none' }}
+              >
+                知道了
+              </Button>
+            </Box>
+          )}
+
           {/* 搜索 */}
           <TextField
             fullWidth

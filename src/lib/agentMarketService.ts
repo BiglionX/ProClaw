@@ -82,7 +82,8 @@ const mockCategories = ['全部', '协作', '销售', '效率', '管理'];
  * 本地已内置的 Agent bundle manifest 映射表
  * 用于 installTeamSkill 在 Nuwax 不可用时直接安装本地 Agent
  */
-const localAgentManifests: Record<string, {
+/** 本地 Agent bundle manifest（导出供 AgentProfilePage 显示 capabilities） */
+export const localAgentManifests: Record<string, {
   id: string;
   name: string;
   version: string;
@@ -442,8 +443,31 @@ export const AgentMarketService = {
 
 /**
  * 本地团队技能映射表（Nuwax 不可用时回退）
+ * export 给 demoBootstrap 使用，用于在 installTeamSkill 之外构造 team payload
  */
-const localTeamSkillMap: Record<string, any> = {
+export const localTeamSkillMap: Record<string, {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  roles: Array<{ role: string; specialty: string; agent_type: string }>;
+}> = {
+  'team-skill-biz-ops-001': {
+    id: 'team-skill-biz-ops-001',
+    name: 'AI 经营团队',
+    description: 'ProClaw 内置的 AI 经营团队，包含库存优化、销售预测、业务分析、采购、财务、客服、自媒体运营等 8 个专业 Agent',
+    category: 'business_operations',
+    roles: [
+      { role: '库存优化师', specialty: '监控库存水平，优化安全库存', agent_type: 'builtin-inventory-optimizer' },
+      { role: '销售预测分析师', specialty: '分析历史趋势，预测销量', agent_type: 'builtin-sales-forecaster' },
+      { role: '业务分析师', specialty: 'KPI 监控，经营报表生成', agent_type: 'builtin-business-analyst' },
+      { role: '采购顾问', specialty: '采购建议与供应商评估', agent_type: 'builtin-purchase-advisor' },
+      { role: '财务分析师', specialty: '现金流与利润率评估', agent_type: 'builtin-financial-advisor' },
+      { role: '客户服务助手', specialty: '客户咨询与售后跟踪', agent_type: 'builtin-cs-agent' },
+      { role: 'AI智能找图', specialty: '商品图片智能搜索', agent_type: 'builtin-image-searcher' },
+      { role: '自媒体运营官', specialty: '社交媒体内容生成', agent_type: 'builtin-content-creator' }
+    ]
+  },
   'team-skill-site-ops-001': {
     id: 'team-skill-site-ops-001',
     name: '网站运营 AI Team',
