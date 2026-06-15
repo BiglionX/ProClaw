@@ -61,6 +61,9 @@
 - [供应商客户自动编码](features/SUPPLIER_CUSTOMER_AUTO_CODE_FEATURE.md)
 - [多图上传](features/MULTI_IMAGE_UPLOAD_FEATURE.md) - 图片管理
 - [用户中心同步](features/USER_CENTER_SYNC.md)
+- [头像跳转规则](features/avatar-navigation.md) - 聊天头像 → Agent/Team 详情页
+- [**联系人→聊天→详情→设置 合并 UX 流程图**](features/contact-chat-profile-ux-flow.md) - 4 阶段完整交互链路 + 移动端 ChatDetailScreen + AI Team 群聊状态机 + Playwright e2e 测试矩阵（v1.1 / 2026-06-15）
+  - [🌐 可分享 HTML 单页](features/contact-chat-profile-ux-flow.html) - 脱离 IDE 可读，浏览器打开即可
 
 ### 📕 发布文档 (Releases)
 - [发布说明](releases/RELEASE_NOTES.md)
@@ -116,4 +119,4 @@
 
 ---
 
-*最后更新: 2026-05-31*
+*最后更新: 2026-06-15 (新增联系资料链 UX 流程图 v1.1 + HTML 单页)*

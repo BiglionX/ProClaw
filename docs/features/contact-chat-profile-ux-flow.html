@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProClaw 联系人 → 聊天 → 头像 → 详情 → 设置 UX 流程图</title>
+<!-- CDN: marked.js (Markdown 渲染) + Mermaid (流程图) + GitHub Markdown CSS -->
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+<style>
+  /* GitHub Markdown 风格 + Mermaid 适配 */
+  body {
+    box-sizing: border-box;
+    min-width: 200px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 45px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+      sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #24292f;
+    background-color: #ffffff;
+  }
+  @media (max-width: 767px) {
+    body { padding: 15px; font-size: 14px; }
+  }
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  h1 { font-size: 2em; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
+  h2 { font-size: 1.5em; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  p { margin-top: 0; margin-bottom: 16px; }
+  a { color: #0969da; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    padding: 0.2em 0.4em;
+    margin: 0;
+    font-size: 85%;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  pre {
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+  }
+  pre code {
+    display: inline;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+    border: 0;
+  }
+  table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    margin: 16px 0;
+    width: 100%;
+    display: block;
+    overflow-x: auto;
+  }
+  table th, table td {
+    padding: 6px 13px;
+    border: 1px solid #d0d7de;
+  }
+  table tr { background-color: #ffffff; border-top: 1px solid #d8dee4; }
+  table tr:nth-child(2n) { background-color: #f6f8fa; }
+  table th { font-weight: 600; background-color: #f6f8fa; }
+  blockquote {
+    margin: 0;
+    padding: 0 1em;
+    color: #57606a;
+    border-left: 0.25em solid #d0d7de;
+  }
+  hr {
+    height: 0.25em;
+    margin: 24px 0;
+    background-color: #d0d7de;
+    border: 0;
+  }
+  ul, ol { padding-left: 2em; margin-top: 0; margin-bottom: 16px; }
+  li + li { margin-top: 0.25em; }
+  img { max-width: 100%; }
+  /* Mermaid 图例外：让 SVG 可缩放 */
+  .mermaid {
+    background-color: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 16px;
+    margin: 16px 0;
+    overflow-x: auto;
+    text-align: center;
+  }
+  .mermaid svg { max-width: 100%; height: auto; }
+  /* 顶部导航 */
+  .toc {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #d0d7de;
+    padding: 8px 16px;
+    font-size: 13px;
+    z-index: 100;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .toc a { color: #0969da; }
+  .toc-brand { font-weight: 600; color: #24292f; }
+  .toc-spacer { flex: 1; }
+  .toc-version { color: #57606a; }
+  body { padding-top: 80px; }
+  @media (max-width: 767px) { body { padding-top: 120px; } }
+  /* 错误提示 */
+  .error-banner {
+    background: #fff8c5;
+    border: 1px solid #d4a72c;
+    padding: 8px 16px;
+    margin: 16px 0;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="toc">
+  <span class="toc-brand">📖 ProClaw UX 流程图</span>
+  <a href="#一概述">概述</a>
+  <a href="#二完整-ux-流程图">完整流程</a>
+  <a href="#十一移动端-chatdetailscreen-ux-流程">移动端</a>
+  <a href="#十二ai-team-群聊特殊状态机">AI Team 状态机</a>
+  <a href="#十三playwright-e2e-测试用例矩阵">E2E 测试</a>
+  <span class="toc-spacer"></span>
+  <span class="toc-version">v1.1 · 2026-06-15</span>
+</div>
+<noscript>
+  <div class="error-banner">⚠️ 本页面需要启用 JavaScript 才能渲染 Markdown 与 Mermaid 流程图。</div>
+</noscript>
+<div id="content"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // 1. 原始 Markdown 内容（从 docs/features/contact-chat-profile-ux-flow.md 同步）
+  var md = `# 联系人 → 聊天 → 头像 → 详情 → 设置 合并 UX 流程图
+
+**版本**: v1.1
+**日期**: 2026-06-15
+**状态**: 已实现
+**维护人**: ProClaw 桌面端团队
+
+> 💡 本页为可分享单页版本（含 Mermaid CDN）。源文档：[docs/features/contact-chat-profile-ux-flow.md](#)
+>
+> 直接用浏览器打开即可查看完整流程图（脱离 IDE / VSCode 也能阅读）。
+
+---
+
+## 一、概述
+
+本文档整合分散在多份 PRD 与代码注释中的"联系人资料链"相关需求，形成一份**集中、可读、可维护**的 UX 流程图，作为后续 UI 设计与端到端测试的单一事实来源（Single Source of Truth）。
+
+### 1.1 覆盖范围
+
+| 阶段 | 入口 | 终点 | 关键交互点 |
+|------|------|------|-----------|
+| 1. 联系人 → 聊天 | 联系人列表行 / 头像 | 聊天页 | 行点击 / 头像点击 |
+| 2. 聊天 → 详情 | 聊天页头部 Avatar | Agent / Team 详情页 | 头像 onClick |
+| 3. 详情 → 设置 | 详情页大头像 | 头像库 Dialog | 头像点击 + Dialog 2 Tab |
+| 4. 能力配置 | Agent 详情页能力卡片 | 启用/通话/权限 | Switch + Button + Chip |
+
+### 1.2 关联文档
+
+- \`docs/features/avatar-navigation.md\` — 联系人头像跳转规则（v1.0 / 2026-06-14）
+- \`src/pages/AgentProfilePage.tsx#L1-L15\` — Agent 详情页 UX 流程注释
+- \`src/pages/ChatPage.tsx#L466-L484\` — 聊天头部头像点击处理
+- \`docs/prd/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md\`
+- \`docs/prd/需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md\`
+- \`docs/prd/需求文档：ProClaw 用户中心（PRD v5.1）.md\`
+
+---
+
+## 二、完整 UX 流程图
+
+\`\`\`mermaid
+graph TB
+    Start[用户在桌面端登录 ProClaw]
+
+    Start --> ContactsPage[ContactsPage<br/>联系人列表<br/>/contacts]
+    Start --> ChatListEntry[MessagesPage<br/>消息列表<br/>/messages]
+    Start --> AIShortcut[TeamsPage<br/>AI 团队卡片<br/>/teams]
+
+    ContactsPage -->|点击联系人行| ChatPage
+    ContactsPage -->|点击联系人头像| ChatPage
+    ChatListEntry -->|点击会话行| ChatPage
+
+    AIShortcut -->|点击 Agent 卡片| ChatPage
+    AIShortcut -->|点击团队卡片| ChatPage
+
+    ChatPage[ChatPage<br/>聊天页<br/>/chat/contactId]
+
+    ChatPage -->|判定 contactId 形态| Judge{contactId 类型?}
+
+    Judge -->|ai-team-group-*| TeamProfilePage
+    Judge -->|ceo-agent| Noop[不响应<br/>保留老板总监身份]
+    Judge -->|ma_* / builtin-*| AgentProfilePage
+    Judge -->|internal / external| AgentProfilePage
+    Judge -->|传统群组| Noop
+
+    TeamProfilePage[TeamProfilePage<br/>AI Team 小组资料<br/>/team-profile/teamId]
+    AgentProfilePage[AgentProfilePage<br/>Agent 详情页<br/>/agent-profile/agentId]
+
+    AgentProfilePage -->|点击大头像| AvatarDialog[Avatar Library Dialog<br/>头像库 Dialog<br/>Tab 0=头像库 Tab 1=上传]
+    AgentProfilePage -->|编辑昵称 TextField| NameEdit[display_name 实时输入]
+    AgentProfilePage -->|能力配置区| CapabilityCard[能力配置卡片<br/>启用 Switch / 聊天 / 语音 / 视频 / 权限]
+
+    AvatarDialog -->|选择预设头像| PresetSave[avatar_key 暂存]
+    AvatarDialog -->|上传自定义| UploadSave[uploadCustomAvatar<br/>写入 custom_avatar_path]
+
+    PresetSave --> SaveBtn
+    UploadSave --> SaveBtn
+    NameEdit --> SaveBtn
+
+    SaveBtn[保存按钮<br/>saveAgentProfileOverride] --> SQLite[(SQLite<br/>agent_profile_overrides)]
+
+    SQLite --> ReloadContacts[联系人列表 / 聊天头部<br/>自动应用新头像昵称]
+
+    TeamProfilePage -->|点击成员行| AgentProfilePage
+    TeamProfilePage -->|打开群聊按钮| ChatPage
+    AgentProfilePage -->|进入聊天按钮| ChatPage
+    AgentProfilePage -->|恢复默认| ResetFlow[resetAgentProfile<br/>清空 override]
+
+    CapabilityCard -->|进入聊天按钮| ChatPage
+    CapabilityCard -->|语音通话| CallPage[CallPage<br/>通话页 /call]
+    CapabilityCard -->|视频通话| CallPage
+    CapabilityCard -->|启用 Switch| EnableToggle[本地状态切换<br/>影响后续响应]
+\`\`\`
+
+---
+
+## 三、分阶段详解
+
+### 阶段 1：联系人列表 → 聊天页
+
+#### 入口与触发
+
+| 触发点 | 文件 | 路径参数 | 备注 |
+|--------|------|----------|------|
+| 联系人列表行点击 | ContactsPage.tsx | \`/chat/:contactId\` | 主入口 |
+| 联系人列表头像点击 | ContactsPage.tsx | \`/chat/:contactId\` | 等同行点击 |
+| 消息列表会话行 | MessagesPage.tsx | \`/chat/:contactId\` | 二级入口 |
+| TeamsPage Agent 卡片 | TeamsPage.tsx | \`/chat/:agentId\` | AI 快捷入口 |
+| TeamsPage 团队卡片 | TeamsPage.tsx | \`/chat/:groupId\` | AI Team 群聊 |
+
+#### 关键逻辑
+
+- \`contactId\` 形态决定后续路由（见阶段 2）
+- 联系人头像优先读取 \`agent_profile_overrides.display_name\` / \`avatar_key\` / \`custom_avatar_path\`
+- 若无 override，回退到 \`agentMarketService\` 默认头像（\`getDefaultAvatarUrl\`）
+
+### 阶段 2：聊天页头部头像 → 详情页
+
+#### 跳转规则表
+
+| contactId 形态 | 跳转目标 | 备注 | 是否实现 |
+|----------------|---------|------|----------|
+| \`ai-team-group-*\`（群聊） | \`/team-profile/:teamId\` | 类似 QQ 群资料 | ✅ 已实现 |
+| \`ceo-agent\`（CEO 特殊身份） | 不响应 | 保留老板/总监身份特殊 | ✅ 已实现 |
+| \`ma_*\` / \`builtin-*\`（Agent） | \`/agent-profile/:agentId\` | 单 Agent 个人资料页 | ✅ 已实现 |
+| 传统群组 \`contact_type='group'\` | 不响应 | 预留 | ✅ 已实现 |
+| 内部 / 外部联系人 | \`/agent-profile/:contactId\` | 沿用原逻辑 | ✅ 已实现 |
+
+#### 关键代码
+
+\`\`\`typescript
+const handleHeadAvatarClick = () => {
+  if (!contactId) return;
+  // 1) AI Team 群聊 → 跳到 AI Team 小组详情页
+  if (isGroupChat) {
+    const teamId = parseTeamId(contactId);
+    navigate(\`/team-profile/\${teamId}\`);
+    return;
+  }
+  // 2) CEO Agent 不响应
+  if (isCEO) return;
+  // 3) 传统群组 → 预留
+  if (contact?.contact_type === 'group') return;
+  // 4) 单 Agent / 内部 / 外部 → Agent 资料页
+  navigate(\`/agent-profile/\${contactId}\`);
+};
+\`\`\`
+
+### 阶段 3：详情页大头像 → 头像库 Dialog + 昵称编辑
+
+#### 详情页布局（AgentProfilePage）
+
+\`\`\`
+┌─────────────────────────────────────────┐
+│ ← Agent 资料                            │
+├─────────────────────────────────────────┤
+│  ┌────────┐                             │
+│  │ 大头像 │  昵称 [TextField]            │  ← Banner：头像 + 昵称编辑
+│  │ 88x88  │  基本信息（角色 / 创建时间）  │
+│  └────────┘  [保存] [恢复默认]           │
+├─────────────────────────────────────────┤
+│  [SkillIcon] Skill 介绍                 │
+│  description 段落                       │  ← Skill 介绍卡片（只读）
+│  核心能力（N）：[Chip][Chip][Chip]...    │
+├─────────────────────────────────────────┤
+│  [BoltIcon] 能力配置                    │
+│  ├ 启用 Agent [Switch]                 │  ← 能力配置卡片
+│  ├ 聊天对话   [进入聊天]               │
+│  ├ 语音通话   [通话]                   │
+│  ├ 视频通话   [视频]                   │
+│  └ 权限声明   [Chip][Chip]...          │
+├─────────────────────────────────────────┤
+│  主页 / 文档 [打开]                    │
+└─────────────────────────────────────────┘
+\`\`\`
+
+### 阶段 4：Agent 能力配置（Skill 设置与微调）
+
+#### 能力配置卡片结构
+
+| ListItem | 控件 | 行为 | 状态 |
+|----------|------|------|------|
+| 启用 Agent | \`Switch\` | 本地切换（\`setAgentEnabled\`） | 立即生效（Snackbar 提示） |
+| 聊天对话 | \`Button\` → \`navigate('/chat/' + agentId)\` | 跳回聊天 | — |
+| 语音通话 | \`Button\` → \`dispatchEvent('proclaw:start-call', { agentId, mode: 'audio' })\` | 跳转 \`/call\` + 触发事件 | — |
+| 视频通话 | \`Button\` → \`dispatchEvent('proclaw:start-call', { agentId, mode: 'video' })\` | 跳转 \`/call\` + 触发事件 | — |
+| 权限声明 | \`Chip\` 列表（只读） | 显示 manifest.permissions | — |
+
+#### 操作按钮区
+
+| 按钮 | 触发函数 | 行为 |
+|------|---------|------|
+| **保存** | \`handleSave\` | 调用 \`saveAgentProfileOverride(agentId, fields)\`，成功后 Snackbar 提示"已保存" |
+| **恢复默认** | \`handleReset\` | 调用 \`resetAgentProfile(agentId)\`，confirm 弹窗后清空 override |
+| **返回** | \`navigate(-1)\` | 返回上一页（聊天 / 联系人） |
+
+---
+
+## 四、关键交互点表格
+
+| 序号 | 触发元素 | 页面 | 跳转目标 | 数据写入 | 反馈方式 |
+|------|---------|------|---------|---------|--------|
+| 1 | 联系人行 / 头像 | ContactsPage | \`/chat/:contactId\` | 无 | 路由跳转 |
+| 2 | 会话行 | MessagesPage | \`/chat/:contactId\` | 无 | 路由跳转 |
+| 3 | Agent 卡片 | TeamsPage | \`/chat/:agentId\` | 无 | 路由跳转 |
+| 4 | 头部 Avatar | ChatPage | \`/agent-profile/:agentId\` 或 \`/team-profile/:teamId\` | 无 | Tooltip 变化 + 路由跳转 |
+| 5 | TeamProfilePage 成员行 | TeamProfilePage | \`/agent-profile/:memberId\` | 无 | 路由跳转 |
+| 6 | 大头像 | AgentProfilePage | 打开 Avatar Dialog | 无 | Dialog 弹出 |
+| 7 | Dialog Tab 0 头像 | AgentProfilePage | — | \`setEditAvatarKey\` | 高亮选中 |
+| 8 | Dialog Tab 1 上传 | AgentProfilePage | — | \`uploadCustomAvatar\` | Snackbar "头像已上传，点击保存以生效" |
+| 9 | 昵称 TextField | AgentProfilePage | — | \`setEditName\` | 实时输入 |
+| 10 | 保存按钮 | AgentProfilePage | — | \`saveAgentProfileOverride\` | Snackbar "已保存" |
+| 11 | 恢复默认按钮 | AgentProfilePage | — | \`resetAgentProfile\` | confirm 弹窗 + Snackbar "已恢复默认" |
+| 12 | 启用 Switch | AgentProfilePage | — | \`setAgentEnabled\`（本地） | Snackbar "已启用/已禁用" |
+| 13 | 进入聊天按钮 | AgentProfilePage | \`/chat/:agentId\` | 无 | 路由跳转 |
+| 14 | 语音 / 视频通话按钮 | AgentProfilePage | \`/call\` + 事件 | 无 | 路由跳转 + 事件触发 |
+
+---
+
+## 五、数据流与持久化
+
+### 5.1 数据模型（SQLite）
+
+表 \`agent_profile_overrides\`（参考 \`database/migrations/\`）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| \`agent_id\` | TEXT PRIMARY KEY | 关联 Agent manifest id |
+| \`display_name\` | TEXT NULL | 自定义昵称，覆盖 manifest.name |
+| \`avatar_key\` | TEXT NULL | 预设头像 key（如 'agent_red_01'） |
+| \`custom_avatar_path\` | TEXT NULL | 用户上传头像的相对路径 |
+| \`updated_at\` | TEXT | 更新时间 |
+
+### 5.2 数据流图
+
+\`\`\`mermaid
+graph LR
+    UI[UI 操作] --> State[React State<br/>editName/editAvatarKey/customAvatarDataUrl]
+    State --> Save[saveAgentProfileOverride]
+    Save --> Tauri[Tauri invoke<br/>save_agent_profile_override]
+    Tauri --> SQLite[(SQLite<br/>agent_profile_overrides)]
+    SQLite --> Reload[页面 useEffect<br/>重新读取 override]
+    Reload --> Display[联系人 / 聊天 / 详情页<br/>自动应用新头像昵称]
+\`\`\`
+
+### 5.3 头像读取优先级
+
+\`\`\`
+contactService.getContactAvatar(contactId)
+  ├─ 1. agent_profile_overrides.custom_avatar_path（自定义）
+  ├─ 2. agent_profile_overrides.avatar_key（预设库）
+  └─ 3. agentMarketService.getDefaultAvatarUrl(agentId)（默认）
+\`\`\`
+
+---
+
+## 六、错误处理与边界情况
+
+| 场景 | 当前处理 | 来源 |
+|------|---------|------|
+| \`AI_TEAM_GROUPS\` 异步未填充时进入 TeamProfilePage | useEffect setInterval(1s) 轮询 + 加载中提示 | avatar-navigation.md |
+| \`parseTeamId\` 收到非 \`ai-team-group-\` 前缀 | 原样返回（向后兼容） | 同上 |
+| TeamProfilePage 直接 \`/team-profile/biz-ops\` | 内部 \`buildGroupId\` 归一化 | 同上 |
+| 上传头像文件 > 2MB | \`uploadCustomAvatar\` 校验，返回错误 | 待确认 |
+| 头像 Dialog 上传失败 | catch + Snackbar "上传失败" | AgentProfilePage.tsx L225-L227 |
+| Save 失败 | catch + Snackbar error | AgentProfilePage.tsx L270-L271 |
+| Reset 失败 | catch + Snackbar error | AgentProfilePage.tsx L288-L289 |
+
+---
+
+## 七、测试覆盖
+
+### 7.1 已实现
+
+\`src/test/contactAvatarNavigation.test.ts\` — 8 个单元测试：
+
+1. \`parseTeamId\` 正确从 \`ai-team-group-xxx\` 提取 \`teamId\`
+2. \`parseTeamId\` 对已经是 \`teamId\` 的输入原样返回（向后兼容）
+3. \`buildGroupId\` 用前缀正确拼接
+4. \`buildGroupId\` ⇔ \`parseTeamId\` 互为反函数
+5. \`isAITeamGroupId\` 只对 groupId 返回 true，不误判 Agent ID / CEO / 团队 raw ID
+6. ChatPage 跳转 URL 验证：从 contactId 拼出 \`/team-profile/:teamId\`
+7. 单 Agent 联系人 contactId 直接作为 \`:agentId\` 传给 \`/agent-profile\`
+8. CEO Agent 特殊处理（navigate 不应被调用）
+
+### 7.2 待补充
+
+- Avatar Dialog 选预设 → 保存 → 联系列表头像更新的端到端测试
+- Avatar Dialog 上传自定义 → 保存 → 联系人头像更新
+- 能力配置 Switch 切换 → Snackbar 提示
+- 进入聊天按钮 → 跳转 \`/chat/:agentId\` 且 contactId 正确
+
+---
+
+## 八、实现状态总览
+
+| 链路节点 | 文件 | 行号 | 状态 |
+|---------|------|------|------|
+| 联系人行点击 → ChatPage | ContactsPage.tsx | 待补 | ✅ 已实现 |
+| ChatPage 头部 Avatar onClick | ChatPage.tsx | L466-L484 | ✅ 已实现 |
+| TeamProfilePage 路由 | App.tsx | — | ✅ 已实现 |
+| AgentProfilePage Banner + Avatar Dialog | AgentProfilePage.tsx | L1-L762 | ✅ 已实现 |
+| 头像预设选择 → editAvatarKey | AgentProfilePage.tsx | L296-L299 | ✅ 已实现 |
+| 自定义头像上传 | AgentProfilePage.tsx | L207-L232 | ✅ 已实现 |
+| 保存 override | AgentProfilePage.tsx | L235-L275 | ✅ 已实现 |
+| 恢复默认 | AgentProfilePage.tsx | L278-L293 | ✅ 已实现 |
+| 能力配置卡片 | AgentProfilePage.tsx | L427-L585 | ✅ 已实现 |
+| SQL 持久化 \`agent_profile_overrides\` | database/migrations | — | ✅ 已实现 |
+
+---
+
+## 九、待补需求（后续扩展）
+
+1. **内部联系人 (internal) 头像** → 跳 \`/ucenter\`（用户中心）
+2. **外部联系人 (external) 头像** → 跳 \`/customer/:id\` / \`/supplier/:id\`（客户/供应商详情）
+3. **TeamProfilePage 增加"小组活动" Tab**（近期任务 / 决策日志）
+4. **TeamProfilePage 增加"小组管理" 入口**（编辑成员 / 配置系统提示词）
+5. **营销网站侧个人资料编辑**（PRD v7.1 已规划 P0，前端无编辑界面）
+
+---
+
+## 十、版本历史
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| v1.0 | 2026-06-15 | 初版：合并 avatar-navigation.md + AgentProfilePage 顶部注释 + 多个 PRD 分散说明 |
+| v1.1 | 2026-06-15 | 扩展：新增 移动端 ChatDetailScreen UX 流程 / AI Team 群聊状态机 / Playwright e2e 测试矩阵 三章，并生成可分享 HTML 单页 |
+
+---
+
+## 十一、移动端 ChatDetailScreen UX 流程
+
+> 配套实现：\`mobile/src/screens/ChatDetailScreen.tsx\` / \`AgentProfileScreen.tsx\` / \`ContactsTab.tsx\`
+
+### 11.1 与桌面端的差异
+
+| 维度 | 桌面端 | 移动端 |
+|------|--------|--------|
+| UI 组件库 | MUI Tabs + Grid | RN Paper Surface + SegmentedButtons + FlatList |
+| 头像上传通道 | Tauri \`invoke('upload_custom_avatar')\` | \`expo-file-system\` + \`ImagePicker\` |
+| 路由形态 | Hash Router (\`/#/chat/:id\`) | React Navigation Native Stack (\`navigation.navigate('ChatDetail', params)\`) |
+| 参数传递 | URL \`:contactId\` | Route params: \`{ sessionId, targetId, targetName, targetType, targetIcon }\` |
+| 聊天头部头像点击 | \`handleHeadAvatarClick\` 路由跳转 | RN: 屏幕 Header 右侧 \`IconButton\` |
+| 数据持久化 | SQLite \`agent_profile_overrides\` | AsyncStorage (expo-secure-store) \`agent_profile_overrides\` |
+| AI 回复 | 普通 fetch + 流式 | \`chatWithAgentStream\` (SSE) |
+
+### 11.2 targetType 路由形态表
+
+| targetType | 来源 | 进入后行为 | 头部头像点击 |
+|------------|------|----------|------------|
+| \`personal\` | 真实用户（外部/内部联系人） | 普通即时通讯，无 AI | \`navigate('Ucenter', { userId })\` |
+| \`agent\` | ContactsTab.handleAgentPress | AI 单 Agent 会话，**首次进入自动发问候** | \`navigate('AgentProfile', { agentId })\` |
+| \`team\` | ContactsTab.handleTeamPress | AI Team 群聊（CEO 主控官自动回复） | 弹出 Members Dialog |
+| \`group\` | 传统群组（占位） | 普通群聊，无 AI | — |
+
+### 11.3 完整 UX 流程图
+
+\`\`\`mermaid
+graph TB
+    Start[移动端登录 ProClaw App]
+
+    Start --> ContactsTab[ContactsTab<br/>联系人列表]
+    Start --> MessagesTab[MessagesTab<br/>消息列表]
+    Start --> AITab[AITab<br/>AI 团队]
+
+    ContactsTab -->|点击 Agent 行| ChatDetail
+    ContactsTab -->|点击 Agent 头像| AgentProfile
+    ContactsTab -->|点击 AI Team 行| ChatDetail
+    ContactsTab -->|点击 AI Team 头像| TeamDialog[TeamMembersDialog<br/>成员列表]
+    ContactsTab -->|点击真实联系人| ChatDetail
+
+    MessagesTab -->|点击会话行| ChatDetail
+
+    AITab -->|点击 Agent| ChatDetail
+    AITab -->|点击 Team| ChatDetail
+
+    ChatDetail[ChatDetailScreen<br/>targetType 决定行为]
+
+    ChatDetail -->|targetType=agent| AgentGreeting
+    ChatDetail -->|targetType=team| TeamGreeting
+    ChatDetail -->|targetType=personal| NormalChat[普通聊天<br/>无 AI]
+    ChatDetail -->|targetType=group| NormalChat
+
+    AgentGreeting[Agent 主动问候<br/>getAgentGreeting targetId] --> ChatUI[消息列表]
+    TeamGreeting[CEO Agent 问候<br/>getAgentGreeting teamId] --> ChatUI
+
+    ChatUI -->|用户发送消息| SendMsg
+    SendMsg{是否 Agent/Team?}
+    SendMsg -->|是| StreamAI[chatWithAgentStream<br/>流式调用 AI]
+    SendMsg -->|否| NormalChat2[等待对方回复]
+    StreamAI --> ChatUI
+    NormalChat2 --> ChatUI
+
+    ChatDetail -->|点击头部 Avatar| AvatarJump{targetType?}
+    AvatarJump -->|agent| AgentProfile
+    AvatarJump -->|team| TeamDialog
+    AvatarJump -->|personal| Ucenter
+
+    AgentProfile[AgentProfileScreen<br/>/agent-profile agentId]
+    AgentProfile -->|编辑昵称 + 选头像| SaveProfile[saveAgentProfileOverride<br/>expo-secure-store]
+    SaveProfile --> OnProfileChanged[onProfileChanged 事件]
+    OnProfileChanged --> ChatUI
+    OnProfileChanged --> ContactsTab
+
+    TeamDialog -->|点击成员行| AgentProfile
+    TeamDialog -->|关闭| ChatDetail
+\`\`\`
+
+### 11.4 Agent 主动问候语（v21 新增）
+
+参考 \`mobile/src/data/agentGreetings.ts\`：
+
+\`\`\`typescript
+const AGENT_GREETINGS: Record<string, string> = {
+  secretary:        '老板，有啥交代？^-^',
+  ceo:              '老板，今日经营决策要点已准备好，请过目^-^',
+  'customer-service':'老板，今日有 3 个客户咨询待处理，请指示^-^',
+  finance:          '老板，今日财务报表已生成，预算执行率 87%^-^',
+  task:             '老板，今日有 5 项新任务等待分配^-^',
+  crm:              '老板，今日有 2 位高意向客户需跟进^-^',
+};
+const DEFAULT_AGENT_GREETING = '老板，有啥交代？^-^';
+\`\`\`
+
+触发条件：\`ChatDetailScreen.tsx#L75-L84\`
+
+\`\`\`typescript
+if ((targetType === 'agent' || targetType === 'team') && msgs.length === 0) {
+  const greeting = getAgentGreeting(targetId);
+  const greetingMsg = await sendMessage(sid, greeting, 'other');
+  setMessages((prev) => [...prev, greetingMsg]);
+  refreshSessions();
+}
+\`\`\`
+
+### 11.5 Agent 会话流式调用 AI
+
+参考 \`ChatDetailScreen.tsx#L112-L193\`：
+
+\`\`\`typescript
+if (targetType === 'agent') {
+  setAiThinking(true);
+  // 取最近 20 条消息作为上下文
+  const history = messagesRef.current.slice(-20).map((m) => ({
+    role: m.sender_type === 'self' ? 'user' : 'assistant',
+    content: m.content,
+  }));
+  // 调用 AIService.chatWithAgentStream (SSE)
+  await chatWithAgentStream(targetId, history, (chunk) => {
+    setMessages((prev) => /* 增量更新最后一条 AI 消息 */);
+  });
+  setAiThinking(false);
+}
+\`\`\`
+
+关键点：
+- 用 \`messagesRef.current\` 解决 \`useCallback\` 闭包捕获旧值问题
+- 流式输出以"打字机"形式逐字更新最后一条消息
+- \`aiThinking\` 状态控制输入区上方的"AI 思考中"提示
+
+---
+
+## 十二、AI Team 群聊特殊状态机
+
+> 配套实现：\`src/lib/aiTeamChatService.ts\` / \`docs/prd/AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md\`
+
+### 12.1 AI Team 角色模型
+
+| 角色 | 身份 | 权限 | 来源 |
+|------|------|------|------|
+| **Boss** | 真实用户（老板/总监） | 创建团队、邀请 Agent、转让群主、退出、解散、@任何人 | 用户当前登录身份 |
+| **CEO Agent** | 主控官（系统内置） | 自动响应 Boss 消息、调度子 Agent、汇报进展 | AI Team 内置 |
+| **Agent 成员** | 各业务 Agent（秘书/客服/财务/任务/CRM） | 接收 CEO 派发任务、汇报结果 | 来自 \`aiTeamGroups.ts\` |
+
+### 12.2 Boss 操作状态机
+
+\`\`\`mermaid
+stateDiagram-v2
+    [*] --> NotInTeam: 初始
+
+    NotInTeam --> Creator: 进入 TeamsPage<br/>点击"创建团队"
+    NotInTeam --> Invitee: 进入 TeamsPage<br/>选择"加入团队"
+
+    Creator --> Boss: 填写团队信息<br/>选择初始成员<br/>确认创建
+    Invitee --> Boss: 系统自动以 Boss 身份<br/>加入已有团队
+
+    state Boss {
+        [*] --> Active
+        Active --> Transferring: 触发"转让群主"<br/>选择新 Boss
+        Transferring --> Active: 新 Boss 确认接管<br/>原 Boss 降为 Member
+        Transferring --> Active: 取消转让
+        Active --> RemovingMember: 点击成员行<br/>"移除成员"
+        RemovingMember --> Active: 确认移除<br/>（CEO 不能被移除）
+        Active --> LeavingTeam: 触发"退出团队"<br/>二次确认
+        LeavingTeam --> Active: 取消退出
+        LeavingTeam --> Dissolving: 二次确认<br/>"解散团队"
+        Dissolving --> TeamArchived: 团队归档<br/>所有会话保留只读
+        Active --> Messaging: 与团队对话<br/>(CEO 自动回复)
+        Messaging --> Active: 流式输出完成
+    }
+
+    Boss --> NotInTeam: 退出团队<br/>主动离开
+    Boss --> TeamArchived: 解散团队
+
+    state TeamArchived {
+        [*] --> ReadOnly: 群组进入只读
+        ReadOnly --> [*]: 30 天后自动清理
+    }
+\`\`\`
+
+### 12.3 Boss 邀请 Agent 状态机
+
+\`\`\`mermaid
+stateDiagram-v2
+    [*] --> Idle: Boss 在 TeamProfilePage
+
+    Idle --> OpenInviteDialog: 点击"邀请成员"
+    OpenInviteDialog --> SelectingAgents: 弹出 Agent 列表<br/>(多选 Checkbox)
+    SelectingAgents --> Confirming: 至少选 1 个 Agent
+    SelectingAgents --> Idle: 取消/关闭 Dialog
+
+    Confirming --> Inviting: 点击"确认邀请"
+    Inviting --> InvitedSuccess: 后端写入群组成员<br/>Snackbar "已邀请 N 个 Agent"
+    Inviting --> InvitedFail: 网络错误/重复邀请<br/>Snackbar 错误提示
+    InvitedSuccess --> Idle: Dialog 关闭<br/>成员列表刷新
+    InvitedFail --> SelectingAgents: 回到选择状态<br/>保留已选项
+
+    Idle --> MaxMembersReached: 团队成员数 = MAX (20)<br/>"邀请" 按钮置灰
+\`\`\`
+
+### 12.4 CEO Agent 自动响应状态机
+
+参考 \`aiTeamChatService.ts#L85-L111\`：
+
+\`\`\`mermaid
+stateDiagram-v2
+    [*] --> Idle: Boss 未发消息
+
+    Idle --> Receiving: Boss 发送消息<br/>(sendMessage)
+    Receiving --> TokenCheck: 估算 token 消耗<br/>(estimateTotalTokens)
+
+    TokenCheck --> InsufficientTokens: isDemoAccount() &&<br/>balance <= 0
+    TokenCheck --> BuildingPrompt: 余额充足 / 非演示账号
+
+    InsufficientTokens --> NotifyBoss: 返回提示<br/>"演示 Token 已用完"
+    NotifyBoss --> Idle: 显示系统提示<br/>不调用 LLM
+
+    BuildingPrompt --> CallingLLM: SystemMessage +<br/>History (max 10) +<br/>HumanMessage
+    CallingLLM --> Streaming: invoke LLM<br/>(30s timeout)
+    CallingLLM --> TimedOut: 30s 超时
+    CallingLLM --> NetworkError: DNS/连接失败
+    CallingLLM --> UserCancelled: Boss 点击"停止生成"
+
+    Streaming --> DeducingTokens: 流式输出完成<br/>(estimateTokens +<br/>response_metadata)
+    Streaming --> UserCancelled: Boss 中途取消
+
+    DeducingTokens --> Replied: deductTokens()<br/>replyContent 显示
+    TimedOut --> Replied: 返回超时错误信息
+    NetworkError --> Replied: 返回网络错误信息
+    UserCancelled --> Replied: aborted=true<br/>不扣 token
+
+    Replied --> Idle: 等待下一条消息
+\`\`\`
+
+### 12.5 关键状态转移表
+
+| 当前状态 | 触发事件 | 前置条件 | 下一状态 | 副作用 |
+|---------|---------|---------|---------|-------|
+| \`Boss.Active\` | 邀请 Agent | 成员数 < 20 | \`Boss.OpenInviteDialog\` | 无 |
+| \`Boss.Active\` | 转让群主 | 新 Boss 必须已加入团队 | \`Boss.Transferring\` | 无 |
+| \`Boss.Transferring\` | 新 Boss 确认 | 双方在线 | \`Boss.Active\`（身份降级） | 原 Boss → Member |
+| \`Boss.Active\` | 退出团队 | 二次确认 | \`NotInTeam\` | 团队保留，新 Boss 自动接管 |
+| \`Boss.Active\` | 解散团队 | 二次确认 | \`TeamArchived.ReadOnly\` | 所有会话保留只读 |
+| \`Boss.Active\` | 移除成员 | 不能移除 CEO | \`Boss.Active\` | 该 Agent 退出群聊 |
+| \`Receiving\` | LLM 30s 超时 | — | \`TimedOut\` | 返回"⏱️ 出站连接超时" |
+| \`Receiving\` | LLM 网络错误 | — | \`NetworkError\` | 返回"⚠️ 无法连接到 AI 服务" |
+| \`Receiving\` | Boss 取消 | AbortSignal | \`UserCancelled\` | \`aborted=true\`,不扣 token |
+| \`Receiving\` | 演示账号余额=0 | \`isDemoAccount()\` | \`InsufficientTokens\` | 返回"演示 Token 已用完" |
+
+### 12.6 暂未实现的转移（PRD v12.0 待补）
+
+> 标记为 🟡 待补，等 PRD 12.x 后续版本或 v13 实现
+
+- 🟡 Boss 主动"踢出"其他 Boss（多 Boss 场景）
+- 🟡 Boss 设置"管理员"角色（Admin，非 Boss 也能管理成员）
+- 🟡 Agent 主动"申请加入"团队（需 Boss 审核）
+- 🟡 CEO Agent 主动"派发任务"给子 Agent（消息接力）
+- 🟡 Boss 设置"仅 Boss 可 @CEO"（静默模式）
+
+---
+
+## 十三、Playwright e2e 测试用例矩阵
+
+> 配套实现：\`e2e/contacts-team-members.spec.ts\`（已实现 6 个）+ 下方待补矩阵
+
+### 13.1 桌面端已实现（6 个）
+
+| # | 测试用例 | 断言 | 状态 |
+|---|---------|------|------|
+| D1 | 联系人行点击应进入聊天页 \`/chat/:id\` | URL 匹配 \`#/chat/[a-z0-9_-]+\` | ✅ |
+| D2 | 联系人头像点击也应进入聊天页（v4 统一行为） | URL 匹配 \`#/chat/[a-z0-9_-]+\` | ✅ |
+| D3 | 聊天页头部头像点击应进入 AgentProfilePage | URL 匹配 \`#/agent-profile/ceo-agent\` | ✅ |
+| D4 | AgentProfilePage 应显示 Skill 介绍 + 能力配置 | "Skill 介绍"/"能力配置"/"启用 Agent" 可见 | ✅ |
+| D5 | 大头像点击应弹头像库 Dialog (30+ 预设) | Dialog 出现 + 30+ Avatar 网格 | ✅ |
+| D6 | 修改昵称 → 返回 → 联系人页显示新昵称 | 联系人列表展示新昵称 | ✅ |
+
+### 13.2 桌面端待补用例（8 个）
+
+| # | 测试用例 | 优先级 | 关联文件 |
+|---|---------|-------|---------|
+| D7 | Avatar Dialog 选预设头像 → 保存 → 联系人列表头像更新 | P0 | AgentProfilePage.tsx L296-L299 / L235-L275 |
+| D8 | Avatar Dialog 上传自定义头像 → 保存 → 联系人头像更新 | P0 | AgentProfilePage.tsx L207-L232 |
+| D9 | 能力配置 "启用 Agent" Switch 切换 → Snackbar 提示 | P1 | AgentProfilePage.tsx L436-L459 |
+| D10 | "进入聊天" 按钮 → 跳转 \`/chat/:agentId\` 且 contactId 正确 | P1 | AgentProfilePage.tsx L463-L527 |
+| D11 | "语音通话" 按钮 → dispatchEvent \`proclaw:start-call\` + 跳转 \`/call\` | P1 | AgentProfilePage.tsx L463-L527 |
+| D12 | "恢复默认" 按钮 → confirm 弹窗 → 清空 override | P2 | AgentProfilePage.tsx L278-L293 |
+| D13 | TeamProfilePage 成员行点击 → 进入 AgentProfilePage | P0 | TeamProfilePage.tsx |
+| D14 | TeamProfilePage "打开群聊" 按钮 → 进入 ChatPage | P0 | TeamProfilePage.tsx |
+
+### 13.3 AI Team 群聊待补用例（10 个）
+
+| # | 测试用例 | 状态机节点 | 关联代码 |
+|---|---------|----------|---------|
+| T1 | Boss 进入 TeamsPage 创建新团队 → 填写团队名 + 选初始成员 → 确认 | \`NotInTeam → Boss\` | TeamsPage.tsx + aiTeamGroups.ts |
+| T2 | Boss 邀请 Agent → 弹出 Agent 多选 → 至少选 1 个 → 确认 | \`Idle → OpenInviteDialog → SelectingAgents → Inviting → InvitedSuccess\` | TeamProfilePage.tsx |
+| T3 | Boss 邀请时成员数已达上限 → "邀请" 按钮置灰 | \`Idle → MaxMembersReached\` | TeamProfilePage.tsx |
+| T4 | Boss 转让群主 → 选择新 Boss → 新 Boss 确认 → 原 Boss 降为 Member | \`Active → Transferring → Active\` | TeamProfilePage.tsx |
+| T5 | Boss 退出团队 → 二次确认 → 退出成功 → 团队保留（新 Boss 自动接管） | \`Active → LeavingTeam → NotInTeam\` | TeamProfilePage.tsx |
+| T6 | Boss 解散团队 → 二次确认 → 团队归档 → 群聊进入只读 | \`Active → Dissolving → TeamArchived.ReadOnly\` | TeamProfilePage.tsx |
+| T7 | Boss 移除成员 → 不能移除 CEO Agent | \`Active → RemovingMember\` | TeamProfilePage.tsx |
+| T8 | Boss 发消息 → CEO Agent 自动流式回复 | \`Receiving → CallingLLM → Streaming → Replied\` | ChatPage.tsx + aiTeamChatService.ts |
+| T9 | CEO Agent 30s 超时 → 返回"⏱️ 出站连接超时" | \`Receiving → TimedOut\` | aiTeamChatService.ts L177-L226 |
+| T10 | 演示账号 token=0 → 返回"演示 Token 已用完"，不调用 LLM | \`TokenCheck → InsufficientTokens\` | aiTeamChatService.ts L162-L171 |
+
+### 13.4 移动端待补用例（8 个）
+
+| # | 测试用例 | 关联文件 |
+|---|---------|---------|
+| M1 | ContactsTab 点击 Agent 行 → 跳 ChatDetail（targetType='agent'） | ContactsTab.tsx L428-L435 |
+| M2 | ContactsTab 点击 Agent 头像 → 跳 AgentProfileScreen | ContactsTab.tsx L437-L443 |
+| M3 | ContactsTab 点击 AI Team 行 → 跳 ChatDetail（targetType='team'） | ContactsTab.tsx L446-L453 |
+| M4 | ContactsTab 点击 AI Team 头像 → 弹 TeamMembersDialog | ContactsTab.tsx L456-L469 |
+| M5 | ChatDetailScreen 进入 agent 会话（消息为空）→ 自动发问候语 | ChatDetailScreen.tsx L75-L84 |
+| M6 | ChatDetailScreen 进入 team 会话 → 自动发 CEO 问候语 | ChatDetailScreen.tsx L75-L84 |
+| M7 | ChatDetailScreen 发送消息 → 流式 AI 回复（打字机效果） | ChatDetailScreen.tsx L112-L193 |
+| M8 | AgentProfileScreen 修改昵称 → onProfileChanged 事件触发 → ChatDetail 同步 | AgentProfileScreen.tsx L116-L122 |
+
+### 13.5 测试矩阵汇总
+
+| 维度 | 已实现 | 待补 | 总数 |
+|------|--------|------|------|
+| 桌面端核心交互（D1-D14） | 6 | 8 | 14 |
+| AI Team 群聊（T1-T10） | 0 | 10 | 10 |
+| 移动端（M1-M8） | 0 | 8 | 8 |
+| **总计** | **6** | **26** | **32** |
+
+### 13.6 测试运行规范
+
+\`\`\`bash
+# 仅跑联系人 + 团队成员相关测试
+npx playwright test e2e/contacts-team-members.spec.ts
+
+# 带 headed 模式（调试用）
+npx playwright test e2e/contacts-team-members.spec.ts --headed
+
+# 生成 HTML 报告
+npx playwright test e2e/contacts-team-members.spec.ts --reporter=html
+\`\`\`
+
+### 13.7 已知稳定性策略
+
+- **避免 SPA Fallback**：用 hash 路由（\`page.goto('/#/agent-profile/ceo-agent')\`）而非 path 路由
+- **Demo 账号兜底**：用 \`test.skip()\` 而非 \`test.fail()\`，避免 demo 数据缺失时全量失败
+- **宽容选择器**：\`main .MuiAvatar-root\` 限定 main 区，避免误中 sidebar
+- **fallback 选择器链**：header avatar → main avatar → skip，避免硬绑定导致误判
+
+---
+
+## 十四、可分享 HTML 单页说明
+
+> 本页是 \`docs/features/contact-chat-profile-ux-flow.md\` 的可分享 HTML 版本。
+>
+> - 使用 marked.js + Mermaid CDN 渲染（需要联网首次加载）
+> - 包含 GitHub Markdown 风格样式 + 顶部 TOC 导航
+> - 离线场景：Mermaid 图会显示为代码块（Markdown 仍可读）
+> - 源 Markdown：\`docs/features/contact-chat-profile-ux-flow.md\`
+> - 浏览器兼容：Chrome / Edge / Firefox / Safari (modern)
+
+---
+
+> 📌 **文档生成时间**: 2026-06-15 · **ProClaw v1.0.0** · **维护**: ProClaw 桌面端团队
+`;
+
+  // 2. 配置 marked 选项
+  if (typeof marked !== 'undefined') {
+    marked.setOptions({
+      gfm: true,
+      breaks: false,
+      pedantic: false,
+    });
+  }
+
+  // 3. 自定义渲染器：把 mermaid 代码块包裹在 <div class="mermaid"> 中
+  if (typeof marked !== 'undefined') {
+    var renderer = new marked.Renderer();
+    var originalCode = renderer.code.bind(renderer);
+    renderer.code = function (code, infostring) {
+      var lang = (infostring || '').trim().toLowerCase();
+      if (lang === 'mermaid') {
+        return '<div class="mermaid">\n' + code + '\n</div>';
+      }
+      return originalCode(code, infostring, function () { return false; });
+    };
+    // marked v9+ 新签名：(code, infostring, escaped)
+    // 兼容旧签名
+    if (renderer.code.length === 3) {
+      renderer.code = function (code, infostring) {
+        var lang = (infostring || '').trim().toLowerCase();
+        if (lang === 'mermaid') {
+          return '<div class="mermaid">\n' + code + '\n</div>';
+        }
+        return '<pre><code class="language-' + this.options.langPrefix + lang + '">' +
+          (typeof code === 'string' ? code.replace(/</g, '&lt;').replace(/>/g, '&gt;') : code) +
+          '</code></pre>';
+      };
+    }
+    marked.use({ renderer: renderer });
+  }
+
+  // 4. 渲染 Markdown 到 #content
+  var contentEl = document.getElementById('content');
+  try {
+    contentEl.innerHTML = marked.parse(md);
+  } catch (e) {
+    contentEl.innerHTML = '<div class="error-banner">❌ Markdown 渲染失败：' +
+      (e && e.message ? e.message : String(e)) + '</div>' +
+      '<pre>' + md.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+    return;
+  }
+
+  // 5. 初始化 Mermaid 并渲染所有 .mermaid 块
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+      flowchart: { useMaxWidth: true, htmlLabels: true },
+      sequence: { useMaxWidth: true },
+      stateDiagram: { useMaxWidth: true },
+    });
+    // 用 mermaid.run() 处理所有 mermaid 块（v10 API）
+    try {
+      mermaid.run({ querySelector: '.mermaid' }).then(function () {
+        console.log('[ProClaw UX] ' + document.querySelectorAll('.mermaid svg').length + ' 个 Mermaid 图渲染完成');
+      }).catch(function (err) {
+        console.error('[ProClaw UX] Mermaid 渲染失败:', err);
+        // 降级：保留原始代码块内容
+        document.querySelectorAll('.mermaid').forEach(function (el) {
+          if (!el.querySelector('svg')) {
+            var code = el.textContent;
+            el.innerHTML = '<pre style="color:#d4a72c">' +
+              code.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+              '</pre>';
+          }
+        });
+      });
+    } catch (e) {
+      console.error('[ProClaw UX] Mermaid init failed:', e);
+    }
+  } else {
+    // 没有 mermaid：把 .mermaid 块降级为 <pre>
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      var code = el.textContent;
+      el.innerHTML = '<pre>' + code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+    });
+    contentEl.insertAdjacentHTML('afterbegin',
+      '<div class="error-banner">⚠️ Mermaid CDN 加载失败，流程图已降级为代码块。请检查网络连接后刷新页面。</div>'
+    );
+  }
+
+  // 6. 给所有标题加锚点（用于 TOC 跳转）
+  document.querySelectorAll('#content h1, #content h2, #content h3').forEach(function (h) {
+    if (h.id) {
+      var a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.style.cssText = 'color:inherit;text-decoration:none;';
+      a.innerHTML = h.innerHTML;
+      h.innerHTML = '';
+      h.appendChild(a);
+    }
+  });
+})();
+</script>
+</body>
+</html>
