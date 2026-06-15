@@ -9,8 +9,9 @@
  *   await pluginLoader.downloadAndInstall('retail', '1.0.0', 'https://...');
  *   await pluginLoader.switchIndustry('retail');
  */
-import { safeInvoke } from './tauri';
+import { safeInvoke, isTauri } from './tauri';
 import { PluginManager, IndustryPluginManifest } from '../config/appMode';
+import { listPluginManifests } from './manifestRegistry';
 
 export interface PluginLoadProgress {
   phase: 'downloading' | 'verifying' | 'installing' | 'activating' | 'done' | 'error';
@@ -244,9 +245,47 @@ class PluginLoader {
 
   /**
    * 获取已安装的插件列表
+   *
+   * 设计要点:
+   * - 浏览器 dev 模式(isTauri() === false):直接返回内置 manifest 兑底(让 UI 有内容)
+   * - Tauri 桌面端:以**后端 list_installed_plugins 实际数据为准**;
+   *   仅在后端返回空时(首次启动 / 未安装)才用内置 manifest 兑底,
+   *   避免与后端插件产生重复显示。
+   * - 后端出错(IPC 掉线)时走兜底,但不再强制 merge。
    */
   async getInstalledPlugins(): Promise<any[]> {
-    return (await safeInvoke<any[]>('list_installed_plugins')) || [];
+    if (!isTauri()) {
+      // 浏览器开发模式:直接返回内置 manifest 作为已安装
+      return this.getBuiltinInstalledFallback();
+    }
+    try {
+      const installed = (await safeInvoke<any[]>('list_installed_plugins')) || [];
+      if (installed.length > 0) {
+        // 后端有真实数据 → 以真实数据为准,不额外合并(避免重复)
+        return installed;
+      }
+      // 后端空 → 用内置 manifest 兑底(首次启动用户也能看到内容)
+      return this.getBuiltinInstalledFallback();
+    } catch {
+      // Tauri 不可用/出错时回退到 manifestRegistry
+      return this.getBuiltinInstalledFallback();
+    }
+  }
+  
+  /** 从 manifestRegistry 提取内置插件作为「已使用」列表的兑底 */
+  private getBuiltinInstalledFallback(): any[] {
+    try {
+      return listPluginManifests().map((m) => ({
+        plugin_id: m.id,
+        name: m.name,
+        version: m.version,
+        install_path: 'builtin',
+        manifest: m,
+        enabled: true,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   /**

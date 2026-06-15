@@ -53,8 +53,21 @@ import {
   ToggleButtonGroup,
 } from '@mui/material';
 import { isTauri, safeInvoke } from '../lib/tauri';
+import { isDemoAccount } from '../lib/aiTeamTokenService';
 import { syncAITeamGroups, buildGroupId } from '../lib/contactService';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+/** 同步 AI Team 数量到 localStorage 并广播变更事件,供 Sidebar 动态 badge 订阅 */
+function syncAITeamCountToSidebar(teams: AiTeam[]) {
+  try {
+    if (typeof window === 'undefined') return;
+    const count = Array.isArray(teams) ? teams.length : 0;
+    window.localStorage.setItem('proclaw:teams:count', String(count));
+    window.dispatchEvent(new CustomEvent('proclaw:teams-changed'));
+  } catch {
+    // 静默失败,不影响业务
+  }
+}
 import { useNavigate } from 'react-router-dom';
 import type { AiTeam, CreateTeamPayload, TeamMember, UpdateTeamPayload } from '../lib/teamTypes';
 import { PUBLISH_STATUS_MAP, PUBLISH_STATUS_COLOR } from '../lib/teamTypes';
@@ -66,6 +79,7 @@ import {
   buildNvwaXUrl,
   type TeamRecommendation,
 } from '../lib/aiTeamRecommendationService';
+import { LONG_OUTBOUND_TIMEOUT_MS, OUTBOUND_ERROR_MESSAGE, withTimeoutPromise } from '../lib/fetchWithTimeout';
 import MarketplaceDialog from '../components/NvwaX/MarketplaceDialog';
 import { NvwaXService } from '../lib/nvwaxClient';
 import BapSettingsPanel from '../components/Agent/BapSettingsPanel';
@@ -151,43 +165,108 @@ export default function TeamsPage() {
         responsibilities: '根据商品名称和描述自动搜索高质量产品图片，支持 Pexels/Pixabay 双源搜索，单商品精搜和批量匹配双模式，智能关键词优化以提升命中率。',
         sort_order: 6,
       },
+      {
+        agent_id: 'builtin-content-creator',
+        role: '自媒体运营官',
+        responsibilities: '策划并生成社交媒体内容（小红书/抖音/微信公众号），撰写营销文案、产品种草文、短视频脚本，分析内容传播效果并优化发布策略。',
+        sort_order: 7,
+      },
     ];
   }
 
-  /** 浏览器开发模式下的 mock 内置团队，无需 Tauri IPC */
-  function getMockBuiltinTeam(): AiTeam {
+  /** 浏览器开发模式下的 mock 内置团队（3 个）:AI 经营 + 国内社媒 + 欧美社媒
+   *  对应 ProClaw 1.0.0 测试数据包的演示要求
+   *  Nvwax 拉取 + Tauri 不可用时的回退数据
+   *
+   * 重要:成员的 agent_id 必须真实存在,确保群聊/任务分派能正常工作。
+   *  - AI 经营团队的 8 个 builtin-* agent 由后端 Tauri 端注册(生产环境有效)
+   *  - 国内/欧美社媒团队的 agent 全部对应 localAgentManifests 中的真实 agent
+   *    (ma_social_cn / ma_social_us),与 production localTeamSkillMap 一致 */
+  function getMockBuiltinTeams(): AiTeam[] {
     const now = new Date().toISOString();
-    return {
-      id: 'mock-builtin-team',
-      name: 'AI 经营团队',
-      description: 'ProClaw 内置的 AI 经营团队（浏览器开发模式），包含 7 个专业 Agent。实际运行请使用 Tauri 桌面端。',
-      category: '通用经营',
-      config_json: '{}',
-      source: 'builtin',
-      version: '1.0.0',
-      publish_status: 'draft',
-      tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图'],
-      members: getBuiltinTeamMembers(),
-      workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
-      triggers: {},
-      created_at: now,
-      updated_at: now,
-    };
+    return [
+      {
+        id: 'mock-builtin-team-biz-ops',
+        name: 'AI 经营团队',
+        description: 'ProClaw 内置的 AI 经营团队，包含 8 个专业 Agent：库存优化师、销售预测分析师、业务分析师、采购顾问、财务分析师、客户服务助手、AI智能找图、自媒体运营官。',
+        category: '通用经营',
+        config_json: '{}',
+        source: 'builtin',
+        version: '1.0.0',
+        publish_status: 'draft',
+        tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图', '自媒体运营'],
+        members: getBuiltinTeamMembers(),
+        workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
+        triggers: {},
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'mock-builtin-team-social-cn',
+        name: '国内社媒运营 Team',
+        description: '国内市场社媒运营团队(对应 localTeamSkillMap.team-skill-social-cn-001),覆盖微信公众号、小红书、知乎、微博,简体中文,合规审查。',
+        category: '社媒运营',
+        config_json: '{}',
+        source: 'builtin',
+        version: '1.0.0',
+        publish_status: 'draft',
+        tags: ['微信公众号', '小红书', '知乎', '微博', '简体中文', '合规审查'],
+        members: [
+          { agent_id: 'ma_social_cn', role: '微信公众号运营', responsibilities: '深度文章与品牌建设,服务号推送,长文排版。', sort_order: 0 },
+          { agent_id: 'ma_social_cn', role: '小红书运营', responsibilities: '种草笔记与好物推荐,封面 / 标题优化。', sort_order: 1 },
+          { agent_id: 'ma_social_cn', role: '知乎运营', responsibilities: '专业问答与技术分享,品牌问答渗透。', sort_order: 2 },
+          { agent_id: 'ma_social_cn', role: '微博运营', responsibilities: '实时热点与话题营销,超话运营。', sort_order: 3 },
+        ],
+        workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
+        triggers: {},
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'mock-builtin-team-social-us-eu',
+        name: '欧美社媒运营 Team',
+        description: '欧美市场社媒运营团队(对应 localTeamSkillMap.team-skill-social-us-eu-001),覆盖 Twitter/X、Facebook、Instagram,英语内容,美西 / 美东时区。',
+        category: '社媒运营',
+        config_json: '{}',
+        source: 'builtin',
+        version: '1.0.0',
+        publish_status: 'draft',
+        tags: ['Twitter/X', 'Facebook', 'Instagram', '英语内容', '欧美市场'],
+        members: [
+          { agent_id: 'ma_social_us', role: 'Twitter/X Manager', responsibilities: '实时互动与技术讨论,话题运营。', sort_order: 0 },
+          { agent_id: 'ma_social_us', role: 'Facebook Manager', responsibilities: '社群建设与页面管理,广告投放。', sort_order: 1 },
+          { agent_id: 'ma_social_us', role: 'Instagram Manager', responsibilities: '视觉内容与快拍,Reels 制作。', sort_order: 2 },
+        ],
+        workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
+        triggers: {},
+        created_at: now,
+        updated_at: now,
+      },
+    ];
   }
 
-  /** 首次加载时若无任何团队，自动创建内置默认团队 */
+  /** 首次加载时若无任何团队，自动创建内置默认团队。
+   *  演示账号下会预置 3 个 AI Team（AI 经营团队 + 国内社媒 + 海外社媒），
+   *  Nvwax 拉取失败时回退到 localTeamSkillMap。
+   *  幂等：同名 Team 已存在则跳过。 */
   async function ensureBuiltinTeam() {
     try {
       // 检查是否已存在内置团队
       const existing = await safeInvoke<AiTeam[]>('get_teams');
-      if (existing && existing.length > 0) return;
+      if (existing && existing.length > 0) {
+        // 演示账号下若团队数 < 3，补充安装
+        if (existing.length < 3) {
+          await ensureBuiltinTeams(existing);
+        }
+        return;
+      }
 
       // 创建默认的 "AI 经营团队"
       const payload: CreateTeamPayload = {
         name: 'AI 经营团队',
-        description: 'ProClaw 内置的 AI 经营团队，包含 7 个专业 Agent：库存优化师、销售预测分析师、业务分析师、采购顾问、财务分析师、客户服务助手、AI智能找图。可根据您的业务数据通过"AI 智能推荐"功能动态调整成员配置。',
+        description: 'ProClaw 内置的 AI 经营团队，包含 8 个专业 Agent：库存优化师、销售预测分析师、业务分析师、采购顾问、财务分析师、客户服务助手、AI智能找图、自媒体运营官。可根据您的业务数据通过“AI 智能推荐”功能动态调整成员配置。',
         category: '通用经营',
-        tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图'],
+        tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图', '自媒体运营'],
         members: getBuiltinTeamMembers(),
         workflow: {
           mode: 'sequential',
@@ -207,10 +286,50 @@ export default function TeamsPage() {
 
       const team = await safeInvoke<AiTeam>('create_team', { payload });
       if (team) setTeams([team]);
+
+      // 演示账号下：补充预置国内/海外社媒团队
+      if (isDemoAccount()) {
+        await ensureBuiltinTeams([team].filter(Boolean) as AiTeam[]);
+      }
     } catch (err) {
       console.error('Failed to create builtin team:', err);
       // 静默失败，不阻塞用户操作
     }
+  }
+
+  /**
+   * 演示账号下：补充安装国内/海外社媒团队。复用 demoBootstrap 中的常量。
+   * 已存在同名 Team 则跳过。
+   */
+  async function ensureBuiltinTeams(existing: AiTeam[]) {
+    try {
+      const { DEMO_TEAM_SKILL_IDS, ensureTeamFromNvwax } = await import('../lib/demoBootstrap');
+      const existingNames = new Set(existing.map(t => t.name));
+      for (const skillId of DEMO_TEAM_SKILL_IDS) {
+        const displayName = lookupDemoTeamName(skillId);
+        if (existingNames.has(displayName)) continue;
+        try {
+          await ensureTeamFromNvwax(skillId, false);
+        } catch (err) {
+          console.warn(`[TeamsPage] 演示团队 ${skillId} 安装失败：`, err);
+        }
+      }
+      // 通知刷新
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('proclaw:teams-changed'));
+      }
+    } catch (err) {
+      console.warn('[TeamsPage] ensureBuiltinTeams 失败：', err);
+    }
+  }
+
+  function lookupDemoTeamName(skillId: string): string {
+    const map: Record<string, string> = {
+      'team-skill-biz-ops-001': 'AI 经营团队',
+      'team-skill-social-cn-001': '国内社媒运营 Team',
+      'team-skill-social-us-eu-001': '欧美社媒运营 Team',
+    };
+    return map[skillId] || skillId;
   }
 
   const loadTeams = useCallback(async () => {
@@ -237,14 +356,30 @@ export default function TeamsPage() {
         setTeams(deduped);
         setExistingTeamNames(deduped.map(t => t.name));
         syncAITeamGroups(deduped);
-        // 首次加载时若无任何团队，自动创建内置默认团队
-        if (deduped.length === 0) {
-          ensureBuiltinTeam();
+        // 演示账号下：保证 3 个 AI Team（AI 经营 + 国内社媒 + 欧美社媒）完整
+        // - 如果团队表为空 → 首次创建内置默认团队
+        // - 如果存在但少于 3 个 → 补充安装缺失的国内/海外社媒团队
+        // (非演示账号不触发，避免给真实用户注入示例数据)
+        if (isDemoAccount() && deduped.length < 3) {
+          await ensureBuiltinTeam();
+          // ensureBuiltinTeam 完成后重新拉取一次，保证 UI 反映补充后的完整状态
+          const reloaded = await safeInvoke<AiTeam[]>('get_teams');
+          if (reloaded && reloaded.length > deduped.length) {
+            const reloadedDeduped = Array.from(
+              new Map(reloaded.map((t) => [t.name, t])).values()
+            );
+            setTeams(reloadedDeduped);
+            setExistingTeamNames(reloadedDeduped.map((t) => t.name));
+            syncAITeamGroups(reloadedDeduped);
+          }
         }
       } else if (!isTauri()) {
-        // 浏览器开发模式：展示模拟内置团队，方便 UI 调试
-        setTeams([getMockBuiltinTeam()]);
-        syncAITeamGroups([getMockBuiltinTeam()]);
+        // 浏览器开发模式：展示 3 个模拟内置团队（AI 经营 + 国内社媒 + 海外社媒），
+        // 对应 ProClaw 1.0.0 测试数据包的演示要求
+        const mockTeams = getMockBuiltinTeams();
+        setTeams(mockTeams);
+        setExistingTeamNames(mockTeams.map(t => t.name));
+        syncAITeamGroups(mockTeams);
       }
     } catch (err) {
       console.error('Failed to load teams:', err);
@@ -257,6 +392,11 @@ export default function TeamsPage() {
   useEffect(() => {
     loadTeams();
   }, [loadTeams]);
+
+  // 同步团队数量到 Sidebar badge(通过 localStorage + 自定义事件)
+  useEffect(() => {
+    syncAITeamCountToSidebar(teams);
+  }, [teams]);
 
   // 导入团队
   const handleImport = async (file: File) => {
@@ -344,13 +484,25 @@ export default function TeamsPage() {
     setRecommendError('');
     setRecommending(true);
     try {
-      const result = await generateTeamRecommendation();
+      // 60s 超时控制（推荐任务比对话更重）
+      const result = await withTimeoutPromise(
+        () => generateTeamRecommendation(),
+        LONG_OUTBOUND_TIMEOUT_MS,
+      );
       setRecommendation(result);
     } catch (err) {
-      setRecommendError('分析失败: ' + String(err));
+      console.error('[AI 智能推荐] 失败:', err);
+      setRecommendError(OUTBOUND_ERROR_MESSAGE);
     } finally {
       setRecommending(false);
     }
+  };
+
+  /**
+   * 重试推荐：重新走一遍 handleRecommend
+   */
+  const handleRetryRecommend = () => {
+    handleRecommend();
   };
 
   // 基于推荐创建团队
@@ -800,7 +952,19 @@ export default function TeamsPage() {
 
           {recommendError && (
             <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
-              <Typography color="error">{recommendError}</Typography>
+              <Typography color="error" sx={{ mb: 2 }}>{recommendError}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                推荐服务连接失败。请检查网络后重试，或前往「设置 → AI 设置」检查大模型配置。
+              </Typography>
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={handleRetryRecommend}
+              >
+                重试
+              </Button>
             </Paper>
           )}
 
@@ -1029,9 +1193,9 @@ const TEAM_TEMPLATES = [
   {
     id: 'ai-business',
     label: 'AI 经营团队',
-    description: '库存优化 + 销售预测 + 业务分析 + 采购顾问 + 财务分析 + 客服 + 智能找图',
+    description: '库存优化 + 销售预测 + 业务分析 + 采购顾问 + 财务分析 + 客服 + 智能找图 + 自媒体运营',
     category: '通用经营',
-    tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图'],
+    tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图', '自媒体运营'],
     members: [
       { agent_id: 'builtin-inventory-optimizer', role: '库存优化师', responsibilities: '监控库存水平，预警低库存商品，优化安全库存设置，识别滞销品并建议清仓策略。', sort_order: 0 },
       { agent_id: 'builtin-sales-forecaster', role: '销售预测分析师', responsibilities: '分析历史销售趋势，预测未来销量，识别季节性波动，辅助采购决策。', sort_order: 1 },
@@ -1040,6 +1204,7 @@ const TEAM_TEMPLATES = [
       { agent_id: 'builtin-financial-advisor', role: '财务分析师', responsibilities: '监控现金流健康度，分析应收应付结构，评估定价策略和利润率。', sort_order: 4 },
       { agent_id: 'builtin-cs-agent', role: '客户服务助手', responsibilities: '自动处理客户咨询、订单查询，维护客户信息，跟踪售后问题。', sort_order: 5 },
       { agent_id: 'builtin-image-searcher', role: 'AI智能找图', responsibilities: '根据商品名称和描述自动搜索高质量产品图片，支持 Pexels/Pixabay 双源搜索，单商品精搜和批量匹配双模式，智能关键词优化以提升命中率。', sort_order: 6 },
+      { agent_id: 'builtin-content-creator', role: '自媒体运营官', responsibilities: '策划并生成社交媒体内容（小红书/抖音/微信公众号），撰写营销文案、产品种草文、短视频脚本，分析内容传播效果并优化发布策略。', sort_order: 7 },
     ],
   },
   {

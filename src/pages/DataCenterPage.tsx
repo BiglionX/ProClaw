@@ -37,14 +37,12 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import {
-  BarChart, Bar,
-  LineChart, Line,
-  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend,
-} from 'recharts';
 
 import AIInsights, { type AIInsightItem } from '../components/DataCenter/AIInsights';
+import AIStatusBar from '../components/DataCenter/AIStatusBar';
+import ChartsSection from '../components/DataCenter/ChartsSection';
 import StatCard from '../components/DataCenter/StatCard';
+import QuickActions from '../components/Agent/QuickActions';
 import { generateAIInsights } from '../lib/aiInsightEngine';
 import {
   getSalesTrend, getProductAnalytics,
@@ -137,6 +135,31 @@ export default function DataCenterPage() {
 
   const finSummary = financialSummary;
 
+  // 构造 sparkline 数据（PRD v11.0 §4.1.3：StatCard 右上角 32px 迷你趋势线）
+  // 优先从 analyticsTrend.data 提取近期数据；为 table 各 metric 构建独立序列
+  const trendData = analyticsTrend?.data || [];
+  const sparklineDataMap = {
+    outbound: trendData.slice(-7).map(d => ({ value: d.outbound_qty })),
+    inbound: trendData.slice(-7).map(d => ({ value: d.inbound_qty })),
+    transactions: trendData.slice(-7).map(d => ({ value: d.transaction_count })),
+    products: trendData.slice(-7).map((_, idx) => ({ value: (dbStats?.spu_count || 0) + idx })),
+  };
+
+  // 转换 analyticsTrend 为 ChartsSection 期望的格式（出库量/入库量/交易数）
+  const salesChartData = trendData.map(d => ({
+    date: d.date,
+    '出库量': d.outbound_qty,
+    '入库量': d.inbound_qty,
+    '交易数': d.transaction_count,
+  }));
+
+  // 库存状态分布（从 inventoryStats 提取）
+  const inventoryDistribution = inventoryStats ? [
+    { name: '充足', value: Math.max(0, (inventoryStats.total_products || 0) - (inventoryStats.low_stock_count || 0) - (inventoryStats.zero_stock_count || 0)), color: '#10B981' },
+    { name: '预警', value: inventoryStats.low_stock_count || 0, color: '#F59E0B' },
+    { name: '缺货', value: inventoryStats.zero_stock_count || 0, color: '#EF4444' },
+  ].filter(item => item.value > 0) : [];
+
   return (
     <Box>
       {/* 页面标题行 + AI小如按钮在右侧 */}
@@ -181,6 +204,10 @@ export default function DataCenterPage() {
       </Box>
 
       {/* 分列导航：业务分析 | 利润表 | 现金流量表 */}
+      <AIStatusBar
+        insight={insights[0]?.message}
+        dailyReport={insights.slice(0, 5).map(i => i.message)}
+      />
       <Paper
         elevation={0}
         sx={{
@@ -254,6 +281,7 @@ export default function DataCenterPage() {
                         title="总产品数"
                         value={inventoryStats.total_products}
                         color="#6366F1"
+                        sparklineData={sparklineDataMap.products}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6} md={3}>
@@ -262,6 +290,8 @@ export default function DataCenterPage() {
                         title="低库存预警"
                         value={inventoryStats.low_stock_count}
                         color={inventoryStats.low_stock_count > 0 ? '#F59E0B' : '#10B981'}
+                        sparklineData={sparklineDataMap.transactions}
+                        alert={inventoryStats.low_stock_count > 5}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6} md={3}>
@@ -270,6 +300,8 @@ export default function DataCenterPage() {
                         title="零库存"
                         value={inventoryStats.zero_stock_count}
                         color={inventoryStats.zero_stock_count > 0 ? '#EF4444' : '#10B981'}
+                        sparklineData={sparklineDataMap.inbound}
+                        alert={inventoryStats.zero_stock_count > 0}
                       />
                     </Grid>
                   </>
@@ -281,10 +313,16 @@ export default function DataCenterPage() {
                       title="SPU 总数"
                       value={dbStats.spu_count || 0}
                       color="#FF3B30"
+                      sparklineData={sparklineDataMap.outbound}
                     />
                   </Grid>
                 )}
               </Grid>
+
+              {/* PRD v11.0 §4.1.2：快捷操作区（含 AI 推荐 + 呼吸光晕） */}
+              <Box sx={{ mb: 3 }}>
+                <QuickActions onSalesAnalysis={() => setTabValue(0)} />
+              </Box>
 
               {/* 财务概览卡片 */}
               {finSummary && (
@@ -382,51 +420,19 @@ export default function DataCenterPage() {
                 <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadAnalyticsData} disabled={analyticsLoading}>刷新</Button>
               </Paper>
 
-              {/* 销售趋势折线图 */}
-              <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <TrendingUpIcon sx={{ mr: 1, color: '#FF3B30' }} />
-                  <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.95rem' }}>销售趋势</Typography>
+              {/* PRD v11.0 §4.1.5：使用 ChartsSection 统一品牌配色 + 毛玻璃 Tooltip */}
+              {analyticsTrend?.data && analyticsTrend.data.length > 0 ? (
+                <Box sx={{ mb: 3 }}>
+                  <ChartsSection
+                    salesChartData={salesChartData}
+                    inventoryDistribution={inventoryDistribution}
+                  />
                 </Box>
-                {analyticsTrend?.data && analyticsTrend.data.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <LineChart data={analyticsTrend.data}>
-                      <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#999' }} angle={-45} textAnchor="end" height={60} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} />
-                      <Tooltip />
-                      <Legend wrapperStyle={{ fontSize: '0.75rem' }} iconType="circle" iconSize={8} />
-                      <Line type="monotone" dataKey="outbound_qty" name="出库量" stroke="#FF3B30" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="inbound_qty" name="入库量" stroke="#6366F1" strokeWidth={2} dot={{ r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
+              ) : (
+                <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                   <Box sx={{ textAlign: 'center', py: 8 }}>
                     <Typography color="text.secondary">暂无销售数据</Typography>
                   </Box>
-                )}
-              </Paper>
-
-              {/* 交易数量柱状图 */}
-              {analyticsTrend?.data && analyticsTrend.data.length > 0 && (
-                <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, fontSize: '0.95rem' }}>交易数量趋势</Typography>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={analyticsTrend.data}>
-                      <CartesianGrid stroke="rgba(0,0,0,0.04)" strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#999' }} angle={-45} textAnchor="end" height={60} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#999' }} axisLine={false} tickLine={false} />
-                      <Tooltip />
-                      <Bar dataKey="transaction_count" name="交易次数" fill="url(#barGradient)" radius={[4, 4, 0, 0]}>
-                        <defs>
-                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#FF3B30" stopOpacity={0.8} />
-                            <stop offset="100%" stopColor="#FF3B30" stopOpacity={0.3} />
-                          </linearGradient>
-                        </defs>
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
                 </Paper>
               )}
 

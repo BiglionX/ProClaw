@@ -26,6 +26,7 @@ import {
   Pets as PetsIcon,
   Home as HomeIcon,
   AutoAwesome as AutoAwesomeIcon,
+  Public as PublicIcon,
 } from '@mui/icons-material';
 import {
   Box,
@@ -41,13 +42,22 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppModeStore, PluginNavItem } from '../../config/appMode';
+// 注：用户信息已上移至 TopBar 右上角展示，Sidebar 不再直接消费 useAuthStore
 
 const DRAWER_WIDTH = 240;
 const DRAWER_COLLAPSED = 64;
 const TOPBAR_HEIGHT = 64;
+
+/** 分组标签配置（PRD v11.0 §4.2.1） */
+const GROUP_LABELS: Record<string, { icon: string; label: string }> = {
+  home: { icon: '🏠', label: '首页' },
+  ai: { icon: '🧠', label: 'AI 智能' },
+  contact: { icon: '👥', label: '通讯' },
+  account: { icon: '👤', label: '账户' },
+};
 
 interface NavItem {
   text: string;
@@ -89,11 +99,41 @@ const DEFAULT_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' | 'conta
   { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter', _group: 'home', isLive: true },
   { text: '商品库', icon: <ProductsIcon />, path: '/products', _group: 'home' },
   { text: '云商城', icon: <StoreIcon />, path: '/shop', _group: 'home' },
+  { text: '外贸柜台', icon: <PublicIcon />, path: '/foreign-counter', _group: 'home' },
   { text: '联系人', icon: <ContactsIcon />, path: '/contacts', _group: 'contact' },
   { text: '消息', icon: <ChatIcon />, path: '/messages', _group: 'contact' },
   { text: 'AI 团队', icon: <TeamsIcon />, path: '/teams', _group: 'ai', badge: 2 },
   { text: 'AI 知识库', icon: <KnowledgeIcon />, path: '/ai-knowledge', _group: 'ai' },
+  { text: '插件商店', icon: <ExtensionIcon />, path: '/plugin-store', _group: 'ai' },
 ];
+
+/** 从 localStorage / 跨页面事件读取 AI Team 数量（动态赋值给 sidebar badge） */
+function useAITeamCount(): number {
+  const [count, setCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const raw = window.localStorage.getItem('proclaw:teams:count');
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      const raw = window.localStorage.getItem('proclaw:teams:count');
+      const n = raw ? parseInt(raw, 10) : 0;
+      setCount(Number.isFinite(n) && n > 0 ? n : 0);
+    };
+    // 监听 TeamsPage 触发的事件
+    window.addEventListener('proclaw:teams-changed', refresh);
+    // 监听 storage 事件（跨 tab）
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('proclaw:teams-changed', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
+  return count;
+}
 
 /** Plus 版本专属导航项 */
 const PLUS_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' | 'contact' })[] = [
@@ -142,16 +182,24 @@ export default function Sidebar() {
   const location = useLocation();
   const navItems = useNavItems();
   const [collapsed, setCollapsed] = useState(false);
+  const aiTeamCount = useAITeamCount();
 
-  // 按分组整理导航项
+  // 按分组整理导航项,并把动态 badge 注入"AI 团队"项
   const groupedItems = navItems.reduce<Record<string, NavItem[]>>((acc, item) => {
     const group = (item as any)._group || item.group || 'home';
     if (!acc[group]) acc[group] = [];
-    acc[group].push(item);
+    if (item.path === '/teams') {
+      // 动态覆盖为实时 AI Team 数量
+      acc[group].push({ ...item, badge: aiTeamCount > 0 ? aiTeamCount : undefined });
+    } else {
+      acc[group].push(item);
+    }
     return acc;
   }, {});
 
   const drawerWidth = collapsed ? DRAWER_COLLAPSED : DRAWER_WIDTH;
+
+  // 注：用户信息（PRD v11.0 §4.2.1 底部用户卡片）已上移至 TopBar 右上角展示，Sidebar 不再消费 useAuthStore / useAppModeStore 的用户态字段
 
   const renderNavItem = (item: NavItem) => {
     const selected = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
@@ -276,20 +324,45 @@ export default function Sidebar() {
       }}
     >
       {/* ---- 导航列表 ---- */}
+      {/* PRD v11.0 §4.2.1：顶部品牌区与底部用户状态已移除（与 TopBar 左上角品牌名 / 右上角用户状态重叠，避免视觉重复） */}
       {Object.entries(groupedItems)
         .sort(([a], [b]) => {
-          const order = ['home', 'ai', 'contact'];
+          const order = ['home', 'ai', 'contact', 'account'];
           return order.indexOf(a) - order.indexOf(b);
         })
-        .map(([group, items]) => (
-        <Box key={group}>
-          <List sx={{ py: 0 }}>
-            {items.map(renderNavItem)}
-          </List>
-        </Box>
-      ))}
+        .map(([group, items], groupIdx) => {
+          const labelCfg = GROUP_LABELS[group];
+          return (
+            <Box key={group}>
+              {/* PRD v11.0 §4.2.1：分组标签（半透明小字） */}
+              {!collapsed && labelCfg && (
+                <Typography
+                  variant="overline"
+                  sx={{
+                    display: 'block',
+                    px: 2.5,
+                    pt: groupIdx === 0 ? 0.5 : 2,
+                    pb: 0.5,
+                    color: 'rgba(255,255,255,0.35)',
+                    fontWeight: 600,
+                    fontSize: '0.65rem',
+                    letterSpacing: '1.5px',
+                    textTransform: 'uppercase',
+                    userSelect: 'none',
+                  }}
+                >
+                  <Box component="span" sx={{ mr: 0.75, fontSize: '0.75rem' }}>{labelCfg.icon}</Box>
+                  {labelCfg.label}
+                </Typography>
+              )}
+              <List sx={{ py: 0 }}>
+                {items.map(renderNavItem)}
+              </List>
+            </Box>
+          );
+        })}
 
-      {/* ---- 底部：折叠按钮 ---- */}
+      {/* ---- 底部：折叠按钮（用户信息已上移至 TopBar 右上角，避免视觉重叠） ---- */}
       <Box sx={{ mt: 'auto' }}>
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
 

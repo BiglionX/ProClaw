@@ -7,7 +7,10 @@ import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import RecruitButton from '../AgentMarket/RecruitButton';
 import MarketDialog from '../AgentMarket/MarketDialog';
+import WelcomeTour from '../Demo/WelcomeTour';
 import { useAppModeStore } from '../../config/appMode';
+import { useAuthStore } from '../../lib/authStore';
+import { isDemoAccount } from '../../lib/aiTeamTokenService';
 
 const TOPBAR_HEIGHT = 64;
 
@@ -37,6 +40,7 @@ const pageVariants = {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const mode = useAppModeStore(state => state.mode);
   const location = useLocation();
+  const user = useAuthStore(state => state.user);
   const [marketOpen, setMarketOpen] = useState(false);
   const [recruitVisible, setRecruitVisible] = useState(() => {
     return localStorage.getItem('proclaw:recruit-visible') !== 'false';
@@ -53,6 +57,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener('proclaw:open-market', handler);
     return () => window.removeEventListener('proclaw:open-market', handler);
   }, []);
+
+  // 演示账号登录后自动注入测试数据包（产品 / 云商城 / AI Team / 插件）
+  // 幂等：内部通过 localStorage flag 判断首次执行
+  useEffect(() => {
+    if (!user || !isDemoAccount()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { bootstrapDemoData } = await import('../../lib/demoBootstrap');
+        if (cancelled) return;
+        await bootstrapDemoData({ silent: true });
+        // 通知各页面刷新
+        if (!cancelled && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('proclaw:teams-changed'));
+          window.dispatchEvent(new CustomEvent('proclaw:agents-changed'));
+        }
+      } catch (err) {
+        console.warn('[AppLayout] 演示数据引导失败：', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, user?.email]);
 
   return (
     <Box
@@ -98,6 +124,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
+      {/* 演示账号首次登录欢迎提示 */}
+      <WelcomeTour />
     </Box>
   );
 }

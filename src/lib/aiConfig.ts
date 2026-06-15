@@ -85,6 +85,10 @@ const DEFAULT_CONFIG: AIConfig = {
 
 const STORAGE_KEY = 'proclaw-ai-config';
 
+// 审计警告 SEC-P0-04: AI API Keys 存储在 localStorage 中，
+// 可被 DevTools 或 XSS 攻击读取。后续应迁移到 Tauri 安全存储
+// （如 tauri-plugin-store + 加密）或通过 Rust 后端代理访问。
+
 export async function getAIConfig(): Promise<AIConfig> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);

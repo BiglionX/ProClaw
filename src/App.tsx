@@ -1,87 +1,81 @@
-import { useEffect } from 'react';
-import { Box } from '@mui/material';
+import React, { useEffect, Suspense } from 'react';
+import { Box, CircularProgress } from '@mui/material';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/Layout/AppLayout';
 import { useAuthStore } from './lib/authStore';
-import AIDemoPage from './pages/AIDemoPage';
-import DataCenterPage from './pages/DataCenterPage';
-import FAQManagementPage from './pages/FAQManagementPage';
-import SupplyChainPage from './pages/SupplyChainPage';
-import LoginPage from './pages/LoginPage';
 import LoginDialog from './components/Auth/LoginDialog';
-import ProductsPage from './pages/ProductsPage';
-import RegisterPage from './pages/RegisterPage';
-import UserCenterPage from './pages/UserCenterPage';
-import SettingsPage from './pages/SettingsPage';
-import SetupPage from './pages/SetupPage';
 import { SetupWizard } from './components/SetupWizard';
-import TeamsPage from './pages/TeamsPage';
-import TestPage from './pages/TestPage';
-import UnrecognizedCommandsPage from './pages/UnrecognizedCommandsPage';
-import UserManagementPage from './pages/UserManagementPage';
-import AISalesOrderPage from './pages/AISalesOrderPage';
-import ContactsPage from './pages/ContactsPage';
-import SalesPage from './pages/SalesPage';
-import InventoryPage from './pages/InventoryPage';
-import DashboardPage from './pages/DashboardPage';
-import ChatPage from './pages/ChatPage';
-import MessagesPage from './pages/MessagesPage';
-import CallPage from './pages/CallPage';
 import IncomingCallDialog from './components/Call/IncomingCallDialog';
-import CloudStorePage from './pages/CloudStorePage';
-import ProjectDashboardPage from './pages/ProjectDashboardPage';
-import AgentManagerPage from './pages/AgentManagerPage';
-import FinanceAgentPage from './pages/FinanceAgentPage';
-import AIKnowledgePage from './pages/AIKnowledgePage';
-import CustomerServicePage from './pages/CustomerServicePage';
 import { useAppModeStore } from './config/appMode';
-import OperationsDashboard from './components/OperationsCenter/OperationsDashboard';
 
-// ========== 行业插件页面（Phase 4 新插件） ==========
-// 餐饮行业
-import PosPage from './pages/pos/PosPage';
-import TablesPage from './pages/pos/TablesPage';
-import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
-// 美业行业
-import AppointmentsPage from './pages/beauty/AppointmentsPage';
-import ServicesPage from './pages/beauty/ServicesPage';
-import EmployeesPage from './pages/beauty/EmployeesPage';
-import MarketingPage from './pages/beauty/MarketingPage';
-// 宠物行业
-import PetProfilesPage from './pages/pet/PetProfilesPage';
-import BoardingPage from './pages/pet/BoardingPage';
-import GroomingPage from './pages/pet/GroomingPage';
-// Cloud 版
-import TokenBillingPage from './pages/cloud/TokenBillingPage';
-import CloudBackupPage from './pages/cloud/CloudBackupPage';
-// 共用页面
-import MembersPage from './pages/MembersPage';
+// 审计修复 SEC-P2-01: 路由懒加载，减少首屏 bundle 大小
+// 所有页面组件均使用 React.lazy 动态导入
+const DataCenterPage = React.lazy(() => import('./pages/DataCenterPage'));
+const FAQManagementPage = React.lazy(() => import('./pages/FAQManagementPage'));
+const SupplyChainPage = React.lazy(() => import('./pages/SupplyChainPage'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const ProductsPage = React.lazy(() => import('./pages/ProductsPage'));
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
+const UserCenterPage = React.lazy(() => import('./pages/UserCenterPage'));
+const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
+const SetupPage = React.lazy(() => import('./pages/SetupPage'));
+const TeamsPage = React.lazy(() => import('./pages/TeamsPage'));
+const TestPage = React.lazy(() => import('./pages/TestPage'));
+const UnrecognizedCommandsPage = React.lazy(() => import('./pages/UnrecognizedCommandsPage'));
+const UserManagementPage = React.lazy(() => import('./pages/UserManagementPage'));
+const AISalesOrderPage = React.lazy(() => import('./pages/AISalesOrderPage'));
+const ContactsPage = React.lazy(() => import('./pages/ContactsPage'));
+const SalesPage = React.lazy(() => import('./pages/SalesPage'));
+const InventoryPage = React.lazy(() => import('./pages/InventoryPage'));
+const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
+const ChatPage = React.lazy(() => import('./pages/ChatPage'));
+const AgentProfilePage = React.lazy(() => import('./pages/AgentProfilePage'));
+const TeamProfilePage = React.lazy(() => import('./pages/TeamProfilePage'));
+const MessagesPage = React.lazy(() => import('./pages/MessagesPage'));
+const CallPage = React.lazy(() => import('./pages/CallPage'));
+const CloudStorePage = React.lazy(() => import('./pages/CloudStorePage'));
+const ProjectDashboardPage = React.lazy(() => import('./pages/ProjectDashboardPage'));
+const AgentManagerPage = React.lazy(() => import('./pages/AgentManagerPage'));
+const FinanceAgentPage = React.lazy(() => import('./pages/FinanceAgentPage'));
+const AIKnowledgePage = React.lazy(() => import('./pages/AIKnowledgePage'));
+const CustomerServicePage = React.lazy(() => import('./pages/CustomerServicePage'));
+const PluginStorePage = React.lazy(() => import('./pages/PluginStorePage'));
+const AIDemoPage = React.lazy(() => import('./pages/AIDemoPage'));
+const OperationsDashboard = React.lazy(() => import('./components/OperationsCenter/OperationsDashboard'));
 
-// ========== 八大新行业插件占位页面 ==========
-// 便利店
-import ConveniencePosPage from './pages/convenience/ConveniencePosPage';
-import DailySettlementPage from './pages/convenience/DailySettlementPage';
-// 酒水批发
-import LiquorCreditLedgerPage from './pages/liquor/CreditLedgerPage';
-import BatchManagePage from './pages/liquor/BatchManagePage';
-// 手机配件
-import QuotationsPage from './pages/phone/QuotationsPage';
-import DeviceModelsPage from './pages/phone/DeviceModelsPage';
-// 食材配送
-import FreshFoodDeliveryPage from './pages/freshfood/DeliveryPage';
-import RecurringOrderPage from './pages/freshfood/RecurringOrderPage';
-// 汽车配件
-import VehicleDbPage from './pages/autoparts/VehicleDbPage';
-import OeSearchPage from './pages/autoparts/OeSearchPage';
-// 五金
-import HwCreditLedgerPage from './pages/hardware/CreditLedgerPage';
-import CuttingCalcPage from './pages/hardware/CuttingCalcPage';
-// 装修材料
-import DecorationProjectsPage from './pages/decoration/ProjectsPage';
-import MaterialBomPage from './pages/decoration/MaterialBomPage';
-// 社区团购
-import GroupBuyPage from './pages/groupbuy/GroupBuyPage';
-import PickupVerifyPage from './pages/groupbuy/PickupVerifyPage';
+// 行业插件页面
+const PosPage = React.lazy(() => import('./pages/pos/PosPage'));
+const TablesPage = React.lazy(() => import('./pages/pos/TablesPage'));
+const KitchenDisplayPage = React.lazy(() => import('./pages/kitchen/KitchenDisplayPage'));
+const AppointmentsPage = React.lazy(() => import('./pages/beauty/AppointmentsPage'));
+const ServicesPage = React.lazy(() => import('./pages/beauty/ServicesPage'));
+const EmployeesPage = React.lazy(() => import('./pages/beauty/EmployeesPage'));
+const MarketingPage = React.lazy(() => import('./pages/beauty/MarketingPage'));
+const PetProfilesPage = React.lazy(() => import('./pages/pet/PetProfilesPage'));
+const BoardingPage = React.lazy(() => import('./pages/pet/BoardingPage'));
+const GroomingPage = React.lazy(() => import('./pages/pet/GroomingPage'));
+const TokenBillingPage = React.lazy(() => import('./pages/cloud/TokenBillingPage'));
+const CloudBackupPage = React.lazy(() => import('./pages/cloud/CloudBackupPage'));
+const MembersPage = React.lazy(() => import('./pages/MembersPage'));
+const ConveniencePosPage = React.lazy(() => import('./pages/convenience/ConveniencePosPage'));
+const DailySettlementPage = React.lazy(() => import('./pages/convenience/DailySettlementPage'));
+const LiquorCreditLedgerPage = React.lazy(() => import('./pages/liquor/CreditLedgerPage'));
+const BatchManagePage = React.lazy(() => import('./pages/liquor/BatchManagePage'));
+const QuotationsPage = React.lazy(() => import('./pages/phone/QuotationsPage'));
+const DeviceModelsPage = React.lazy(() => import('./pages/phone/DeviceModelsPage'));
+const FreshFoodDeliveryPage = React.lazy(() => import('./pages/freshfood/DeliveryPage'));
+const RecurringOrderPage = React.lazy(() => import('./pages/freshfood/RecurringOrderPage'));
+const VehicleDbPage = React.lazy(() => import('./pages/autoparts/VehicleDbPage'));
+const OeSearchPage = React.lazy(() => import('./pages/autoparts/OeSearchPage'));
+const HwCreditLedgerPage = React.lazy(() => import('./pages/hardware/CreditLedgerPage'));
+const CuttingCalcPage = React.lazy(() => import('./pages/hardware/CuttingCalcPage'));
+const DecorationProjectsPage = React.lazy(() => import('./pages/decoration/ProjectsPage'));
+const MaterialBomPage = React.lazy(() => import('./pages/decoration/MaterialBomPage'));
+const GroupBuyPage = React.lazy(() => import('./pages/groupbuy/GroupBuyPage'));
+const PickupVerifyPage = React.lazy(() => import('./pages/groupbuy/PickupVerifyPage'));
+
+// 演示数据新增：外贸柜台运营插件（ProClaw 1.0.0）
+const ForeignCounterPage = React.lazy(() => import('./pages/ForeignCounter/ForeignCounterPage'));
 
 // 添加启动日志
 console.log('App component rendering...');
@@ -123,6 +117,12 @@ function App() {
       {/* 全局弹窗 */}
       <IncomingCallDialog />
       <LoginDialog />
+      {/* 审计修复 SEC-P2-01: Suspense 包裹路由，支持懒加载 */}
+      <Suspense fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+          <CircularProgress />
+        </Box>
+      }>
       <Routes>
         {/* 公开路由 */}
         {/* 安装向导 - 独立无边框窗口使用 */}
@@ -241,6 +241,22 @@ function App() {
           }
         />
         <Route
+          path="/agent-profile/:agentId"
+          element={
+            <ProtectedRoute>
+              <AgentProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/team-profile/:teamId"
+          element={
+            <ProtectedRoute>
+              <TeamProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/call"
           element={
             <ProtectedRoute>
@@ -273,6 +289,24 @@ function App() {
           element={
             <ProtectedRoute>
               <CloudStorePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 外贸柜台运营插件路由（ProClaw 1.0.0） */}
+        <Route
+          path="/foreign-counter"
+          element={
+            <ProtectedRoute>
+              <ForeignCounterPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/foreign-counter/*"
+          element={
+            <ProtectedRoute>
+              <ForeignCounterPage />
             </ProtectedRoute>
           }
         />
@@ -342,6 +376,16 @@ function App() {
           element={
             <ProtectedRoute>
               <TeamsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 插件商店（独立路由，直接访问 /plugin-store） */}
+        <Route
+          path="/plugin-store"
+          element={
+            <ProtectedRoute>
+              <PluginStorePage />
             </ProtectedRoute>
           }
         />
@@ -637,6 +681,7 @@ function App() {
         {/* 测试页面 - 开发环境使用 */}
         <Route path="/test" element={<TestPage />} />
       </Routes>
+      </Suspense>
     </HashRouter>
   );
 }
