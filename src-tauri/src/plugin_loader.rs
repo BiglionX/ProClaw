@@ -10,6 +10,7 @@ use directories::ProjectDirs;
 ///   3. 命令注册到全局命令表，由统一调度器调用
 use libloading::{Library, Symbol};
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
@@ -129,8 +130,33 @@ impl PluginLoader {
         }
 
         // 加载动态库
-        // 审计修复 #2: 加载动态库在宿主进程空间内执行任意代码，
-        // 属于插件架构固有风险。生产环境应增加代码签名验证。
+        // 审计修复 SEC-P1-02: 加载前验证动态库文件完整性（SHA-256 哈希）
+        let hash_file = library_path.with_extension(
+            format!("{}.sha256", ext)
+        );
+        if hash_file.exists() {
+            let expected_hash = std::fs::read_to_string(&hash_file)
+                .map_err(|e| format!("读取哈希文件失败: {}", e))?
+                .trim()
+                .to_lowercase();
+            let file_bytes = std::fs::read(library_path)
+                .map_err(|e| format!("读取动态库文件失败: {}", e))?;
+            let actual_hash = hex::encode(sha2::Sha256::digest(&file_bytes));
+            if actual_hash != expected_hash {
+                return Err(format!(
+                    "插件 '{}' 动态库完整性校验失败！期望 SHA-256: {}, 实际: {}. 文件可能被篡改。",
+                    plugin_id, expected_hash, actual_hash
+                ));
+            }
+        } else {
+            // 无哈希文件时记录警告，后续版本应强制要求签名
+            eprintln!(
+                "[PluginLoader] WARNING: 插件 '{}' 的动态库缺少 SHA-256 哈希文件 ({}), 跳过完整性校验",
+                plugin_id,
+                hash_file.display()
+            );
+        }
+
         let library = unsafe {
             Library::new(library_path)
                 .map_err(|e| format!("加载动态库失败 ({}): {}", library_path.display(), e))?

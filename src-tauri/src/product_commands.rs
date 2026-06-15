@@ -1206,3 +1206,184 @@ pub fn downgrade_to_simple_mode(db: tauri::State<Mutex<Database>>) -> Result<(),
 
     Ok(())
 }
+
+// ==================== 演示数据 Seed 命令（ProClaw 1.0.0）====================
+// 演示账号 `boss / IamBigBoss` 首次登录时自动注入 20 个 iPhone 电池 SPU。
+// 同时写入简单模式 products 表与电商模式 product_spus / product_skus 表，保持一致。
+
+/// 单条演示产品定义
+struct DemoSeedItem {
+    id: &'static str,
+    spu_code: &'static str,
+    name: &'static str,
+    category_id: &'static str,
+    brand_id: &'static str,
+    unit: &'static str,
+    cost_price: f64,
+    sell_price: f64,
+    current_stock: i32,
+    min_stock: i32,
+    max_stock: i32,
+    barcode: &'static str,
+    sort_order: i32,
+    created_at: &'static str,
+}
+
+const DEMO_SEED_ITEMS: &[DemoSeedItem] = &[
+    DemoSeedItem { id: "spu_iphone15pm_bat",  spu_code: "SPU-2026-001", name: "iPhone 15 Pro Max 电池",  category_id: "cat_iphone15", brand_id: "brand_apple", unit: "块", cost_price: 80.0,  sell_price: 199.0, current_stock: 50, min_stock: 5, max_stock: 100, barcode: "6931234560001", sort_order: 1,  created_at: "2025-01-15T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone15pro_bat", spu_code: "SPU-2026-002", name: "iPhone 15 Pro 电池",      category_id: "cat_iphone15", brand_id: "brand_apple", unit: "块", cost_price: 70.0,  sell_price: 179.0, current_stock: 50, min_stock: 5, max_stock: 100, barcode: "6931234560002", sort_order: 2,  created_at: "2025-01-16T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone15_bat",    spu_code: "SPU-2026-003", name: "iPhone 15 电池",          category_id: "cat_iphone15", brand_id: "brand_apple", unit: "块", cost_price: 60.0,  sell_price: 159.0, current_stock: 60, min_stock: 5, max_stock: 100, barcode: "6931234560003", sort_order: 3,  created_at: "2025-01-17T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone15plus_bat",spu_code: "SPU-2026-004", name: "iPhone 15 Plus 电池",     category_id: "cat_iphone15", brand_id: "brand_apple", unit: "块", cost_price: 85.0,  sell_price: 189.0, current_stock: 45, min_stock: 5, max_stock: 100, barcode: "6931234560004", sort_order: 4,  created_at: "2025-01-18T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone14pm_bat",  spu_code: "SPU-2026-005", name: "iPhone 14 Pro Max 电池",  category_id: "cat_iphone14", brand_id: "brand_apple", unit: "块", cost_price: 75.0,  sell_price: 179.0, current_stock: 45, min_stock: 5, max_stock: 100, barcode: "6931234560005", sort_order: 5,  created_at: "2025-02-01T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone14pro_bat", spu_code: "SPU-2026-006", name: "iPhone 14 Pro 电池",      category_id: "cat_iphone14", brand_id: "brand_apple", unit: "块", cost_price: 65.0,  sell_price: 159.0, current_stock: 55, min_stock: 5, max_stock: 100, barcode: "6931234560006", sort_order: 6,  created_at: "2025-02-02T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone14_bat",    spu_code: "SPU-2026-007", name: "iPhone 14 电池",          category_id: "cat_iphone14", brand_id: "brand_apple", unit: "块", cost_price: 60.0,  sell_price: 149.0, current_stock: 60, min_stock: 5, max_stock: 100, barcode: "6931234560007", sort_order: 7,  created_at: "2025-02-03T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone14plus_bat",spu_code: "SPU-2026-008", name: "iPhone 14 Plus 电池",     category_id: "cat_iphone14", brand_id: "brand_apple", unit: "块", cost_price: 80.0,  sell_price: 169.0, current_stock: 40, min_stock: 5, max_stock: 100, barcode: "6931234560008", sort_order: 8,  created_at: "2025-02-04T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone13pm_bat",  spu_code: "SPU-2026-009", name: "iPhone 13 Pro Max 电池",  category_id: "cat_iphone13", brand_id: "brand_apple", unit: "块", cost_price: 70.0,  sell_price: 169.0, current_stock: 50, min_stock: 5, max_stock: 100, barcode: "6931234560009", sort_order: 9,  created_at: "2025-03-01T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone13pro_bat", spu_code: "SPU-2026-010", name: "iPhone 13 Pro 电池",      category_id: "cat_iphone13", brand_id: "brand_apple", unit: "块", cost_price: 60.0,  sell_price: 149.0, current_stock: 55, min_stock: 5, max_stock: 100, barcode: "6931234560010", sort_order: 10, created_at: "2025-03-02T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone13_bat",    spu_code: "SPU-2026-011", name: "iPhone 13 电池",          category_id: "cat_iphone13", brand_id: "brand_apple", unit: "块", cost_price: 55.0,  sell_price: 139.0, current_stock: 60, min_stock: 5, max_stock: 100, barcode: "6931234560011", sort_order: 11, created_at: "2025-03-03T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone13mini_bat",spu_code: "SPU-2026-012", name: "iPhone 13 mini 电池",     category_id: "cat_iphone13", brand_id: "brand_apple", unit: "块", cost_price: 45.0,  sell_price: 119.0, current_stock: 35, min_stock: 5, max_stock: 100, barcode: "6931234560012", sort_order: 12, created_at: "2025-03-04T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone12pm_bat",  spu_code: "SPU-2026-013", name: "iPhone 12 Pro Max 电池",  category_id: "cat_iphone12", brand_id: "brand_apple", unit: "块", cost_price: 65.0,  sell_price: 159.0, current_stock: 45, min_stock: 5, max_stock: 100, barcode: "6931234560013", sort_order: 13, created_at: "2025-04-01T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone12pro_bat", spu_code: "SPU-2026-014", name: "iPhone 12 Pro 电池",      category_id: "cat_iphone12", brand_id: "brand_apple", unit: "块", cost_price: 55.0,  sell_price: 139.0, current_stock: 55, min_stock: 5, max_stock: 100, barcode: "6931234560014", sort_order: 14, created_at: "2025-04-02T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone12_bat",    spu_code: "SPU-2026-015", name: "iPhone 12 电池",          category_id: "cat_iphone12", brand_id: "brand_apple", unit: "块", cost_price: 55.0,  sell_price: 129.0, current_stock: 60, min_stock: 5, max_stock: 100, barcode: "6931234560015", sort_order: 15, created_at: "2025-04-03T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone12mini_bat",spu_code: "SPU-2026-016", name: "iPhone 12 mini 电池",     category_id: "cat_iphone12", brand_id: "brand_apple", unit: "块", cost_price: 40.0,  sell_price: 109.0, current_stock: 40, min_stock: 5, max_stock: 100, barcode: "6931234560016", sort_order: 16, created_at: "2025-04-04T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone11pm_bat",  spu_code: "SPU-2026-017", name: "iPhone 11 Pro Max 电池",  category_id: "cat_iphone11", brand_id: "brand_apple", unit: "块", cost_price: 60.0,  sell_price: 149.0, current_stock: 40, min_stock: 5, max_stock: 100, barcode: "6931234560017", sort_order: 17, created_at: "2025-05-01T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone11pro_bat", spu_code: "SPU-2026-018", name: "iPhone 11 Pro 电池",      category_id: "cat_iphone11", brand_id: "brand_apple", unit: "块", cost_price: 50.0,  sell_price: 129.0, current_stock: 50, min_stock: 5, max_stock: 100, barcode: "6931234560018", sort_order: 18, created_at: "2025-05-02T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphone11_bat",    spu_code: "SPU-2026-019", name: "iPhone 11 电池",          category_id: "cat_iphone11", brand_id: "brand_apple", unit: "块", cost_price: 50.0,  sell_price: 119.0, current_stock: 60, min_stock: 5, max_stock: 100, barcode: "6931234560019", sort_order: 19, created_at: "2025-05-03T00:00:00Z" },
+    DemoSeedItem { id: "spu_iphonese3_bat",   spu_code: "SPU-2026-020", name: "iPhone SE (第三代) 电池", category_id: "cat_iphonese", brand_id: "brand_apple", unit: "块", cost_price: 25.0,  sell_price: 59.0,  current_stock: 45, min_stock: 5, max_stock: 100, barcode: "6931234560020", sort_order: 20, created_at: "2025-06-01T00:00:00Z" },
+];
+
+/// 幂等插入 20 个演示产品（同时写入 simple / ecommerce 两套表）
+/// 返回实际新增的数量（已存在则不计数）。
+#[tauri::command]
+pub fn seed_demo_products(
+    db: tauri::State<Mutex<Database>>,
+    force: Option<bool>,
+) -> Result<i32, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let force = force.unwrap_or(false);
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let mut inserted = 0i32;
+
+    for item in DEMO_SEED_ITEMS {
+        // 幂等检查：products 表
+        let exists_simple: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 OR sku = ?2)",
+                params![item.id, item.spu_code],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+        // 幂等检查：product_spus 表
+        let exists_spu: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM product_spus WHERE id = ?1 OR spu_code = ?2)",
+                params![item.id, item.spu_code],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+
+        if !force && (exists_simple || exists_spu) {
+            continue;
+        }
+
+        // 1) 插入 simple 模式 products 表（库存管理页可见）
+        if force || !exists_simple {
+            tx.execute(
+                "INSERT OR REPLACE INTO products (id, sku, name, description, category_id, brand_id, unit,
+                 cost_price, sell_price, min_stock, max_stock, current_stock,
+                 image_url, barcode, is_active, metadata, sync_status, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 1, ?15, 'synced',
+                         COALESCE(NULLIF(?16, ''), datetime('now')),
+                         COALESCE(NULLIF(?16, ''), datetime('now')))",
+                params![
+                    item.id,
+                    item.spu_code,
+                    item.name,
+                    Option::<String>::None,                                     // description
+                    item.category_id,
+                    item.brand_id,
+                    item.unit,
+                    item.cost_price,
+                    item.sell_price,
+                    item.min_stock,
+                    item.max_stock,
+                    item.current_stock,
+                    Option::<String>::None,                                     // image_url
+                    item.barcode,
+                    Some(format!("{{\"demo_seed\":true,\"spu_code\":\"{}\"}}", item.spu_code)), // metadata
+                    item.created_at,
+                ],
+            ).map_err(|e| format!("seed products 失败 ({}): {}", item.spu_code, e))?;
+        }
+
+        // 2) 插入电商模式 product_spus
+        if force || !exists_spu {
+            tx.execute(
+                "INSERT OR REPLACE INTO product_spus (id, spu_code, name, description, category_id, brand_id, unit,
+                 is_on_sale, status, metadata, sync_status, created_at, updated_at, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'on_sale', ?8, 'synced',
+                         COALESCE(NULLIF(?9, ''), datetime('now')),
+                         COALESCE(NULLIF(?9, ''), datetime('now')),
+                         ?10)",
+                params![
+                    item.id,
+                    item.spu_code,
+                    item.name,
+                    Option::<String>::None,
+                    item.category_id,
+                    item.brand_id,
+                    item.unit,
+                    Some(format!("{{\"demo_seed\":true}}")),
+                    item.created_at,
+                    item.sort_order,
+                ],
+            ).map_err(|e| format!("seed product_spus 失败 ({}): {}", item.spu_code, e))?;
+
+            // 3) 插入默认 SKU（标准版）
+            let sku_id = format!("{}_sku", item.id);
+            let sku_code = item.spu_code.replace("SPU-", "SKU-");
+            let specifications = "{\"标准\": \"标准版\"}";
+            tx.execute(
+                "INSERT OR REPLACE INTO product_skus (id, spu_id, sku_code, specifications, spec_text,
+                 cost_price, sell_price, current_stock, min_stock, max_stock, barcode,
+                 is_default, sort_order, is_active, sync_status)
+                 VALUES (?1, ?2, ?3, ?4, '标准版', ?5, ?6, ?7, ?8, ?9, ?10, 1, 0, 1, 'synced')",
+                params![
+                    sku_id,
+                    item.id,
+                    sku_code,
+                    specifications,
+                    item.cost_price,
+                    item.sell_price,
+                    item.current_stock,
+                    item.min_stock,
+                    item.max_stock,
+                    item.barcode,
+                ],
+            ).map_err(|e| format!("seed product_skus 失败 ({}): {}", item.spu_code, e))?;
+        }
+
+        inserted += 1;
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(inserted)
+}
+
+/// 标记云商城为「演示数据」（仅后端记录，不影响 UI）
+#[tauri::command]
+pub fn mark_store_as_demo(
+    db: tauri::State<Mutex<Database>>,
+    store_id: String,
+) -> Result<(), String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    // 检查 cloud_stores 表是否存在 theme_data 列，若不存在则跳过（保持向后兼容）
+    let _ = conn.execute(
+        "UPDATE cloud_stores SET theme_data = json_insert(COALESCE(theme_data, '{}'), '$.is_demo_data', 1) WHERE id = ?1",
+        params![store_id],
+    );
+    Ok(())
+}

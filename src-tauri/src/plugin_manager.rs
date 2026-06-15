@@ -674,23 +674,23 @@ pub fn get_plugin_migration_history(
 // ============ 插件数据库查询/写入 API ============
 
 /// 插件数据库只读查询（仅允许 SELECT）
-/// 审计修复 #6: 增强 SQL 注入防护 - 使用预编译校验 + 多行注释绕过防护
+/// 审计修复 SEC-P1-03/P2-05: 增强 SQL 注入防护 + 强制权限检查
 #[tauri::command]
 pub fn plugin_db_query(
     sql: String,
     params: Vec<String>,
+    plugin_id: Option<String>,
     db: tauri::State<'_, std::sync::Mutex<crate::database::Database>>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    // 安全检查：仅允许 SELECT，防范注释绕过攻击
-    // 移除所有 SQL 注释后再检查
-    let sanitized = sql
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            !trimmed.starts_with("--") && !trimmed.starts_with("/*") && !trimmed.starts_with('*')
-        })
-        .collect::<Vec<&str>>()
-        .join("\n");
+    // 审计修复 SEC-P2-05: 强制插件权限检查
+    if let Some(ref pid) = plugin_id {
+        if !check_plugin_permission(pid, "database:read") {
+            return Err(format!("插件 '{}' 缺少 database:read 权限", pid));
+        }
+    }
+
+    // 审计修复 SEC-P1-03: 完整剥离 SQL 注释（包括行注释和块注释）
+    let sanitized = strip_sql_comments_plugin(&sql);
     let trimmed = sanitized.trim().to_uppercase();
     if !trimmed.starts_with("SELECT") && !trimmed.starts_with("WITH") {
         return Err("插件数据库查询仅允许 SELECT 或 WITH 语句".to_string());
@@ -740,13 +740,21 @@ pub fn plugin_db_query(
 }
 
 /// 插件数据库写入操作（仅允许 INSERT/UPDATE/DELETE/CREATE TABLE IF NOT EXISTS）
-/// 审计修复 #6: 禁止 DROP TABLE/ALTER TABLE/PRAGMA/TRUNCATE 等危险操作
+/// 审计修复 SEC-P2-05: 强制权限检查 + 禁止危险操作
 #[tauri::command]
 pub fn plugin_db_execute(
     sql: String,
     params: Vec<String>,
+    plugin_id: Option<String>,
     db: tauri::State<'_, std::sync::Mutex<crate::database::Database>>,
 ) -> Result<u64, String> {
+    // 审计修复 SEC-P2-05: 强制插件权限检查
+    if let Some(ref pid) = plugin_id {
+        if !check_plugin_permission(pid, "database:write") {
+            return Err(format!("插件 '{}' 缺少 database:write 权限", pid));
+        }
+    }
+
     // 安全检查：仅允许安全的写操作
     let trimmed = sql.trim().to_uppercase();
     let allowed = [
@@ -1216,4 +1224,58 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+// ============ SQL 安全工具函数 (审计修复 SEC-P1-03) ============
+
+/// 去除 SQL 中的所有注释（行注释 -- 和块注释 /* */）
+fn strip_sql_comments_plugin(sql: &str) -> String {
+    let mut result = String::with_capacity(sql.len());
+    let chars: Vec<char> = sql.chars().collect();
+    let mut i = 0;
+    let mut in_string = false;
+    let mut string_char = '"';
+
+    while i < chars.len() {
+        if in_string {
+            result.push(chars[i]);
+            if chars[i] == string_char {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+
+        if chars[i] == '\'' || chars[i] == '"' {
+            in_string = true;
+            string_char = chars[i];
+            result.push(chars[i]);
+            i += 1;
+            continue;
+        }
+
+        if i + 1 < chars.len() && chars[i] == '-' && chars[i + 1] == '-' {
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+            result.push(' ');
+            continue;
+        }
+
+        if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '*' {
+            i += 2;
+            while i + 1 < chars.len() && !(chars[i] == '*' && chars[i + 1] == '/') {
+                i += 1;
+            }
+            if i + 1 < chars.len() {
+                i += 2;
+            }
+            result.push(' ');
+            continue;
+        }
+
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
 }

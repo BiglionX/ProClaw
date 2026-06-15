@@ -181,11 +181,18 @@ pub async fn recognize_order(
         call_local_ocr(&image_bytes, endpoint).await
     } else {
         // cloud (default) - DeepSeek
-        let api_key = payload
-            .api_key
-            .clone()
+        // 审计修复 SEC-P1-07: 优先使用服务端环境变量中的 API Key，而非客户端提供的
+        // 客户端提供的 api_key 仅作为回退，并在生产环境中记录警告
+        let api_key = std::env::var("DEEPSEEK_API_KEY")
+            .ok()
             .filter(|k| !k.is_empty())
-            .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
+            .or_else(|| {
+                if payload.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
+                    eprintln!("[Security] WARNING: AI API key provided via HTTP request body. \
+                              This is insecure - configure DEEPSEEK_API_KEY env var instead.");
+                }
+                payload.api_key.clone().filter(|k| !k.is_empty())
+            })
             .unwrap_or_default();
         let api_base = payload
             .api_base

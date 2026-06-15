@@ -2,10 +2,11 @@
 // Phase 3: 实现实时消息通信、消息路由、持久化、离线消息推送
 
 use crate::api::AppState;
+use crate::api::auth::Claims;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        ConnectInfo, Query, State,
+        ConnectInfo, Extension, Query, State,
     },
     response::IntoResponse,
 };
@@ -188,17 +189,29 @@ struct WsResponse {
 // ============================================================
 
 /// WebSocket 升级处理
-/// 从 query 参数提取 token 和 user_id
+/// 审计修复 SEC-P1-01: 使用中间件注入的 Claims 验证身份，而非信任 query 参数
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(claims): Extension<Claims>,
 ) -> impl IntoResponse {
     println!("[WS] Connection request from: {:?}", addr);
 
-    let token = params.get("token").cloned();
-    let user_id = params.get("user_id").cloned();
+    // 审计修复 SEC-P1-01: 从 JWT Claims 提取 user_id，而非信任客户端提供的 query 参数
+    let user_id = Some(claims.sub.clone());
+    let token = None; // token 已经由中间件验证，不再传递给 handler
+
+    // 记录客户端提供的 user_id 以检测潜在身份伪造尝试
+    if let Some(client_uid) = params.get("user_id") {
+        if client_uid != &claims.sub {
+            eprintln!(
+                "[WS] SECURITY: client claimed user_id='{}' but JWT verified user_id='{}'",
+                client_uid, claims.sub
+            );
+        }
+    }
 
     ws.on_upgrade(move |socket| handle_websocket(socket, state, user_id, token))
 }
@@ -212,11 +225,11 @@ async fn handle_websocket(
 ) {
     use futures_util::{SinkExt, StreamExt};
 
-    // ---- 认证: 从 query 参数获取 user_id ----
+    // 审计修复 SEC-P1-01: user_id 来自 JWT Claims 而非客户端 query 参数
     let user_id = match user_id {
         Some(uid) if !uid.is_empty() => uid,
         _ => {
-            println!("[WS] Connection rejected: no user_id");
+            println!("[WS] Connection rejected: no verified user_id");
             return;
         }
     };
@@ -268,11 +281,44 @@ async fn handle_websocket(
         eprintln!("[WS] Failed to send connected notification to {}", user_id);
     }
 
+    // 审计修复 SEC-P2-02: 消息速率和大小限制
+    const MAX_MSG_SIZE: usize = 64 * 1024; // 64KB
+    const MAX_MSG_PER_SECOND: u32 = 10;
+    let mut msg_count: u32 = 0;
+    let mut window_start = std::time::Instant::now();
+
     // ---- 主消息循环 ----
     while let Some(msg_result) = ws_receiver.next().await {
         match msg_result {
             Ok(Message::Text(text)) => {
+                // 审计修复 SEC-P2-02: 消息大小限制
                 let text_str = text.to_string();
+                if text_str.len() > MAX_MSG_SIZE {
+                    let _ = self_tx.send(
+                        serde_json::json!({
+                            "type": "error",
+                            "error": format!("Message too large: {} bytes (max {})", text_str.len(), MAX_MSG_SIZE)
+                        }).to_string()
+                    );
+                    continue;
+                }
+
+                // 审计修复 SEC-P2-02: 速率限制 (10 msg/s)
+                let now = std::time::Instant::now();
+                if now.duration_since(window_start).as_secs() >= 1 {
+                    msg_count = 0;
+                    window_start = now;
+                }
+                msg_count += 1;
+                if msg_count > MAX_MSG_PER_SECOND {
+                    let _ = self_tx.send(
+                        serde_json::json!({
+                            "type": "error",
+                            "error": "Rate limit exceeded: max 10 messages per second"
+                        }).to_string()
+                    );
+                    continue;
+                }
 
                 // 心跳处理
                 if text_str.trim() == "ping" {

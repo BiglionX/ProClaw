@@ -60,6 +60,7 @@ pub mod sales_orders;
 pub mod store;
 pub mod subscriptions;
 pub mod suppliers;
+pub mod sync_ws;
 pub mod users;
 pub mod websocket;
 
@@ -81,6 +82,11 @@ pub fn create_router(state: AppState) -> axum::Router {
             "/api/invitations/accept_employee",
             axum::routing::post(invitations::accept_employee_invitation),
         );
+
+    // 局域网同步 WebSocket（无需 JWT，使用配对码鉴权）
+    // PRD v11.0 第4节：局域网直连同步
+    let sync_ws_route = axum::Router::new()
+        .route("/proclaw/sync", axum::routing::get(sync_ws::sync_websocket_handler));
 
     // 需要认证的端点
     let protected_routes = axum::Router::new()
@@ -380,16 +386,24 @@ pub fn create_router(state: AppState) -> axum::Router {
         .route("/ws/chat", axum::routing::get(websocket::websocket_handler))
         .layer(middleware::from_fn(auth_middleware_ws));
 
+    // 审计修复 SEC-P0-02: CORS 限制为 localhost 来源，防止任意外部域名访问
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::AllowOrigin::predicate(|origin, _parts| {
+            let origin_str = origin.to_str().unwrap_or("");
+            origin_str == "tauri://localhost"
+                || origin_str == "https://tauri.localhost"
+                || origin_str.starts_with("http://localhost:")
+                || origin_str.starts_with("http://127.0.0.1:")
+        }))
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     // 合并所有路由
     let app = public_routes
         .merge(protected_routes)
         .merge(websocket_route)
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any),
-        )
+        .merge(sync_ws_route)
+        .layer(cors)
         .with_state(state);
 
     app

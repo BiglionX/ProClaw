@@ -1,6 +1,40 @@
 use rusqlite::{params, Connection, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+/// 清除目录的 NTFS Compressed 属性（Windows 专用）
+///
+/// **背景**：SQLite 的 WAL 模式与 NTFS Compressed 卷不兼容。
+/// 当 db 文件所在目录被 NSIS 安装器或 Windows 设置了 Compressed 属性后，
+/// SQLite 会自动将连接降级为 readonly 模式，导致后续的 PRAGMA 报错
+/// "attempt to write a readonly database"（与 v1.0.0 白屏问题直接相关）。
+///
+/// 使用 Windows 自带的 `compact /U` 命令（不是 `fsutil`，
+/// `fsutil file setattrib` 在 Windows 中并不存在）。
+/// compact /U 取消当前目录及子目录的 NTFS 文件压缩。
+#[cfg(windows)]
+fn clear_ntfs_compressed_attribute(path: &Path) {
+    let path_str = path.as_os_str().to_string_lossy().to_string();
+    // compact /U <path> 取消路径下所有文件的 NTFS 压缩
+    let result = std::process::Command::new("compact")
+        .args(["/U", "/S", &path_str, "/Q", "/I", "/F"])
+        .output();
+    match result {
+        Ok(out) if out.status.success() => {
+            eprintln!("✓ 已清除目录 NTFS Compressed 属性: {}", path_str);
+        }
+        Ok(out) => {
+            eprintln!(
+                "⚠️ 清除 NTFS Compressed 属性失败 (exit={:?}): {}",
+                out.status.code(),
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+        Err(e) => {
+            eprintln!("⚠️ 无法执行 compact: {}（可能不在 Windows 环境）", e);
+        }
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
@@ -23,12 +57,30 @@ impl Database {
         // 确保目录存在
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent)?;
+
+            // 修复 v1.0.0 白屏问题: 移除 NTFS Compressed 属性
+            // SQLite WAL 模式与 NTFS Compressed 卷不兼容，会导致 readonly 错误
+            // （NSIS 安装器可能在 AppData 上设置了 Compressed）
+            #[cfg(windows)]
+            clear_ntfs_compressed_attribute(parent);
+        }
+
+        // 诊断 v1.0.0 白屏问题: 测试当前进程能否在 data 目录写文件
+        // 如果这一行失败，说明 Tauri main 进程 token 受限导致 Connection::open 失败
+        #[cfg(windows)]
+        {
+            let test_path = db_path.with_extension("write_test.txt");
+            match std::fs::write(&test_path, b"main_proc_can_write") {
+                Ok(_) => eprintln!("✓ [DIAG] Main 进程能写文件: {:?}", test_path),
+                Err(e) => eprintln!("✗ [DIAG] Main 进程写文件失败: {} (path: {:?})", e, test_path),
+            }
         }
 
         let conn = Connection::open(&db_path)?;
 
-        // 启用 WAL 模式以提高并发性能
-        conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+        // 改用 DELETE 模式（v3 fix）: 避免 WAL 模式的 -shm/-wal 辅助文件
+        // 在受限 token 下更可靠（只需要一个 db 主文件）
+        conn.execute_batch("PRAGMA journal_mode=DELETE;")?;
         // 设置 busy timeout 避免写锁冲突直接报错（5秒等待容忍）
         conn.execute_batch("PRAGMA busy_timeout=5000;")?;
         // 启用外键约束
@@ -116,6 +168,227 @@ impl Database {
         if let Err(e) = self.conn.execute_batch(nvwax_migration) {
             eprintln!("[DB Migration WARNING] 028_nvwax_usage_logs: {}", e);
             migration_errors.push(format!("028: {}", e));
+        }
+
+        // 运行迁移：Agent 个性化配置（昵称/头像覆盖）
+        let agent_profile_migration =
+            include_str!("../../database/migrations/041_agent_profile_overrides.sql");
+        if let Err(e) = self.conn.execute_batch(agent_profile_migration) {
+            eprintln!("[DB Migration WARNING] 041_agent_profile_overrides: {}", e);
+            migration_errors.push(format!("041: {}", e));
+        }
+
+        // 运行迁移：给缺 deleted_at 列的表补充软删除列（v1.0.0+tray 补丁）
+        // 原因：销售/采购/联系人代码使用 WHERE deleted_at IS NULL，但 src/db/schema.sql
+        // 原始定义里没建这个列。SQLite 不支持 ADD COLUMN IF NOT EXISTS，
+        // 错误被静默吞掉（重复列名时不影响后续迁移）。
+        // v1.0.0+tray+db+contacts+msgs: 补齐 messages / brands / product_categories
+        //                              / product_skus / purchase_returns / sales_returns
+        // v1.0.0+tray+db+contacts+msgs+safety+view: 拆成独立 try/catch
+        //                                          避免一条失败影响其他表的迁移
+        let deleted_at_tables = [
+            "users", "customers", "products", "purchase_orders", "sales_orders",
+            "suppliers", "messages", "brands", "product_categories", "product_skus",
+            "purchase_returns", "sales_returns",
+        ];
+        for table in deleted_at_tables.iter() {
+            let sql = format!("ALTER TABLE {} ADD COLUMN deleted_at TIMESTAMP;", table);
+            match self.conn.execute_batch(&sql) {
+                Ok(_) => {}
+                Err(e) => {
+                    // 重复列名错误（如 "duplicate column name: deleted_at"）视为成功
+                    let msg = e.to_string();
+                    if msg.contains("duplicate column") {
+                        eprintln!("[DB Migration INFO] {}.deleted_at 已存在，跳过", table);
+                    } else {
+                        eprintln!("[DB Migration WARNING] ALTER TABLE {} ADD deleted_at: {}", table, msg);
+                    }
+                }
+            }
+        }
+
+        // 运行迁移：重建 v_spu_inventory 视图为完整 16 列版本
+        // v1.0.0+tray+db+contacts+msgs+safety+view: 修复 get_product_spus 报错
+        //   "no such column: description / category_id / brand_id / unit / is_on_sale
+        //    / metadata / created_at / updated_at"
+        // SQLite 不支持 CREATE OR REPLACE VIEW，必须先 DROP 再 CREATE
+        if let Err(e) = self.conn.execute_batch(
+            "DROP VIEW IF EXISTS v_spu_inventory;
+             CREATE VIEW v_spu_inventory AS
+             SELECT
+                 spu.id,
+                 spu.spu_code,
+                 spu.name,
+                 spu.description,
+                 spu.category_id,
+                 spu.brand_id,
+                 spu.unit,
+                 spu.is_on_sale,
+                 spu.status,
+                 spu.metadata,
+                 COUNT(sku.id) as sku_count,
+                 COALESCE(SUM(sku.current_stock), 0) as total_stock,
+                 COALESCE(MIN(sku.sell_price), 0) as min_price,
+                 COALESCE(MAX(sku.sell_price), 0) as max_price,
+                 spu.created_at,
+                 spu.updated_at
+             FROM product_spus spu
+             LEFT JOIN product_skus sku ON spu.id = sku.spu_id AND sku.deleted_at IS NULL
+             WHERE spu.deleted_at IS NULL
+             GROUP BY spu.id, spu.spu_code, spu.name, spu.description, spu.category_id,
+                      spu.brand_id, spu.unit, spu.is_on_sale, spu.status, spu.metadata,
+                      spu.created_at, spu.updated_at;",
+        ) {
+            eprintln!("[DB Migration WARNING] recreate_v_spu_inventory: {}", e);
+            migration_errors.push(format!("v_spu_inventory: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] v_spu_inventory 视图已重建为 16 列版本");
+        }
+
+        // 运行迁移：iPhone 电池演示案例数据（v1.0.0+tray+db+contacts+msgs+safety+view+demo 补丁）
+        // 原因：模拟账号依赖 20 个 iPhone 电池 SPU + 对应 SKU + 图片作为初始案例数据。
+        //       src-tauri 此前未加载 seed_iphone_batteries.sql，导致新装数据库空空如也。
+        // SQL 使用 INSERT OR IGNORE 幂等插入：老用户重复运行不会报错。
+        let iphone_seed = include_str!("../../database/seed_iphone_batteries.sql");
+        match self.conn.execute_batch(iphone_seed) {
+            Ok(_) => {
+                eprintln!("✓ [DB Migration] iPhone 电池案例数据已载入（20 个 SPU + 20 个 SKU + 20 张图片）");
+            }
+            Err(e) => {
+                // 部分失败是允许的（例如某条 INSERT 违反约束），记录警告
+                eprintln!("[DB Migration WARNING] seed_iphone_batteries (部分插入可忽略): {}", e);
+                migration_errors.push(format!("seed_iphone_batteries: {}", e));
+            }
+        }
+
+        // 运行迁移：云商城表（v1.0.0+tray+db+contacts+msgs 补丁）
+        // 原因：src/db/migrations/007_cloud_store.sql 未被 database.rs 加载，
+        // 启动时调用 get_cloud_store / create_cloud_store 会报
+        // "no such table: cloud_stores"。这里内联一份 SQLite 兼容版本。
+        // 包含：cloud_stores / cloud_store_themes / cloud_sync_log / cloud_orders
+        //       + product_spu 云同步字段（云同步状态、版本号、是否上架）
+        if let Err(e) = self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS cloud_stores (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                subdomain TEXT UNIQUE NOT NULL,
+                custom_domain TEXT,
+                api_key TEXT NOT NULL,
+                status TEXT DEFAULT 'active' CHECK(status IN ('inactive', 'active', 'expired', 'suspended')),
+                plan_type TEXT DEFAULT 'free' CHECK(plan_type IN ('free', 'basic', 'professional', 'enterprise')),
+                expires_at INTEGER,
+                theme_data TEXT DEFAULT '{}',
+                created_at INTEGER DEFAULT (strftime('%s','now') * 1000),
+                updated_at INTEGER DEFAULT (strftime('%s','now') * 1000),
+                deleted_at TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_cloud_stores_user ON cloud_stores(user_id);
+            CREATE INDEX IF NOT EXISTS idx_cloud_stores_subdomain ON cloud_stores(subdomain);
+
+            -- 幂等迁移：给已存在的 cloud_stores 表补充 theme_data 列（mark_store_as_demo 需要）
+            -- SQLite 不支持 IF NOT EXISTS 给 ADD COLUMN，吞掉「重复列名」错误即可
+            -- 这里用单独 execute，每个独立 try/catch
+
+            CREATE TABLE IF NOT EXISTS cloud_store_themes (
+                store_id TEXT PRIMARY KEY REFERENCES cloud_stores(id) ON DELETE CASCADE,
+                primary_color TEXT DEFAULT '#1890ff',
+                secondary_color TEXT DEFAULT '#f5f5f5',
+                layout_style TEXT DEFAULT 'card' CHECK(layout_style IN ('card', 'list')),
+                font_family TEXT DEFAULT 'PingFang SC, Microsoft YaHei, sans-serif',
+                logo_url TEXT,
+                banner_images TEXT DEFAULT '[]',
+                theme_data TEXT DEFAULT '{}',
+                updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+            );
+
+            CREATE TABLE IF NOT EXISTS cloud_sync_log (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES cloud_stores(id) ON DELETE CASCADE,
+                sync_type TEXT NOT NULL CHECK(sync_type IN ('full', 'incremental')),
+                status TEXT NOT NULL CHECK(status IN ('pending', 'syncing', 'success', 'failed')),
+                message TEXT,
+                items_synced INTEGER DEFAULT 0,
+                created_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+            );
+            CREATE INDEX IF NOT EXISTS idx_cloud_sync_log_store ON cloud_sync_log(store_id);
+            CREATE INDEX IF NOT EXISTS idx_cloud_sync_log_created ON cloud_sync_log(created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS cloud_orders (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES cloud_stores(id) ON DELETE CASCADE,
+                order_no TEXT UNIQUE NOT NULL,
+                customer_name TEXT,
+                customer_phone TEXT,
+                customer_address TEXT,
+                total_amount REAL DEFAULT 0,
+                status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'paid', 'shipped', 'delivered', 'cancelled')),
+                payment_method TEXT CHECK(payment_method IN ('wechat', 'alipay')),
+                items TEXT NOT NULL DEFAULT '[]',
+                callback_status TEXT DEFAULT 'pending' CHECK(callback_status IN ('pending', 'success', 'failed')),
+                callback_message TEXT,
+                created_at INTEGER DEFAULT (strftime('%s','now') * 1000),
+                updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+            );
+            CREATE INDEX IF NOT EXISTS idx_cloud_orders_store ON cloud_orders(store_id);
+            CREATE INDEX IF NOT EXISTS idx_cloud_orders_status ON cloud_orders(status);
+            CREATE INDEX IF NOT EXISTS idx_cloud_orders_created ON cloud_orders(created_at DESC);
+
+            -- 给 product_spu 补云同步相关字段（幂等 ALTER，错误被吞掉）
+            -- 错误被外层静默：重复列名时不影响后续迁移。",
+        ) {
+            eprintln!("[DB Migration WARNING] cloud_stores_inline: {}", e);
+            migration_errors.push(format!("cloud_stores_inline: {}", e));
+        }
+        // 单独跑 product_spus 的 ALTER（独立 try/catch，避免与 cloud_stores 创建耦合）
+        // 重要：云商城查的是 product_spus（复数），不是 product_spu（单数）！
+        // 这里补上云同步相关字段，让 get_store_stats / get_syncable_products 能正常查到。
+        if let Err(e) = self.conn.execute_batch(
+            "ALTER TABLE product_spus ADD COLUMN cloud_sync_status TEXT DEFAULT 'synced';
+             ALTER TABLE product_spus ADD COLUMN cloud_sync_version INTEGER DEFAULT 1;
+             ALTER TABLE product_spus ADD COLUMN is_cloud_visible INTEGER DEFAULT 1;
+             ALTER TABLE product_spus ADD COLUMN cloud_sync_time TEXT;
+             CREATE INDEX IF NOT EXISTS idx_product_spus_cloud_sync ON product_spus(cloud_sync_status);
+             CREATE INDEX IF NOT EXISTS idx_product_spus_cloud_visible ON product_spus(is_cloud_visible);",
+        ) {
+            eprintln!("[DB Migration INFO] product_spus_cloud_fields: {}", e);
+        }
+
+        // 保留对老 product_spu（单数）表的兼容 ALTER（幂等，错误被吞掉）
+        let _ = self.conn.execute_batch(
+            "ALTER TABLE product_spu ADD COLUMN cloud_sync_status TEXT DEFAULT 'pending';
+             ALTER TABLE product_spu ADD COLUMN cloud_sync_version INTEGER DEFAULT 0;
+             ALTER TABLE product_spu ADD COLUMN is_cloud_visible INTEGER DEFAULT 0;",
+        );
+
+        // 幂等迁移：给已存在的 cloud_stores 表补充 theme_data 列
+        // mark_store_as_demo / get_store_stats 需要读取这个列
+        // SQLite ADD COLUMN 没有 IF NOT EXISTS，吞掉「重复列名」错误即可
+        let _ = self.conn.execute(
+            "ALTER TABLE cloud_stores ADD COLUMN theme_data TEXT DEFAULT '{}'",
+            [],
+        );
+
+        // 运行迁移：商务秘书 BAP 表（SQLite 兼容版本）
+        // 原 PostgreSQL 版 025_secretary_bap.sql 用了 JSON 类型和 EXTRACT(EPOCH FROM NOW())
+        // 在 SQLite 中不可用，这里内联一个等价的 SQLite 版本
+        if let Err(e) = self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS secretary_bap (
+                id TEXT PRIMARY KEY,
+                profile_type TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                confidence REAL DEFAULT 0.5,
+                source TEXT DEFAULT 'observed',
+                last_matched_at INTEGER,
+                created_at INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER)),
+                updated_at INTEGER DEFAULT (CAST(strftime('%s', 'now') AS INTEGER))
+            );
+            CREATE INDEX IF NOT EXISTS idx_secretary_bap_profile_type ON secretary_bap(profile_type);
+            CREATE INDEX IF NOT EXISTS idx_secretary_bap_source ON secretary_bap(source);
+            CREATE INDEX IF NOT EXISTS idx_secretary_bap_updated ON secretary_bap(updated_at);",
+        ) {
+            eprintln!("[DB Migration WARNING] secretary_bap: {}", e);
+            migration_errors.push(format!("secretary_bap: {}", e));
         }
 
         // 运行迁移：采购退货表

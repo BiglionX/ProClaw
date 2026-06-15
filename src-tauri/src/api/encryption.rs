@@ -1,44 +1,14 @@
-use crate::api::AppState;
 use crate::utils::crypto::Aes256GcmCipher;
-use axum::{
-    body::Body,
-    extract::{Request, State},
-    middleware::Next,
-    response::Response,
-};
-use std::convert::Infallible;
 
-/// 加密响应中间件
-/// 对响应数据进行 AES-256-GCM 加密
-#[allow(dead_code)]
-pub async fn encrypt_response(
-    _state: State<AppState>,
-    request: Request<Body>,
-    next: Next,
-) -> Result<Response, Infallible> {
-    // 执行请求
-    let response = next.run(request).await;
-
-    // TODO: 检查请求是否需要加密
-    // 目前简化实现，直接返回原始响应
-
-    Ok(response)
-}
-
-/// 解密请求中间件
-/// 对请求数据进行 AES-256-GCM 解密
-#[allow(dead_code)]
-pub async fn decrypt_request(
-    _state: State<AppState>,
-    request: Request<Body>,
-    next: Next,
-) -> Result<Response, Infallible> {
-    // TODO: 检查请求是否加密
-    // 目前简化实现，直接传递请求
-
-    let response = next.run(request).await;
-    Ok(response)
-}
+// ====================================================================
+// 注意（v1.0.0+tray+db+sync+sec 补丁，修复审计 SEC-P1-06）：
+// 之前定义的 `encrypt_response` / `decrypt_request` 中间件是透传占位实现，
+// 并没有真正加密响应 / 解密请求，却挂载在路由上给人"已加密"的错误安全感。
+// 桌面端通过 Tauri 自身的 IPC + 局域网 TLS 通道提供传输安全，
+// 不应使用全局 HTTP 中间件做透明加密（会破坏 axum 响应流、拖慢性能，
+// 且与 RESTful API 语义冲突）。已从 mod.rs 路由中全部移除。
+// 如需对特定端点加密，请使用下面的 `encrypt_json_response` / `decrypt_json_request` 工具函数。
+// ====================================================================
 
 /// 加密 JSON 响应
 #[allow(dead_code)]

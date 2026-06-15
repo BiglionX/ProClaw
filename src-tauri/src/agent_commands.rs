@@ -126,6 +126,13 @@ fn install_agent_internal(
         if !valid {
             return Err("Invalid manifest signature".to_string());
         }
+    } else if !is_builtin {
+        // 审计修复 SEC-P1-10: 非内置 Agent 安装时警告缺少签名验证
+        eprintln!(
+            "[Security] WARNING: Agent '{}' v{} installed without signature verification. \
+             Non-builtin agents should be signed in production.",
+            name, version
+        );
     }
 
     let db_guard = db.lock().map_err(|e| e.to_string())?;
@@ -337,6 +344,114 @@ pub fn get_agent_data_dir(
     .map_err(|e| format!("Agent not found: {}", e))
 }
 
+// ============ SQL 安全工具函数 (审计修复 SEC-P1-03/04/05) ============
+
+/// 去除 SQL 中的所有注释（行注释 -- 和块注释 /* */）
+fn strip_sql_comments(sql: &str) -> String {
+    let mut result = String::with_capacity(sql.len());
+    let chars: Vec<char> = sql.chars().collect();
+    let mut i = 0;
+    let mut in_string = false;
+    let mut string_char = '"';
+
+    while i < chars.len() {
+        if in_string {
+            result.push(chars[i]);
+            if chars[i] == string_char {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+
+        // 检测字符串开始
+        if chars[i] == '\'' || chars[i] == '"' {
+            in_string = true;
+            string_char = chars[i];
+            result.push(chars[i]);
+            i += 1;
+            continue;
+        }
+
+        // 检测行注释 --
+        if i + 1 < chars.len() && chars[i] == '-' && chars[i + 1] == '-' {
+            // 跳过到行尾
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+            result.push(' ');
+            continue;
+        }
+
+        // 检测块注释 /* ... */
+        if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '*' {
+            i += 2;
+            while i + 1 < chars.len() && !(chars[i] == '*' && chars[i + 1] == '/') {
+                i += 1;
+            }
+            if i + 1 < chars.len() {
+                i += 2; // skip */
+            }
+            result.push(' ');
+            continue;
+        }
+
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
+}
+
+/// 从 SQL 语句中提取表名（简化解析，支持 FROM/JOIN/INTO/UPDATE/TABLE 关键字）
+fn extract_table_names(sql: &str) -> Vec<String> {
+    let upper = sql.to_uppercase();
+    let tokens: Vec<&str> = upper.split_whitespace().collect();
+    let mut tables = Vec::new();
+    let table_keywords = ["FROM", "JOIN", "INTO", "UPDATE", "TABLE"];
+
+    for (i, token) in tokens.iter().enumerate() {
+        let clean_token = token.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+        if table_keywords.contains(&clean_token) {
+            // 下一个 token 应该是表名
+            if i + 1 < tokens.len() {
+                let next = tokens[i + 1]
+                    .trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '.');
+                // 跳过关键字如 IF NOT EXISTS
+                if next == "IF" {
+                    // CREATE TABLE IF NOT EXISTS table_name
+                    if i + 4 < tokens.len() {
+                        let table_name = tokens[i + 4]
+                            .trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                        if !table_name.is_empty() {
+                            // 从原始 SQL 中提取对应位置的表名（保持大小写）
+                            tables.push(find_original_table_name(sql, table_name));
+                        }
+                    }
+                } else if !next.is_empty()
+                    && next != "SELECT"
+                    && next != "SET"
+                    && next != "WHERE"
+                    && next != "EXISTS"
+                    && next != "NOT"
+                {
+                    tables.push(find_original_table_name(sql, next));
+                }
+            }
+        }
+    }
+    tables
+}
+
+/// 从原始 SQL 中查找表名（保持原始大小写）
+fn find_original_table_name(sql: &str, upper_name: &str) -> String {
+    let sql_upper = sql.to_uppercase();
+    if let Some(pos) = sql_upper.find(upper_name) {
+        sql[pos..pos + upper_name.len()].to_string()
+    } else {
+        upper_name.to_string()
+    }
+}
+
 /// Agent 数据库查询（只允许读取以 agent_<agentId>_ 开头的表）
 #[tauri::command]
 pub fn agent_db_query(
@@ -345,20 +460,34 @@ pub fn agent_db_query(
     sql: String,
     params_json: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    // 安全检查：只允许 SELECT 语句
-    let trimmed = sql.trim_start();
-    if !trimmed.to_uppercase().starts_with("SELECT") {
+    // 审计修复 SEC-P1-04: 增强 SQL 安全检查
+    // 1. 去除所有注释后再检查
+    let stripped = strip_sql_comments(&sql);
+    let trimmed = stripped.trim().to_uppercase();
+
+    // 2. 仅允许 SELECT/WITH
+    if !trimmed.starts_with("SELECT") && !trimmed.starts_with("WITH") {
         return Err("Only SELECT queries are allowed".to_string());
     }
 
-    // 安全检查：只能访问 agent 自己的表
-    let expected_prefix = format!("agent_{}_", agent_id);
-    let sql_upper = sql.to_uppercase();
-    if !sql_upper.contains(&expected_prefix.to_uppercase()) {
-        return Err(format!(
-            "Access denied: query must reference tables with prefix '{}'",
-            expected_prefix
-        ));
+    // 3. 禁止多语句注入
+    if trimmed.trim_end_matches(';').contains(';') {
+        return Err("Multiple statements are not allowed".to_string());
+    }
+
+    // 4. 审计修复 SEC-P1-04: 提取实际表名并验证前缀，而非简单的 contains 检查
+    let expected_prefix = format!("agent_{}_", agent_id).to_uppercase();
+    let table_names = extract_table_names(&stripped);
+    if table_names.is_empty() {
+        return Err("No table references found in query".to_string());
+    }
+    for table in &table_names {
+        if !table.to_uppercase().starts_with(&expected_prefix) {
+            return Err(format!(
+                "Access denied: table '{}' does not have required prefix 'agent_{}_{}'",
+                table, agent_id, ""
+            ));
+        }
     }
 
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
@@ -431,22 +560,34 @@ pub fn agent_db_execute(
     sql: String,
     params_json: Option<String>,
 ) -> Result<u64, String> {
-    // 安全检查：只允许 INSERT/UPDATE/DELETE/CREATE
-    let trimmed = sql.trim_start();
-    let upper = trimmed.to_uppercase();
-    let allowed_keywords = ["INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER"];
+    // 审计修复 SEC-P1-05: 去除注释后再检查 + 移除 DROP/ALTER 权限
+    let stripped = strip_sql_comments(&sql);
+    let upper = stripped.trim().to_uppercase();
+
+    // 审计修复 SEC-P1-05: 移除 DROP 和 ALTER，仅允许 INSERT/UPDATE/DELETE/CREATE TABLE IF NOT EXISTS
+    let allowed_keywords = ["INSERT", "UPDATE", "DELETE", "CREATE TABLE IF NOT EXISTS"];
     if !allowed_keywords.iter().any(|kw| upper.starts_with(kw)) {
-        return Err("Only INSERT/UPDATE/DELETE/CREATE statements are allowed".to_string());
+        return Err("Only INSERT/UPDATE/DELETE/CREATE TABLE IF NOT EXISTS statements are allowed".to_string());
     }
 
-    // 安全检查：只能操作 agent 自己的表
-    let expected_prefix = format!("agent_{}_", agent_id);
-    let sql_upper = sql.to_uppercase();
-    if !sql_upper.contains(&expected_prefix.to_uppercase()) {
-        return Err(format!(
-            "Access denied: query must reference tables with prefix '{}'",
-            expected_prefix
-        ));
+    // 禁止多语句注入
+    if upper.trim_end_matches(';').contains(';') {
+        return Err("Multiple statements are not allowed".to_string());
+    }
+
+    // 审计修复 SEC-P1-04: 提取实际表名并验证前缀
+    let expected_prefix = format!("agent_{}_", agent_id).to_uppercase();
+    let table_names = extract_table_names(&stripped);
+    if table_names.is_empty() {
+        return Err("No table references found in query".to_string());
+    }
+    for table in &table_names {
+        if !table.to_uppercase().starts_with(&expected_prefix) {
+            return Err(format!(
+                "Access denied: table '{}' does not have required prefix 'agent_{}_{}'",
+                table, agent_id, ""
+            ));
+        }
     }
 
     let db_guard = db.inner().lock().map_err(|e| e.to_string())?;
