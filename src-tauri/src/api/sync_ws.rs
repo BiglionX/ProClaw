@@ -51,15 +51,18 @@ struct PairAck {
 /// 移动端推送变更
 #[derive(Debug, Deserialize)]
 struct SyncPush {
+    #[allow(dead_code)]
     #[serde(rename = "type")]
     msg_type: String, // "sync_push"
     #[serde(default)]
     seq: Option<u64>,
     #[serde(default)]
     changes: Vec<ChangeEntry>,
+    #[allow(dead_code)]
     #[serde(default)]
     #[serde(rename = "deviceId")]
     device_id: String,
+    #[allow(dead_code)]
     #[serde(default)]
     timestamp: i64,
 }
@@ -77,8 +80,10 @@ struct SyncPushAck {
 /// 移动端拉取请求
 #[derive(Debug, Deserialize)]
 struct SyncPull {
+    #[allow(dead_code)]
     #[serde(rename = "type")]
     msg_type: String, // "sync_pull"
+    #[allow(dead_code)]
     #[serde(default)]
     #[serde(rename = "deviceId")]
     device_id: String,
@@ -238,10 +243,6 @@ async fn handle_sync_connection(
     let mut paired_device_id = String::new();
 
     // 消息循环
-    use futures::StreamExt;
-    use futures::SinkExt;
-
-    // 使用 tokio select + 超时机制
     loop {
         let msg = match tokio::time::timeout(
             tokio::time::Duration::from_secs(300), // 5 分钟空闲超时
