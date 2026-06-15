@@ -1,0 +1,17 @@
+{
+  "identifier": "setup-wizard",
+  "description": "Restricted capabilities for setup-wizard window only",
+  "windows": ["setup-wizard"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-ask",
+    "dialog:allow-message",
+    "fs:default",
+    "fs:allow-exists",
+    "fs:allow-stat",
+    "fs:scope-app-recursive",
+    "fs:scope-data-recursive"
+  ]
+}
