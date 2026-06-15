@@ -23,6 +23,7 @@ use std::net::SocketAddr;
 
 /// 移动端发送的配对请求
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct PairRequest {
     #[serde(rename = "type")]
     msg_type: String, // "pair"
