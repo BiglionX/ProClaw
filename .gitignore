@@ -6,6 +6,17 @@ dist/
 src-tauri/target/
 dist-*/
 
+# Mobile build artifacts (all variations)
+mobile/dist/
+mobile/dist-*/
+mobile/dist-web*/
+mobile/*.log
+mobile/.expo/web/cache/
+
+# Expo cache
+.expo/
+.expo-cli/
+
 # Environment files
 .env.local
 .env.*.local

@@ -27,6 +27,8 @@ import { useAuthStore } from '../../lib/authStore';
 import { useNotificationStore } from '../../lib/notificationStore';
 import NotificationPanel from './NotificationPanel';
 import TokenDisplay from './TokenDisplay';
+import GlobalSearchDialog, { useGlobalSearch } from '../GlobalSearch/GlobalSearchDialog';
+import { isDemoAccountContext, readDemoFlag } from '../../lib/demoFlag';
 
 /** 页面路径到中文名的映射 */
 const PATH_LABELS: Record<string, string> = {
@@ -78,12 +80,22 @@ export default function TopBar() {
   const togglePanel = useNotificationStore(s => s.togglePanel);
   const startMockAutoPush = useNotificationStore(s => s.startMockAutoPush);
   const stopMockAutoPush = useNotificationStore(s => s.stopMockAutoPush);
+  const startWebSocketListener = useNotificationStore(s => s.startWebSocketListener);
+  const stopWebSocketListener = useNotificationStore(s => s.stopWebSocketListener);
+  // PRD v11.0 §4.2.2：全局搜索（⌘K 快捷键 + 命令面板）
+  const globalSearch = useGlobalSearch();
 
-  // 启动模拟自动推送（Phase 1 演示用，Phase 2 替换为 WebSocket）
+  // 启动模拟自动推送（Phase 1 演示用）和 WebSocket 监听（Phase 2）
   useEffect(() => {
-    startMockAutoPush();
-    return () => stopMockAutoPush();
-  }, [startMockAutoPush, stopMockAutoPush]);
+    // Phase 1: 模拟推送（演示用，可选）
+    // startMockAutoPush();
+    // Phase 2: WebSocket 实时推送
+    startWebSocketListener();
+    return () => {
+      stopMockAutoPush();
+      stopWebSocketListener();
+    };
+  }, [startMockAutoPush, stopMockAutoPush, startWebSocketListener, stopWebSocketListener]);
 
   const handleLogout = async () => {
     setAnchorEl(null);
@@ -175,19 +187,55 @@ export default function TopBar() {
           ))}
         </Breadcrumbs>
 
+        {/* 演示账号徽章 */}
+        {user && isDemoAccountContext() && (
+          <Tooltip
+            title={
+              readDemoFlag()
+                ? `已预置 ${readDemoFlag()!.productsCount} 个产品 / ${readDemoFlag()!.teamNames.length} 个 AI 团队`
+                : '演示账号'
+            }
+          >
+            <Chip
+              icon={<span style={{ fontSize: 14 }}>🧪</span>}
+              label="演示数据"
+              size="small"
+              onClick={() => navigate('/settings')}
+              sx={{
+                bgcolor: 'rgba(255, 59, 48, 0.15)',
+                color: '#FF8060',
+                borderColor: 'rgba(255, 59, 48, 0.4)',
+                fontWeight: 600,
+                fontSize: '0.7rem',
+                height: 24,
+                ml: 2,
+                cursor: 'pointer',
+                '&:hover': { bgcolor: 'rgba(255, 59, 48, 0.25)' },
+                '@keyframes demoPulse': {
+                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,48,0.4)' },
+                  '50%': { boxShadow: '0 0 0 4px rgba(255,59,48,0)' },
+                },
+                animation: 'demoPulse 2s infinite',
+              }}
+              variant="outlined"
+            />
+          </Tooltip>
+        )}
+
         <Box sx={{ flexGrow: 1 }} />
 
-        {/* 全局搜索入口 */}
+        {/* 全局搜索入口（PRD v11.0 §4.2.2：⌘K 快捷键 + 命令面板） */}
+        <GlobalSearchDialog
+          open={globalSearch.isOpen}
+          onClose={globalSearch.close}
+        />
         <Tooltip title="搜索 (⌘K)">
           <Chip
             icon={<span style={{ opacity: 0.5 }}>🔍</span>}
-            label="搜索..."
+            label="搜索... (⌘K)"
             variant="outlined"
             size="small"
-            onClick={() => {
-              // Phase 2 完善搜索逻辑
-              console.log('Global search clicked');
-            }}
+            onClick={globalSearch.open}
             sx={{
               color: 'rgba(255,255,255,0.5)',
               borderColor: 'rgba(255,255,255,0.12)',

@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { sendDesktopNotification, updateTrayTooltip, buildTrayTooltip } from './trayService';
+import { desktopWsService } from '../services/WebSocketService';
 
 // ==================== 类型定义 ====================
 
@@ -70,12 +72,122 @@ interface NotificationState {
   startMockAutoPush: () => void;
   /** 停止模拟自动推送 */
   stopMockAutoPush: () => void;
+  /** 启动 WebSocket 实时推送监听 */
+  startWebSocketListener: () => void;
+  /** 停止 WebSocket 监听 */
+  stopWebSocketListener: () => void;
 }
 
 // ==================== Store ====================
 
 export const useNotificationStore = create<NotificationState>((set, get) => {
   let mockInterval: ReturnType<typeof setInterval> | null = null;
+  // WebSocket 订阅取消函数
+  let wsUnsubscribers: (() => void)[] = [];
+
+  // ==================== WebSocket 消息转换 ====================
+
+  /** 将 WebSocket 消息转换为 NotificationItem */
+  function convertWsMessageToNotification(msg: any): NotificationItem | null {
+    const now = Date.now();
+
+    switch (msg.type) {
+      case 'employee_invitation_accepted':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'invitation_accepted',
+          title: '邀请已接受',
+          message: `${msg.user_name || '新成员'}已接受您的团队邀请`,
+          actionPath: '/contacts',
+          refId: msg.invitation_id,
+          isRead: false,
+          createdAt: now,
+          source: 'invitation',
+        };
+
+      case 'task_completed':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'task_completed',
+          title: '任务完成',
+          message: msg.message || 'AI 任务已完成',
+          actionPath: '/teams',
+          refId: msg.task_id,
+          isRead: false,
+          createdAt: now,
+          source: 'ai_agent',
+        };
+
+      case 'task_failed':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'task_failed',
+          title: '任务失败',
+          message: msg.message || 'AI 任务执行失败',
+          actionPath: '/teams',
+          refId: msg.task_id,
+          isRead: false,
+          createdAt: now,
+          source: 'ai_agent',
+        };
+
+      case 'low_stock_alert':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'low_stock',
+          title: '库存预警',
+          message: msg.message || '商品库存低于安全线',
+          actionPath: '/inventory',
+          refId: msg.product_id,
+          isRead: false,
+          createdAt: now,
+          source: 'inventory',
+        };
+
+      case 'system_notification':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'system',
+          title: msg.title || '系统通知',
+          message: msg.message || '',
+          actionPath: undefined,
+          refId: undefined,
+          isRead: false,
+          createdAt: now,
+          source: 'system',
+        };
+
+      case 'order_status_changed':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'order_status',
+          title: '订单更新',
+          message: msg.message || `订单状态变更为 ${msg.status || '未知'}`,
+          actionPath: '/sales',
+          refId: msg.order_id,
+          isRead: false,
+          createdAt: now,
+          source: 'order',
+        };
+
+      default:
+        // 通用的通知类型
+        if (msg.notification_type) {
+          return {
+            id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+            type: (msg.notification_type as NotificationType) || 'system',
+            title: msg.title || '新通知',
+            message: msg.message || '',
+            actionPath: msg.action_path,
+            refId: msg.ref_id,
+            isRead: false,
+            createdAt: now,
+            source: msg.source || 'system',
+          };
+        }
+        return null;
+    }
+  }
 
   return {
     notifications: [],
@@ -88,6 +200,14 @@ export const useNotificationStore = create<NotificationState>((set, get) => {
       set(state => ({
         notifications: [item, ...state.notifications].slice(0, 100),
       }));
+
+      // 未读消息：同步系统托盘（OS 通知 + tooltip 未读数）
+      if (!item.isRead) {
+        const next = [item, ...get().notifications].slice(0, 100);
+        const unread = next.filter(n => !n.isRead).length;
+        sendDesktopNotification(item.title, item.message).catch(() => {});
+        updateTrayTooltip(buildTrayTooltip(unread)).catch(() => {});
+      }
     },
 
     markAsRead: (id: string) => {
@@ -96,16 +216,23 @@ export const useNotificationStore = create<NotificationState>((set, get) => {
           n.id === id ? { ...n, isRead: true } : n,
         ),
       }));
+      // 同步托盘 tooltip 未读数
+      const unread = get().notifications.filter(n => !n.isRead).length;
+      updateTrayTooltip(buildTrayTooltip(unread)).catch(() => {});
     },
 
     markAllAsRead: () => {
       set(state => ({
         notifications: state.notifications.map(n => ({ ...n, isRead: true })),
       }));
+      // 全部已读：重置托盘 tooltip
+      updateTrayTooltip(buildTrayTooltip(0)).catch(() => {});
     },
 
     clearAll: () => {
       set({ notifications: [] });
+      // 清空后重置托盘 tooltip
+      updateTrayTooltip(buildTrayTooltip(0)).catch(() => {});
     },
 
     setPanelOpen: (open: boolean) => {
@@ -170,6 +297,40 @@ export const useNotificationStore = create<NotificationState>((set, get) => {
         clearInterval(mockInterval);
         mockInterval = null;
       }
+    },
+
+    // ---- WebSocket 实时推送 ----
+
+    startWebSocketListener: () => {
+      // 避免重复订阅
+      if (wsUnsubscribers.length > 0) return;
+
+      // 订阅所有通知类型的 WebSocket 消息
+      const handleNotification = (_type: string, data: any) => {
+        const notification = convertWsMessageToNotification(data);
+        if (notification) {
+          get().addNotification(notification);
+        }
+      };
+
+      // 订阅已知的通知类型
+      wsUnsubscribers.push(
+        desktopWsService.on('employee_invitation_accepted', handleNotification),
+        desktopWsService.on('task_completed', handleNotification),
+        desktopWsService.on('task_failed', handleNotification),
+        desktopWsService.on('low_stock_alert', handleNotification),
+        desktopWsService.on('system_notification', handleNotification),
+        desktopWsService.on('order_status_changed', handleNotification),
+        desktopWsService.on('notification', handleNotification),
+        // 通配符订阅（兜底）
+        desktopWsService.on('*', handleNotification)
+      );
+    },
+
+    stopWebSocketListener: () => {
+      // 取消所有订阅
+      wsUnsubscribers.forEach(unsub => unsub());
+      wsUnsubscribers = [];
     },
   };
 });
