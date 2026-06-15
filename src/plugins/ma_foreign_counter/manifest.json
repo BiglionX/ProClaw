@@ -1,0 +1,49 @@
+{
+  "id": "ma_foreign_counter",
+  "name": "外贸柜台运营助手",
+  "version": "1.0.0",
+  "description": "面向外贸柜台的多语言商品管理、国际物流跟踪、海关申报辅助、跨境结算管理一体化插件。覆盖 12 种主流语种，集成 DHL/FedEx/UPS/EMS 物流查询接口，提供 HS 编码自动匹配与报关单草稿生成。",
+  "icon": "🌍",
+  "category": "official",
+  "tags": ["外贸", "跨境", "多语言", "物流", "海关", "结算", "HS编码"],
+  "author": "ProClaw 官方",
+  "homepage": "https://nvwa.proclaw.cc/plugins/ma_foreign_counter",
+  "minProclawVersion": "1.0.0",
+  "permissions": [
+    "read_user",
+    "read_products",
+    "write_products",
+    "http_request",
+    "send_message",
+    "show_notification",
+    "database:create_table",
+    "database:read:foreign_orders",
+    "database:write:foreign_orders"
+  ],
+  "features": {
+    "modules": ["foreign-counter"],
+    "dashboards": ["foreign-counter-dashboard"],
+    "reports": ["foreign-counter-monthly", "foreign-counter-logistics"]
+  },
+  "navigation": {
+    "add": [
+      { "text": "外贸柜台", "icon": "🌍", "path": "/foreign-counter", "group": "业务" }
+    ]
+  },
+  "dataModels": {
+    "tables": ["foreign_orders", "foreign_logistics", "foreign_translations"],
+    "migrations": ["ma_foreign_counter_v1.sql"]
+  },
+  "ui": {
+    "quickActions": [
+      { "label": "新建外贸订单", "icon": "📝", "action": "new_foreign_order", "color": "#0EA5E9" },
+      { "label": "物流跟踪", "icon": "📦", "action": "track_logistics", "color": "#10B981" },
+      { "label": "海关申报", "icon": "📋", "action": "customs_declare", "color": "#F59E0B" },
+      { "label": "多语言翻译", "icon": "🌐", "action": "translate_product", "color": "#8B5CF6" }
+    ]
+  },
+  "assets": {
+    "path": "./assets",
+    "files": ["icon.svg"]
+  }
+}

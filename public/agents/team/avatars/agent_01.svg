@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <clipPath id="c"><circle cx="128" cy="128" r="128"/></clipPath>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="256" height="256" fill="#6366f1"/>
+    <!-- 头 -->
+    <circle cx="128" cy="108" r="40" fill="#f4d2b3"/>
+    <!-- 头发 -->
+    <path d="M88 100 Q88 70 128 68 Q168 70 168 100 Q168 90 158 86 Q148 82 128 82 Q108 82 98 86 Q88 90 88 100 Z" fill="#1f2937"/>
+    <!-- 西装领 -->
+    <path d="M68 256 L68 200 Q98 168 128 168 Q158 168 188 200 L188 256 Z" fill="#1e3a8a"/>
+    <!-- 衬衫 V 字领 -->
+    <path d="M108 200 L128 232 L148 200 L148 256 L108 256 Z" fill="white"/>
+    <!-- 领带 -->
+    <path d="M122 218 L134 218 L138 240 L128 256 L118 240 Z" fill="#dc2626"/>
+    <!-- 眼睛 -->
+    <circle cx="116" cy="112" r="2.5" fill="#1f2937"/>
+    <circle cx="140" cy="112" r="2.5" fill="#1f2937"/>
+    <!-- 嘴 -->
+    <path d="M118 126 Q128 132 138 126" stroke="#7c2d12" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

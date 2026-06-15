@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <clipPath id="c"><circle cx="128" cy="128" r="128"/></clipPath>
+    <linearGradient id="techG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="256" height="256" fill="url(#techG)"/>
+    <!-- 几何装饰 -->
+    <circle cx="200" cy="56" r="32" fill="#ef4444" opacity="0.3"/>
+    <circle cx="50" cy="200" r="20" fill="white" opacity="0.15"/>
+    <!-- 头 -->
+    <circle cx="128" cy="112" r="38" fill="#f4d2b3"/>
+    <!-- 科技感发型（头盔式） -->
+    <path d="M88 108 Q88 70 128 68 Q168 70 168 108 L168 96 L160 92 L148 96 L136 92 L128 96 L120 92 L108 96 L96 92 L88 96 Z" fill="#1f2937"/>
+    <!-- 高光 -->
+    <path d="M100 90 Q120 76 140 88" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
+    <!-- 简约眼（无嘴） -->
+    <rect x="110" y="108" width="12" height="3" fill="#ef4444"/>
+    <rect x="134" y="108" width="12" height="3" fill="#ef4444"/>
+    <!-- 衣领（极简） -->
+    <path d="M76 256 L76 200 Q108 176 128 176 Q148 176 180 200 L180 256 Z" fill="#0f172a"/>
+    <path d="M108 200 L128 220 L148 200 L148 256 L108 256 Z" fill="#1e293b"/>
+  </g>
+</svg>
