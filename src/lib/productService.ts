@@ -88,6 +88,11 @@ export interface ProductSKU {
   barcode?: string;
   is_default: boolean;
   status: 'active' | 'inactive';
+  // PRD v12.0 灵活库存
+  allow_negative_stock?: boolean; // 商品级软约束开关
+  stock_confidence?: 'high' | 'medium' | 'low'; // 置信度等级
+  last_calibrated_at?: string | null; // 上次校准时间
+  negative_since?: string | null; // 首次变负时间
   created_at: string;
   updated_at: string;
 }
@@ -155,6 +160,8 @@ export interface CreateProductSKUInput {
   max_stock?: number;
   barcode?: string;
   is_default?: boolean;
+  // PRD v12.0 灵活库存
+  allow_negative_stock?: boolean; // 创建时直接设置软约束开关
 }
 
 /**

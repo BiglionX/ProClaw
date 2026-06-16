@@ -4,7 +4,7 @@
  * 支持：确认/拒绝(含原因)/编辑/稍后提醒 + 键盘快捷键
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box, Typography, Button, Paper, Divider, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, Select, MenuItem, FormControl, InputLabel,
@@ -14,6 +14,8 @@ import {
   WarningAmber as WarnIcon, CheckCircle as ConfirmIcon, Cancel as RejectIcon,
   Edit as EditIcon, Schedule as SnoozeIcon, Keyboard as KeyIcon,
 } from '@mui/icons-material';
+// 补全 4：集成 ceoLearning 自动学习（任务 #5）
+import { ceoLearning, type DecisionAction } from '../../lib/ceoLearning';
 
 export interface ConfirmationData {
   /** 操作类型 */
@@ -94,7 +96,7 @@ export default function ConfirmationCard({
     switch (e.key.toLowerCase()) {
       case 'y':
         e.preventDefault();
-        onConfirm();
+        handleConfirmWithRecord();
         break;
       case 'n':
         e.preventDefault();
@@ -110,15 +112,30 @@ export default function ConfirmationCard({
         setSnoozeDialogOpen(true);
         break;
     }
-  }, [onConfirm, onModify, rejectDialogOpen, editDialogOpen, snoozeDialogOpen]);
+  }, [handleConfirmWithRecord, onModify, rejectDialogOpen, editDialogOpen, snoozeDialogOpen]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // 补全 4：决策开始时间（用于计算耗时）
+  const decisionStartRef = useRef<number>(Date.now());
+
+  // 补全 4：记录决策到 ceoLearning 用于偏好学习
+  const recordDecision = (action: DecisionAction) => {
+    ceoLearning.recordDecision({
+      action,
+      riskLevel: data.estimatedImpact?.riskLevel,
+      decisionSeconds: Math.round((Date.now() - decisionStartRef.current) / 1000),
+      pcpId: data.pcpReferences?.[0]?.id,
+      chosenOption: action === 'confirm' ? '执行' : action === 'modify' ? '修改' : action === 'snooze' ? '稍后' : '拒绝',
+    });
+  };
+
   // 拒绝提交
   const handleRejectSubmit = () => {
+    recordDecision('reject');
     onReject(rejectReason);
     setRejectDialogOpen(false);
     setRejectReason('');
@@ -126,6 +143,7 @@ export default function ConfirmationCard({
 
   // 编辑提交
   const handleEditSubmit = () => {
+    recordDecision('modify');
     try {
       const parsed = JSON.parse(editContent);
       data.details = parsed;
@@ -138,8 +156,15 @@ export default function ConfirmationCard({
 
   // 稍后提醒提交
   const handleSnoozeSubmit = () => {
+    recordDecision('snooze');
     onSnooze?.(snoozeMinutes);
     setSnoozeDialogOpen(false);
+  };
+
+  // 补全 4：直接确认时记录（键盘 Y / 按钮）
+  const handleConfirmWithRecord = () => {
+    recordDecision('confirm');
+    onConfirm();
   };
 
   const riskInfo = data.estimatedImpact?.riskLevel

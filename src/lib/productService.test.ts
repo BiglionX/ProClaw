@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createProduct,
   getProducts,
-  // getProductSPUById, // TODO: 待添加测试
+  getProductSPUById,
   updateProduct,
   deleteProduct,
   getDatabaseStats,
@@ -228,66 +228,91 @@ describe('productService', () => {
     });
   });
 
-  // TODO: 更新为SPU-SKU架构的测试
-  // describe('getProductById', () => {
-  //   it('应该根据 ID 获取产品', async () => {
-  //     const mockProduct = {
-  //       id: '1',
-  //       sku: 'PROD001',
-  //       name: 'Test Product',
-  //       cost_price: 100,
-  //       sell_price: 150,
-  //       current_stock: 50,
-  //       min_stock: 10,
-  //       max_stock: 100,
-  //       unit: '个',
-  //       status: 'active',
-  //       created_at: new Date().toISOString(),
-  //       updated_at: new Date().toISOString(),
-  //     };
+  describe('getProductSPUById (SPU-SKU 架构)', () => {
+    it('应该根据 ID 获取完整 SPU 详情（含 SKU 和图片）', async () => {
+      const now = new Date().toISOString();
+      const mockSPU = {
+        id: 'spu-100',
+        spu_code: 'SPU-DETAIL001',
+        name: 'Detail Product',
+        unit: '个',
+        status: 'on_sale' as const,
+        is_on_sale: true,
+        is_featured: false,
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        images: [
+          { id: 'img1', spu_id: 'spu-100', image_url: 'https://example.com/1.jpg', image_type: 'main' as const, sort_order: 0 },
+          { id: 'img2', spu_id: 'spu-100', image_url: 'https://example.com/2.jpg', image_type: 'gallery' as const, sort_order: 1 },
+        ],
+        skus: [
+          {
+            id: 'sku-1', spu_id: 'spu-100', sku_code: 'SKU-1', specifications: { 颜色: '红色' },
+            spec_text: '红色', cost_price: 80, sell_price: 120, current_stock: 30,
+            min_stock: 5, max_stock: 200, is_default: true, status: 'active' as const,
+            created_at: now, updated_at: now,
+          },
+          {
+            id: 'sku-2', spu_id: 'spu-100', sku_code: 'SKU-2', specifications: { 颜色: '蓝色' },
+            spec_text: '蓝色', cost_price: 80, sell_price: 120, current_stock: 20,
+            min_stock: 5, max_stock: 200, is_default: false, status: 'active' as const,
+            created_at: now, updated_at: now,
+          },
+        ],
+      };
 
-  //     (invoke as any).mockResolvedValue(mockProduct);
+      (invoke as any).mockResolvedValue(mockSPU);
 
-  //     const result = await getProductById('1');
+      const result = await getProductSPUById('spu-100');
 
-  //     expect(result).toEqual(mockProduct);
-  //     expect(invoke).toHaveBeenCalledWith('get_product_by_id', { id: '1' });
-  //   });
+      // SPU 基本字段
+      expect(result.id).toBe('spu-100');
+      expect(result.spu_code).toBe('SPU-DETAIL001');
+      expect(result.name).toBe('Detail Product');
+      // SKU 数量及内容
+      expect(result.skus).toHaveLength(2);
+      expect(result.skus?.[0].spec_text).toBe('红色');
+      expect(result.skus?.[1].spec_text).toBe('蓝色');
+      // 图片
+      expect(result.images).toHaveLength(2);
+      // invoke 参数
+      expect(invoke).toHaveBeenCalledWith('get_product_spu_by_id', { id: 'spu-100' });
+    });
 
-  //   it('应该在产品不存在时抛出错误', async () => {
-  //     (invoke as any).mockRejectedValue(new Error('Product not found'));
+    it('应该在后端报错时抛出错误', async () => {
+      (invoke as any).mockRejectedValue(new Error('SPU not found'));
 
-  //     await expect(getProductById('999')).rejects.toThrow('Product not found');
-  //   });
-  // });
+      await expect(getProductSPUById('nonexistent')).rejects.toThrow('SPU not found');
+      expect(invoke).toHaveBeenCalledWith('get_product_spu_by_id', { id: 'nonexistent' });
+    });
 
-  // describe('getProductBySku', () => {
-  //   it('应该根据 SKU 获取产品', async () => {
-  //     const mockProduct = {
-  //       id: '1',
-  //       sku: 'SKU001',
-  //       name: 'Test Product',
-  //       cost_price: 100,
-  //       sell_price: 150,
-  //       current_stock: 50,
-  //       min_stock: 10,
-  //       max_stock: 100,
-  //       unit: '个',
-  //       status: 'active',
-  //       created_at: new Date().toISOString(),
-  //       updated_at: new Date().toISOString(),
-  //     };
+    it('应该正确处理不含 SKU 的 SPU（仅基本信息）', async () => {
+      const now = new Date().toISOString();
+      const mockSPU = {
+        id: 'spu-200',
+        spu_code: 'SPU-NOSKU',
+        name: 'No SKU Product',
+        unit: '件',
+        status: 'draft' as const,
+        is_on_sale: false,
+        is_featured: false,
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        // skus/images 未返回
+      };
 
-  //     (invoke as any).mockResolvedValue(mockProduct);
+      (invoke as any).mockResolvedValue(mockSPU);
 
-  //     const result = await getProductBySku('SKU001');
+      const result = await getProductSPUById('spu-200');
 
-  //     expect(result).toEqual(mockProduct);
-  //     expect(invoke).toHaveBeenCalledWith('get_product_by_sku', {
-  //       sku: 'SKU001',
-  //     });
-  //   });
-  // });
+      expect(result.id).toBe('spu-200');
+      expect(result.status).toBe('draft');
+      expect(result.skus).toBeUndefined();
+      expect(result.images).toBeUndefined();
+    });
+  });
 
   describe('updateProduct', () => {
     it('应该更新产品信息', async () => {

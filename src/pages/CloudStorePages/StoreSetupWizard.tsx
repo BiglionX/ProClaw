@@ -16,7 +16,9 @@ interface CloudStoreSetupWizardProps {
 export default function CloudStoreSetupWizard({
   open,
   subdomain,
-  storeName: _storeName, // TODO: 后续可用于传递店铺名称到后端
+  // storeName 当前为预留字段：当前流程只需 subdomain 即可创建云商城
+  // 后续如需在向导内传递店铺名称给后端，可直接使用该 prop
+  storeName: _storeName,
   onComplete,
   onCancel,
 }: CloudStoreSetupWizardProps) {

@@ -14,6 +14,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Divider,
   Dialog,
   DialogActions,
   DialogContent,
@@ -49,6 +50,8 @@ import {
   type KnowledgeCategory,
   type KnowledgeDocument,
 } from '../lib/knowledgeBaseService';
+// 补全 2：集成 AskKnowledgeBar（任务 #4 AI 知识库问答）
+import AskKnowledgeBar from '../components/KnowledgeBase/AskKnowledgeBar';
 
 const FILE_ICONS: Record<string, React.ReactNode> = {
   pdf: <PdfIcon sx={{ fontSize: 40, color: '#e74c3c' }} />,
@@ -134,6 +137,11 @@ export default function KnowledgeBasePage() {
         <Typography variant="body1" color="text.secondary">
           存储业务相关文档和参考资料，AI 助手可检索回答客户提问
         </Typography>
+      </Box>
+
+      {/* 补全 2：AI 知识库智能问答入口（任务 #4） */}
+      <Box sx={{ mb: 3 }}>
+        <AskKnowledgeBar />
       </Box>
 
       {/* 统计卡片 */}

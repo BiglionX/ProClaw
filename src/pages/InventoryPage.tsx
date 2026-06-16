@@ -46,6 +46,11 @@ import {
 } from '../lib/inventoryService';
 import { ProductSPU, getProductSPUs } from '../lib/productService';
 import {
+  StockConfidenceInfo,
+  getLowConfidenceProducts,
+} from '../lib/inventoryCalibrationService';
+import StockCalibrationDialog from '../components/Inventory/StockCalibrationDialog';
+import {
   CreateSupplierInput,
   Supplier,
   createSupplier,
@@ -96,6 +101,15 @@ export default function InventoryPage() {
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [products, setProducts] = useState<ProductSPU[]>([]);
+  // PRD v12.0 灵活库存：低置信度商品列表
+  const [lowConfidence, setLowConfidence] = useState<StockConfidenceInfo[]>([]);
+  // 校准对话框状态
+  const [calibrationDialogOpen, setCalibrationDialogOpen] = useState(false);
+  const [calibrationTarget, setCalibrationTarget] = useState<{
+    productId: string;
+    productName?: string;
+    currentStock: number;
+  } | null>(null);
 
   // 供应商管理状态
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -163,6 +177,14 @@ export default function InventoryPage() {
       setStats(statsData);
       setTransactions(transactionsData);
       setProducts(productsData);
+      // 加载低置信度商品（PRD v12.0）
+      try {
+        const lc = await getLowConfidenceProducts();
+        setLowConfidence(lc);
+      } catch {
+        // 非阻塞：即使获取失败也不影响主流程
+        setLowConfidence([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载库存数据失败');
     } finally {
@@ -202,6 +224,19 @@ export default function InventoryPage() {
     } else if (tabValue === 2) {
       loadCustomers();
     }
+  }, [tabValue]);
+
+  // 监听全局库存变更事件（PRD v12.0 灵活库存）
+  useEffect(() => {
+    const handler = () => {
+      if (tabValue === 0) loadInventoryData();
+    };
+    window.addEventListener('proclaw:inventory-calibrated', handler);
+    window.addEventListener('proclaw:products-changed', handler);
+    return () => {
+      window.removeEventListener('proclaw:inventory-calibrated', handler);
+      window.removeEventListener('proclaw:products-changed', handler);
+    };
   }, [tabValue]);
 
   // Tab 切换处理
@@ -566,6 +601,52 @@ export default function InventoryPage() {
                     color="warning"
                     variant="outlined"
                     size="small"
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          </Paper>
+        )}
+
+        {/* 库存置信度预警（PRD v12.0 灵活库存） */}
+        {lowConfidence.length > 0 && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 3,
+              border: '1px solid',
+              borderColor: 'error.main',
+              borderRadius: 2,
+              bgcolor: 'error.50',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <SmartToyIcon sx={{ color: 'error.main', mr: 1 }} />
+              <Typography variant="h6" color="error.dark">
+                库存置信度预警 ({lowConfidence.length})
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+                长期未校准或存在负库存，建议尽快盘点
+              </Typography>
+            </Box>
+            <Grid container spacing={1}>
+              {lowConfidence.map(item => (
+                <Grid item key={item.product_id}>
+                  <Chip
+                    label={`${item.product_name || item.spu_code} | 库存 ${item.current_stock} | ${item.aging_days}天未校准`}
+                    color="error"
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      setCalibrationTarget({
+                        productId: item.product_id,
+                        productName: item.product_name,
+                        currentStock: item.current_stock,
+                      });
+                      setCalibrationDialogOpen(true);
+                    }}
+                    sx={{ cursor: 'pointer' }}
                   />
                 </Grid>
               ))}
@@ -1310,6 +1391,27 @@ export default function InventoryPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 灵活库存微盘点对话框（PRD v12.0） */}
+      {calibrationTarget && (
+        <StockCalibrationDialog
+          open={calibrationDialogOpen}
+          onClose={() => {
+            setCalibrationDialogOpen(false);
+            setCalibrationTarget(null);
+          }}
+          productId={calibrationTarget.productId}
+          productName={calibrationTarget.productName}
+          currentStock={calibrationTarget.currentStock}
+          trigger="manual"
+          onSuccess={() => {
+            setCalibrationDialogOpen(false);
+            setCalibrationTarget(null);
+            setSuccessMessage('微盘点校准成功');
+            loadInventoryData();
+          }}
+        />
+      )}
 
       {/* 错误提示 */}
       <Snackbar

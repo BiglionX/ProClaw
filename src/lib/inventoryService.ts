@@ -10,6 +10,9 @@ export interface InventoryTransaction {
   reason?: string;
   performed_by?: string;
   notes?: string;
+  // PRD v12.0 灵活库存：负库存相关
+  is_negative_allowed?: boolean; // 本次操作是否在 allow_negative_stock=true 时执行
+  stock_after?: number; // 操作后库存
   created_at: string;
   sync_status: string;
 }

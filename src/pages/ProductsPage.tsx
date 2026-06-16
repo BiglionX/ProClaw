@@ -58,6 +58,8 @@ import {
   DowngradeConfirmDialog,
   LibraryModeToggle,
 } from '../components/Products';
+// 任务 #2：骨架屏全面铺开
+import TableSkeleton from '../components/common/TableSkeleton';
 
 export default function ProductsPage() {
   // ==================== 商品库模式状态 ====================
@@ -136,10 +138,26 @@ export default function ProductsPage() {
         setLibraryMode('simple'); // 默认简单模式
       }
     };
-    
+
     loadProducts();
     loadFilters();
     initMode();
+  }, []);
+
+  // 监听演示数据引导完成 / 产品变更事件，自动刷新产品列表
+  // 修复：演示账号登录后 bootstrap 异步注入 20 个 iPhone 电池 SPU，
+  // 如果 ProductsPage 先于 bootstrap 完成首次加载，会出现空表不刷新的问题。
+  useEffect(() => {
+    const refreshOnBootstrap = () => {
+      loadProducts();
+      loadFilters();
+    };
+    window.addEventListener('proclaw:demo-bootstrapped', refreshOnBootstrap);
+    window.addEventListener('proclaw:products-changed', refreshOnBootstrap);
+    return () => {
+      window.removeEventListener('proclaw:demo-bootstrapped', refreshOnBootstrap);
+      window.removeEventListener('proclaw:products-changed', refreshOnBootstrap);
+    };
   }, []);
 
   // 当筛选条件改变时重新加载

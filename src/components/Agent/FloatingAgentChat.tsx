@@ -52,6 +52,9 @@ import { DEFAULT_OUTBOUND_TIMEOUT_MS, OUTBOUND_ERROR_MESSAGE, isAbortError, isNe
 import SecretaryAvatarSelector from './SecretaryAvatarSelector';
 import SecretaryNameDialog from './SecretaryNameDialog';
 import BapSettingsPanel from './BapSettingsPanel';
+// 补全 3：集成语音通话面板（任务 #3）
+import VoiceCallPanel from './VoiceCallPanel';
+import { isSpeechRecognitionSupported } from '../../lib/speechService';
 
 // ===== 秘书 LLM 系统提示词 =====
 const SECRETARY_SYSTEM_PROMPT = `你是「{name}」，ProClaw 系统的内置商务秘书 AI。
@@ -206,6 +209,9 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
   const [bapSettingsOpen, setBapSettingsOpen] = useState(false);
   const [aboutDialogOpen, setAboutDialogOpen] = useState(false);
+  // 补全 3：语音通话面板状态
+  const [voiceCallOpen, setVoiceCallOpen] = useState(false);
+  const [sttSupported] = useState(isSpeechRecognitionSupported());
   
   // 从 localStorage 加载名称和头像
   useEffect(() => {
@@ -374,6 +380,23 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
     handleContextMenuClose();
     setAboutDialogOpen(true);
   }, [handleContextMenuClose]);
+
+  // 补全 3：启用语音通话
+  const handleMenuVoiceCall = useCallback(() => {
+    handleContextMenuClose();
+    if (!sttSupported) {
+      // 不支持时显示提示（可通过 setMessage 等）
+      const tipMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '抱歉，当前浏览器不支持语音输入。请使用 Chrome 或 Edge 浏览器以体验完整功能。',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, tipMsg]);
+      return;
+    }
+    setVoiceCallOpen(true);
+  }, [handleContextMenuClose, sttSupported]);
 
   const handleAvatarSelect = useCallback((key: string) => {
     setSecretaryAvatar(key);
@@ -688,9 +711,14 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
           <ListItemText>关注设置</ListItemText>
         </MenuItem>
         <Divider />
-        <MenuItem disabled>
-          <ListItemIcon><MicIcon fontSize="small" sx={{ color: 'text.disabled' }} /></ListItemIcon>
-          <ListItemText primary="语音通话" secondary="即将上线" />
+        <MenuItem onClick={handleMenuVoiceCall} disabled={!sttSupported}>
+          <ListItemIcon>
+            <MicIcon fontSize="small" sx={{ color: sttSupported ? 'primary.main' : 'text.disabled' }} />
+          </ListItemIcon>
+          <ListItemText
+            primary="语音通话"
+            secondary={sttSupported ? '使用麦克风与小 Pro 对话' : '当前浏览器不支持'}
+          />
         </MenuItem>
         <Divider />
         <MenuItem onClick={handleMenuAbout}>
@@ -1201,6 +1229,16 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
         currentKey={secretaryAvatar}
         onSelect={handleAvatarSelect}
         onClose={() => setAvatarSelectorOpen(false)}
+      />
+      {/* 补全 3：语音通话面板（任务 #3） */}
+      <VoiceCallPanel
+        open={voiceCallOpen}
+        onClose={() => setVoiceCallOpen(false)}
+        initialMessage={
+          teamContext
+            ? `你好！我是 **${teamContext.teamName}** 的 AI 助手，可以使用语音跟我对话。`
+            : `老板好！我是您的商务秘书「${secretaryName}」，可以叫我小 Pro。使用语音跟我对话吧～`
+        }
       />
       <SecretaryNameDialog
         open={nameDialogOpen}

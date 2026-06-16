@@ -12,7 +12,10 @@ export type NotificationType =
   | 'system'
   | 'finance'
   | 'agent_message'
-  | 'order_status';
+  | 'order_status'
+  | 'inventory_low_confidence' // 库存低置信度（PRD v12.0）
+  | 'inventory_negative_aging' // 库存负库存老化（PRD v12.0）
+  | 'inventory_calibration';   // 库存校准提醒（PRD v12.0）
 
 export interface NotificationItem {
   id: string;
@@ -37,6 +40,10 @@ const MOCK_TEMPLATES: Omit<NotificationItem, 'id' | 'createdAt' | 'isRead'>[] = 
   { type: 'finance', title: '财务提醒', message: '本月应收账款到期提醒，共 3 笔', actionPath: '/supplychain', source: 'finance' },
   { type: 'agent_message', title: 'Agent 消息', message: 'CEO Agent 已完成日报生成', actionPath: '/teams', source: 'ai_agent' },
   { type: 'order_status', title: '订单更新', message: '订单 #20260606 状态变更为已发货', actionPath: '/sales', source: 'order' },
+  // PRD v12.0 灵活库存通知
+  { type: 'inventory_low_confidence', title: '库存置信度低', message: 'iPhone 14 电池 15 天未校准，建议微盘点', actionPath: '/inventory', source: 'inventory' },
+  { type: 'inventory_negative_aging', title: '负库存超期未冲销', message: '小米充电宝 库存 -3 已 5 天，建议立即进货冲销', actionPath: '/inventory', source: 'inventory' },
+  { type: 'inventory_calibration', title: '建议微盘点', message: '销售/进货已完成，是否进行一次快速盘点？', actionPath: '/inventory', source: 'inventory' },
 ];
 
 // ==================== 工具函数 ====================
@@ -168,6 +175,46 @@ export const useNotificationStore = create<NotificationState>((set, get) => {
           isRead: false,
           createdAt: now,
           source: 'order',
+        };
+
+      // PRD v12.0 灵活库存通知类型
+      case 'inventory_low_confidence':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'inventory_low_confidence',
+          title: msg.title || '库存置信度低',
+          message: msg.message || '该商品长期未校准，库存数据可能不准确',
+          actionPath: '/inventory',
+          refId: msg.product_id,
+          isRead: false,
+          createdAt: now,
+          source: 'inventory',
+        };
+
+      case 'inventory_negative_aging':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'inventory_negative_aging',
+          title: msg.title || '负库存超期未冲销',
+          message: msg.message || '该商品库存已为负且超过 3 天未处理',
+          actionPath: '/inventory',
+          refId: msg.product_id,
+          isRead: false,
+          createdAt: now,
+          source: 'inventory',
+        };
+
+      case 'inventory_calibration':
+        return {
+          id: `notif_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'inventory_calibration',
+          title: msg.title || '建议微盘点',
+          message: msg.message || '销售/进货已完成，建议进行一次快速盘点',
+          actionPath: '/inventory',
+          refId: msg.product_id,
+          isRead: false,
+          createdAt: now,
+          source: 'inventory',
         };
 
       default:

@@ -46,6 +46,13 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import PaymentDialog from '../components/PaymentDialog';
+import MicroStocktakingPrompt from '../components/Inventory/MicroStocktakingPrompt';
+import {
+  shouldTriggerPostSalesCalibration,
+  shouldTriggerPostPurchaseCalibration,
+  type PostSalesCheckResult,
+  type PostPurchaseCheckResult,
+} from '../lib/inventoryCalibrationService';
 import {
   CreateTransactionInput,
   InventoryStats,
@@ -120,6 +127,80 @@ const getTransactionTypeColor = (type: string) => {
   };
   return colors[type] || 'default';
 };
+
+/* ========== PRD v12.0 灵活库存：模块级辅助函数 ========== */
+
+type CalibrationPromptSetter = React.Dispatch<React.SetStateAction<{
+  open: boolean;
+  productId: string;
+  productName: string;
+  currentStock: number;
+  salesResult: PostSalesCheckResult | null;
+  purchaseResult: PostPurchaseCheckResult | null;
+}>>;
+
+/**
+ * 销售出库后检查每个明细商品是否需要微盘点
+ * 触发条件：3天未校准 + 热销 + 收银间隔>3秒
+ */
+async function maybePromptPostSalesCalibration(
+  detail: any,
+  setCalibrationPrompt: CalibrationPromptSetter
+) {
+  const items = detail?.items || [];
+  for (const item of items) {
+    const productId = item.product_id || item.sku_id;
+    if (!productId) continue;
+    try {
+      const result = await shouldTriggerPostSalesCalibration(productId);
+      if (result.should_trigger) {
+        setCalibrationPrompt({
+          open: true,
+          productId,
+          productName: item.product_name || item.sku_name || '',
+          currentStock: item.current_stock || 0,
+          salesResult: result,
+          purchaseResult: null,
+        });
+        // 一次只提示一个，避免过多弹窗
+        return;
+      }
+    } catch {
+      // 静默失败
+    }
+  }
+}
+
+/**
+ * 进货完成后检查每个明细商品是否需要微盘点
+ * 触发条件：进货后库存仍为负
+ */
+async function maybePromptPostPurchaseCalibration(
+  detail: any,
+  setCalibrationPrompt: CalibrationPromptSetter
+) {
+  const items = detail?.items || [];
+  for (const item of items) {
+    const productId = item.product_id || item.sku_id;
+    if (!productId) continue;
+    try {
+      const result = await shouldTriggerPostPurchaseCalibration(productId);
+      if (result.should_trigger) {
+        setCalibrationPrompt({
+          open: true,
+          productId,
+          productName: item.product_name || item.sku_name || '',
+          currentStock: result.current_stock,
+          salesResult: null,
+          purchaseResult: result,
+        });
+        return;
+      }
+    } catch {
+      // 静默失败
+    }
+  }
+}
 
 /* ========== 库存管理 Tab ========== */
 
@@ -415,6 +496,23 @@ function PurchaseTab({
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
+  // PRD v12.0 灵活库存：微盘点弹窗
+  const [calibrationPrompt, setCalibrationPrompt] = useState<{
+    open: boolean;
+    productId: string;
+    productName: string;
+    currentStock: number;
+    salesResult: PostSalesCheckResult | null;
+    purchaseResult: PostPurchaseCheckResult | null;
+  }>({
+    open: false,
+    productId: '',
+    productName: '',
+    currentStock: 0,
+    salesResult: null,
+    purchaseResult: null,
+  });
+
   const openCreateOrderDialog = () => {
     setOrderForm({
       supplier_id: '',
@@ -512,6 +610,12 @@ function PurchaseTab({
       setSuccessMessage('收货成功，库存已更新!');
       setDetailDialogOpen(false);
       loadOrders();
+      // PRD v12.0 灵活库存：进货后检查是否需要微盘点
+      if (selectedOrderDetail) {
+        await maybePromptPostPurchaseCalibration(selectedOrderDetail, setCalibrationPrompt);
+      }
+      // 通知库存页面刷新
+      window.dispatchEvent(new CustomEvent('proclaw:products-changed'));
     } catch (err) {
       setError(err instanceof Error ? err.message : '收货失败');
     } finally {
@@ -925,6 +1029,22 @@ function PurchaseTab({
           onSuccess={handlePaymentSuccess}
         />
       )}
+
+      {/* 灵活库存微盘点建议（PRD v12.0） */}
+      <MicroStocktakingPrompt
+        open={calibrationPrompt.open}
+        onClose={() => setCalibrationPrompt(prev => ({ ...prev, open: false }))}
+        salesResult={calibrationPrompt.salesResult}
+        purchaseResult={calibrationPrompt.purchaseResult}
+        productId={calibrationPrompt.productId}
+        productName={calibrationPrompt.productName}
+        currentStock={calibrationPrompt.currentStock}
+        onCalibrated={() => {
+          setCalibrationPrompt(prev => ({ ...prev, open: false }));
+          loadOrders();
+          window.dispatchEvent(new CustomEvent('proclaw:inventory-calibrated'));
+        }}
+      />
     </Box>
   );
 }
@@ -1338,6 +1458,23 @@ function SalesTab({
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
+  // PRD v12.0 灵活库存：微盘点弹窗
+  const [calibrationPrompt, setCalibrationPrompt] = useState<{
+    open: boolean;
+    productId: string;
+    productName: string;
+    currentStock: number;
+    salesResult: PostSalesCheckResult | null;
+    purchaseResult: PostPurchaseCheckResult | null;
+  }>({
+    open: false,
+    productId: '',
+    productName: '',
+    currentStock: 0,
+    salesResult: null,
+    purchaseResult: null,
+  });
+
   const openCreateOrderDialog = () => {
     setOrderForm({
       customer_id: '',
@@ -1422,6 +1559,10 @@ function SalesTab({
       setSuccessMessage('销售订单已确认出库，库存已扣减!');
       setDetailDialogOpen(false);
       loadOrders();
+      // PRD v12.0 灵活库存：检查每个明细商品是否需要微盘点
+      if (selectedOrderDetail) {
+        await maybePromptPostSalesCalibration(selectedOrderDetail, setCalibrationPrompt);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '确认出库失败');
     } finally {
@@ -1878,6 +2019,22 @@ function SalesTab({
           onSuccess={handlePaymentSuccess}
         />
       )}
+
+      {/* 灵活库存微盘点建议（PRD v12.0） */}
+      <MicroStocktakingPrompt
+        open={calibrationPrompt.open}
+        onClose={() => setCalibrationPrompt(prev => ({ ...prev, open: false }))}
+        salesResult={calibrationPrompt.salesResult}
+        purchaseResult={calibrationPrompt.purchaseResult}
+        productId={calibrationPrompt.productId}
+        productName={calibrationPrompt.productName}
+        currentStock={calibrationPrompt.currentStock}
+        onCalibrated={() => {
+          setCalibrationPrompt(prev => ({ ...prev, open: false }));
+          loadOrders();
+          window.dispatchEvent(new CustomEvent('proclaw:inventory-calibrated'));
+        }}
+      />
     </Box>
   );
 }

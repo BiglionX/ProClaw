@@ -37,6 +37,8 @@ import { useAppModeStore } from '../config/appMode';
 import { isDemoAccountContext, readDemoFlag, recordDemoReset } from '../lib/demoFlag';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
+// 补全 5：自动更新 Tab（任务 #10）
+import UpdaterSettings from '../components/Settings/UpdaterSettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -177,6 +179,8 @@ export default function SettingsPage() {
           <Tab label="ℹ️ 系统信息" {...a11yProps(3)} />
           {mode !== 'light' && <Tab label="📧 邀请管理" {...a11yProps(4)} />}
           {isDemo && <Tab label="🧪 数据管理" {...a11yProps(5)} />}
+          {/* 补全 5：自动更新 Tab */}
+          <Tab label="🔄 自动更新" {...a11yProps(6)} />
         </Tabs>
       </Paper>
 

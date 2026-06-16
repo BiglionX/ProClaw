@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Card,
@@ -9,6 +8,7 @@ import {
 import {
   AreaChart, Area, ResponsiveContainer,
 } from 'recharts';
+import { useCountUp } from '../../lib/hooks/useCountUp';
 
 interface StatCardProps {
   title: string;
@@ -23,50 +23,17 @@ interface StatCardProps {
   alert?: boolean;
   /** 颜色映射名（用于主题色） */
   colorName?: string;
-}
-
-/** 数字计数动画 Hook */
-function useCountUp(target: number | string, duration = 600) {
-  const [display, setDisplay] = useState<string>('0');
-  const prevTarget = useRef<string>('');
-
-  useEffect(() => {
-    const targetStr = String(target);
-    if (targetStr === prevTarget.current) return;
-    prevTarget.current = targetStr;
-
-    // 如果是带单位的字符串（如 ¥28.5万），直接显示
-    if (isNaN(Number(target)) || target === 0) {
-      setDisplay(targetStr);
-      return;
-    }
-
-    const numTarget = Number(target);
-    const startTime = performance.now();
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // easeOutExpo
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      const current = Math.round(eased * numTarget);
-      setDisplay(current.toLocaleString());
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }, [target, duration]);
-
-  return display;
+  /** 是否启用计数动画（默认 true） */
+  countUpEnabled?: boolean;
+  /** 动画持续时间（ms） */
+  countUpDuration?: number;
 }
 
 export default function StatCard({
   title, value, icon, color, change, subtitle, sparklineData, alert = false,
+  countUpEnabled = true, countUpDuration = 600,
 }: StatCardProps) {
-  const displayValue = useCountUp(value);
+  const displayValue = useCountUp(value, { enabled: countUpEnabled, duration: countUpDuration });
 
   const colorMap: Record<string, string> = {
     primary: '#FF3B30',

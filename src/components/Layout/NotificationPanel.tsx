@@ -35,6 +35,10 @@ const TYPE_CONFIG: Record<NotificationType, { icon: string; color: string }> = {
   finance:             { icon: '💰', color: '#10B981' },
   agent_message:       { icon: '🤖', color: '#6366F1' },
   order_status:        { icon: '📋', color: '#FF3B30' },
+  // PRD v12.0 灵活库存通知
+  inventory_low_confidence: { icon: '⚠️', color: '#F59E0B' },
+  inventory_negative_aging: { icon: '📉', color: '#EF4444' },
+  inventory_calibration:    { icon: '🔧', color: '#6366F1' },
 };
 
 // ==================== 工具函数 ====================
