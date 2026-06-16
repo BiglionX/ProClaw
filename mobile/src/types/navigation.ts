@@ -73,6 +73,8 @@ export type RootStackParamList = {
 
   // Task 8：Agent 介绍页（与桌面端 /agent-profile/:agentId 一致）
   AgentProfile: { agentId: string };
+  // 云商城页面
+  CloudStore: undefined;
 };
 
 /** 通用 Navigation 快捷类型 */

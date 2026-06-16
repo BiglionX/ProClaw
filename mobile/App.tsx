@@ -42,6 +42,7 @@ import ProfileSelectScreen from './src/screens/ProfileSelectScreen';
 import PluginStoreScreen from './src/screens/PluginStoreScreen';
 import PluginDetailScreen from './src/screens/PluginDetailScreen';
 import PluginScreen from './src/screens/PluginScreen';
+import CloudStoreScreen from './src/screens/CloudStoreScreen';
 import LanSyncScreen from './src/screens/LanSyncScreen';
 import DataTransferScreen from './src/screens/DataTransferScreen';
 import BackupWalletScreen from './src/components/BackupWalletScreen';
@@ -435,6 +436,11 @@ export default function App() {
                   headerTintColor: '#fff',
                   headerTitleStyle: { fontWeight: '700' },
                 })}
+              />
+              <Stack.Screen
+                name="CloudStore"
+                component={CloudStoreScreen}
+                options={{ title: '云商城' }}
               />
             </Stack.Navigator>
           </NavigationContainer>

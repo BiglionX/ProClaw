@@ -8,12 +8,28 @@ import { isDemoMode } from '../services/AuthService';
 import { showToast } from '../components/Toast';
 import { getErrorMessage } from '../utils/errorUtils';
 
+// 演示产品数据（与桌面端 demoBootstrapData.ts 保持一致，共20个iPhone电池产品）
 const DEMO_PRODUCTS: Product[] = [
-  { id: '1', name: 'iPhone 15 Pro', sku: 'SKU-001', price: 8999, stock_quantity: 120 },
-  { id: '2', name: 'MacBook Air M3', sku: 'SKU-002', price: 10499, stock_quantity: 45 },
-  { id: '3', name: 'AirPods Pro 2', sku: 'SKU-003', price: 1999, stock_quantity: 200 },
-  { id: '4', name: 'iPad Air 11"', sku: 'SKU-004', price: 4799, stock_quantity: 88 },
-  { id: '5', name: 'Apple Watch S9', sku: 'SKU-005', price: 3199, stock_quantity: 150 },
+  { id: '1', name: 'iPhone 15 Pro Max 电池', sku: 'SKU-001', price: 199, stock_quantity: 50 },
+  { id: '2', name: 'iPhone 15 Pro 电池', sku: 'SKU-002', price: 179, stock_quantity: 50 },
+  { id: '3', name: 'iPhone 15 电池', sku: 'SKU-003', price: 159, stock_quantity: 60 },
+  { id: '4', name: 'iPhone 15 Plus 电池', sku: 'SKU-004', price: 189, stock_quantity: 45 },
+  { id: '5', name: 'iPhone 14 Pro Max 电池', sku: 'SKU-005', price: 179, stock_quantity: 45 },
+  { id: '6', name: 'iPhone 14 Pro 电池', sku: 'SKU-006', price: 159, stock_quantity: 55 },
+  { id: '7', name: 'iPhone 14 电池', sku: 'SKU-007', price: 149, stock_quantity: 60 },
+  { id: '8', name: 'iPhone 14 Plus 电池', sku: 'SKU-008', price: 169, stock_quantity: 40 },
+  { id: '9', name: 'iPhone 13 Pro Max 电池', sku: 'SKU-009', price: 169, stock_quantity: 50 },
+  { id: '10', name: 'iPhone 13 Pro 电池', sku: 'SKU-010', price: 149, stock_quantity: 55 },
+  { id: '11', name: 'iPhone 13 电池', sku: 'SKU-011', price: 139, stock_quantity: 60 },
+  { id: '12', name: 'iPhone 13 mini 电池', sku: 'SKU-012', price: 119, stock_quantity: 35 },
+  { id: '13', name: 'iPhone 12 Pro Max 电池', sku: 'SKU-013', price: 159, stock_quantity: 45 },
+  { id: '14', name: 'iPhone 12 Pro 电池', sku: 'SKU-014', price: 139, stock_quantity: 55 },
+  { id: '15', name: 'iPhone 12 电池', sku: 'SKU-015', price: 129, stock_quantity: 60 },
+  { id: '16', name: 'iPhone 12 mini 电池', sku: 'SKU-016', price: 109, stock_quantity: 40 },
+  { id: '17', name: 'iPhone 11 Pro Max 电池', sku: 'SKU-017', price: 149, stock_quantity: 40 },
+  { id: '18', name: 'iPhone 11 Pro 电池', sku: 'SKU-018', price: 129, stock_quantity: 50 },
+  { id: '19', name: 'iPhone 11 电池', sku: 'SKU-019', price: 119, stock_quantity: 60 },
+  { id: '20', name: 'iPhone SE (第三代) 电池', sku: 'SKU-020', price: 59, stock_quantity: 45 },
 ];
 
 const ProductsScreen: React.FC = () => {

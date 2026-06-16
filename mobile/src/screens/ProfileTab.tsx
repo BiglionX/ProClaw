@@ -42,11 +42,11 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'products', label: '商品目录', icon: 'package-variant-closed', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'Products' },
+  { id: 'cloudstore', label: '云商城', icon: 'store', color: '#6366f1', glow: 'rgba(99,102,241,0.2)', navigateTo: 'CloudStore' },
   { id: 'sales', label: '创建销售单', icon: 'clipboard-text', color: '#00f5d4', glow: 'rgba(0,245,212,0.2)', navigateTo: 'SalesOrder' },
   { id: 'supply', label: '采购入库', icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.2)', navigateTo: 'SupplyChain' },
   { id: 'calls', label: '通话记录', icon: 'phone-classic', color: '#7b2ff7', glow: 'rgba(123,47,247,0.2)', navigateTo: 'CallHistory' },
   { id: 'lansync', label: '局域网同步', icon: 'wifi', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'LanSync' },
-  { id: 'backup', label: '云备份', icon: 'cloud-upload', color: '#7b2ff7', glow: 'rgba(123,47,247,0.2)', navigateTo: 'BackupWallet' },
 ];
 
 // ============ 组件 ============
