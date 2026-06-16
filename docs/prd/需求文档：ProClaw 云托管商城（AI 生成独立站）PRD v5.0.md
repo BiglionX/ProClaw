@@ -1,5 +1,28 @@
 ## 需求文档：ProClaw 云托管商城（AI 生成独立站）PRD v5.0
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"云托管商城增强 - AI 生成独立电商站点（Next.js 16 + React 19）" |
+| **覆盖率** | 100%（独立子域名/商品同步/订单/优惠券/多套餐已上线；演示账号预置 proclaw.cc/demo） |
+| **代码入口** | `cloud-store/`（Next.js 16 项目）、`src/pages/CloudStorePages/`（桌面端管理后台 9 子页）、`src/pages/CloudStorePage.tsx` |
+| **数据库依赖** | `database/complete_schema.sql`（merchants/products_snapshot/orders/store_config/sync_logs） |
+| **测试覆盖** | `e2e/cloud-store-creation.spec.ts`、`e2e/cloud-store-flow.spec.ts` |
+| **差异与遗留** | AI 生成独立站已上线；演示账号预置 1 个商城（proclaw.cc/demo）含 8 管理 Tab |
+| **后续动作** | 维持现状；按市场反馈扩展多端适配 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，云托管商城上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 ### 1. 背景与目标
 
 #### 1.1 背景

@@ -1,5 +1,29 @@
 ## 产品需求文档：ProClaw 手机独立版（PRD v11.0）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"双模式架构"（含手机独立版能力） |
+| **覆盖率** | ~95%（多身份/云备份/局域网同步已落地；插件按需下载待 iOS 端验收） |
+| **代码入口** | `mobile/App.tsx`、`mobile/src/services/SchemaManager.ts`、`mobile/src/services/DatabaseFactory.ts`、`mobile/src/services/ConnectionManager.ts`、`mobile/src/screens/`（29 个屏） |
+| **数据库依赖** | `mobile/src/services/SchemaManager.ts`（多身份独立 SQLite） |
+| **测试覆盖** | `mobile/src/services/__tests__/SchemaManager.test.ts`、`ConnectionManager.test.ts`、`DatabaseFactory.test.ts` |
+| **差异与遗留** | SDK 56 升级（2026-06-10）已完成；玻璃拟态重写、闪退修复、字体打包已修复（见 `mobile-audit-report-v14.md`） |
+| **后续动作** | 维持现状；按 `MOBILE_ROADMAP.md` P3+ 技术债清理后持续迭代 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，含手机独立版基础能力 |
+| 2026-06-10 | ✅ 已实现 v1.0+ | SDK 56 升级 + P0-P6 技术债清理 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 **版本**：v1.0  
 **依赖**：ProClaw 通用同步框架（PRD v10.0）、ProClaw 插件系统（PRD 插件部分）  
 **目标**：实现手机端作为独立的 ProClaw 运行节点，拥有完整本地数据库，支持可选云备份、局域网直连同步、按需安装插件以及多身份数据隔离。

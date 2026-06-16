@@ -1,5 +1,28 @@
 # 需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"AI 经营团队增强" + `mobile-audit-report-v14.md` 玻璃拟态重写 |
+| **覆盖率** | 100% |
+| **代码入口** | `mobile/src/screens/TeamsPage.tsx`（桌面端镜像）、`mobile/src/screens/AgentsScreen.tsx`、`mobile/src/theme/glassmorphism.ts` |
+| **数据库依赖** | N/A（前端展示层） |
+| **测试覆盖** | `mobile/src/services/__tests__/AgentRuntimeBridge.test.ts`（P3 单测补全） |
+| **差异与遗留** | 无显著差异；玻璃拟态 11 屏全部重写（commit `c17fc5d` 基线） |
+| **后续动作** | 维持现状 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，AI Team UI 重构并入玻璃拟态基线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **版本**：v1.0  
 > **日期**：2026-06-05  
 > **关联 PRD**：v11.0（桌面端 UI 全面升级）、v6.4（AI Team 群聊 LLM 接入）、AI团队交互与AI知识库统一管理  

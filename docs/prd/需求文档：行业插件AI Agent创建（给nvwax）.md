@@ -1,5 +1,28 @@
 # 需求文档：行业插件 AI Agent 创建
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"AI 经营团队增强 - 25+ 行业 Agent" |
+| **覆盖率** | ~80%（4 大行业 Agent 已建；细分行业 Agent 按需生成） |
+| **代码入口** | `src/services/agent-factory/`、`src/services/aiTeamChatService.ts`、`src-tauri/src/commands/agent.rs` |
+| **数据库依赖** | `database/complete_schema.sql`（agent 包元数据） |
+| **测试覆盖** | `e2e/agent-manager.spec.ts` |
+| **差异与遗留** | 4 大行业 Agent 模板已发布至演示账号；细分行业 Agent 由 Nvwax 动态生成 |
+| **后续动作** | 维持现状；按需扩展更多行业模板 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，4 大行业 Agent 模板上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 <!-- cSpell:ignore nvwax -->
 
 > 版本：v1.0 · 目标：为餐饮/美业/宠物/Cloud 四大行业插件创建专用 AI Agent  

@@ -1,5 +1,28 @@
 # ProClaw × NvwaX API 集成需求文档
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"测试用户数据包 - AI 团队从 Nvwax 下载，失败回退本地映射" |
+| **覆盖率** | ~85%（AI Team 下载/API 调用已落地；3 大团队预置；离线回退机制完善） |
+| **代码入口** | `src/services/nvwax/`、`src/lib/aiTeamChatService.ts`、`src/lib/localTeamSkillMap.ts`、`scripts/seed-products.js` |
+| **数据库依赖** | N/A（外部 API + 演示种子） |
+| **测试覆盖** | `e2e/agent-manager.spec.ts`（含 Nvwax 集成） |
+| **差异与遗留** | 演示账号预置 3 个 AI 团队（AI 经营/国内社媒/海外社媒）；Nvwax 接入失败时回退 `localTeamSkillMap` |
+| **后续动作** | 维持现状；按 v1.x 路线图扩展更多 Nvwax 资源类型 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，Nvwax 集成 + 本地回退上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 ## 1. 整体架构
 
 ```

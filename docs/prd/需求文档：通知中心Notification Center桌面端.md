@@ -1,5 +1,28 @@
 # 需求文档：通知中心（桌面端 Notification Center）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"双模式架构" / "AI 经营团队增强"（通知系统融入） |
+| **覆盖率** | ~90%（实时通知/未读管理/抽屉式面板已上线；与 AI 智能提醒的深度联动部分完成） |
+| **代码入口** | `src/pages/notifications/`、`src/components/Layout/TopBar.tsx`（铃铛入口）、`src-tauri/src/commands/notification.rs`、`src-tauri/src/api/websocket.rs` |
+| **数据库依赖** | `database/complete_schema.sql`（notifications 表） |
+| **测试覆盖** | `e2e/dashboard.spec.ts`（含 TopBar 通知铃铛交互） |
+| **差异与遗留** | 通知中心主功能已上线；与 AI Agent 主动报告的深度联动持续优化中 |
+| **后续动作** | 维持现状；按市场反馈增强通知策略 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，通知中心上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **版本**：v1.0
 > **日期**：2026-06-06
 > **关联**：Tauri WebSocket 后端、TopBar 铃铛占位符

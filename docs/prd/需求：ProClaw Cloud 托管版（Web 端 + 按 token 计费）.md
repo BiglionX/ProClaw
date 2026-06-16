@@ -1,3 +1,28 @@
+# 需求：ProClaw Cloud 托管版（Web 端 + 按 token 计费）
+
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"云托管商城增强 - AI 生成独立电商站点" |
+| **覆盖率** | 100%（Web 端商城 + 按 token 计费均已上线） |
+| **代码入口** | `cloud-store/`（Next.js 16 完整 Web 端）、`cloud-store/vercel.json`、`cloud-store/Dockerfile`、`cloud-store/src/lib/billing/` |
+| **数据库依赖** | `database/complete_schema.sql`（云商城全表 + token 计费） |
+| **测试覆盖** | `e2e/cloud-store-flow.spec.ts` |
+| **差异与遗留** | 无显著差异；演示账号已预置 `proclaw.cc/demo` |
+| **后续动作** | 维持现状；按市场反馈扩展功能 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，Cloud 托管版上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 “个体户连电脑都没有，直接在 proclaw.cc 网页上登录使用，数据存在云端，按 token 消耗收费”的模式，**不是传统 SaaS（软件即服务，通常按订阅制收费）**，而更接近：
 
 ## 建议命名：**ProClaw Cloud 托管版** 或 **ProClaw Cloud 按量版**

@@ -1,5 +1,28 @@
 # 应付/应收台账与对账管理需求文档 (PRD)
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"双模式架构 - 财务：损益报表/现金流/应收应付对账" |
+| **覆盖率** | ~85%（财务对账/台账核心模块已上线；跨期对账与自动核销部分简化为手动） |
+| **代码入口** | `src/pages/FinancePage.tsx`（1569 行）、`src/pages/ProfitLossPage.tsx`、`src/pages/CashFlowPage.tsx`、`src-tauri/src/finance_commands.rs`、`src-tauri/src/services/subscription_service.rs` |
+| **数据库依赖** | `database/complete_schema.sql`（accounts/financial_transactions/sales_orders/purchase_orders） |
+| **测试覆盖** | `e2e/finance.spec.ts` |
+| **差异与遗留** | 应付/应收台账与对账主流程已落地；自动化核销与跨期冲账待 v1.x |
+| **后续动作** | 维持现状；按需补齐自动化核销 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，财务对账模块上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > 文档状态：草稿 | 优先级：P1~P2 | 版本：v1.0 | 日期：2026-06-05
 
 ---

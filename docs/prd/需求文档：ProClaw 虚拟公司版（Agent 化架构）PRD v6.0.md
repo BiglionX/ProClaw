@@ -1,5 +1,28 @@
 ## 需求文档：ProClaw（Agent 化架构）PRD v6.0
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"AI 经营团队增强 - 25+ 行业 Agent + CEO Agent 主控官" |
+| **覆盖率** | ~90%（Agent 化架构 + CEO Agent 主控官 + 财务/任务/文档/客户/营销模块 Agent 全部上线） |
+| **代码入口** | `src/services/agent-orchestrator/`、`src/pages/virtual-company/`、`src/pages/TeamProfilePage.tsx`、`src-tauri/src/commands/agent.rs`、`src-tauri/src/ceo_commands.rs` |
+| **数据库依赖** | `database/complete_schema.sql`（agent 元数据 + 财务/任务/客户/文档表） |
+| **测试覆盖** | `e2e/ceo-agent.spec.ts`、`e2e/agent-manager.spec.ts` |
+| **差异与遗留** | 虚拟公司版架构与 Plus 版共享同一二进制；通过 FeatureGate/Feature 切换 |
+| **后续动作** | 维持现状；按 v1.x 路线图扩展更多垂直行业 Agent |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，虚拟公司版架构上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 ### 1. 背景与目标
 
 #### 1.1 背景

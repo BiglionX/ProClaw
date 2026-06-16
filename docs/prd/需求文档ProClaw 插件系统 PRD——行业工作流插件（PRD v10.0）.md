@@ -1,5 +1,28 @@
 ## 1. ProClaw 插件系统 PRD（行业工作流插件）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | 🟡 草案 (待 v1.x 规划) |
+| **首次落地版本** | 未落地（v1.0.0 仅实现基础插件加载，完整生态联动待 v1.x） |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) 未涉及 |
+| **覆盖率** | 0% |
+| **代码入口** | 未来：`src-tauri/src/commands/plugin.rs` 扩展点；Nuwax/SkillHub/FlowHub 联动需 v1.x 规划 |
+| **数据库依赖** | 未来：plugin marketplace schema |
+| **测试覆盖** | N/A |
+| **差异与遗留** | v10.0 依赖 Nuwax（AI Team 市场）/ SkillHub（技能仓库）/ FlowHub（插件市场）三个外部平台；v1.0.0 中未独立发布；需三个上游平台同步落地 |
+| **后续动作** | 等待 v1.x 路线图；与 Nuwax+SkillHub+FlowHub 团队协同推进 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-05-30 | 🟡 草案 | PRD 创建，依赖 Nuwax/SkillHub/FlowHub 上游平台 |
+| 2026-06-16 | 🟡 草案 | 文档整理：添加实施状态区块；标记为 v1.x 路线图项 |
+
+---
+
 **项目**：ProClaw 桌面端 / 手机端  
 **版本**：v1.0  
 **依赖**：ProClaw v10.0 通用同步框架、Nuwax（AI Team 市场）、SkillHub（技能仓库）  

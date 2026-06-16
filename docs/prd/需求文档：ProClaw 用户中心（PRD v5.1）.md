@@ -1,5 +1,28 @@
 # 需求文档：ProClaw 用户中心（PRD v5.1）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"双模式架构" |
+| **覆盖率** | ~90%（个人资料/安全/设备/订阅全 Tab 均落地；通知偏好 P2 留有简化） |
+| **代码入口** | `src/pages/UserCenterPage.tsx`（811 行）、`src/pages/DevicePairingPage.tsx`、`src-tauri/src/user_commands.rs`、`src-tauri/src/commands/setup.rs` |
+| **数据库依赖** | `database/complete_schema.sql`（users/login_logs/user_sessions） |
+| **测试覆盖** | `e2e/invitation.spec.ts`、`src/lib/authStore.test.ts` |
+| **差异与遗留** | 桌面端用户中心主要模块全部就位；移动端 `ProfileScreen.tsx` 采用独立实现但数据结构一致 |
+| **后续动作** | 维持现状；通知偏好 Tab 可后续增强 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，个人资料/安全/设备/订阅全 Tab 上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **版本**: v5.1  
 > **更新日期**: 2026-05-29  
 > **状态**: 草案  

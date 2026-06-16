@@ -1,5 +1,28 @@
 # 需求文档：ProClaw 手机端消息链路对齐补充需求（PRD v11.2）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"双模式架构" |
+| **覆盖率** | 100%（P0 3 项 + P1 2 项 + P2 3 项 + P3 2 项均已落地） |
+| **代码入口** | `mobile/src/services/ChatService.ts`、`mobile/src/services/AgentRuntimeBridge.ts`、`mobile/src/screens/ChatDetailScreen.tsx`、`mobile/src/screens/ContactsTab.tsx`、`mobile/src/components/FloatingSecretaryButton.tsx` |
+| **数据库依赖** | `mobile/src/services/SchemaManager.ts`（chat_sessions/chat_messages 统一表） |
+| **测试覆盖** | `mobile/src/services/__tests__/ChatService.test.ts` |
+| **差异与遗留** | 无显著差异；统一表体系/桥接修复/未读计数/ChatStore/多供应商回退/流式/历史标准化/秘书 badge/订单卡片全部落地 |
+| **后续动作** | 维持现状 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，10 项需求全部落地 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > 版本：v11.2  
 > 状态：待评审  
 > 创建日期：2026-06-07  

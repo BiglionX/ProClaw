@@ -1,5 +1,29 @@
 # 需求文档：ProClaw AI 网关统购分销与多模型路由（PRD v9.0）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | 🔵 部分实现 v1.0+ (2026-06-08, 进度 ~40%) |
+| **首次落地版本** | v1.0.0 (2026-06-08)（Token 计费已落地；统购分销网关未独立部署） |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"云托管商城增强 - 多套餐订阅 + Token 用量监控" |
+| **覆盖率** | ~40%（v8.0 Token 计费已上线；统购 `ai.proclaw.cc` 网关未独立部署；多模型路由桌面端已支持） |
+| **代码入口** | `src/services/llm/`（多模型路由）、`src-tauri/src/services/subscription_service.rs`、`src/pages/cloud/TokenBillingPage.tsx` |
+| **数据库依赖** | `database/complete_schema.sql`（token_balances/token_sales/api_usage_logs） |
+| **测试覆盖** | `e2e/token-billing.spec.ts` |
+| **差异与遗留** | 桌面端多 LLM 路由（DeepSeek/OpenAI/Anthropic/Ollama）已实现；外部统购网关待 v1.x |
+| **后续动作** | 进入 v1.x 路线图；评估 `ai.proclaw.cc` 独立部署时机 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-05-31 | 🟡 草案 | PRD 起草 |
+| 2026-06-08 | 🔵 部分实现 ~40% | v1.0.0 发布，Token 计费落地，统购网关待建 |
+| 2026-06-16 | 🔵 部分实现 ~40% | 文档整理：添加实施状态区块；统购网关列为 v1.x |
+
+---
+
 > **版本**: v9.0  
 > **更新日期**: 2026-05-31  
 > **状态**: 草案  

@@ -1,5 +1,28 @@
 # ProClaw 架构分层优化方案
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"测试覆盖: 96.5% 通过率 (221/229)" / 架构分层优化（166 个 Rust 命令） |
+| **覆盖率** | 100%（Sprint 1-4 全部完成：Rust 命令注册表 + FeatureGate 组件 + 服务层分层 + 页面分组） |
+| **代码入口** | `src-tauri/src/commands/mod.rs`（2145 行）、`src-tauri/src/commands/stats.rs`、`src/components/FeatureGate.tsx`、`src/services/index.ts`、`src/pages/_light/`、`src/pages/_plus/`、`src/pages/_agent/` |
+| **数据库依赖** | N/A（架构重构） |
+| **测试覆盖** | `src/components/FeatureGate/FeatureGate.test.tsx`、`src-tauri/src/commands/stats.rs` 单元测试 |
+| **差异与遗留** | 无显著差异；Feature Flag 注解从 50+ 减到 7 处；命令注册表 166 个命令集中管理 |
+| **后续动作** | 维持现状；按 v1.x 路线图持续维护 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | Sprint 1-4 全部完成，166 个命令迁移至注册表 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **文档类型**：技术架构改进需求
 > **版本**：v1.0
 > **日期**：2026-06-08

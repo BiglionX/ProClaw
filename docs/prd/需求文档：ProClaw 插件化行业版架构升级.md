@@ -1,5 +1,28 @@
 # 需求文档：ProClaw 插件化行业版架构升级
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"行业插件系统 Phase 4" / "架构分层优化（166 个 Rust 命令）" |
+| **覆盖率** | ~85%（架构主架/插件加载/签名验证/CLI 入口已落地；面向 Nuwax+SkillHub+FlowHub 的生态联动为 v1.x 路线） |
+| **代码入口** | `src-tauri/src/commands/mod.rs`（166 个命令注册表）、`src-tauri/src/commands/plugin.rs`、`public/plugins/ma_foreign_counter/`（示范插件）、`src/pages/PluginStorePage.tsx` |
+| **数据库依赖** | `database/complete_schema.sql`（plugin_registry + 插件 schema） |
+| **测试覆盖** | `e2e/plugins.spec.ts`、`e2e/dual-mode-library.spec.ts` |
+| **差异与遗留** | 本地插件（ma_foreign_counter）已上线；Nuwax 同步入口已预留但需上层平台同步上线 |
+| **后续动作** | 维持现状；按 `architecture/插件 v1.0 路线图.md` 增强插件生态 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，插件化架构升级上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **版本**: v1.0  
 > **日期**: 2026-05-30  
 > **适用范围**: ProClaw 桌面端 + 营销网站 + Admin 后台

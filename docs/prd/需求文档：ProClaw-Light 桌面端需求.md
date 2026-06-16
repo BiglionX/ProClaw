@@ -1,3 +1,28 @@
+# 需求文档：ProClaw-Light 桌面端需求
+
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"双模式架构正式上线 - ProClaw Light" |
+| **覆盖率** | ~85%（轻量商品/销售单/库存流水/收入支出全部上线；多店+小票+移动端入口部分完成） |
+| **代码入口** | `src/pages/_light/`、`src/pages/LightHome/`、`src/components/FeatureGate.tsx`（Light/Plus 模式切换） |
+| **数据库依赖** | `database/complete_schema.sql`（products/sales_orders 共享表 + 轻量视图） |
+| **测试覆盖** | `e2e/light-flow.spec.ts` |
+| **差异与遗留** | Light/Plus 双模式已落地；轻量视图与命令注册表已分级 |
+| **后续动作** | 维持现状；按 v1.x 路线图扩展 Light 行业模板 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，ProClaw Light 正式版上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 项目名称：ProClaw-Light
 定位：基于 ProClaw 进销存版裁剪，专门面向县区小微商家的极简智能经营助手，聚焦获客、履约、客户管理，内置 AI Team 辅助运营。
 

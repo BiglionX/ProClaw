@@ -1,5 +1,28 @@
 ## 需求文档：ProClaw 员工邀请与角色权限自动分配（PRD v4.3）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"用户管理 - 角色权限" |
+| **覆盖率** | 100%（5 大角色 boss/finance/purchase/warehouse/sales 权限矩阵已落地） |
+| **代码入口** | `src/services/team/`、`src/pages/UserManagementPage.tsx`、`src-tauri/src/commands/permissions.rs`、`src-tauri/src/user_commands.rs` |
+| **数据库依赖** | `database/complete_schema.sql`（users/roles/permissions） |
+| **测试覆盖** | `e2e/invitation.spec.ts`（含员工邀请）、`src-tauri/src/permissions.rs` 单测（22 个） |
+| **差异与遗留** | 5 角色权限已实装；细分权限粒度按需扩展 |
+| **后续动作** | 维持现状 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，5 角色权限矩阵上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 ### 1. 背景与目标
 
 #### 1.1 背景

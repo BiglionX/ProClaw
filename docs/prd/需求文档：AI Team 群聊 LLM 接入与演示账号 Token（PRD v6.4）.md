@@ -1,5 +1,28 @@
 ## 需求文档：AI Team 群聊 LLM 接入 + 演示账号 Token（PRD v6.4）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"测试用户数据包 - AI 团队 3 个" / "双模式架构" |
+| **覆盖率** | 100% |
+| **代码入口** | `src/lib/aiTeamTokenService.ts`、`src/lib/aiTeamChatService.ts`、`src/pages/ChatPage.tsx`、`scripts/seed-products.js` |
+| **数据库依赖** | `database/complete_schema.sql`（演示账号 seed 数据） |
+| **测试覆盖** | `e2e/ceo-agent.spec.ts`（AI 团队群聊集成） |
+| **差异与遗留** | 无显著差异；10,000 PT 演示 Token、CEO Agent 自动回复、Token 余额 UI 均落地 |
+| **后续动作** | 维持现状；Nvwax 接入失败回退 `localTeamSkillMap` 已实现 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，含 AI Team 群聊 LLM 接入与演示 Token |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 ### 1. 背景与目标
 
 #### 1.1 背景

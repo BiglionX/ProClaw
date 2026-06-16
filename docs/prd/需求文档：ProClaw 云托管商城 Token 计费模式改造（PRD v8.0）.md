@@ -1,5 +1,28 @@
 ﻿# 需求文档：ProClaw 云托管商城 Token 计费模式改造（PRD v8.0）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"云托管商城增强 - 多套餐订阅 + Token 用量监控" |
+| **覆盖率** | ~85%（Token 购买/余额/消费明细/充值记录已上线；预充值自动停服保护按既定规则触发） |
+| **代码入口** | `src/pages/cloud/TokenBillingPage.tsx`、`cloud-store/src/lib/billing/`、`src-tauri/src/services/subscription_service.rs`（含 TokenCost/check_and_consume） |
+| **数据库依赖** | `database/complete_schema.sql`（token_balances/token_sales/token_packages/api_usage_logs + RPC `deduct_tokens`/`add_tokens`） |
+| **测试覆盖** | `e2e/token-billing.spec.ts` |
+| **差异与遗留** | v8.0 Token 计费已上线；统购分销网关（v9.0）按部分实现 ~40% 推进 |
+| **后续动作** | 维持现状；按 v9.0 PRD 推进统购网关 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，Token 计费模式上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **版本**: v8.0  
 > **更新日期**: 2026-05-29  
 > **状态**: 草案  

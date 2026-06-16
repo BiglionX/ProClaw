@@ -1,5 +1,28 @@
 # 进销存（供应链）模块完善需求文档 (PRD)
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"双模式架构 - 供应链：库存/采购/销售管理" |
+| **覆盖率** | ~90%（采购/销售订单 CRUD 全状态流已落地；退货闭环已上线；P2 完善项如库存盘点/应付应收台账部分落地） |
+| **代码入口** | `src/pages/PurchasePage.tsx`（589 行）、`src/pages/SalesPage.tsx`（634 行）、`src/pages/InventoryPage.tsx`（1449 行）、`src/pages/SupplyChainPage.tsx`（2458 行）、`src-tauri/src/purchase_commands.rs`、`src-tauri/src/sales_commands.rs` |
+| **数据库依赖** | `database/complete_schema.sql`（purchase_orders/sales_orders/inventory_transactions + 新增 purchase_returns/sales_returns） |
+| **测试覆盖** | `e2e/purchase.spec.ts`、`e2e/sales.spec.ts`、`e2e/inventory.spec.ts` |
+| **差异与遗留** | P0 采购/销售订单 UI + P0 退货闭环均已落地；P2 库存盘点/订单打印/操作日志待 v1.x |
+| **后续动作** | 维持现状；按 v1.x 路线图补齐 P2 项 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，进销存全状态流 + 退货闭环上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > 文档状态：草稿 | 优先级：P0~P2 | 版本：v1.0 | 日期：2026-06-05
 
 ---

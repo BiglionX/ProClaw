@@ -1,5 +1,28 @@
 # 需求文档：ProClaw AI 团队交互 & AI 知识库统一管理
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"AI 知识库升级 - 三库合一（媒体库 + 问答库 + 资料库）" |
+| **覆盖率** | ~90%（三库合一已落地；多模态检索与 RAG 优化待 v1.x） |
+| **代码入口** | `src/pages/AIKnowledgePage.tsx`、`src/pages/MediaLibraryPage.tsx`、`src/pages/QALibraryPage.tsx`、`src/pages/KnowledgeBasePage.tsx`、`src/services/ai-team/`、`src/services/knowledge/` |
+| **数据库依赖** | `database/complete_schema.sql`（knowledge/media/qa 表） |
+| **测试覆盖** | `e2e/secretary.spec.ts`（含知识库调用） |
+| **差异与遗留** | 知识库三库合一已落地；全模态 RAG 增强按 `MOBILE_ROADMAP.md` 持续迭代 |
+| **后续动作** | 维持现状；后续可加强多模态与向量检索 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，AI 知识库三库合一上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **版本**: v1.0  
 > **日期**: 2026-05-30  
 > **适用范围**: ProClaw 全版本（进销存版 / 虚拟公司版 / Light 极简版）

@@ -1,5 +1,28 @@
 # 需求文档：ProClaw 营销网站用户中心（PRD v7.1）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"云托管商城增强"（用户中心关联云数据管理） |
+| **覆盖率** | ~85%（个人资料/安全/订阅/API Keys/Token/云数据 6 Tab 全部落地；细分子页面部分含 P1 占位） |
+| **代码入口** | `marketing-site/src/pages/UserCenterPage.tsx`、`marketing-site/src/lib/authStore.ts` |
+| **数据库依赖** | `marketing-site/database/schema.sql`（profiles/api_keys/token_*/user_subscriptions 等表） |
+| **测试覆盖** | `marketing-site/src/lib/authStore.test.ts` |
+| **差异与遗留** | 用户中心 6 Tab 已上线；登录历史/订阅事件等表已建好（详见 PRD §5.2） |
+| **后续动作** | 维持现状；按需补齐 P1 优先级子页面 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，营销网站用户中心 6 Tab 上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > **版本**: v7.1  
 > **更新日期**: 2026-05-29  
 > **状态**: 草案  

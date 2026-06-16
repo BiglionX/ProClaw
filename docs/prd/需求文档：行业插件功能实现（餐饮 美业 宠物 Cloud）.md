@@ -1,5 +1,28 @@
 # 需求文档：行业插件功能实现（餐饮 / 美业 / 宠物 / ProClaw Cloud）
 
+## 实施状态
+
+| 字段 | 值 |
+|---|---|
+| **状态标签** | ✅ 已实现 v1.0+ (2026-06-08) |
+| **首次落地版本** | v1.0.0 (2026-06-08) |
+| **关联发布** | [RELEASE_NOTES_v1.0.0.md](../../RELEASE_NOTES_v1.0.0.md) §"行业插件系统 Phase 4 - 餐饮/美业/宠物/Cloud/会员管理" |
+| **覆盖率** | 100%（4 大行业插件已上线） |
+| **代码入口** | `src/pages/pos/`、`src/pages/beauty/`、`src/pages/pet/`、`src/pages/cloud/`、`src/pages/MembersPage.tsx`、`src/pages/kitchen/`、`public/plugins/ma_foreign_counter/` |
+| **数据库依赖** | `database/complete_schema.sql`（pos/beauty/pet/cloud schema） |
+| **测试覆盖** | `e2e/dual-mode-library.spec.ts`（含会员通用能力） |
+| **差异与遗留** | 4 大行业插件全部上线；Cloud 插件含 Token 计费与云端备份 |
+| **后续动作** | 维持现状；按市场反馈扩展行业生态 |
+
+### 状态变更日志
+
+| 日期 | 状态 | 变更人/触发事件 |
+|---|---|---|
+| 2026-06-08 | ✅ 已实现 v1.0+ | v1.0.0 发布，4 大行业插件上线 |
+| 2026-06-16 | ✅ 已实现 v1.0+ | 文档整理：添加实施状态区块 |
+
+---
+
 > 版本：v1.0 · 基于插件化行业版架构升级（v1.3+）的 Phase 4 补充实现  
 > 关联：`docs/需求文档：ProClaw 插件化行业版架构升级.md`
 
