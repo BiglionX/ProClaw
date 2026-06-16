@@ -178,6 +178,17 @@ impl Database {
             migration_errors.push(format!("041: {}", e));
         }
 
+        // 运行迁移：ProductsPage 多图持久化支持（中等优先级 TODO #1）
+        // 为 product_images 表增加 product_id 列（与 spu_id 共存）
+        // SQLite 3.35+ 支持 ADD COLUMN；旧版会报 duplicate column，已被迁移错误吞掉
+        let gallery_migration = include_str!("../../database/migrations/051_product_gallery.sql");
+        if let Err(e) = self.conn.execute_batch(gallery_migration) {
+            eprintln!("[DB Migration WARNING] 051_product_gallery: {}", e);
+            migration_errors.push(format!("051: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] 051_product_gallery 多图支持已加载");
+        }
+
         // 运行迁移：给缺 deleted_at 列的表补充软删除列（v1.0.0+tray 补丁）
         // 原因：销售/采购/联系人代码使用 WHERE deleted_at IS NULL，但 src/db/schema.sql
         // 原始定义里没建这个列。SQLite 不支持 ADD COLUMN IF NOT EXISTS，
@@ -509,6 +520,128 @@ impl Database {
         ") {
             eprintln!("[DB Migration WARNING] payment/reconciliation: {}", e);
             migration_errors.push(format!("payment/reconciliation: {}", e));
+        }
+
+        // 运行迁移：灵活库存支持（PRD v12.0 库存负库存与微盘点）
+        //   - product_sku 扩展字段：allow_negative_stock / stock_confidence / last_calibrated_at / negative_since
+        //   - inventory_calibrations：校准历史（微盘点/冲销/清零）
+        //   - notification_suppressions：通知防骚扰
+        //   - inventory_aging_tasks：负库存老化待处理
+        if let Err(e) = self.conn.execute_batch("
+            ALTER TABLE product_sku ADD COLUMN allow_negative_stock INTEGER DEFAULT 0;
+            ALTER TABLE product_sku ADD COLUMN stock_confidence TEXT DEFAULT 'low';
+            ALTER TABLE product_sku ADD COLUMN last_calibrated_at TIMESTAMP;
+            ALTER TABLE product_sku ADD COLUMN negative_since TIMESTAMP;
+            -- 同样为旧版 products 表添加字段（销售/采购订单使用该表）
+            ALTER TABLE products ADD COLUMN allow_negative_stock INTEGER DEFAULT 0;
+            ALTER TABLE products ADD COLUMN stock_confidence TEXT DEFAULT 'low';
+            ALTER TABLE products ADD COLUMN last_calibrated_at TIMESTAMP;
+            ALTER TABLE products ADD COLUMN negative_since TIMESTAMP;
+            CREATE INDEX IF NOT EXISTS idx_product_sku_negative_since ON product_sku(negative_since);
+            CREATE INDEX IF NOT EXISTS idx_product_sku_confidence ON product_sku(stock_confidence);
+            CREATE INDEX IF NOT EXISTS idx_product_sku_last_calibrated ON product_sku(last_calibrated_at);
+            CREATE TABLE IF NOT EXISTS inventory_calibrations (
+                id TEXT PRIMARY KEY,
+                sku_id TEXT NOT NULL,
+                spu_id TEXT,
+                calibration_type TEXT NOT NULL CHECK(calibration_type IN ('micro','manual','writeoff','auto_offset')),
+                book_stock INTEGER NOT NULL,
+                actual_stock INTEGER NOT NULL,
+                delta INTEGER NOT NULL,
+                trigger_source TEXT NOT NULL CHECK(trigger_source IN ('after_sale','after_purchase','manual','aging','low_confidence','top_sales_aging')),
+                reference_id TEXT,
+                reference_type TEXT,
+                confidence_before TEXT,
+                confidence_after TEXT,
+                notes TEXT,
+                performed_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_inventory_calibrations_sku ON inventory_calibrations(sku_id);
+            CREATE INDEX IF NOT EXISTS idx_inventory_calibrations_type ON inventory_calibrations(calibration_type);
+            CREATE INDEX IF NOT EXISTS idx_inventory_calibrations_created ON inventory_calibrations(created_at DESC);
+            CREATE TABLE IF NOT EXISTS notification_suppressions (
+                id TEXT PRIMARY KEY,
+                sku_id TEXT NOT NULL,
+                notification_kind TEXT NOT NULL CHECK(notification_kind IN ('negative_aging','low_confidence','top_sales_aging')),
+                ignore_count INTEGER DEFAULT 0,
+                suppressed_until TIMESTAMP,
+                last_dismissed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_notification_suppressions_sku ON notification_suppressions(sku_id);
+            CREATE INDEX IF NOT EXISTS idx_notification_suppressions_until ON notification_suppressions(suppressed_until);
+            CREATE TABLE IF NOT EXISTS inventory_aging_tasks (
+                id TEXT PRIMARY KEY,
+                sku_id TEXT NOT NULL,
+                spu_id TEXT,
+                task_type TEXT NOT NULL CHECK(task_type IN ('negative_aging')),
+                status TEXT DEFAULT 'pending' CHECK(status IN ('pending','resolved','cancelled')),
+                triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP,
+                resolution TEXT,
+                resolution_qty INTEGER,
+                notes TEXT,
+                highlighted INTEGER DEFAULT 1
+            );
+            CREATE INDEX IF NOT EXISTS idx_inventory_aging_tasks_status ON inventory_aging_tasks(status);
+            CREATE INDEX IF NOT EXISTS idx_inventory_aging_tasks_sku ON inventory_aging_tasks(sku_id);
+            UPDATE product_sku
+            SET stock_confidence = CASE
+              WHEN EXISTS (
+                SELECT 1 FROM inventory_transactions it
+                WHERE it.product_id = product_sku.id
+                  AND it.created_at >= datetime('now', '-7 days')
+              ) THEN 'medium'
+              ELSE 'low'
+            END
+            WHERE stock_confidence IS NULL OR stock_confidence = 'low';
+            UPDATE product_sku
+            SET negative_since = CURRENT_TIMESTAMP
+            WHERE current_stock < 0 AND negative_since IS NULL;
+            -- 触发器：库存变为负时自动设置 negative_since（PRD v12.0 §3.6）
+            DROP TRIGGER IF EXISTS trg_product_sku_negative_since;
+            CREATE TRIGGER trg_product_sku_negative_since
+                AFTER UPDATE OF current_stock ON product_sku
+                WHEN NEW.current_stock < 0 AND (OLD.current_stock >= 0 OR OLD.negative_since IS NULL)
+            BEGIN
+                UPDATE product_sku
+                SET negative_since = CURRENT_TIMESTAMP
+                WHERE id = NEW.id;
+            END;
+            -- 触发器：库存回到非负时清空 negative_since
+            DROP TRIGGER IF EXISTS trg_product_sku_negative_clear;
+            CREATE TRIGGER trg_product_sku_negative_clear
+                AFTER UPDATE OF current_stock ON product_sku
+                WHEN NEW.current_stock >= 0 AND OLD.negative_since IS NOT NULL
+            BEGIN
+                UPDATE product_sku
+                SET negative_since = NULL
+                WHERE id = NEW.id;
+            END;
+            -- 旧版 products 表也加同样的触发器（销售/采购使用该表）
+            DROP TRIGGER IF EXISTS trg_products_negative_since;
+            CREATE TRIGGER trg_products_negative_since
+                AFTER UPDATE OF current_stock ON products
+                WHEN NEW.current_stock < 0 AND (OLD.current_stock >= 0 OR OLD.negative_since IS NULL)
+            BEGIN
+                UPDATE products
+                SET negative_since = CURRENT_TIMESTAMP
+                WHERE id = NEW.id;
+            END;
+            DROP TRIGGER IF EXISTS trg_products_negative_clear;
+            CREATE TRIGGER trg_products_negative_clear
+                AFTER UPDATE OF current_stock ON products
+                WHEN NEW.current_stock >= 0 AND OLD.negative_since IS NOT NULL
+            BEGIN
+                UPDATE products
+                SET negative_since = NULL
+                WHERE id = NEW.id;
+            END;
+        ") {
+            eprintln!("[DB Migration WARNING] flexible_inventory: {}", e);
+            migration_errors.push(format!("flexible_inventory: {}", e));
         }
 
         // 自动安装内置 Agent

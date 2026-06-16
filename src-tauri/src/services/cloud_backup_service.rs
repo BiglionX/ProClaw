@@ -571,9 +571,35 @@ impl CloudBackupService {
         Ok(())
     }
 
-    fn get_current_user_id(&self, _conn: &rusqlite::Connection) -> Result<String, String> {
-        // TODO: 从当前会话或配置文件获取用户 ID
-        Ok("local_owner".to_string())
+    /// 获取当前活跃的内部用户 ID（桌面端单用户模式简化）
+    ///
+    /// 查询逻辑复用 `user_commands::get_current_user_cmd`：
+    /// 从 `users` 表查首个 `is_active=1 AND user_type='internal'` 的用户。
+    /// 找不到时兜底返回 "local_owner"（保持向后兼容旧云端备份数据）。
+    /// 真实 DB 错误（schema 损坏、连接异常等）应传播给调用方，不再静默兜底。
+    fn get_current_user_id(&self, conn: &rusqlite::Connection) -> Result<String, String> {
+        let user_id: rusqlite::Result<String> = conn.query_row(
+            "SELECT id FROM users \
+             WHERE is_active = 1 AND user_type = 'internal' \
+             ORDER BY created_at ASC LIMIT 1",
+            [],
+            |row| row.get(0),
+        );
+
+        match user_id {
+            Ok(uid) => Ok(uid),
+            Err(rusqlite::Error::QueryReturnedNoRows) => {
+                // 没有活跃用户：兜底保持原有行为（已有云端备份数据 user_id="local_owner"）
+                Ok("local_owner".to_string())
+            }
+            Err(e) => {
+                // 真实 DB 错误：传播给调用方
+                Err(format!(
+                    "get_current_user_id: failed to query users table: {}",
+                    e
+                ))
+            }
+        }
     }
 
     fn get_sender_id(&self) -> String {

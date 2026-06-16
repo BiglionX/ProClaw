@@ -478,20 +478,63 @@ pub fn receive_purchase_order_cmd(
         rows.filter_map(|r| r.ok()).collect()
     };
 
+    let mut auto_offset_details: Vec<serde_json::Value> = Vec::new();
+
     for (pid, qty) in &items {
+        // PRD v12.0：进货前检查是否存在负库存，自动冲销
+        let pre_stock: i32 = tx
+            .query_row(
+                "SELECT current_stock FROM products WHERE id = ?1 AND deleted_at IS NULL",
+                params![pid],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
         tx.execute("UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", params![qty, pid]).map_err(|e| e.to_string())?;
         let txn_id = Uuid::new_v4().to_string();
         tx.execute("INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, reference_no, reason) VALUES (?1, ?2, 'inbound', ?3, ?4, 'purchase_order')",
             params![txn_id, pid, qty, order_id]).map_err(|e| e.to_string())?;
         tx.execute("UPDATE purchase_order_items SET received_quantity = received_quantity + ?1 WHERE purchase_order_id = ?2 AND product_id = ?3", params![qty, order_id, pid]).map_err(|e| e.to_string())?;
+
+        // PRD v12.0：进货冲销提示
+        if pre_stock < 0 {
+            let offset_qty = -pre_stock; // 需冲销数量
+            let offset_note = if *qty >= offset_qty {
+                format!("已自动冲销缺货 {} 件（进货前 {} + 进货 {} = {}）", offset_qty, pre_stock, qty, pre_stock + qty)
+            } else {
+                format!("部分冲销缺货 {} 件（进货前 {} + 进货 {} = {}，仍需补货 {}）", qty, pre_stock, qty, pre_stock + qty, offset_qty - qty)
+            };
+            auto_offset_details.push(serde_json::json!({
+                "product_id": pid,
+                "pre_stock": pre_stock,
+                "inbound_qty": qty,
+                "new_stock": pre_stock + qty,
+                "note": offset_note,
+            }));
+        }
+
+        // 进货后若库存 >= 0，清除 negative_since
+        let post_stock = pre_stock + qty;
+        if post_stock >= 0 {
+            tx.execute("UPDATE products SET negative_since = NULL WHERE id = ?1", params![pid]).map_err(|e| e.to_string())?;
+        }
+
+        // 进货后提升置信度为 medium
+        tx.execute("UPDATE products SET stock_confidence = 'medium' WHERE id = ?1", params![pid]).map_err(|e| e.to_string())?;
     }
 
     tx.execute("UPDATE purchase_orders SET status = 'received', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id]).map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
 
-    Ok(
-        serde_json::json!({"id": order_id, "status": "received", "message": "Purchase order received. Inventory updated."}),
-    )
+    let mut response = serde_json::json!({
+        "id": order_id,
+        "status": "received",
+        "message": "Purchase order received. Inventory updated.",
+    });
+    if !auto_offset_details.is_empty() {
+        response["auto_offsets"] = serde_json::Value::Array(auto_offset_details);
+    }
+    Ok(response)
 }
 
 /// 确认采购订单 (draft → confirmed)

@@ -486,6 +486,11 @@ pub mod product {
                     description: "删除产品",
                 },
                 CommandDef {
+                    name: "set_product_gallery",
+                    module: "product",
+                    description: "设置产品多图列表",
+                },
+                CommandDef {
                     name: "create_product_spu",
                     module: "product",
                     description: "创建SPU",

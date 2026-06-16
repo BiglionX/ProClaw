@@ -431,28 +431,43 @@ pub fn submit_sales_order_cmd(
     };
 
     for (pid, qty) in &items {
-        let current: i32 = tx
+        let (current, allow_negative): (i32, bool) = tx
             .query_row(
-                "SELECT current_stock FROM products WHERE id = ?1 AND deleted_at IS NULL",
+                "SELECT current_stock, COALESCE(allow_negative_stock, 0) FROM products WHERE id = ?1 AND deleted_at IS NULL",
                 params![pid],
-                |row| row.get(0),
+                |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)? != 0)),
             )
             .map_err(|_| format!("Product {} not found", pid))?;
 
-        if current < *qty {
+        if current < *qty && !allow_negative {
             if let Err(rb) = tx.rollback() {
                 eprintln!("[sales] rollback failed: {}", rb);
             }
             return Err(format!(
-                "Insufficient stock for product {}. Current: {}, Required: {}",
+                "Insufficient stock for product {}. Current: {}, Required: {}. 可在商品设置中开启“允许负库存销售”以启用软约束（PRD v12.0）",
                 pid, current, qty
             ));
         }
+
+        // PRD v12.0：软约束通过（负库存销售），在原负库存时负负库存→0
+        // 如果销售后库存变为负，记录 negative_since（会在库存交易后续写入）
+        let is_soft_constraint = current < *qty;
 
         tx.execute("UPDATE products SET current_stock = current_stock - ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", params![qty, pid]).map_err(|e| e.to_string())?;
         let txn_id = Uuid::new_v4().to_string();
         tx.execute("INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, reference_no, reason) VALUES (?1, ?2, 'outbound', ?3, ?4, 'sales_order')",
             params![txn_id, pid, qty, order_id]).map_err(|e| e.to_string())?;
+
+        // PRD v12.0：销售后负库存时设置 negative_since（通过应用层确保（触发器同时处理）
+        if is_soft_constraint {
+            let new_stock = current - *qty;
+            if new_stock < 0 {
+                tx.execute("UPDATE products SET negative_since = COALESCE(negative_since, CURRENT_TIMESTAMP) WHERE id = ?1 AND negative_since IS NULL", params![pid]).map_err(|e| e.to_string())?;
+            }
+        } else {
+            // 销售后库存依然 >= 0，清除 negative_since
+            tx.execute("UPDATE products SET negative_since = NULL WHERE id = ?1 AND current_stock >= 0", params![pid]).map_err(|e| e.to_string())?;
+        }
     }
 
     tx.execute("UPDATE sales_orders SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id]).map_err(|e| e.to_string())?;

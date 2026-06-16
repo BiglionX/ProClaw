@@ -89,6 +89,10 @@ md-5 = "0.10"
 # 插件动态加载
 libloading = "0.8"
 
+# Tauri 自动更新插件（任务 #10）
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+
 [lints.rust]
 
 [profile.dev]

@@ -28,8 +28,19 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com https://api.openai.com https://ai.proclaw.cc https://nvwa.proclaw.cc https://dashscope.aliyuncs.com https://open.bigmodel.cn https://api.pexels.com https://pixabay.com http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' blob:; frame-src 'self' https://*.proclaw.cc",
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com https://api.openai.com https://ai.proclaw.cc https://nvwa.proclaw.cc https://dashscope.aliyuncs.com https://open.bigmodel.cn https://api.pexels.com https://pixabay.com https://releases.proclaw.cc http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' blob:; frame-src 'self' https://*.proclaw.cc",
       "dangerousDisableAssetCspModification": true
+    },
+    "plugins": {
+      "updater": {
+        "endpoints": [
+          "https://releases.proclaw.cc/{{target}}/{{arch}}/{{current_version}}"
+        ],
+        "pubkey": "REPLACE_WITH_ACTUAL_PUBLIC_KEY",
+        "windows": {
+          "installMode": "passive"
+        }
+      }
     }
   },
   "bundle": {

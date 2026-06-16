@@ -150,6 +150,8 @@ pub fn get_products(
                 updated_at: row.get(17)?,
                 sync_status: row.get(18)?,
                 last_synced_at: row.get(19)?,
+                // 列表查询不加载 images（避免 N+1），详情/编辑页按需加载
+                images: vec![],
             })
         })
         .map_err(|e| e.to_string())?;
@@ -204,11 +206,15 @@ pub fn get_product_by_id_inner(conn: &rusqlite::Connection, id: &str) -> Option<
                 updated_at: row.get(17)?,
                 sync_status: row.get(18)?,
                 last_synced_at: row.get(19)?,
+                // 先占位，函数末尾会覆盖
+                images: vec![],
             })
         })
-        .ok();
+        .ok()?;
 
-    product
+    // 加载多图（中等优先级 TODO #1 治理）
+    let images = get_images_by_product_id(conn, id).unwrap_or_default();
+    Some(Product { images, ..product })
 }
 
 /// 更新产品
@@ -905,6 +911,120 @@ fn get_images_by_spu_id(
     images
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
+}
+
+/// 根据 product_id 获取图片列表（中等优先级 TODO #1 治理）
+/// 复用了现有的 product_images 表（product_id 列为单 product 模式关联）
+fn get_images_by_product_id(
+    conn: &rusqlite::Connection,
+    product_id: &str,
+) -> Result<Vec<ProductImage>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, spu_id, image_url, image_type, sort_order, is_primary, created_at
+             FROM product_images WHERE product_id = ?1 ORDER BY sort_order ASC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let images = stmt
+        .query_map(params![product_id], |row| {
+            Ok(ProductImage {
+                id: row.get(0)?,
+                // 单 product 模式下 spu_id 为空字符串
+                spu_id: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                image_url: row.get(2)?,
+                image_type: row.get(3)?,
+                sort_order: row.get(4)?,
+                is_primary: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    images
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+/// 原子地替换某个产品的多图列表（中等优先级 TODO #1 治理）
+///
+/// 流程：事务内先删旧图（按 product_id），再批量插入新图。
+/// 同时更新 products.image_url 主图为第一张（向后兼容旧渲染逻辑）。
+#[tauri::command]
+pub fn set_product_gallery(
+    db: tauri::State<Mutex<Database>>,
+    product_id: String,
+    image_urls: Vec<String>,
+) -> Result<Vec<ProductImage>, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    // 验证产品存在
+    let exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 AND deleted_at IS NULL)",
+            params![product_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if !exists {
+        return Err(format!("Product {} not found", product_id));
+    }
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    // 删除该产品的旧图
+    tx.execute(
+        "DELETE FROM product_images WHERE product_id = ?1",
+        params![product_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 插入新图（第一张主图，后续 gallery）
+    let mut result = Vec::new();
+    for (index, url) in image_urls.iter().enumerate() {
+        if url.is_empty() {
+            continue;
+        }
+        let image_id = Uuid::new_v4().to_string();
+        let is_primary = index == 0;
+
+        tx.execute(
+            "INSERT INTO product_images (id, product_id, image_url, image_type, sort_order, is_primary, sync_status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'pending')",
+            params![
+                image_id,
+                product_id,
+                url,
+                if is_primary { "main" } else { "gallery" },
+                index as i32,
+                is_primary,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+
+        result.push(ProductImage {
+            id: image_id,
+            spu_id: String::new(),
+            image_url: url.clone(),
+            image_type: if is_primary { "main".to_string() } else { "gallery".to_string() },
+            sort_order: index as i32,
+            is_primary,
+            created_at: String::new(),
+        });
+    }
+
+    // 同步 products.image_url 主图为第一张（向后兼容旧渲染逻辑）
+    let main_url = image_urls.first().cloned().filter(|s| !s.is_empty());
+    tx.execute(
+        "UPDATE products SET image_url = ?1, sync_status = 'pending' WHERE id = ?2",
+        params![main_url, product_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(result)
 }
 
 /// 内部函数：根据ID获取SPU（不含SKU和图片）

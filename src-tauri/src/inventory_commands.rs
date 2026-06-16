@@ -45,21 +45,23 @@ pub fn create_inventory_transaction(
     }
 
     // 如果是出库，检查库存是否充足
+    // PRD v12.0 灵活库存：支持 allow_negative_stock 软约束
     if transaction_type == "outbound" {
-        let current_stock: i32 = conn
+        let (current_stock, allow_negative): (i32, bool) = conn
             .query_row(
-                "SELECT current_stock FROM products WHERE id = ?1",
+                "SELECT current_stock, COALESCE(allow_negative_stock, 0) FROM product_sku WHERE id = ?1",
                 params![product_id],
-                |row| row.get(0),
+                |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)? != 0)),
             )
             .map_err(|e| e.to_string())?;
 
-        if current_stock < quantity {
+        if current_stock < quantity && !allow_negative {
             return Err(format!(
-                "Insufficient stock. Current: {}, Requested: {}",
+                "Insufficient stock. Current: {}, Requested: {}. 可在商品设置中开启“允许负库存销售”以启用软约束（PRD v12.0）",
                 current_stock, quantity
             ));
         }
+        // 软约束通过：允许后续触发 negative_since 触发器（已在迁移中创建）
     }
 
     // 插入交易记录
@@ -89,19 +91,46 @@ pub fn create_inventory_transaction(
         _ => 0,
     };
 
+    // PRD v12.0：进货入库时检查是否存在负库存，自动冲销
+    // 若进货前库存 < 0，则进货数量优先抵冲负数部分
+    let mut auto_offset_note: Option<String> = None;
+    if transaction_type == "inbound" {
+        let pre_inbound_stock: i32 = conn
+            .query_row(
+                "SELECT current_stock FROM product_sku WHERE id = ?1",
+                params![product_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        if pre_inbound_stock < 0 {
+            auto_offset_note = Some(format!(
+                "自动冲销缺货 {} 件（进货前库存 {} + 进货数量 {} = {}）",
+                -pre_inbound_stock,
+                pre_inbound_stock,
+                quantity,
+                pre_inbound_stock + quantity
+            ));
+        }
+    }
+
     conn.execute(
-        "UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+        "UPDATE product_sku SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
         params![stock_change, product_id],
     )
     .map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({
+    let mut response = serde_json::json!({
         "id": id,
         "product_id": product_id,
         "transaction_type": transaction_type,
         "quantity": quantity,
         "message": "Transaction created successfully"
-    }))
+    });
+    if let Some(note) = auto_offset_note {
+        response["auto_offset_note"] = serde_json::Value::String(note);
+        response["auto_offset"] = serde_json::Value::Bool(true);
+    }
+    Ok(response)
 }
 
 /// 获取库存交易列表

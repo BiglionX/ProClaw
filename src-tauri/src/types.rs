@@ -24,6 +24,10 @@ pub struct Product {
     pub updated_at: String,
     pub sync_status: String,
     pub last_synced_at: Option<String>,
+    /// 多图列表（来自 product_images 表的 product_id 关联）
+    /// 中等优先级 TODO #1 治理：用于 ProductsPage 多图持久化
+    #[serde(default)]
+    pub images: Vec<ProductImage>,
 }
 
 // ==================== SPU-SKU 电商架构类型 ====================

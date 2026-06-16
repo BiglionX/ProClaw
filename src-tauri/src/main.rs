@@ -23,6 +23,10 @@ pub mod finance_commands;
 #[cfg(feature = "inventory")]
 pub mod inventory_commands;
 #[cfg(feature = "inventory")]
+pub mod inventory_aging_commands;        // PRD v12.0 灵活库存老化
+#[cfg(feature = "inventory")]
+pub mod inventory_calibration_commands;   // PRD v12.0 灵活库存微盘点/置信度
+#[cfg(feature = "inventory")]
 pub mod payment_commands;
 #[cfg(feature = "inventory")]
 pub mod purchase_commands;
@@ -148,6 +152,10 @@ use fresh_food_commands::*;
 use hardware_commands::*;
 #[cfg(feature = "inventory")]
 use inventory_commands::*;
+#[cfg(feature = "inventory")]
+use inventory_aging_commands::*;
+#[cfg(feature = "inventory")]
+use inventory_calibration_commands::*;
 use invitation_commands::*;
 use liquor_commands::*;
 #[cfg(feature = "virtual_company")]
@@ -706,6 +714,12 @@ async fn main() {
             get_product_by_id,
             update_product,
             delete_product,
+            // 中等优先级 TODO #1：产品多图
+            set_product_gallery,
+            // 简�模式产品查询（同步引擎用）
+            get_product_by_id,
+            update_product,
+            delete_product,
             // SPU-SKU 电商架构
             create_product_spu,
             get_product_spus,
@@ -732,6 +746,40 @@ async fn main() {
             get_inventory_transactions,
             #[cfg(feature = "inventory")]
             get_inventory_stats,
+            // 灵活库存 PRD v12.0：微盘点/置信度/冲销
+            #[cfg(feature = "inventory")]
+            calibrate_stock,
+            #[cfg(feature = "inventory")]
+            get_stock_confidence,
+            #[cfg(feature = "inventory")]
+            get_stock_confidence_batch,
+            #[cfg(feature = "inventory")]
+            get_calibration_history,
+            #[cfg(feature = "inventory")]
+            force_clear_negative,
+            #[cfg(feature = "inventory")]
+            supplement_inbound,
+            #[cfg(feature = "inventory")]
+            set_allow_negative_stock,
+            // 灵活库存 PRD v12.0：老化监控 + AI 提醒
+            #[cfg(feature = "inventory")]
+            check_negative_aging,
+            #[cfg(feature = "inventory")]
+            get_pending_aging_tasks,
+            #[cfg(feature = "inventory")]
+            compute_reminders,
+            #[cfg(feature = "inventory")]
+            mark_reminder_dismissed,
+            #[cfg(feature = "inventory")]
+            reset_reminder_suppression,
+            #[cfg(feature = "inventory")]
+            get_low_confidence_products_cmd,
+            // 销售提交后微盘点建议触发
+            #[cfg(feature = "inventory")]
+            should_trigger_post_sales_calibration_cmd,
+            // 进货完成后微盘点建议触发
+            #[cfg(feature = "inventory")]
+            should_trigger_post_purchase_calibration_cmd,
             // 数据分析 (进销存版)
             #[cfg(feature = "inventory")]
             get_sales_trend,

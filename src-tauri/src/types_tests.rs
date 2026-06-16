@@ -28,6 +28,7 @@ mod tests {
             updated_at: "2024-01-01T00:00:00Z".to_string(),
             sync_status: "synced".to_string(),
             last_synced_at: None,
+            images: vec![],
         };
 
         let json = serde_json::to_string(&product).unwrap();
