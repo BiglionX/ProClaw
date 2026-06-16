@@ -303,7 +303,7 @@ CEO Agent 的 System Prompt 包含以下上下文：
 | 展示项 | 数据来源 | 示例 |
 |--------|---------|------|
 | 产品数量 | `demoFlag.productsCount` | `20 个 iPhone 电池 SPU 产品` |
-| 云商城 | `demoFlag.cloudStoreSubdomain` | `已开通云商城（demo.proclaw.cc）` |
+| 云商城 | `demoFlag.cloudStoreSubdomain` | `已开通云商城（proclaw.cc/demo）` |
 | AI 团队 | `demoFlag.teamNames` | `3 个 AI 团队` + 名称列表 |
 | 行业插件 | `demoFlag.pluginIds` | `1 个行业插件` + 外贸柜台运营助手 |
 | 初始化时间 | `demoFlag.initializedAt` | `2026-06-15 10:30:00` |
