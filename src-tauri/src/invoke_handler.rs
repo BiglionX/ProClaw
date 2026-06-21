@@ -55,12 +55,13 @@ use crate::setup_commands::*;
 #[cfg(any(feature = "light", feature = "inventory"))]
 use crate::store_commands::*;
 use crate::subscription_commands::*;
+use crate::sync_engine::*;
 use crate::team_commands::*;
 use crate::tray_commands::*;
 use crate::user_commands::*;
 
 /// Register all Tauri invoke handlers on the builder.
-pub fn apply<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
     builder.invoke_handler(tauri::generate_handler![
             create_product,
             get_products,

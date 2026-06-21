@@ -97,7 +97,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
 use sync_engine::SyncEngine;
-use sync_engine::*;
 use utils::crypto::Aes256GcmCipher;
 use utils::key_manager::KeyManager;
 
