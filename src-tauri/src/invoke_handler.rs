@@ -1,63 +1,63 @@
 //! Tauri IPC command registration (extracted from main.rs)
 
 #[cfg(feature = "virtual_company")]
-use agent_commands::*;
-use approval_commands::*;
-use auto_parts_commands::*;
-use beauty_commands::*;
-use call_commands::*;
-use catering_commands::*;
-use ceo_commands::*;
-use cloud_backup_commands::*;
-use common_commands::*;
-use community_group_buy_commands::*;
-use convenience_commands::*;
-use decoration_material_commands::*;
+use crate::agent_commands::*;
+use crate::approval_commands::*;
+use crate::auto_parts_commands::*;
+use crate::beauty_commands::*;
+use crate::call_commands::*;
+use crate::catering_commands::*;
+use crate::ceo_commands::*;
+use crate::cloud_backup_commands::*;
+use crate::common_commands::*;
+use crate::community_group_buy_commands::*;
+use crate::convenience_commands::*;
+use crate::decoration_material_commands::*;
 #[cfg(feature = "virtual_company")]
-use finance_agent_commands::*;
+use crate::finance_agent_commands::*;
 #[cfg(feature = "inventory")]
-use finance_commands::*;
-use fresh_food_commands::*;
-use hardware_commands::*;
+use crate::finance_commands::*;
+use crate::fresh_food_commands::*;
+use crate::hardware_commands::*;
 #[cfg(feature = "inventory")]
-use inventory_commands::*;
+use crate::inventory_commands::*;
 #[cfg(feature = "inventory")]
-use inventory_aging_commands::*;
+use crate::inventory_aging_commands::*;
 #[cfg(feature = "inventory")]
-use inventory_calibration_commands::*;
-use invitation_commands::*;
-use liquor_commands::*;
+use crate::inventory_calibration_commands::*;
+use crate::invitation_commands::*;
+use crate::liquor_commands::*;
 #[cfg(feature = "virtual_company")]
-use market_commands::*;
-use message_commands::*;
+use crate::market_commands::*;
+use crate::message_commands::*;
 #[cfg(feature = "inventory")]
-use payment_commands::*;
-use pet_commands::*;
-use phone_accessories_commands::*;
-use plugin_loader::*;
-use plugin_manager::*;
+use crate::payment_commands::*;
+use crate::pet_commands::*;
+use crate::phone_accessories_commands::*;
+use crate::plugin_loader::*;
+use crate::plugin_manager::*;
 #[cfg(any(feature = "light", feature = "inventory"))]
-use product_commands::*;
+use crate::product_commands::*;
 #[cfg(feature = "inventory")]
-use purchase_commands::*;
+use crate::purchase_commands::*;
 #[cfg(feature = "inventory")]
-use purchase_return_commands::*;
+use crate::purchase_return_commands::*;
 #[cfg(feature = "inventory")]
-use reconciliation_commands::*;
+use crate::reconciliation_commands::*;
 #[cfg(feature = "inventory")]
-use sales_commands::*;
+use crate::sales_commands::*;
 #[cfg(feature = "inventory")]
-use sales_return_commands::*;
-use secretary_commands::*;
-use agent_profile_commands::*;
-use services::nvwax_commands::*;
-use setup_commands::*;
+use crate::sales_return_commands::*;
+use crate::secretary_commands::*;
+use crate::agent_profile_commands::*;
+use crate::services::nvwax_commands::*;
+use crate::setup_commands::*;
 #[cfg(any(feature = "light", feature = "inventory"))]
-use store_commands::*;
-use subscription_commands::*;
-use team_commands::*;
-use tray_commands::*;
-use user_commands::*;
+use crate::store_commands::*;
+use crate::subscription_commands::*;
+use crate::team_commands::*;
+use crate::tray_commands::*;
+use crate::user_commands::*;
 
 /// Register all Tauri invoke handlers on the builder.
 pub fn apply<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
