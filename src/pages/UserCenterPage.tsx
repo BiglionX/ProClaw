@@ -55,9 +55,24 @@ import {
   CircularProgress,
   InputAdornment,
 } from '@mui/material';
-import { useEffect, useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useEffect, useState } from 'react';
+import { ipcInvoke as invoke } from '../lib/tauri';
 import { useAuthStore } from '../lib/authStore';
+import {
+  useInvalidateUserCenter,
+  useSubscriptionBundle,
+  useUserDevices,
+  useUserProfile,
+} from '../lib/hooks/useUserCenter';
+import type {
+  Device,
+  InvoiceItem,
+  PlanData,
+  SubData,
+  TokenSummary,
+  UsageItem,
+  UserProfile,
+} from '../lib/userCenterService';
 
 // ========================== Types ==========================
 
@@ -70,50 +85,6 @@ function TabPanel(p: TabPanelProps) {
   return p.value === p.index ? <Box sx={{ pt: 3 }}>{p.children}</Box> : null;
 }
 
-interface UserProfile {
-  id: string;
-  name: string;
-  phone?: string;
-  email?: string;
-  user_type: string;
-  role: string;
-  permissions: string[];
-  created_at: string;
-}
-
-interface Device {
-  id: string;
-  device_name: string;
-  device_type: 'desktop' | 'mobile';
-  last_active_at?: number;
-  is_revoked: boolean;
-  created_at: string;
-}
-
-interface PlanData {
-  id: string; plan_key: string; name: string; description: string | null;
-  monthly_price: number; yearly_price: number;
-  token_quota: number; max_devices: number; features: string;
-}
-interface SubData {
-  id: string; plan_key: string | null; plan_name: string | null;
-  token_quota: number | null; status: string; billing_cycle: string;
-  started_at: string; expires_at: string | null;
-}
-interface TokenSummary {
-  plan_name: string; plan_key: string; token_quota: number;
-  token_used: number; token_remaining: number;
-  usage_percent: number; subscription_status: string;
-}
-interface UsageItem {
-  id: string; tokens_consumed: number; action_type: string;
-  resource_path: string; created_at: string;
-}
-interface InvoiceItem {
-  id: string; invoice_number: string; amount: number;
-  status: string; payment_method: string; created_at: string;
-}
-
 // ========================== Main Component ==========================
 
 export default function UserCenterPage() {
@@ -122,10 +93,34 @@ export default function UserCenterPage() {
 
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState('');
-  const [loading, setLoading] = useState(true);
+
+  const profileFallback = {
+    email: storeUser?.email,
+    created_at: storeUser?.created_at,
+  };
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    refetch: refetchProfile,
+  } = useUserProfile(userId, profileFallback);
+  const {
+    data: devices = [],
+    refetch: refetchDevices,
+  } = useUserDevices(userId);
+  const {
+    data: subscriptionBundle,
+    refetch: refetchSubscription,
+  } = useSubscriptionBundle(userId);
+  const invalidateUserCenter = useInvalidateUserCenter();
+  const loading = profileLoading;
+
+  const plans = subscriptionBundle?.plans ?? [];
+  const sub = subscriptionBundle?.sub ?? null;
+  const summary = subscriptionBundle?.summary ?? null;
+  const usageItems = subscriptionBundle?.usageItems ?? [];
+  const invoices = subscriptionBundle?.invoices ?? [];
 
   // ---- Profile ----
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -141,7 +136,6 @@ export default function UserCenterPage() {
   const [changingPwd, setChangingPwd] = useState(false);
 
   // ---- Devices ----
-  const [devices, setDevices] = useState<Device[]>([]);
   const [pairingCode, setPairingCode] = useState('123456');
   const [pairingExpires, setPairingExpires] = useState(Date.now() / 1000 + 300);
   const [revokeTarget, setRevokeTarget] = useState<Device | null>(null);
@@ -149,90 +143,23 @@ export default function UserCenterPage() {
   const [pairingLoading, setPairingLoading] = useState(false);
 
   // ---- Subscription ----
-  const [plans, setPlans] = useState<PlanData[]>([]);
-  const [sub, setSub] = useState<SubData | null>(null);
-  const [summary, setSummary] = useState<TokenSummary | null>(null);
-  const [usageItems, setUsageItems] = useState<UsageItem[]>([]);
-  const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [selectedBilling, setSelectedBilling] = useState('monthly');
   const [subscribeTarget, setSubscribeTarget] = useState<PlanData | null>(null);
 
-  // ========================== Data Loading ==========================
+  useEffect(() => {
+    if (!profile) return;
+    setEditName(profile.name || '');
+    setEditPhone(profile.phone || '');
+    setEditEmail(profile.email || storeUser?.email || '');
+  }, [profile, storeUser?.email]);
 
-  const loadProfile = useCallback(async () => {
-    try {
-      const res = await invoke<any>('get_current_user_cmd');
-      if (res && !res.error) {
-        setProfile({
-          id: res.id,
-          name: res.name || storeUser?.email?.split('@')[0] || '用户',
-          phone: res.phone,
-          email: res.email || storeUser?.email,
-          user_type: res.user_type || 'internal',
-          role: res.role || 'admin',
-          permissions: res.permissions || [],
-          created_at: res.created_at || storeUser?.created_at || new Date().toISOString(),
-        });
-        setEditName(res.name || '');
-        setEditPhone(res.phone || '');
-        setEditEmail(res.email || storeUser?.email || '');
-      }
-    } catch {
-      // 兜底：从 authStore 读取
-      setProfile({
-        id: userId,
-        name: storeUser?.email?.split('@')[0] || '用户',
-        email: storeUser?.email,
-        user_type: 'internal',
-        role: 'admin',
-        permissions: ['*'],
-        created_at: storeUser?.created_at || new Date().toISOString(),
-      });
-      setEditName(storeUser?.email?.split('@')[0] || '用户');
-      setEditEmail(storeUser?.email || '');
-    }
-  }, [userId, storeUser]);
-
-  const loadDevicesData = useCallback(async () => {
-    try {
-      const res = await invoke<any>('get_devices_cmd', { userId }).catch(() => null);
-      if (res?.data) {
-        setDevices(res.data);
-      } else {
-        // 模拟数据
-        setDevices([
-          { id: '1', device_name: '我的 iPhone', device_type: 'mobile', last_active_at: Date.now() / 1000 - 120, is_revoked: false, created_at: '2026-01-15' },
-          { id: '2', device_name: '办公室电脑', device_type: 'desktop', last_active_at: Date.now() / 1000 - 3600, is_revoked: false, created_at: '2026-03-20' },
-        ]);
-      }
-    } catch { /* demo */ }
-  }, [userId]);
-
-  const loadSubscriptionData = useCallback(async () => {
-    try {
-      const [plansRes, subRes, summaryRes, usageRes, invoicesRes] = await Promise.all([
-        invoke('get_plans_cmd').catch(() => ({ data: [] })),
-        invoke('get_my_subscription_cmd', { userId }).catch(() => null),
-        invoke('get_token_summary_cmd', { userId }).catch(() => null),
-        invoke('get_token_usage_cmd', { userId, limit: 20, offset: 0 }).catch(() => ({ data: [] })),
-        invoke('get_invoices_cmd', { userId }).catch(() => ({ data: [] })),
-      ]);
-      setPlans((plansRes as any)?.data || []);
-      setSub((subRes as any)?.data || null);
-      setSummary((summaryRes as any)?.data || null);
-      setUsageItems((usageRes as any)?.data || []);
-      setInvoices((invoicesRes as any)?.data || []);
-    } catch { /* demo fallback */ }
-  }, [userId]);
-
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([loadProfile(), loadDevicesData(), loadSubscriptionData()]);
-    setLoading(false);
-  }, [loadProfile, loadDevicesData, loadSubscriptionData]);
-
-  useEffect(() => { loadAll(); }, []);
+  const refreshUserCenter = () => {
+    invalidateUserCenter();
+    refetchProfile();
+    refetchDevices();
+    refetchSubscription();
+  };
 
   // ========================== Actions ==========================
 
@@ -242,7 +169,7 @@ export default function UserCenterPage() {
       await invoke('update_user_cmd', { id: userId, name: editName, phone: editPhone || null, email: editEmail || null });
       setSnackbar('个人资料已更新');
       setEditing(false);
-      loadProfile();
+      refetchProfile();
     } catch (e: any) {
       setSnackbar(`保存失败: ${e}`);
     }
@@ -287,7 +214,7 @@ export default function UserCenterPage() {
       await invoke('revoke_device_cmd', { userId, deviceId: revokeTarget.id }).catch(() => {});
       setSnackbar(`已踢除设备: ${revokeTarget.device_name}`);
       setRevokeOpen(false);
-      loadDevicesData();
+      refetchDevices();
     } catch (e: any) {
       setSnackbar(`踢除失败: ${e}`);
     }
@@ -299,7 +226,7 @@ export default function UserCenterPage() {
       await invoke('subscribe_plan_cmd', { userId, planId: subscribeTarget.id, billingCycle: selectedBilling });
       setSnackbar('订阅成功！');
       setSubscribeOpen(false);
-      loadSubscriptionData();
+      refetchSubscription();
     } catch (e: any) {
       setSnackbar(`订阅失败: ${e}`);
     }
@@ -309,7 +236,7 @@ export default function UserCenterPage() {
     try {
       await invoke('cancel_subscription_cmd', { userId });
       setSnackbar('已取消订阅');
-      loadSubscriptionData();
+      refetchSubscription();
     } catch (e: any) {
       setSnackbar(`取消失败: ${e}`);
     }
@@ -358,7 +285,14 @@ export default function UserCenterPage() {
             <Button startIcon={<EditIcon />} onClick={() => setEditing(true)} size="small">编辑</Button>
           ) : (
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button startIcon={<CancelIcon />} onClick={() => { setEditing(false); loadProfile(); }} size="small" color="inherit">取消</Button>
+              <Button startIcon={<CancelIcon />} onClick={() => {
+                setEditing(false);
+                if (profile) {
+                  setEditName(profile.name || '');
+                  setEditPhone(profile.phone || '');
+                  setEditEmail(profile.email || storeUser?.email || '');
+                }
+              }} size="small" color="inherit">取消</Button>
               <Button startIcon={<SaveIcon />} onClick={handleSaveProfile} size="small" variant="contained" disabled={savingProfile}>
                 {savingProfile ? '保存中...' : '保存'}
               </Button>
@@ -784,7 +718,7 @@ export default function UserCenterPage() {
       {/* 页面标题 */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h5" fontWeight={700}>用户中心</Typography>
-        <Button startIcon={<RefreshIcon />} onClick={loadAll} size="small">刷新</Button>
+        <Button startIcon={<RefreshIcon />} onClick={refreshUserCenter} size="small">刷新</Button>
       </Box>
 
       {renderHeader()}

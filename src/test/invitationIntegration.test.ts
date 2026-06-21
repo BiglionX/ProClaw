@@ -5,8 +5,11 @@ import { describe, test, expect, beforeAll, afterAll, vi, beforeEach } from 'vit
 
 // 在所有测试之前 mock tauri 模块
 vi.mock('../lib/tauri', () => ({
-  isTauri: vi.fn(() => false), // 默认返回 false，使用 mock 模式
+  isTauri: vi.fn(() => false),
   safeInvoke: vi.fn(),
+  ipcInvokeOrNull: vi.fn(),
+  ipcInvoke: vi.fn(),
+  openExternalUrl: vi.fn(),
 }));
 
 // 动态导入以避免 hoisting 问题

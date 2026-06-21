@@ -566,7 +566,7 @@ Boss 在群聊发送消息
 |----------|------|
 | `docs/features/demo-data.md` | 演示数据包功能文档 |
 | `docs/prd/需求文档：AI Team 群聊 LLM 接入与演示账号 Token（PRD v6.4）.md` | Token 管理 PRD |
-| `docs/prd/需求文档：ProClaw 用户中心（PRD v5.1）.md` | 桌面端用户中心 PRD |
+| `docs/prd/marketing/需求文档：ProClaw 用户中心（PRD v5.1）.md` | 桌面端用户中心 PRD |
 | `docs/prd/需求文档：ProClaw 营销网站用户中心（PRD v7.1）.md` | 营销网站用户中心 PRD |
 
 ### 10.5 测试

@@ -41,14 +41,14 @@ import { useEffect, useState } from 'react';
 import {
   AIConfig,
   AIProvider,
-  getAIConfig,
   saveAIConfig,
   testAIConnection,
 } from '../../lib/aiConfig';
+import { useAIConfigSettings } from '../../lib/hooks/useSettings';
 
 export default function AISettings() {
+  const { data: fetchedConfig, isLoading: loading, refetch, isError } = useAIConfigSettings();
   const [config, setConfig] = useState<AIConfig | null>(null);
-  const [loading, setLoading] = useState(true);
   const [editingProvider, setEditingProvider] = useState<AIProvider | null>(
     null
   );
@@ -64,24 +64,20 @@ export default function AISettings() {
   }>({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
-    loadConfig();
-  }, []);
+    if (fetchedConfig) {
+      setConfig(fetchedConfig);
+    }
+  }, [fetchedConfig]);
 
-  const loadConfig = async () => {
-    try {
-      setLoading(true);
-      const data = await getAIConfig();
-      setConfig(data);
-    } catch (error) {
+  useEffect(() => {
+    if (isError) {
       setSnackbar({
         open: true,
         message: '加载配置失败',
         severity: 'error',
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [isError]);
 
   const handleSave = async () => {
     if (!config) return;
@@ -564,7 +560,7 @@ export default function AISettings() {
 
       {/* 保存按钮 */}
       <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-        <Button variant="outlined" onClick={loadConfig}>
+        <Button variant="outlined" onClick={() => refetch()}>
           重置
         </Button>
         <Button variant="contained" onClick={handleSave}>

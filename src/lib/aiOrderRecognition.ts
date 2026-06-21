@@ -65,6 +65,9 @@ export async function recognizeOrder(
     imageBase64,
     customerId: options?.customerId,
     saveDraft: options?.saveDraft ?? true,
+  }).then((result) => {
+    if (!result) throw new Error('AI 订单识别失败');
+    return result;
   });
 }
 
@@ -72,7 +75,8 @@ export async function recognizeOrder(
 export async function listOrderDrafts(limit = 20): Promise<OrderDraft[]> {
   if (!isTauri()) return [];
   try {
-    return await safeInvoke<OrderDraft[]>('list_order_drafts', { limit });
+    const drafts = await safeInvoke<OrderDraft[]>('list_order_drafts', { limit });
+    return drafts ?? [];
   } catch (err) {
     console.warn('listOrderDrafts failed:', err);
     return [];
@@ -83,7 +87,8 @@ export async function listOrderDrafts(limit = 20): Promise<OrderDraft[]> {
 export async function deleteOrderDraft(draftId: string): Promise<boolean> {
   if (!isTauri()) return false;
   try {
-    return await safeInvoke<boolean>('delete_order_draft', { draftId });
+    const ok = await safeInvoke<boolean>('delete_order_draft', { draftId });
+    return ok ?? false;
   } catch {
     return false;
   }

@@ -24,22 +24,38 @@ export async function openExternalUrl(url: string): Promise<void> {
   }
 }
 
-/** 防重复警告：已被警告过的 Tauri 命令（dev 模式下不刷屏） */
-const warnOnce = new Set<string>();
-
 /**
  * 安全地调用 Tauri 命令
- * 如果不在 Tauri 环境中，返回 null 或抛出友好的错误
+ * @deprecated 使用 ipcInvoke / ipcInvokeOrNull
  */
-export async function safeInvoke<T>(command: string, args?: any): Promise<T | null> {
+export async function safeInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T | null> {
+  return ipcInvokeOrNull<T>(command, args);
+}
+
+const ipcWarnOnce = new Set<string>();
+
+/** Tauri IPC；浏览器 dev 抛出友好错误 */
+export async function ipcInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
-    if (!warnOnce.has(command)) {
-      warnOnce.add(command);
-      console.warn(`[ProClaw Dev] Tauri 命令 "${command}" 在纯浏览器中不可用，已跳过`);
+    if (import.meta.env.DEV && !ipcWarnOnce.has(command)) {
+      ipcWarnOnce.add(command);
+      console.warn(`[ProClaw Dev] IPC "${command}" requires Tauri runtime`);
+    }
+    throw new Error(`IPC command "${command}" requires Tauri runtime`);
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(command, args);
+}
+
+/** 浏览器 dev 返回 null；Tauri 正常 invoke */
+export async function ipcInvokeOrNull<T>(command: string, args?: Record<string, unknown>): Promise<T | null> {
+  if (!isTauri()) {
+    if (import.meta.env.DEV && !ipcWarnOnce.has(command)) {
+      ipcWarnOnce.add(command);
+      console.warn(`[ProClaw Dev] IPC "${command}" skipped in browser`);
     }
     return null;
   }
-
   const { invoke } = await import('@tauri-apps/api/core');
-  return await invoke<T>(command, args);
+  return invoke<T>(command, args);
 }

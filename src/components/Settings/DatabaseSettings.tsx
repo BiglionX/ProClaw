@@ -22,14 +22,7 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { testSupabaseConnection } from '../../lib/supabaseTest';
-import { getDatabaseStats } from '../../lib/syncService';
-
-interface DatabaseStats {
-  products: number;
-  categories: number;
-  transactions: number;
-  pending_sync: number;
-}
+import { useDatabaseStatsSettings } from '../../lib/hooks/useSettings';
 
 interface SupabaseConfig {
   url: string;
@@ -40,8 +33,7 @@ interface SupabaseConfig {
 const STORAGE_KEY = 'proclaw-supabase-config';
 
 export default function DatabaseSettings() {
-  const [dbStats, setDbStats] = useState<DatabaseStats | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { data: dbStats = null, isLoading: loading } = useDatabaseStatsSettings();
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
     url: '',
     apiKey: '',
@@ -59,21 +51,8 @@ export default function DatabaseSettings() {
   }>({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
-    loadDatabaseStats();
     loadSupabaseConfig();
   }, []);
-
-  const loadDatabaseStats = async () => {
-    try {
-      setLoading(true);
-      const stats = await getDatabaseStats();
-      setDbStats(stats);
-    } catch (error) {
-      console.error('Failed to load database stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadSupabaseConfig = () => {
     try {

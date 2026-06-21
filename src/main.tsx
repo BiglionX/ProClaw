@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from '@mui/material/styles';
@@ -31,11 +32,22 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 console.log('Application starting...');
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 console.log('Environment:', import.meta.env.MODE);
 
 try {
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={proClawTheme}>
         <CssBaseline />
         {/* v6：全局 ErrorBoundary 捕获 React 渲染错误，显示 fallback UI 而不是白屏 */}
@@ -43,6 +55,7 @@ try {
           <App />
         </ErrorBoundary>
       </ThemeProvider>
+      </QueryClientProvider>
     </React.StrictMode>,
   );
 } catch (err) {

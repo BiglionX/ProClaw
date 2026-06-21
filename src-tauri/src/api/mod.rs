@@ -381,10 +381,10 @@ pub fn create_router(state: AppState) -> axum::Router {
         // 添加认证+权限中间件
         .layer(middleware::from_fn(rbac_middleware));
 
-    // WebSocket 聊天（单独处理，使用认证中间件）
+    // WebSocket 聊天（可选 JWT 升级 + 连接后 auth 消息认证）
     let websocket_route = axum::Router::new()
         .route("/ws/chat", axum::routing::get(websocket::websocket_handler))
-        .layer(middleware::from_fn(auth_middleware_ws));
+        .layer(middleware::from_fn(auth_middleware_ws_optional));
 
     // 审计修复 SEC-P0-02: CORS 限制为 localhost 来源，防止任意外部域名访问
     let cors = CorsLayer::new()
@@ -502,10 +502,9 @@ pub async fn rbac_middleware(mut request: Request<Body>, next: Next) -> Response
     }
 }
 
-/// WebSocket 认证中间件（无 RBAC 检查，仅验证 token）
-/// 审计修复 #3: 实际验证 JWT token 而非仅检查存在性
-pub async fn auth_middleware_ws(mut request: Request<Body>, next: Next) -> Response {
-    let token = request
+/// 从 HTTP 请求提取 JWT（Authorization Bearer 或 query token=）
+fn extract_ws_token(request: &Request<Body>) -> Option<String> {
+    request
         .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
@@ -517,32 +516,63 @@ pub async fn auth_middleware_ws(mut request: Request<Body>, next: Next) -> Respo
                     .find(|p| p.starts_with("token="))
                     .map(|p| p[6..].to_string())
             })
-        });
+        })
+}
 
+/// WebSocket 认证中间件（可选 JWT）
+/// - 无 token：允许升级，连接后首条 `auth` 消息认证（SEC-P1-08）
+/// - 有效 token（Header/query）：注入 Claims，兼容旧客户端
+/// - 无效 token：拒绝升级
+pub async fn auth_middleware_ws_optional(mut request: Request<Body>, next: Next) -> Response {
     let secret = JWT_SECRET
         .get()
         .cloned()
         .expect("JWT_SECRET not initialized — startup must call JWT_SECRET.set()");
 
-    match token {
-        Some(t) => {
-            match auth::verify_token(&t, &secret) {
-                Ok(claims) => {
-                    // 将 Claims 注入 request extensions 供 handler 使用
-                    request.extensions_mut().insert(claims);
-                    next.run(request).await
-                }
-                Err(_) => {
-                    let mut resp = Response::new(Body::from(
-                        serde_json::json!({"error": "Invalid or expired token"}).to_string(),
-                    ));
-                    *resp.status_mut() = StatusCode::UNAUTHORIZED;
-                    resp.headers_mut()
-                        .insert("content-type", HeaderValue::from_static("application/json"));
-                    resp
-                }
+    match extract_ws_token(&request) {
+        Some(t) => match auth::verify_token(&t, &secret) {
+            Ok(claims) => {
+                request.extensions_mut().insert(claims);
+                next.run(request).await
             }
-        }
+            Err(_) => {
+                let mut resp = Response::new(Body::from(
+                    serde_json::json!({"error": "Invalid or expired token"}).to_string(),
+                ));
+                *resp.status_mut() = StatusCode::UNAUTHORIZED;
+                resp.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/json"));
+                resp
+            }
+        },
+        None => next.run(request).await,
+    }
+}
+
+/// WebSocket 认证中间件（强制 JWT，保留供测试/内部路由使用）
+#[allow(dead_code)]
+pub async fn auth_middleware_ws(mut request: Request<Body>, next: Next) -> Response {
+    let secret = JWT_SECRET
+        .get()
+        .cloned()
+        .expect("JWT_SECRET not initialized — startup must call JWT_SECRET.set()");
+
+    match extract_ws_token(&request) {
+        Some(t) => match auth::verify_token(&t, &secret) {
+            Ok(claims) => {
+                request.extensions_mut().insert(claims);
+                next.run(request).await
+            }
+            Err(_) => {
+                let mut resp = Response::new(Body::from(
+                    serde_json::json!({"error": "Invalid or expired token"}).to_string(),
+                ));
+                *resp.status_mut() = StatusCode::UNAUTHORIZED;
+                resp.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/json"));
+                resp
+            }
+        },
         None => {
             let mut resp = Response::new(Body::from(
                 serde_json::json!({"error": "Missing Authorization header"}).to_string(),

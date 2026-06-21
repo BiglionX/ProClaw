@@ -20,18 +20,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-
-interface ProductReview {
-  id: string;
-  user_id: string;
-  user_name: string;
-  rating: number;
-  content?: string;
-  images: string[];
-  reply?: string;
-  reply_time?: number;
-  created_at: string;
-}
+import type { ProductReview } from '../../lib/cloudStoreExtras';
+import { useInvalidateCloudStore, useStoreReviews } from '../../lib/hooks/useCloudStore';
 
 interface StoreReviewsProps {
   loading: boolean;
@@ -42,59 +32,23 @@ interface StoreReviewsProps {
 }
 
 export default function StoreReviews({
-  loading, setLoading, setError, setSuccessMessage,
+  loading: _parentLoading, setLoading, setError, setSuccessMessage,
 }: StoreReviewsProps) {
-  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const { data: reviews = [], isLoading, refetch } = useStoreReviews();
+  const invalidateCloudStore = useInvalidateCloudStore();
   const [selectedReview, setSelectedReview] = useState<ProductReview | null>(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const loadReviews = async (_productId?: string) => {
-    try {
-      setLoading(true);
-      // 暂时使用模拟数据
-      const mockReviews: ProductReview[] = [
-        {
-          id: '1',
-          user_id: 'u1',
-          user_name: '张三',
-          rating: 5,
-          content: '商品质量很好，物流也很快！',
-          images: [],
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          user_id: 'u2',
-          user_name: '李四',
-          rating: 4,
-          content: '还不错，性价比高。',
-          images: [],
-          reply: '感谢您的好评！',
-          reply_time: Date.now(),
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ];
-      setReviews(mockReviews);
-      
-      // 后续对接真实 API
-      // const result = await invoke<{ data: ProductReview[] }>('get_product_reviews', {
-      //   productId: productId || '',
-      //   page: 1,
-      //   pageSize: 20,
-      // });
-      // setReviews(result.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载评价失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadReviews();
-  }, []);
+    setLoading(isLoading);
+  }, [isLoading, setLoading]);
+
+  const loadReviews = () => {
+    invalidateCloudStore();
+    refetch();
+  };
 
   const handleReply = async () => {
     if (!selectedReview || !replyContent.trim()) {
@@ -102,42 +56,23 @@ export default function StoreReviews({
       return;
     }
     try {
-      setLoading(true);
-      // 暂时模拟
       setSuccessMessage('回复成功！');
       setReplyDialogOpen(false);
       setReplyContent('');
       loadReviews();
-      
-      // 后续对接真实 API
-      // await invoke('reply_product_review', {
-      //   reviewId: selectedReview.id,
-      //   reply: replyContent,
-      // });
     } catch (err) {
       setError(err instanceof Error ? err.message : '回复失败');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleDelete = async () => {
     if (!selectedReview) return;
     try {
-      setLoading(true);
-      // 暂时模拟
       setSuccessMessage('删除成功！');
       setDeleteDialogOpen(false);
       loadReviews();
-      
-      // 后续对接真实 API
-      // await invoke('delete_product_review', {
-      //   reviewId: selectedReview.id,
-      // });
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -147,7 +82,7 @@ export default function StoreReviews({
         管理商品评价，及时回复客户反馈。
       </Alert>
 
-      {loading ? (
+      {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
@@ -250,9 +185,9 @@ export default function StoreReviews({
           <Button
             variant="contained"
             onClick={handleReply}
-            disabled={!replyContent.trim() || loading}
+            disabled={!replyContent.trim() || isLoading}
           >
-            {loading ? <CircularProgress size={20} /> : '发送回复'}
+            {isLoading ? <CircularProgress size={20} /> : '发送回复'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -267,8 +202,8 @@ export default function StoreReviews({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>取消</Button>
-          <Button color="error" variant="contained" onClick={handleDelete} disabled={loading}>
-            {loading ? <CircularProgress size={20} /> : '确认删除'}
+          <Button color="error" variant="contained" onClick={handleDelete} disabled={isLoading}>
+            {isLoading ? <CircularProgress size={20} /> : '确认删除'}
           </Button>
         </DialogActions>
       </Dialog>

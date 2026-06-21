@@ -2,7 +2,7 @@
 // 封装 Tauri invoke 调用，提供类型安全的订阅操作
 // 桌面端 Token 用量同时同步到 Supabase（平台统一统计）
 
-import { invoke } from '@tauri-apps/api/core';
+import { ipcInvoke as invoke } from './tauri';
 import { supabase } from './supabase';
 
 // Supabase Token 用量同步（平台侧统一统计）

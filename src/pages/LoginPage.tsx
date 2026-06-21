@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
 import { MOCK_PASSWORD } from '../lib/authStore';
-import { open } from '@tauri-apps/api/shell';
+import { open } from '@tauri-apps/plugin-shell';
 
 export default function LoginPage() {
   const navigate = useNavigate();

@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { ipcInvoke as invoke } from '../lib/tauri';
 
 // 导出新的SPU-SKU类型(从productService)
 export type { ProductSPU, ProductSKU } from '../lib/productService';

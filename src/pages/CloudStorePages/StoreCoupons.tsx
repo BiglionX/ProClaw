@@ -26,20 +26,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-
-interface Coupon {
-  id: string;
-  code: string;
-  discount_type: 'fixed' | 'percentage';
-  discount_value: number;
-  min_amount: number;
-  max_uses: number;
-  used_count: number;
-  start_time: number;
-  end_time: number;
-  status: 'active' | 'inactive' | 'expired';
-  created_at: string;
-}
+import type { StoreCoupon } from '../../lib/cloudStoreExtras';
+import { useInvalidateCloudStore, useStoreCoupons } from '../../lib/hooks/useCloudStore';
 
 interface StoreCouponsProps {
   loading: boolean;
@@ -50,11 +38,12 @@ interface StoreCouponsProps {
 }
 
 export default function StoreCoupons({
-  loading, setLoading, setError, setSuccessMessage,
+  loading: _parentLoading, setLoading, setError, setSuccessMessage,
 }: StoreCouponsProps) {
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const { data: coupons = [], isLoading, refetch } = useStoreCoupons();
+  const invalidateCloudStore = useInvalidateCloudStore();
   const [openDialog, setOpenDialog] = useState(false);
-  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [editingCoupon, setEditingCoupon] = useState<StoreCoupon | null>(null);
   const [formData, setFormData] = useState({
     code: '',
     discount_type: 'fixed' as 'fixed' | 'percentage',
@@ -65,59 +54,19 @@ export default function StoreCoupons({
     end_time: '',
   });
 
-  const loadCoupons = async () => {
-    try {
-      setLoading(true);
-      // 暂时使用模拟数据
-      const mockCoupons: Coupon[] = [
-        {
-          id: '1',
-          code: 'WELCOME10',
-          discount_type: 'fixed',
-          discount_value: 10,
-          min_amount: 0,
-          max_uses: 100,
-          used_count: 5,
-          start_time: Date.now() - 86400000,
-          end_time: Date.now() + 30 * 86400000,
-          status: 'active',
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          code: 'SAVE20',
-          discount_type: 'percentage',
-          discount_value: 20,
-          min_amount: 100,
-          max_uses: 0,
-          used_count: 12,
-          start_time: Date.now() - 86400000,
-          end_time: Date.now() + 7 * 86400000,
-          status: 'active',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ];
-      setCoupons(mockCoupons);
-      
-      // 后续对接真实 API
-      // const result = await invoke<{ data: Coupon[] }>('get_coupons', {
-      //   storeId: store?.id,
-      //   page: 1,
-      //   pageSize: 20,
-      // });
-      // setCoupons(result.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载优惠券失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [submitting, setSubmitting] = useState(false);
+  const loading = isLoading || submitting;
 
   useEffect(() => {
-    loadCoupons();
-  }, []);
+    setLoading(isLoading || submitting);
+  }, [isLoading, submitting, setLoading]);
 
-  const handleOpenDialog = (coupon?: Coupon) => {
+  const loadCoupons = () => {
+    invalidateCloudStore();
+    refetch();
+  };
+
+  const handleOpenDialog = (coupon?: StoreCoupon) => {
     if (coupon) {
       setEditingCoupon(coupon);
       setFormData({
@@ -155,7 +104,7 @@ export default function StoreCoupons({
     }
 
     try {
-      setLoading(true);
+      setSubmitting(true);
       setSuccessMessage(editingCoupon ? '优惠券更新成功！' : '优惠券创建成功！');
       setOpenDialog(false);
       loadCoupons();
@@ -181,16 +130,16 @@ export default function StoreCoupons({
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = async (coupon: Coupon) => {
+  const handleDelete = async (coupon: StoreCoupon) => {
     if (!confirm(`确定要删除优惠码 "${coupon.code}" 吗？`)) {
       return;
     }
     try {
-      setLoading(true);
+      setSubmitting(true);
       setSuccessMessage('优惠券删除成功！');
       loadCoupons();
       
@@ -201,7 +150,7 @@ export default function StoreCoupons({
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -223,7 +172,7 @@ export default function StoreCoupons({
     return colors[status] || 'default';
   };
 
-  const formatDiscount = (coupon: Coupon) => {
+  const formatDiscount = (coupon: StoreCoupon) => {
     if (coupon.discount_type === 'fixed') {
       return `¥${coupon.discount_value.toFixed(2)}`;
     } else {

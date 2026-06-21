@@ -52,10 +52,11 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import { isTauri, safeInvoke } from '../lib/tauri';
+import { safeInvoke } from '../lib/tauri';
 import { isDemoAccount } from '../lib/aiTeamTokenService';
-import { syncAITeamGroups, buildGroupId } from '../lib/contactService';
+import { buildGroupId } from '../lib/contactService';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fetchTeams, useTeams, useInvalidateTeams } from '../lib/hooks/useTeams';
 
 /** 同步 AI Team 数量到 localStorage 并广播变更事件,供 Sidebar 动态 badge 订阅 */
 function syncAITeamCountToSidebar(teams: AiTeam[]) {
@@ -88,10 +89,10 @@ import AiPluginPanel from '../components/Teams/AiPluginPanel';
 
 export default function TeamsPage() {
   const navigate = useNavigate();
-  const [teams, setTeams] = useState<AiTeam[]>([]);
-  const [loading, setLoading] = useState(true);
+  const invalidateTeams = useInvalidateTeams();
+  const { data: teams = [], isLoading: loading } = useTeams();
+  const existingTeamNames = useMemo(() => teams.map((t) => t.name), [teams]);
   const [snackbar, setSnackbar] = useState('');
-  const [existingTeamNames, setExistingTeamNames] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 对话框状态
@@ -174,77 +175,6 @@ export default function TeamsPage() {
     ];
   }
 
-  /** 浏览器开发模式下的 mock 内置团队（3 个）:AI 经营 + 国内社媒 + 欧美社媒
-   *  对应 ProClaw 1.0.0 测试数据包的演示要求
-   *  Nvwax 拉取 + Tauri 不可用时的回退数据
-   *
-   * 重要:成员的 agent_id 必须真实存在,确保群聊/任务分派能正常工作。
-   *  - AI 经营团队的 8 个 builtin-* agent 由后端 Tauri 端注册(生产环境有效)
-   *  - 国内/欧美社媒团队的 agent 全部对应 localAgentManifests 中的真实 agent
-   *    (ma_social_cn / ma_social_us),与 production localTeamSkillMap 一致 */
-  function getMockBuiltinTeams(): AiTeam[] {
-    const now = new Date().toISOString();
-    return [
-      {
-        id: 'mock-builtin-team-biz-ops',
-        name: 'AI 经营团队',
-        description: 'ProClaw 内置的 AI 经营团队，包含 8 个专业 Agent：库存优化师、销售预测分析师、业务分析师、采购顾问、财务分析师、客户服务助手、AI智能找图、自媒体运营官。',
-        category: '通用经营',
-        config_json: '{}',
-        source: 'builtin',
-        version: '1.0.0',
-        publish_status: 'draft',
-        tags: ['库存管理', '销售预测', '数据分析', '采购管理', '财务管理', '客户服务', '智能找图', '自媒体运营'],
-        members: getBuiltinTeamMembers(),
-        workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
-        triggers: {},
-        created_at: now,
-        updated_at: now,
-      },
-      {
-        id: 'mock-builtin-team-social-cn',
-        name: '国内社媒运营 Team',
-        description: '国内市场社媒运营团队(对应 localTeamSkillMap.team-skill-social-cn-001),覆盖微信公众号、小红书、知乎、微博,简体中文,合规审查。',
-        category: '社媒运营',
-        config_json: '{}',
-        source: 'builtin',
-        version: '1.0.0',
-        publish_status: 'draft',
-        tags: ['微信公众号', '小红书', '知乎', '微博', '简体中文', '合规审查'],
-        members: [
-          { agent_id: 'ma_social_cn', role: '微信公众号运营', responsibilities: '深度文章与品牌建设,服务号推送,长文排版。', sort_order: 0 },
-          { agent_id: 'ma_social_cn', role: '小红书运营', responsibilities: '种草笔记与好物推荐,封面 / 标题优化。', sort_order: 1 },
-          { agent_id: 'ma_social_cn', role: '知乎运营', responsibilities: '专业问答与技术分享,品牌问答渗透。', sort_order: 2 },
-          { agent_id: 'ma_social_cn', role: '微博运营', responsibilities: '实时热点与话题营销,超话运营。', sort_order: 3 },
-        ],
-        workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
-        triggers: {},
-        created_at: now,
-        updated_at: now,
-      },
-      {
-        id: 'mock-builtin-team-social-us-eu',
-        name: '欧美社媒运营 Team',
-        description: '欧美市场社媒运营团队(对应 localTeamSkillMap.team-skill-social-us-eu-001),覆盖 Twitter/X、Facebook、Instagram,英语内容,美西 / 美东时区。',
-        category: '社媒运营',
-        config_json: '{}',
-        source: 'builtin',
-        version: '1.0.0',
-        publish_status: 'draft',
-        tags: ['Twitter/X', 'Facebook', 'Instagram', '英语内容', '欧美市场'],
-        members: [
-          { agent_id: 'ma_social_us', role: 'Twitter/X Manager', responsibilities: '实时互动与技术讨论,话题运营。', sort_order: 0 },
-          { agent_id: 'ma_social_us', role: 'Facebook Manager', responsibilities: '社群建设与页面管理,广告投放。', sort_order: 1 },
-          { agent_id: 'ma_social_us', role: 'Instagram Manager', responsibilities: '视觉内容与快拍,Reels 制作。', sort_order: 2 },
-        ],
-        workflow: { mode: 'sequential', steps: [], fallback_strategy: 'skip_on_error' },
-        triggers: {},
-        created_at: now,
-        updated_at: now,
-      },
-    ];
-  }
-
   /** 首次加载时若无任何团队，自动创建内置默认团队。
    *  演示账号下会预置 3 个 AI Team（AI 经营团队 + 国内社媒 + 海外社媒），
    *  Nvwax 拉取失败时回退到 localTeamSkillMap。
@@ -285,7 +215,7 @@ export default function TeamsPage() {
       };
 
       const team = await safeInvoke<AiTeam>('create_team', { payload });
-      if (team) setTeams([team]);
+      if (team) await invalidateTeams();
 
       // 演示账号下：补充预置国内/海外社媒团队
       if (isDemoAccount()) {
@@ -333,61 +263,20 @@ export default function TeamsPage() {
   }
 
   const loadTeams = useCallback(async () => {
-    setLoading(true);
     try {
-      const result = await safeInvoke<AiTeam[]>('get_teams');
-      if (result) {
-        // 自动去重：同名团队只保留最早创建的
-        const seen = new Map<string, AiTeam>();
-        const dups: string[] = [];
-        for (const team of result) {
-          if (seen.has(team.name)) {
-            dups.push(team.name);
-            // 删除较晚创建的重复团队
-            safeInvoke('delete_team', { id: team.id }).catch(() => {});
-          } else {
-            seen.set(team.name, team);
-          }
-        }
-        const deduped = Array.from(seen.values());
-        if (dups.length > 0) {
-          setSnackbar(`已自动清理 ${dups.length} 个重复团队`);
-        }
-        setTeams(deduped);
-        setExistingTeamNames(deduped.map(t => t.name));
-        syncAITeamGroups(deduped);
-        // 演示账号下：保证 3 个 AI Team（AI 经营 + 国内社媒 + 欧美社媒）完整
-        // - 如果团队表为空 → 首次创建内置默认团队
-        // - 如果存在但少于 3 个 → 补充安装缺失的国内/海外社媒团队
-        // (非演示账号不触发，避免给真实用户注入示例数据)
-        if (isDemoAccount() && deduped.length < 3) {
-          await ensureBuiltinTeam();
-          // ensureBuiltinTeam 完成后重新拉取一次，保证 UI 反映补充后的完整状态
-          const reloaded = await safeInvoke<AiTeam[]>('get_teams');
-          if (reloaded && reloaded.length > deduped.length) {
-            const reloadedDeduped = Array.from(
-              new Map(reloaded.map((t) => [t.name, t])).values()
-            );
-            setTeams(reloadedDeduped);
-            setExistingTeamNames(reloadedDeduped.map((t) => t.name));
-            syncAITeamGroups(reloadedDeduped);
-          }
-        }
-      } else if (!isTauri()) {
-        // 浏览器开发模式：展示 3 个模拟内置团队（AI 经营 + 国内社媒 + 海外社媒），
-        // 对应 ProClaw 1.0.0 测试数据包的演示要求
-        const mockTeams = getMockBuiltinTeams();
-        setTeams(mockTeams);
-        setExistingTeamNames(mockTeams.map(t => t.name));
-        syncAITeamGroups(mockTeams);
+      const { teams: current, dupCount } = await fetchTeams();
+      if (dupCount > 0) {
+        setSnackbar(`已自动清理 ${dupCount} 个重复团队`);
       }
+      if (isDemoAccount() && current.length < 3) {
+        await ensureBuiltinTeam();
+      }
+      await invalidateTeams();
     } catch (err) {
       console.error('Failed to load teams:', err);
       setSnackbar('加载团队列表失败: ' + String(err));
-    } finally {
-      setLoading(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [invalidateTeams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadTeams();
@@ -405,7 +294,7 @@ export default function TeamsPage() {
       JSON.parse(text); // 验证
       const team = await safeInvoke<AiTeam>('import_team', { teamJson: text });
       if (team) {
-        setTeams((prev) => [team, ...prev]);
+        await invalidateTeams();
         setSnackbar(`成功导入"${team.name}"`);
       }
     } catch (err) {
@@ -420,7 +309,7 @@ export default function TeamsPage() {
   const handleDelete = async (id: string) => {
     try {
       await safeInvoke('delete_team', { id });
-      setTeams((prev) => prev.filter((t) => t.id !== id));
+      await invalidateTeams();
       setSnackbar('已删除团队');
     } catch (err) {
       setSnackbar('删除失败: ' + String(err));
@@ -438,7 +327,7 @@ export default function TeamsPage() {
         payload: { publish_status: newStatus },
       });
       if (updated) {
-        setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        await invalidateTeams();
         setSnackbar(newStatus === 'published' ? '已发布到市场' : '已取消发布');
       }
     } catch (err) {
@@ -510,7 +399,7 @@ export default function TeamsPage() {
     if (!recommendation) return;
     try {
       const team = await createRecommendedTeam(recommendation);
-      setTeams((prev) => [team, ...prev]);
+      await invalidateTeams();
       setSnackbar(`已创建: ${team.name}`);
       setRecommendOpen(false);
     } catch (err) {
@@ -900,7 +789,7 @@ export default function TeamsPage() {
 
       {/* ============ 创建对话框 ============ */}
       <CreateTeamDialog open={createOpen} onClose={() => setCreateOpen(false)}
-        onCreated={(team) => { setTeams((prev) => [team, ...prev]); setCreateOpen(false); setSnackbar(`创建成功: ${team.name}`); }}
+        onCreated={(team) => { void invalidateTeams(); setCreateOpen(false); setSnackbar(`创建成功: ${team.name}`); }}
         onImportFile={() => { fileInputRef.current?.click(); }}
         existingNames={existingTeamNames} />
 
@@ -920,7 +809,7 @@ export default function TeamsPage() {
       {/* ============ 编辑对话框 ============ */}
       {editTeam && (
         <EditTeamDialog team={editTeam} onClose={() => setEditTeam(null)}
-          onSaved={(updated) => { setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t))); setEditTeam(null); setSnackbar('团队已更新'); }} />
+          onSaved={(updated) => { void invalidateTeams(); setEditTeam(null); setSnackbar('团队已更新'); }} />
       )}
 
       {/* ============ 删除确认 ============ */}

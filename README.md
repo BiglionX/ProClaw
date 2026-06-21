@@ -362,13 +362,17 @@ npm run dev
 - [实施计划](docs/IMPLEMENTATION_PLAN.md)
 
 ### PRD 产品需�?
-- [PRD v4.0 核心需求](docs/prd/ProClaw_PRD_v4.0.md)
+### PRD 产品需求
+- [**产品需求总览**](docs/REQUIREMENTS.md) - 推荐首读
+- [PRD 总索引](docs/prd/PRD_INDEX.md)
+
+- [PRD v4.0 核心需求](docs/prd/_deprecated/ProClaw_PRD_v4.0.md)
 - [PRD v4.1 音视频通话](docs/prd/ProClaw 手机端音视频通话功能需求（补充 v4.1�?md)
 - [PRD v4.2 外部伙伴邀请](docs/prd/需求文档：ProClaw 外部伙伴邀请与自动关联机制（PRD v4.2�?md)
 - [PRD v4.3 员工邀请与角色分配](docs/prd/需求文档：ProClaw 员工邀请与角色权限自动分配（PRD v4.3�?md)
 - [PRD v5.0 云托管商城](docs/prd/需求文档：ProClaw 云托管商城（AI 生成独立站）PRD v5.0.md)
 - [PRD v5.1 用户中心](docs/prd/需求文档：ProClaw 用户中心（PRD v5.1�?md)
-- [PRD v6.0 ProClaw Light 版](docs/prd/需求文档：ProClaw 虚拟公司版（Agent 化架构）PRD v6.0.md)
+- [PRD v6.0 ProClaw Light 版](docs/prd/architecture/需求文档：ProClaw 虚拟公司版（Agent 化架构）PRD v6.0.md)
 - [PRD v6.1 安装向导](docs/prd/需求文档：ProClaw 安装向导（CEO Agent 对话式配置）PRD v6.1.md)
 - [PRD v6.2 CEO Agent 主控官](docs/prd/需求文档：CEO Agent 作为主控�?- 项目上下文协议与任务分派（PRD v6.2�?md)
 - [PRD v6.3 决策确认机制](docs/prd/需求文档：CEO Agent 决策确认机制与个性化学习（PRD v6.3�?md)

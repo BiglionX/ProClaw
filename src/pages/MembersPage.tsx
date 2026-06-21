@@ -47,27 +47,8 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 
-import apiClient from '../lib/apiClient';
-
-// ==================== 类型定义 ====================
-
-interface Member {
-  id: string;
-  name: string;
-  code: string;
-  contact_person?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  website?: string;
-  customer_type: 'individual' | 'vip' | 'enterprise';
-  tax_number?: string;
-  credit_limit: number;
-  notes?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import type { Member, MemberInput } from '../lib/memberService';
+import { useMemberMutations, useMembers } from '../lib/hooks/useMembers';
 
 interface MemberFormData {
   name: string;
@@ -111,9 +92,8 @@ const buildEmptyForm = (): MemberFormData => ({
 // ==================== 主页面 ====================
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [page, setPage] = useState(0);
@@ -122,7 +102,6 @@ export default function MembersPage() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [formData, setFormData] = useState<MemberFormData>(buildEmptyForm());
   const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
     open: false,
     message: '',
@@ -130,34 +109,13 @@ export default function MembersPage() {
   });
   const [deleteConfirm, setDeleteConfirm] = useState<Member | null>(null);
 
-  // ==================== 数据加载 ====================
-
-  const loadMembers = async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get<{ data: Member[]; total: number }>(
-        '/api/customers',
-        { params: { search: searchText || undefined } }
-      );
-      const list = Array.isArray(response?.data) ? response.data : [];
-      setMembers(list);
-    } catch (error: any) {
-      console.error('[MembersPage] load failed:', error);
-      setSnackbar({
-        open: true,
-        message: error?.response?.data?.error || '加载会员列表失败',
-        severity: 'error',
-      });
-      setMembers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: members = [], isLoading: loading, refetch } = useMembers(debouncedSearch);
+  const { create, update, remove } = useMemberMutations();
+  const mutating = create.isPending || update.isPending || remove.isPending;
 
   useEffect(() => {
-    const timer = setTimeout(loadMembers, 250);
+    const timer = setTimeout(() => setDebouncedSearch(searchText), 250);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText]);
 
   // ==================== 统计 ====================
@@ -214,7 +172,7 @@ export default function MembersPage() {
   };
 
   const closeDialog = () => {
-    if (submitting) return;
+    if (mutating) return;
     setDialogOpen(false);
     setEditingMember(null);
     setFormError(null);
@@ -238,10 +196,9 @@ export default function MembersPage() {
       return;
     }
 
-    setSubmitting(true);
     setFormError(null);
     try {
-      const payload = {
+      const payload: MemberInput = {
         name: formData.name.trim(),
         code: formData.code.trim() || undefined,
         contact_person: formData.contact_person.trim() || undefined,
@@ -255,31 +212,27 @@ export default function MembersPage() {
       };
 
       if (editingMember) {
-        await apiClient.put(`/api/customers/${editingMember.id}`, payload);
+        await update.mutateAsync({ id: editingMember.id, input: payload });
         setSnackbar({ open: true, message: '会员信息已更新', severity: 'success' });
       } else {
-        await apiClient.post('/api/customers', payload);
+        await create.mutateAsync(payload);
         setSnackbar({ open: true, message: '会员创建成功', severity: 'success' });
       }
 
       setDialogOpen(false);
       setEditingMember(null);
-      await loadMembers();
     } catch (error: any) {
       console.error('[MembersPage] submit failed:', error);
       setFormError(error?.response?.data?.error || error?.message || '保存失败');
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
-      await apiClient.delete(`/api/customers/${deleteConfirm.id}`);
+      await remove.mutateAsync(deleteConfirm.id);
       setSnackbar({ open: true, message: `已删除会员：${deleteConfirm.name}`, severity: 'success' });
       setDeleteConfirm(null);
-      await loadMembers();
     } catch (error: any) {
       console.error('[MembersPage] delete failed:', error);
       setSnackbar({
@@ -309,7 +262,7 @@ export default function MembersPage() {
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="刷新">
-            <IconButton onClick={loadMembers} disabled={loading}>
+            <IconButton onClick={() => refetch()} disabled={loading}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
@@ -703,14 +656,14 @@ export default function MembersPage() {
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={closeDialog} disabled={submitting}>取消</Button>
+          <Button onClick={closeDialog} disabled={mutating}>取消</Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : undefined}
+            disabled={mutating}
+            startIcon={mutating ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
-            {submitting ? '保存中…' : (editingMember ? '保存修改' : '创建会员')}
+            {mutating ? '保存中…' : (editingMember ? '保存修改' : '创建会员')}
           </Button>
         </DialogActions>
       </Dialog>

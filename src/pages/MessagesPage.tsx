@@ -19,32 +19,16 @@ import {
   ToggleButton,
   Chip,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Contact, getRecentContacts } from '../lib/contactService';
+import { useRecentContacts } from '../lib/hooks/useContacts';
 
 export default function MessagesPage() {
   const navigate = useNavigate();
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('all');
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadContacts();
-  }, []);
-
-  const loadContacts = async () => {
-    setLoading(true);
-    try {
-      const data = await getRecentContacts('self');
-      setContacts(data);
-    } catch (e) {
-      console.error('加载消息列表失败:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: contacts = [], isLoading: loading, refetch } = useRecentContacts('self');
 
   const filtered = contacts.filter(c => {
     if (filter === 'unread') return (c.unread_count || 0) > 0;

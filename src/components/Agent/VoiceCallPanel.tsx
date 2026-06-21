@@ -366,7 +366,7 @@ export function VoiceCallPanel({
                   {entry.text}
                   {entry.speaking && (
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', ml: 1, gap: 0.5 }}>
-                      <VolumeUp sx={{ fontSize: 14, color: '#FF8060' }} />
+                      <SpeakIcon sx={{ fontSize: 14, color: '#FF8060' }} />
                       <Typography variant="caption" sx={{ color: '#FF8060' }}>
                         朗读中
                       </Typography>

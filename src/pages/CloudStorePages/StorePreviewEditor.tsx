@@ -3,7 +3,7 @@
  * 组合手机模拟器 + 编辑面板，管理数据加载和保存逻辑
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { Box, Typography, Alert, CircularProgress, useMediaQuery, ToggleButton, ToggleButtonGroup, Chip } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -11,14 +11,12 @@ import {
   ShoppingCart as CartIcon,
 } from '@mui/icons-material';
 import {
-  getCloudStore,
-  getStoreTheme,
-  getSyncableProducts,
   updateStoreTheme,
   updateCloudStore,
   generateThemeWithAI,
   getStoreUrl,
 } from '../../lib/cloudStoreService';
+import { useCloudStore, useStoreTheme, useSyncableProducts } from '../../lib/hooks/useCloudStore';
 import { PreviewProvider, usePreviewContext, previewThemeToStoreTheme } from '../../components/CloudPreview/PreviewContext';
 import PhoneSimulator from '../../components/CloudPreview/PhoneSimulator';
 import H5StoreRenderer from '../../components/CloudPreview/H5StoreRenderer';
@@ -45,23 +43,19 @@ function StorePreviewEditorInner({
   setError, setSuccessMessage,
 }: StorePreviewEditorProps) {
   const ctx = usePreviewContext();
+  const { data: storeData, isLoading: storeLoading } = useCloudStore();
+  const { data: themeData, isLoading: themeLoading } = useStoreTheme(storeData?.id, !!storeData);
+  const { data: productList = [], isLoading: productsLoading } = useSyncableProducts();
+  const initLoading = storeLoading || productsLoading || (!!storeData && themeLoading);
+  const didInit = useRef(false);
 
-  // 响应式断点
   const isXl = useMediaQuery('(min-width: 1400px)');
   const isLg = useMediaQuery('(min-width: 1100px)');
   const isMd = useMediaQuery('(min-width: 900px)');
-  const isStackLayout = !isMd; // < 900px 上下堆叠
-
-  // 手机缩放比例
+  const isStackLayout = !isMd;
   const phoneScale = isXl ? 1 : isLg ? 0.85 : isMd ? 0.75 : 0.65;
-
-  // 编辑面板宽度
   const panelWidth = isXl ? 400 : isLg ? 360 : 320;
 
-  // 本地初始化加载状态
-  const [initLoading, setInitLoading] = useState(true);
-
-  // 从 ctx 解构稳定依赖，避免 useCallback 依赖整个 ctx 对象
   const {
     config,
     store,
@@ -71,54 +65,29 @@ function StorePreviewEditorInner({
     initData,
   } = ctx;
 
-  // 加载数据
   useEffect(() => {
-    let cancelled = false;
-    const loadData = async () => {
-      try {
-        setInitLoading(true);
-
-        // 仅调用 getCloudStore 一次，避免双调用导致数据不一致
-        const storeResult = await getCloudStore();
-        const [themeData, products] = await Promise.all([
-          storeResult ? getStoreTheme(storeResult.id).catch(() => null) : Promise.resolve(null),
-          getSyncableProducts().catch(() => []),
-        ]);
-
-        if (cancelled) return;
-
-        // 将 ProductSPU[] 转换为 PreviewProduct[]
-        const previewProducts: PreviewProduct[] = products.map(p => ({
-          id: p.id,
-          name: p.name,
-          price: p.skus?.[0]?.sell_price || 0,
-          images: p.images?.map(img => img.image_url).filter(Boolean) || [],
-          category: p.category_id,
-          stock: p.skus?.[0]?.current_stock || 0,
-          is_on_sale: p.is_on_sale ?? p.status === 'on_sale',
-        }));
-
-        initData({
-          store: storeResult,
-          theme: themeData,
-          products: previewProducts,
-        });
-      } catch (err) {
-        if (cancelled) return;
-        console.error('加载预览数据失败:', err);
-        setError('加载预览数据失败');
-      } finally {
-        if (!cancelled) {
-          setInitLoading(false);
-        }
-      }
-    };
-
-    loadData();
-    return () => {
-      cancelled = true;
-    };
-  }, [setError, initData]);
+    if (initLoading || didInit.current) return;
+    try {
+      const previewProducts: PreviewProduct[] = productList.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.skus?.[0]?.sell_price || 0,
+        images: p.images?.map((img) => img.image_url).filter(Boolean) || [],
+        category: p.category_id,
+        stock: p.skus?.[0]?.current_stock || 0,
+        is_on_sale: p.is_on_sale ?? p.status === 'on_sale',
+      }));
+      initData({
+        store: storeData ?? null,
+        theme: themeData ?? null,
+        products: previewProducts,
+      });
+      didInit.current = true;
+    } catch (err) {
+      console.error('加载预览数据失败:', err);
+      setError('加载预览数据失败');
+    }
+  }, [initLoading, storeData, themeData, productList, initData, setError]);
 
   // 保存配置
   const handleSave = useCallback(async () => {

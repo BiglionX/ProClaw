@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * NvwaX 市场 Mock 后端（任务 #6：Agent 市场后端 mock）
  *

@@ -17,6 +17,7 @@ class WebSocketService {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map();
   private isConnected: boolean = false;
+  private isAuthenticated: boolean = false;
   private isConnecting: boolean = false;
   private isIntentionalDisconnect: boolean = false; // 审计 H5：区分主动/被动断开
   private reconnectAttempts: number = 0; // 审计 E10：指数退避计数器
@@ -48,19 +49,31 @@ class WebSocketService {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        logger.log('[WS] Connected');
-        this.isConnected = true;
-        this.isConnecting = false;
-        // 通过首条消息发送认证信息（审计 S7）
+        logger.log('[WS] Socket open, sending auth');
+        this.isAuthenticated = false;
         this.ws!.send(JSON.stringify({ type: 'auth', user_id: this.userId, token: this.token }));
-        this.startHeartbeat();
-        this.onStatusChange?.(true);
       };
 
       this.ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
           const type = msg.type || 'unknown';
+
+          if (type === 'auth_ok' || type === 'connection_status') {
+            if (!this.isAuthenticated) {
+              this.isAuthenticated = true;
+              this.isConnected = true;
+              this.isConnecting = false;
+              this.startHeartbeat();
+              this.onStatusChange?.(true);
+              logger.log('[WS] Authenticated');
+            }
+          } else if (type === 'auth_error') {
+            logger.error('[WS] Auth failed:', msg.error);
+            this.ws?.close();
+            return;
+          }
+
           this.dispatchMessage(type, msg);
         } catch {
           // Non-JSON message (e.g., "pong")
@@ -73,6 +86,7 @@ class WebSocketService {
       this.ws.onclose = () => {
         logger.log('[WS] Disconnected');
         this.isConnected = false;
+        this.isAuthenticated = false;
         this.isConnecting = false;
         this.stopHeartbeat();
         this.onStatusChange?.(false);
@@ -152,7 +166,7 @@ class WebSocketService {
 
   /** 发送 JSON 消息 */
   send(type: string, payload?: any, toUserId?: string) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.isAuthenticated) {
       logger.warn('[WS] Cannot send, not connected');
       return false;
     }
@@ -165,7 +179,7 @@ class WebSocketService {
 
   /** 发送原始文本 */
   sendRaw(text: string) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN && this.isAuthenticated) {
       this.ws.send(text);
     }
   }
@@ -207,11 +221,13 @@ class WebSocketService {
     this.ws?.close();
     this.ws = null;
     this.isConnected = false;
+    this.isAuthenticated = false;
+    this.isConnecting = false;
   }
 
-  /** 是否已连接 */
+  /** 是否已连接（含 JWT 认证完成） */
   get connected(): boolean {
-    return this.isConnected;
+    return this.isConnected && this.isAuthenticated;
   }
 
   /** 获取当前用户ID */

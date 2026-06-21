@@ -3,8 +3,12 @@
  *
  * 测试 tokenize 检索 + fallback 答案 + validateResult
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { KnowledgeDocument } from './knowledgeBaseService';
+
+vi.mock('./llmProvider', () => ({
+  getLLMForTask: vi.fn().mockRejectedValue(new Error('LLM unavailable in test')),
+}));
 
 describe('knowledgeQA - 检索与降级', () => {
   // 通过模拟 documents 直接测试导出函数行为

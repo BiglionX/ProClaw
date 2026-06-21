@@ -2,6 +2,7 @@
 // 提供产品的 CRUD 操作 RESTful API
 
 use super::AppState;
+use crate::product_commands::get_product_by_id_inner;
 use axum::{
     extract::{Json, Path, Query, State},
     http::StatusCode,
@@ -292,19 +293,33 @@ pub async fn create_product(
         ),
     };
 
-    // 返回创建的产品
-    let product = get_product_by_id(&conn, &id);
-    match product {
-        Ok(p) => (
+    // 返回创建的产品（共享 product_commands 查询逻辑）
+    match get_product_by_id_inner(&conn, &id) {
+        Some(p) => (
             StatusCode::CREATED,
-            Json(
-                serde_json::to_value(p)
-                    .unwrap_or(serde_json::json!({"error": "Serialization failed"})),
-            ),
+            Json(serde_json::json!({
+                "id": p.id,
+                "sku": p.sku,
+                "name": p.name,
+                "description": p.description,
+                "category_id": p.category_id,
+                "brand_id": p.brand_id,
+                "unit": p.unit,
+                "cost_price": p.cost_price,
+                "sell_price": p.sell_price,
+                "current_stock": p.current_stock,
+                "min_stock": p.min_stock,
+                "max_stock": p.max_stock,
+                "image_url": p.image_url,
+                "barcode": p.barcode,
+                "is_active": p.is_active,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+            })),
         ),
-        Err(e) => (
+        None => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
+            Json(serde_json::json!({"error": "Product not found after create"})),
         ),
     }
 }

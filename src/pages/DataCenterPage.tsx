@@ -36,7 +36,7 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import AIInsights, { type AIInsightItem } from '../components/DataCenter/AIInsights';
 import AIStatusBar from '../components/DataCenter/AIStatusBar';
@@ -44,15 +44,8 @@ import ChartsSection from '../components/DataCenter/ChartsSection';
 import StatCard from '../components/DataCenter/StatCard';
 import QuickActions from '../components/Agent/QuickActions';
 import { generateAIInsights } from '../lib/aiInsightEngine';
-import {
-  getSalesTrend, getProductAnalytics,
-  type SalesTrendData, type ProductAnalytics,
-} from '../lib/analyticsService';
-import { getFinancialSummary,
-  type FinancialSummary,
-} from '../lib/financeService';
-import { getInventoryStats, type InventoryStats } from '../lib/inventoryService';
-import { getDatabaseStats } from '../lib/productService';
+import { useProductAnalytics, useSalesTrend } from '../lib/hooks/useAnalytics';
+import { useDashboardOverview, useInvalidateDashboard } from '../lib/hooks/useDashboard';
 import ProfitLossPage from './ProfitLossPage';
 import CashFlowPage from './CashFlowPage';
 import AITaskOverview from '../components/DataCenter/AITaskOverview';
@@ -67,71 +60,57 @@ const formatCurrency = (value: number) => {
 /* ========== 主页面 ========== */
 
 export default function DataCenterPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
-  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
-  const [dbStats, setDbStats] = useState<any>(null);
-  const [insights, setInsights] = useState<AIInsightItem[]>([]);
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
-  const [analyticsTrend, setAnalyticsTrend] = useState<SalesTrendData | null>(null);
-  const [analyticsProducts, setAnalyticsProducts] = useState<ProductAnalytics | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
 
-  // 加载概览数据
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [invStats, prodAnalytics, finSummary, dbStatistics] = await Promise.all([
-        getInventoryStats(), getProductAnalytics(),
-        getFinancialSummary(), getDatabaseStats(),
-      ]);
-      setInventoryStats(invStats);
-      setFinancialSummary(finSummary);
-      setDbStats(dbStatistics);
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    error: overviewError,
+    refetch: refetchOverview,
+  } = useDashboardOverview();
+  const {
+    data: analyticsTrend,
+    isLoading: analyticsLoading,
+    error: analyticsError,
+    refetch: refetchTrend,
+  } = useSalesTrend(period);
+  const { data: analyticsProductsData } = useProductAnalytics(tabValue === 0);
+  const analyticsProducts = analyticsProductsData ?? overview?.prodAnalytics ?? null;
+  const analyticsErrorMsg = analyticsError instanceof Error ? analyticsError.message : null;
+  const invalidateDashboard = useInvalidateDashboard();
 
-      const generatedInsights = generateAIInsights({
-        lowStockCount: invStats?.low_stock_count || 0,
-        zeroStockCount: invStats?.zero_stock_count || 0,
-        totalProducts: dbStatistics?.spu_count || 0,
-        monthlyRevenue: finSummary?.monthly_revenue || 0,
-        monthlyProfit: finSummary?.monthly_profit || 0,
-        bestSellingProducts: prodAnalytics?.best_selling?.slice(0, 3),
-        lowStockProducts: invStats?.low_stock_products,
-        accountsReceivable: finSummary?.accounts_receivable || 0,
-        accountsPayable: finSummary?.accounts_payable || 0,
-      });
-      setInsights(generatedInsights);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
-    } finally {
-      setLoading(false);
-    }
+  const loading = overviewLoading;
+  const error = overviewError instanceof Error ? overviewError.message : null;
+  const inventoryStats = overview?.invStats ?? null;
+  const financialSummary = overview?.finSummary ?? null;
+  const dbStats = overview?.dbStatistics ?? null;
+
+  const insights = useMemo<AIInsightItem[]>(() => {
+    if (!overview) return [];
+    const prodAnalytics = overview.prodAnalytics;
+    return generateAIInsights({
+      lowStockCount: inventoryStats?.low_stock_count || 0,
+      zeroStockCount: inventoryStats?.zero_stock_count || 0,
+      totalProducts: (dbStats as any)?.spu_count || 0,
+      monthlyRevenue: financialSummary?.monthly_revenue || 0,
+      monthlyProfit: financialSummary?.monthly_profit || 0,
+      bestSellingProducts: prodAnalytics?.best_selling?.slice(0, 3),
+      lowStockProducts: inventoryStats?.low_stock_products,
+      accountsReceivable: financialSummary?.accounts_receivable || 0,
+      accountsPayable: financialSummary?.accounts_payable || 0,
+    });
+  }, [overview, inventoryStats, financialSummary, dbStats]);
+
+  const loadDashboardData = () => {
+    invalidateDashboard();
+    refetchOverview();
   };
 
-  // 加载数据分析
-  const loadAnalyticsData = async () => {
-    try {
-      setAnalyticsLoading(true);
-      setAnalyticsError(null);
-      const [trendData, analyticsData] = await Promise.all([
-        getSalesTrend(period), getProductAnalytics(),
-      ]);
-      setAnalyticsTrend(trendData);
-      setAnalyticsProducts(analyticsData);
-    } catch (err) {
-      setAnalyticsError(err instanceof Error ? err.message : '加载数据失败');
-    } finally {
-      setAnalyticsLoading(false);
-    }
+  const loadAnalyticsData = () => {
+    refetchTrend();
   };
-
-  useEffect(() => { loadDashboardData(); }, []);
-  useEffect(() => { loadAnalyticsData(); }, [period]);
 
   const finSummary = financialSummary;
 
@@ -544,9 +523,9 @@ export default function DataCenterPage() {
               </Paper>
 
               {/* 加载错误提示 */}
-              {analyticsError && (
+              {analyticsErrorMsg && (
                 <Paper elevation={0} sx={{ mt: 3, p: 2, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 2 }}>
-                  <Typography>{analyticsError}</Typography>
+                  <Typography>{analyticsErrorMsg}</Typography>
                 </Paper>
               )}
             </>

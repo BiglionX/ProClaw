@@ -20,7 +20,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -33,41 +33,35 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import {
-  ProductAnalytics,
-  SalesTrendData,
-  getProductAnalytics,
-  getSalesTrend,
-} from '../lib/analyticsService';
+import { useInvalidateAnalytics, useProductAnalytics, useSalesTrend } from '../lib/hooks/useAnalytics';
 
 export default function AnalyticsPage() {
-  const [salesTrend, setSalesTrend] = useState<SalesTrendData | null>(null);
-  const [productAnalytics, setProductAnalytics] =
-    useState<ProductAnalytics | null>(null);
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // 加载数据
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [trendData, analyticsData] = await Promise.all([
-        getSalesTrend(period),
-        getProductAnalytics(),
-      ]);
-      setSalesTrend(trendData);
-      setProductAnalytics(analyticsData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
-    } finally {
-      setLoading(false);
-    }
+  const {
+    data: salesTrend,
+    isLoading: trendLoading,
+    error: trendError,
+    refetch: refetchTrend,
+  } = useSalesTrend(period);
+  const {
+    data: productAnalytics,
+    isLoading: analyticsLoading,
+    error: analyticsError,
+    refetch: refetchAnalytics,
+  } = useProductAnalytics();
+  const invalidateAnalytics = useInvalidateAnalytics();
+
+  const loading = trendLoading || analyticsLoading;
+  const error =
+    (trendError instanceof Error ? trendError.message : null) ||
+    (analyticsError instanceof Error ? analyticsError.message : null);
+
+  const loadData = () => {
+    invalidateAnalytics();
+    refetchTrend();
+    refetchAnalytics();
   };
-
-  useEffect(() => {
-    loadData();
-  }, [period]);
 
   return (
     <Box>

@@ -41,24 +41,17 @@ import {
   SystemUpdateAlt as UpdateIcon,
 } from '@mui/icons-material';
 import { pluginLoader } from '../../lib/pluginLoader';
-import type { IndustryPluginManifest } from '../../config/appMode';
 import { openExternalUrl } from '../../lib/tauri';
-import { listPluginManifests } from '../../lib/manifestRegistry';
-
-/** 插件信息（来自 Tauri 后端） */
-interface InstalledPluginInfo {
-  plugin_id: string;
-  name: string;
-  version: string;
-  install_path: string;
-  manifest: IndustryPluginManifest;
-  /** 是否为内置插件（仅前端 manifestRegistry 中的预装插件，不可卸载） */
-  isBuiltin?: boolean;
-}
+import {
+  useInstalledPlugins,
+  useInvalidatePlugins,
+  type InstalledPluginInfo,
+} from '../../lib/hooks/usePlugins';
 
 export default function PluginSettings() {
-  const [plugins, setPlugins] = useState<InstalledPluginInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading } = useInstalledPlugins();
+  const invalidatePlugins = useInvalidatePlugins();
+  const plugins = data?.plugins ?? [];
   const [selectedPlugin, setSelectedPlugin] = useState<InstalledPluginInfo | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [uninstallConfirm, setUninstallConfirm] = useState<string | null>(null);
@@ -75,47 +68,11 @@ export default function PluginSettings() {
     is_force_update: boolean;
   }>>({});
 
-  /** 加载已安装的插件列表及启用状态 */
-  const loadPlugins = async () => {
-    setLoading(true);
-    try {
-      const installed = await pluginLoader.getInstalledPlugins();
-      // 合并 manifestRegistry 中的内置插件（演示预装：外贸柜台）
-      // builtin 插件不需要"安装"步骤，但应出现在列表中
-      const builtinManifests = listPluginManifests().filter(m => m.builtin);
-      const builtinItems: InstalledPluginInfo[] = builtinManifests
-        .filter(m => !(installed || []).some((p: any) => p.plugin_id === m.id))
-        .map(m => ({
-          plugin_id: m.id,
-          name: m.name,
-          version: m.version,
-          install_path: 'builtin',
-          manifest: m as unknown as IndustryPluginManifest,
-          isBuiltin: true,
-        }));
-      const merged: InstalledPluginInfo[] = [...(installed || []), ...builtinItems];
-      setPlugins(merged);
-      // 加载持久化的启用状态
-      const statuses = await pluginLoader.getAllPluginEnabledStatuses();
-      const map: Record<string, boolean> = {};
-      for (const s of statuses) {
-        map[s.plugin_id] = s.enabled;
-      }
-      // builtin 插件默认启用
-      for (const b of builtinItems) {
-        if (map[b.plugin_id] === undefined) map[b.plugin_id] = true;
-      }
-      setEnabledMap(map);
-    } catch (err) {
-      console.error('加载插件列表失败:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadPlugins();
-  }, []);
+    if (data?.enabledMap) {
+      setEnabledMap(data.enabledMap);
+    }
+  }, [data?.enabledMap]);
 
   /** 查看插件详情 */
   const handleShowDetail = (plugin: InstalledPluginInfo) => {
@@ -129,7 +86,7 @@ export default function PluginSettings() {
       const success = await pluginLoader.uninstallPlugin(pluginId);
       if (success) {
         setSnackbar({ message: '插件已卸载', severity: 'success' });
-        await loadPlugins();
+        await invalidatePlugins();
       } else {
         setSnackbar({ message: '卸载插件失败', severity: 'error' });
       }
@@ -201,7 +158,7 @@ export default function PluginSettings() {
         delete next[pluginId];
         return next;
       });
-      await loadPlugins();
+      await invalidatePlugins();
     } else {
       setSnackbar({ message: '应用更新失败', severity: 'error' });
     }

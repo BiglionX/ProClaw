@@ -1,9 +1,19 @@
 # ProClaw PRD 总索引
 
-> **最后更新**: 2026-06-16
+> **最后更新**: 2026-06-21
 > **覆盖版本**: v1.0.0 (2026-06-08)
-> **统计**: 43 份 PRD（34 已实现 / 6 部分实现 / 1 草案 / 1 已替代 + 1 客服接入重复）
-> **整理事件**: 2026-06-16 文档 Owner 全面整理 43 份 PRD 实施状态区块
+> **统计**: 42 份 PRD（34 已实现 / 6 部分实现 / 1 草案 / 1 已替代）
+> **整理事件**: 2026-06-21 按主题目录重组 docs/prd/ + 新建 REQUIREMENTS.md
+
+---
+
+## 文档导航
+
+| 文档 | 说明 |
+|------|------|
+| [../REQUIREMENTS.md](../REQUIREMENTS.md) | **产品需求总览**（推荐首读） |
+| [README.md](README.md) | PRD 目录说明 |
+| 本文档 | 42 份 PRD 完整索引 |
 
 ---
 
@@ -25,73 +35,73 @@
 
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
-| [CEO Agent 作为主控官 - 项目上下文协议与任务分派](需求文档：CEO%20Agent%20作为主控官%20-%20项目上下文协议与任务分派（PRD%20v6.2）.md) | v6.2 | ✅ 已实现 v1.0+ | PCP/任务分派/审查汇报全链路 |
-| [CEO Agent 决策确认机制与个性化学习](需求文档：CEO%20Agent%20决策确认机制与个性化学习（PRD%20v6.3）.md) | v6.3 | ✅ 已实现 v1.0+ | 决策卡片/偏好学习落地 |
-| [AI Team 群聊 LLM 接入 + 演示账号 Token](需求文档：AI%20Team%20群聊%20LLM%20接入与演示账号%20Token（PRD%20v6.4）.md) | v6.4 | ✅ 已实现 v1.0+ | 10,000 PT 演示 Token + Nvwax 回退 |
+| [CEO Agent 作为主控官 - 项目上下文协议与任务分派](ceo-agent/需求文档：CEO%20Agent%20作为主控官%20-%20项目上下文协议与任务分派（PRD%20v6.2）.md) | v6.2 | ✅ 已实现 v1.0+ | PCP/任务分派/审查汇报全链路 |
+| [CEO Agent 决策确认机制与个性化学习](ceo-agent/需求文档：CEO%20Agent%20决策确认机制与个性化学习（PRD%20v6.3）.md) | v6.3 | ✅ 已实现 v1.0+ | 决策卡片/偏好学习落地 |
+| [AI Team 群聊 LLM 接入 + 演示账号 Token](ceo-agent/需求文档：AI%20Team%20群聊%20LLM%20接入与演示账号%20Token（PRD%20v6.4）.md) | v6.4 | ✅ 已实现 v1.0+ | 10,000 PT 演示 Token + Nvwax 回退 |
 
 ### B. 移动端（6）
 
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
-| [ProClaw 手机独立版](产品需求文档：ProClaw%20手机独立版（PRD%20v11.0）.md) | v11.0 | ✅ 已实现 v1.0+ | SDK 56 + 玻璃拟态重写 |
-| [ProClaw 手机端底部导航重构](产品需求文档：ProClaw%20手机端底部导航重构（v11.1）.md) | v11.1 | ✅ 已实现 v1.0+ | 3 Tab（联系人/消息/我的）|
-| [ProClaw 手机端消息链路对齐补充需求](需求文档：ProClaw%20手机端消息链路对齐补充需求（PRD%20v11.2）.md) | v11.2 | ✅ 已实现 v1.0+ | 10 项需求全部落地 |
-| [ProClaw 手机端音视频通话功能需求（补充）](ProClaw%20手机端音视频通话功能需求（补充%20v4.1）.md) | v4.1 | 🔵 部分实现 ~20% | 仅基础设施预留；野火 IM SDK 未引入 |
-| [AI Team 页面 UI 重构与交互体验优化](需求文档：AI%20Team%20页面%20UI%20重构与交互体验优化（PRD%20v12.0）.md) | v12.0 | ✅ 已实现 v1.0+ | 玻璃拟态 11 屏重写 |
-| [ProClaw 商务通产品需求文档](ProClaw_PRD_v4.0.md) | v4.0 | 🔴 已替代 | 由 v11.x / v12.0 系列承接 |
+| [ProClaw 手机独立版](mobile/产品需求文档：ProClaw%20手机独立版（PRD%20v11.0）.md) | v11.0 | ✅ 已实现 v1.0+ | SDK 56 + 玻璃拟态重写 |
+| [ProClaw 手机端底部导航重构](mobile/产品需求文档：ProClaw%20手机端底部导航重构（v11.1）.md) | v11.1 | ✅ 已实现 v1.0+ | 3 Tab（联系人/消息/我的）|
+| [ProClaw 手机端消息链路对齐补充需求](mobile/需求文档：ProClaw%20手机端消息链路对齐补充需求（PRD%20v11.2）.md) | v11.2 | ✅ 已实现 v1.0+ | 10 项需求全部落地 |
+| [ProClaw 手机端音视频通话功能需求（补充）](mobile/ProClaw%20手机端音视频通话功能需求（补充%20v4.1）.md) | v4.1 | 🔵 部分实现 ~20% | 仅基础设施预留；野火 IM SDK 未引入 |
+| [AI Team 页面 UI 重构与交互体验优化](mobile/需求文档：AI%20Team%20页面%20UI%20重构与交互体验优化（PRD%20v12.0）.md) | v12.0 | ✅ 已实现 v1.0+ | 玻璃拟态 11 屏重写 |
+| [ProClaw 商务通产品需求文档](_deprecated/ProClaw_PRD_v4.0.md) | v4.0 | 🔴 已替代 | 由 v11.x / v12.0 系列承接 |
 
 ### C. 营销网站 / 用户中心（9）
 
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
-| [ProClaw 用户中心](需求文档：ProClaw%20用户中心（PRD%20v5.1）.md) | v5.1 | ✅ 已实现 v1.0+ | 个人/安全/设备/订阅全 Tab |
-| [ProClaw 内置商务秘书 Agent](需求文档：ProClaw%20内置商务秘书%20Agent（PRD%20v8.5）.md) | v8.5 | ✅ 已实现 v1.0+ | BAP 偏好/碰壁话术/浮动入口 |
-| [ProClaw 安装向导（CEO Agent 对话式配置）](需求文档：ProClaw%20安装向导（CEO%20Agent%20对话式配置）PRD%20v6.1.md) | v6.1 | ✅ 已实现 v1.0+ | CEO Agent 对话式引导 |
-| [ProClaw AI 团队交互 & AI 知识库统一管理](需求文档：AI团队交互与AI知识库统一管理.md) | v1.0 | ✅ 已实现 v1.0+ | 三库合一上线 |
-| [ProClaw 网站运营 AI Team 与多区域社媒运营](需求文档：ProClaw%20网站运营%20AI%20Team%20与多区域社媒运营（PRD%20v7.0）.md) | v7.0 | 🔵 部分实现 ~70% | 3 区域 Agent 上线；多区域调度待 v1.x |
-| [ProClaw 营销网站用户中心](需求文档：ProClaw%20营销网站用户中心（PRD%20v7.1）.md) | v7.1 | ✅ 已实现 v1.0+ | 6 Tab 全部上线 |
-| [ProClaw 营销网站优化升级](需求文档：ProClaw%20营销网站优化升级（PRD%20v7.2）.md) | v7.2 | ✅ 已实现 v1.0+ | 4 行业方案页 + 导航增强 |
-| [ProClaw 营销网站用户场景与品牌定位](需求文档：ProClaw%20营销网站用户场景与品牌定位%20PRD%20v7.0.md) | v7.0 | ✅ 已实现 v1.0+ | 与 `PROJECT_POSITIONING.md` 协同 |
-| [ProClaw 版本命名统一与营销网站对齐](需求文档：ProClaw%20版本命名统一与营销网站对齐（PRD%20v9.0）.md) | v9.0 | ✅ 已实现 v1.0+ | v1.0.0 全端版本号统一 |
+| [ProClaw 用户中心](marketing/需求文档：ProClaw%20用户中心（PRD%20v5.1）.md) | v5.1 | ✅ 已实现 v1.0+ | 个人/安全/设备/订阅全 Tab |
+| [ProClaw 内置商务秘书 Agent](marketing/需求文档：ProClaw%20内置商务秘书%20Agent（PRD%20v8.5）.md) | v8.5 | ✅ 已实现 v1.0+ | BAP 偏好/碰壁话术/浮动入口 |
+| [ProClaw 安装向导（CEO Agent 对话式配置）](marketing/需求文档：ProClaw%20安装向导（CEO%20Agent%20对话式配置）PRD%20v6.1.md) | v6.1 | ✅ 已实现 v1.0+ | CEO Agent 对话式引导 |
+| [ProClaw AI 团队交互 & AI 知识库统一管理](marketing/需求文档：AI团队交互与AI知识库统一管理.md) | v1.0 | ✅ 已实现 v1.0+ | 三库合一上线 |
+| [ProClaw 网站运营 AI Team 与多区域社媒运营](marketing/需求文档：ProClaw%20网站运营%20AI%20Team%20与多区域社媒运营（PRD%20v7.0）.md) | v7.0 | 🔵 部分实现 ~70% | 3 区域 Agent 上线；多区域调度待 v1.x |
+| [ProClaw 营销网站用户中心](marketing/需求文档：ProClaw%20营销网站用户中心（PRD%20v7.1）.md) | v7.1 | ✅ 已实现 v1.0+ | 6 Tab 全部上线 |
+| [ProClaw 营销网站优化升级](marketing/需求文档：ProClaw%20营销网站优化升级（PRD%20v7.2）.md) | v7.2 | ✅ 已实现 v1.0+ | 4 行业方案页 + 导航增强 |
+| [ProClaw 营销网站用户场景与品牌定位](marketing/需求文档：ProClaw%20营销网站用户场景与品牌定位%20PRD%20v7.0.md) | v7.0 | ✅ 已实现 v1.0+ | 与 `PROJECT_POSITIONING.md` 协同 |
+| [ProClaw 版本命名统一与营销网站对齐](marketing/需求文档：ProClaw%20版本命名统一与营销网站对齐（PRD%20v9.0）.md) | v9.0 | ✅ 已实现 v1.0+ | v1.0.0 全端版本号统一 |
 
 ### D. 插件化 / 供应链 / 桌面端 UI（12）
 
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
-| [ProClaw 插件化行业版架构升级](需求文档：ProClaw%20插件化行业版架构升级.md) | v1.0 | ✅ 已实现 v1.0+ | 166 个 Rust 命令注册表 |
-| [行业插件功能实现（餐饮 / 美业 / 宠物 / Cloud）](需求文档：行业插件功能实现（餐饮%20美业%20宠物%20Cloud）.md) | v1.0 | ✅ 已实现 v1.0+ | 4 大行业插件已上线 |
-| [行业插件补充 —— 八大行业插件发布至插件商店](需求文档：行业插件补充——八大行业插件发布至插件商店.md) | v1.0 | 🔵 部分实现 ~75% | 8 行业中 6+ 页面原型上线 |
-| [行业插件 AI Agent 创建（给 nvwax）](需求文档：行业插件AI%20Agent创建（给nvwax）.md) | v1.0 | ✅ 已实现 v1.0+ | 4 大行业 Agent 模板 |
-| [ProClaw 插件系统 PRD（行业工作流插件）](需求文档ProClaw%20插件系统%20PRD——行业工作流插件（PRD%20v10.0）.md) | v10.0 | 🟡 草案 | 依赖 Nuwax/SkillHub/FlowHub |
-| [ProClaw AI 网关统购分销与多模型路由](需求文档：ProClaw%20AI%20网关统购分销与多模型路由（PRD%20v9.0）.md) | v9.0 | 🔵 部分实现 ~40% | Token 计费已落地；统购网关待 v1.x |
-| [进销存（供应链）模块完善需求文档](SUPPLY_CHAIN_ENHANCEMENT_PRD.md) | v1.0 | ✅ 已实现 v1.0+ | 采购/销售/退货闭环全状态流 |
-| [应付/应收台账与对账管理需求文档](ACCOUNTS_PAYABLE_RECEIVABLE_PRD.md) | v1.0 | ✅ 已实现 v1.0+ | 财务对账核心模块 |
-| [ProClaw 桌面端 UI 全面升级](需求文档：ProClaw%20桌面端%20UI%20全面升级（PRD%20v11.0）.md) | v11.0 | ✅ 已实现 v1.0+ | AI-Native 设计语言 |
-| [ProClaw 外部伙伴邀请与自动关联机制](需求文档：ProClaw%20外部伙伴邀请与自动关联机制（PRD%20v4.2）.md) | v4.2 | ✅ 已实现 v1.0+ | HMAC-SHA256 防伪 |
-| [ProClaw 员工邀请与角色权限自动分配](需求文档：ProClaw%20员工邀请与角色权限自动分配（PRD%20v4.3）.md) | v4.3 | ✅ 已实现 v1.0+ | 5 角色权限矩阵 |
-| [通知中心（桌面端 Notification Center）](需求文档：通知中心Notification%20Center桌面端.md) | v1.0 | ✅ 已实现 v1.0+ | 实时通知 + 抽屉式面板 |
+| [ProClaw 插件化行业版架构升级](plugins-supply-chain/需求文档：ProClaw%20插件化行业版架构升级.md) | v1.0 | ✅ 已实现 v1.0+ | 166 个 Rust 命令注册表 |
+| [行业插件功能实现（餐饮 / 美业 / 宠物 / Cloud）](plugins-supply-chain/需求文档：行业插件功能实现（餐饮%20美业%20宠物%20Cloud）.md) | v1.0 | ✅ 已实现 v1.0+ | 4 大行业插件已上线 |
+| [行业插件补充 —— 八大行业插件发布至插件商店](plugins-supply-chain/需求文档：行业插件补充——八大行业插件发布至插件商店.md) | v1.0 | 🔵 部分实现 ~75% | 8 行业中 6+ 页面原型上线 |
+| [行业插件 AI Agent 创建（给 nvwax）](plugins-supply-chain/需求文档：行业插件AI%20Agent创建（给nvwax）.md) | v1.0 | ✅ 已实现 v1.0+ | 4 大行业 Agent 模板 |
+| [ProClaw 插件系统 PRD（行业工作流插件）](plugins-supply-chain/需求文档ProClaw%20插件系统%20PRD——行业工作流插件（PRD%20v10.0）.md) | v10.0 | 🟡 草案 | 依赖 Nuwax/SkillHub/FlowHub |
+| [ProClaw AI 网关统购分销与多模型路由](plugins-supply-chain/需求文档：ProClaw%20AI%20网关统购分销与多模型路由（PRD%20v9.0）.md) | v9.0 | 🔵 部分实现 ~40% | Token 计费已落地；统购网关待 v1.x |
+| [进销存（供应链）模块完善需求文档](plugins-supply-chain/SUPPLY_CHAIN_ENHANCEMENT_PRD.md) | v1.0 | ✅ 已实现 v1.0+ | 采购/销售/退货闭环全状态流 |
+| [应付/应收台账与对账管理需求文档](plugins-supply-chain/ACCOUNTS_PAYABLE_RECEIVABLE_PRD.md) | v1.0 | ✅ 已实现 v1.0+ | 财务对账核心模块 |
+| [ProClaw 桌面端 UI 全面升级](plugins-supply-chain/需求文档：ProClaw%20桌面端%20UI%20全面升级（PRD%20v11.0）.md) | v11.0 | ✅ 已实现 v1.0+ | AI-Native 设计语言 |
+| [ProClaw 外部伙伴邀请与自动关联机制](plugins-supply-chain/需求文档：ProClaw%20外部伙伴邀请与自动关联机制（PRD%20v4.2）.md) | v4.2 | ✅ 已实现 v1.0+ | HMAC-SHA256 防伪 |
+| [ProClaw 员工邀请与角色权限自动分配](plugins-supply-chain/需求文档：ProClaw%20员工邀请与角色权限自动分配（PRD%20v4.3）.md) | v4.3 | ✅ 已实现 v1.0+ | 5 角色权限矩阵 |
+| [通知中心（桌面端 Notification Center）](plugins-supply-chain/需求文档：通知中心Notification%20Center桌面端.md) | v1.0 | ✅ 已实现 v1.0+ | 实时通知 + 抽屉式面板 |
 
 ### E. 云商城 / Cloud（6）
 
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
-| [ProClaw 云托管商城（AI 生成独立站）](需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md) | v5.0 | ✅ 已实现 v1.0+ | 演示账号预置 proclaw.cc/demo |
-| [ProClaw 云托管商城 Token 计费模式改造](需求文档：ProClaw%20云托管商城%20Token%20计费模式改造（PRD%20v8.0）.md) | v8.0 | ✅ 已实现 v1.0+ | Token 购买/余额/明细上线 |
-| [ProClaw 云商城开通引导流程](需求文档：云商城开通引导流程（PRD%20v6.0）.md) | v6.0 | ✅ 已实现 v1.0+ | 5 步引导流程 |
-| [云商城 AI 客服模块](需求文档：云商城%20AI%20客服模块.md) | v1.0 | 🔵 部分实现 ~60% | 独立 AI 客服 Agent 上线；人工坐席待 v1.x |
-| [云商城客服功能接入 ProClaw 桌面端（方案 A）](需求文档：云商城客服接入ProClaw桌面端（方案A）.md) | v2.0 | 🔵 部分实现 ~40% | 客服基础落地；方案 A 跨端同步待 v1.x |
-| [ProClaw Cloud 托管版（Web 端 + 按 token 计费）](需求：ProClaw%20Cloud%20托管版（Web%20端%20+%20按%20token%20计费）.md) | v1.0 | ✅ 已实现 v1.0+ | Next.js 16 + Vercel |
+| [ProClaw 云托管商城（AI 生成独立站）](cloud-store/需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md) | v5.0 | ✅ 已实现 v1.0+ | 演示账号预置 proclaw.cc/demo |
+| [ProClaw 云托管商城 Token 计费模式改造](cloud-store/需求文档：ProClaw%20云托管商城%20Token%20计费模式改造（PRD%20v8.0）.md) | v8.0 | ✅ 已实现 v1.0+ | Token 购买/余额/明细上线 |
+| [ProClaw 云商城开通引导流程](cloud-store/需求文档：云商城开通引导流程（PRD%20v6.0）.md) | v6.0 | ✅ 已实现 v1.0+ | 5 步引导流程 |
+| [云商城 AI 客服模块](cloud-store/需求文档：云商城%20AI%20客服模块.md) | v1.0 | 🔵 部分实现 ~60% | 独立 AI 客服 Agent 上线；人工坐席待 v1.x |
+| [云商城客服功能接入 ProClaw 桌面端（方案 A）](cloud-store/需求文档：云商城客服接入ProClaw桌面端（方案A）.md) | v2.0 | 🔵 部分实现 ~40% | 客服基础落地；方案 A 跨端同步待 v1.x |
+| [ProClaw Cloud 托管版（Web 端 + 按 token 计费）](cloud-store/需求：ProClaw%20Cloud%20托管版（Web%20端%20+%20按%20token%20计费）.md) | v1.0 | ✅ 已实现 v1.0+ | Next.js 16 + Vercel |
 
 ### F. 架构 / 库存 / 其他（7）
 
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
-| [ProClaw 架构分层优化方案](%23%23%20产品需求文档：ProClaw架构分层优化方案（PRD%20v1.0）.md) | v1.0 | ✅ 已实现 v1.0+ | Sprint 1-4 全部完成 |
-| [ProClaw-Light 桌面端需求](需求文档：ProClaw-Light%20桌面端需求.md) | v1.0 | ✅ 已实现 v1.0+ | Light/Plus 双模式 |
-| [ProClaw（Agent 化架构）PRD v6.0](需求文档：ProClaw%20虚拟公司版（Agent%20化架构）PRD%20v6.0.md) | v6.0 | ✅ 已实现 v1.0+ | 虚拟公司版架构 |
-| [灵活库存需求（ProClaw 核心）](需求文档：灵活库存需求-ProClaw%20核心（PRD%20v12.0）.md) | v12.0 | ✅ 已实现 v1.0+ | 允许负库存/智能校准 |
-| [数据中心「AI 任务概览」子页面](需求文档：数据中心AI任务概览子页面.md) | v1.0 | ✅ 已实现 v1.0+ | AI 任务闭环跟踪 |
-| [ProClaw × NvwaX API 集成需求文档](PROCLAW-NVWAX-API-INTEGRATION-REQUIREMENT.md) | v1.0 | ✅ 已实现 v1.0+ | 离线回退 `localTeamSkillMap` |
+| [ProClaw 架构分层优化方案](architecture/ARCHITECTURE_LAYERING_PRD_v1.0.md) | v1.0 | ✅ 已实现 v1.0+ | Sprint 1-4 全部完成 |
+| [ProClaw-Light 桌面端需求](architecture/需求文档：ProClaw-Light%20桌面端需求.md) | v1.0 | ✅ 已实现 v1.0+ | Light/Plus 双模式 |
+| [ProClaw（Agent 化架构）PRD v6.0](architecture/需求文档：ProClaw%20虚拟公司版（Agent%20化架构）PRD%20v6.0.md) | v6.0 | ✅ 已实现 v1.0+ | 虚拟公司版架构 |
+| [灵活库存需求（ProClaw 核心）](architecture/需求文档：灵活库存需求-ProClaw%20核心（PRD%20v12.0）.md) | v12.0 | ✅ 已实现 v1.0+ | 允许负库存/智能校准 |
+| [数据中心「AI 任务概览」子页面](architecture/需求文档：数据中心AI任务概览子页面.md) | v1.0 | ✅ 已实现 v1.0+ | AI 任务闭环跟踪 |
+| [ProClaw × NvwaX API 集成需求文档](architecture/PROCLAW-NVWAX-API-INTEGRATION-REQUIREMENT.md) | v1.0 | ✅ 已实现 v1.0+ | 离线回退 `localTeamSkillMap` |
 
 > 注：F 组按计划是 7 份；上述 6 份列出后，第 7 份为 v4.0（已归入 B 组"已替代"项）。完整 43 份计数与附录 A 一致。
 
@@ -156,7 +166,8 @@ v12.0（×2：AI Team UI + 灵活库存）
 - **移动端审计**：[mobile-audit-report-v14.md](../mobile-audit-report-v14.md)
 - **移动端技术债清理**：[MOBILE_ROADMAP.md](../MOBILE_ROADMAP.md)
 - **项目定位**：[PROJECT_POSITIONING.md](../PROJECT_POSITIONING.md)
-- **实施计划**：[IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md)
+- **需求总览**：[REQUIREMENTS.md](../REQUIREMENTS.md)
+- **演示账号规范**：[demo-account-spec.md](../features/demo-account-spec.md)
 - **API 文档**：[API_DOCUMENTATION.md](../API_DOCUMENTATION.md)
 - **归档目录**：[_archive/](_archive/)
 
@@ -258,4 +269,4 @@ docs/prd/_archive/
 
 ---
 
-*索引维护日期: 2026-06-16 · 维护人: 文档 Owner · 下次复核: 2026-09-15*
+*索引维护日期: 2026-06-21 · 维护人: 文档 Owner · 下次复核: 2026-09-15*

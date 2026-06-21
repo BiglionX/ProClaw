@@ -20,7 +20,8 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCloudStore, updateCloudStore, resetApiKey, CloudStore } from '../../lib/cloudStoreService';
+import { updateCloudStore, resetApiKey } from '../../lib/cloudStoreService';
+import { useCloudStore, useInvalidateCloudStore } from '../../lib/hooks/useCloudStore';
 
 interface StoreSettingsProps {
   loading: boolean;
@@ -31,34 +32,30 @@ interface StoreSettingsProps {
 }
 
 export default function StoreSettings({
-  loading, setLoading, setError, setSuccessMessage,
+  loading: _parentLoading, setLoading, setError, setSuccessMessage,
 }: StoreSettingsProps) {
   const navigate = useNavigate();
-  const [store, setStore] = useState<CloudStore | null>(null);
+  const { data: store, isLoading, refetch } = useCloudStore();
+  const invalidateCloudStore = useInvalidateCloudStore();
   const [customDomain, setCustomDomain] = useState('');
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const loadStore = async () => {
-    try {
-      setLoading(true);
-      const data = await getCloudStore();
-      setStore(data);
-    } catch {
-      // 忽略错误
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    setLoading(isLoading);
+  }, [isLoading, setLoading]);
 
-  useEffect(() => { loadStore(); }, []);
+  const loadStore = () => {
+    invalidateCloudStore();
+    refetch();
+  };
 
   const handleResetApiKey = async () => {
     if (!store) return;
     try {
       setSaving(true);
-      const { api_key } = await resetApiKey(store.id);
-      setStore({ ...store, api_key });
+      await resetApiKey(store.id);
+      loadStore();
       setSuccessMessage('API Key 已重置！');
     } catch (err) {
       setError(err instanceof Error ? err.message : '重置失败');
@@ -76,8 +73,8 @@ export default function StoreSettings({
     
     try {
       setSaving(true);
-      const updated = await updateCloudStore(store.id, { custom_domain: customDomain.trim() });
-      setStore(updated);
+      await updateCloudStore(store.id, { custom_domain: customDomain.trim() });
+      loadStore();
       setSuccessMessage(`自定义域名 ${customDomain} 已绑定！SSL 证书正在自动申请中...`);
       setCustomDomain('');
     } catch (err) {
@@ -87,7 +84,7 @@ export default function StoreSettings({
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress />

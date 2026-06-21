@@ -84,6 +84,26 @@ export default function ConfirmationCard({
     setEditContent(JSON.stringify(data.details, null, 2));
   }, [data.details]);
 
+  // 补全 4：决策开始时间（用于计算耗时）
+  const decisionStartRef = useRef<number>(Date.now());
+
+  // 补全 4：记录决策到 ceoLearning 用于偏好学习
+  const recordDecision = useCallback((action: DecisionAction) => {
+    ceoLearning.recordDecision({
+      action,
+      riskLevel: data.estimatedImpact?.riskLevel,
+      decisionSeconds: Math.round((Date.now() - decisionStartRef.current) / 1000),
+      pcpId: data.pcpReferences?.[0]?.id,
+      chosenOption: action === 'confirm' ? '执行' : action === 'modify' ? '修改' : action === 'snooze' ? '稍后' : '拒绝',
+    });
+  }, [data.estimatedImpact?.riskLevel, data.pcpReferences]);
+
+  // 补全 4：直接确认时记录（键盘 Y / 按钮）
+  const handleConfirmWithRecord = useCallback(() => {
+    recordDecision('confirm');
+    onConfirm();
+  }, [onConfirm, recordDecision]);
+
   // 键盘快捷键
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // 只在没有打开对话框时响应快捷键
@@ -119,20 +139,6 @@ export default function ConfirmationCard({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // 补全 4：决策开始时间（用于计算耗时）
-  const decisionStartRef = useRef<number>(Date.now());
-
-  // 补全 4：记录决策到 ceoLearning 用于偏好学习
-  const recordDecision = (action: DecisionAction) => {
-    ceoLearning.recordDecision({
-      action,
-      riskLevel: data.estimatedImpact?.riskLevel,
-      decisionSeconds: Math.round((Date.now() - decisionStartRef.current) / 1000),
-      pcpId: data.pcpReferences?.[0]?.id,
-      chosenOption: action === 'confirm' ? '执行' : action === 'modify' ? '修改' : action === 'snooze' ? '稍后' : '拒绝',
-    });
-  };
-
   // 拒绝提交
   const handleRejectSubmit = () => {
     recordDecision('reject');
@@ -159,12 +165,6 @@ export default function ConfirmationCard({
     recordDecision('snooze');
     onSnooze?.(snoozeMinutes);
     setSnoozeDialogOpen(false);
-  };
-
-  // 补全 4：直接确认时记录（键盘 Y / 按钮）
-  const handleConfirmWithRecord = () => {
-    recordDecision('confirm');
-    onConfirm();
   };
 
   const riskInfo = data.estimatedImpact?.riskLevel

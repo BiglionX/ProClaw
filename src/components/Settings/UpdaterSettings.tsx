@@ -61,7 +61,11 @@ export function UpdaterSettings() {
   async function loadCurrentVersion() {
     try {
       const version = await safeInvoke<string>('app_version');
-      setUpdateInfo(prev => ({ available: false, currentVersion: version, ...(prev || {}) }));
+      setUpdateInfo(prev => ({
+        available: false,
+        currentVersion: version ?? prev?.currentVersion ?? 'unknown',
+        ...(prev || {}),
+      }));
     } catch (err) {
       console.warn('获取版本失败：', err);
     }
@@ -81,7 +85,7 @@ export function UpdaterSettings() {
     try {
       const result = await safeInvoke<UpdateInfo>('check_for_update');
 
-      if (result.available) {
+      if (result?.available) {
         setUpdateInfo(result);
         setStatus('available');
         appendLog(`✓ 发现新版本 ${result.latestVersion}`);
@@ -242,7 +246,6 @@ export function UpdaterSettings() {
                 color="warning"
                 startIcon={<DownloadIcon />}
                 onClick={downloadAndInstall}
-                disabled={status === 'downloading' || status === 'installing'}
               >
                 下载并安装
               </Button>

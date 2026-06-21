@@ -18,11 +18,17 @@ vi.mock('@tauri-apps/api/event', () => ({
   emit: vi.fn(),
 }));
 
-// Mock isTauri to return true so service functions don't short-circuit in tests
-vi.mock('../lib/tauri', () => ({
-  isTauri: vi.fn(() => true),
-  safeInvoke: vi.fn(),
-}));
+// ipcInvoke 委托给 @tauri-apps/api/core 的 mock，与现有 service 测试兼容
+vi.mock('../lib/tauri', async () => {
+  const core = await import('@tauri-apps/api/core');
+  return {
+    isTauri: vi.fn(() => true),
+    ipcInvoke: core.invoke,
+    ipcInvokeOrNull: core.invoke,
+    safeInvoke: core.invoke,
+    openExternalUrl: vi.fn(),
+  };
+});
 
 // 抑制 jsdom 中 AbortController.abort() 内部产生的已知 unhandled rejection 误报。
 // 当测试代码已经显式 catch 了用户层面的 rejection（例如 expect(promise).rejects.toThrow）

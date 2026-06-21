@@ -5,25 +5,27 @@
 ## 📋 目录
 
 ### 🏗️ 产品需求 (PRD)
-- [PRD 总索引](prd/PRD_INDEX.md) - **43 份 PRD 的唯一入口**（覆盖 34 已实现 / 6 部分实现 / 1 草案 / 1 已替代 + 1 重复），含按主题/状态/版本号分类
+- [**产品需求总览**](REQUIREMENTS.md) - **推荐首读**：产品矩阵、需求域地图、实施状态与 v1.x 路线图
+- [PRD 总索引](prd/PRD_INDEX.md) - **42 份 PRD 完整索引**（34 已实现 / 6 部分实现 / 1 草案 / 1 已替代），按主题子目录组织
+- [PRD 目录说明](prd/README.md) - `ceo-agent/` `mobile/` `marketing/` 等主题文件夹导航
 - 每份 PRD 顶部均已添加「实施状态」区块（首次落地版本、关联发布、代码入口、覆盖率、差异与遗留）
 - 主要 PRD 快查表：
-  - [PRD v4.0 核心需求](prd/ProClaw_PRD_v4.0.md)（已替代 → 由 v11.0 / v12.0 承接）
-  - [CEO Agent 主控官 (v6.2)](prd/需求文档：CEO%20Agent%20作为主控官%20-%20项目上下文协议与任务分派（PRD%20v6.2）.md)
-  - [CEO Agent 决策确认 (v6.3)](prd/需求文档：CEO%20Agent%20决策确认机制与个性化学习（PRD%20v6.3）.md)
-  - [AI Team 群聊 LLM (v6.4)](prd/需求文档：AI%20Team%20群聊%20LLM%20接入与演示账号%20Token（PRD%20v6.4）.md)
-  - [手机独立版 (v11.0)](prd/产品需求文档：ProClaw%20手机独立版（PRD%20v11.0）.md)
-  - [底部导航重构 (v11.1)](prd/产品需求文档：ProClaw%20手机端底部导航重构（v11.1）.md)
-  - [消息链路对齐 (v11.2)](prd/需求文档：ProClaw%20手机端消息链路对齐补充需求（PRD%20v11.2）.md)
-  - [云托管商城 (v5.0)](prd/需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md)
-  - [Token 计费 (v8.0)](prd/需求文档：ProClaw%20云托管商城%20Token%20计费模式改造（PRD%20v8.0）.md)
-  - [营销网站用户中心 (v7.1)](prd/需求文档：ProClaw%20营销网站用户中心（PRD%20v7.1）.md)
-  - [营销网站优化升级 (v7.2)](prd/需求文档：ProClaw%20营销网站优化升级（PRD%20v7.2）.md)
-  - [行业插件架构升级](prd/需求文档：ProClaw%20插件化行业版架构升级.md)
-  - [行业插件功能实现 (餐饮/美业/宠物/Cloud)](prd/需求文档：行业插件功能实现（餐饮%20美业%20宠物%20Cloud）.md)
-  - [桌面端 UI 全面升级 (v11.0)](prd/需求文档：ProClaw%20桌面端%20UI%20全面升级（PRD%20v11.0）.md)
-  - [进销存增强 (P0/P1/P2)](prd/SUPPLY_CHAIN_ENHANCEMENT_PRD.md)
-  - [架构分层优化方案](prd/%23%23%20产品需求文档：ProClaw架构分层优化方案（PRD%20v1.0）.md)
+  - [PRD v4.0 核心需求](prd/_deprecated/ProClaw_PRD_v4.0.md)（已替代 → 由 v11.0 / v12.0 承接）
+  - [CEO Agent 主控官 (v6.2)](prd/ceo-agent/需求文档：CEO%20Agent%20作为主控官%20-%20项目上下文协议与任务分派（PRD%20v6.2）.md)
+  - [CEO Agent 决策确认 (v6.3)](prd/ceo-agent/需求文档：CEO%20Agent%20决策确认机制与个性化学习（PRD%20v6.3）.md)
+  - [AI Team 群聊 LLM (v6.4)](prd/ceo-agent/需求文档：AI%20Team%20群聊%20LLM%20接入与演示账号%20Token（PRD%20v6.4）.md)
+  - [手机独立版 (v11.0)](prd/mobile/产品需求文档：ProClaw%20手机独立版（PRD%20v11.0）.md)
+  - [底部导航重构 (v11.1)](prd/mobile/产品需求文档：ProClaw%20手机端底部导航重构（v11.1）.md)
+  - [消息链路对齐 (v11.2)](prd/mobile/需求文档：ProClaw%20手机端消息链路对齐补充需求（PRD%20v11.2）.md)
+  - [云托管商城 (v5.0)](prd/cloud-store/需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md)
+  - [Token 计费 (v8.0)](prd/cloud-store/需求文档：ProClaw%20云托管商城%20Token%20计费模式改造（PRD%20v8.0）.md)
+  - [营销网站用户中心 (v7.1)](prd/marketing/需求文档：ProClaw%20营销网站用户中心（PRD%20v7.1）.md)
+  - [营销网站优化升级 (v7.2)](prd/marketing/需求文档：ProClaw%20营销网站优化升级（PRD%20v7.2）.md)
+  - [行业插件架构升级](prd/marketing/需求文档：ProClaw%20插件化行业版架构升级.md)
+  - [行业插件功能实现 (餐饮/美业/宠物/Cloud)](prd/plugins-supply-chain/需求文档：行业插件功能实现（餐饮%20美业%20宠物%20Cloud）.md)
+  - [桌面端 UI 全面升级 (v11.0)](prd/plugins-supply-chain/需求文档：ProClaw%20桌面端%20UI%20全面升级（PRD%20v11.0）.md)
+  - [进销存增强 (P0/P1/P2)](prd/plugins-supply-chain/SUPPLY_CHAIN_ENHANCEMENT_PRD.md)
+  - [架构分层优化方案](prd/architecture/ARCHITECTURE_LAYERING_PRD_v1.0.md)
 
 ### 📘 用户指南 (Guides)
 - [安装指南](guides/INSTALLATION_GUIDE.md) - 详细安装步骤
@@ -105,16 +107,16 @@
 3. [贡献指南](../CONTRIBUTING.md)
 
 ### 功能开发
-1. [PRD v4.0 核心需求](prd/ProClaw_PRD_v4.0.md)
-2. [行业插件功能实现](prd/需求文档：行业插件功能实现（餐饮%20美业%20宠物%20Cloud）.md)
+1. [PRD v4.0 核心需求](prd/_deprecated/ProClaw_PRD_v4.0.md)
+2. [行业插件功能实现](prd/plugins-supply-chain/需求文档：行业插件功能实现（餐饮%20美业%20宠物%20Cloud）.md)
 3. [AI 决策系统](features/AI_DECISION_SYSTEM.md)
 
 ### 当前版本重点
-1. [CEO Agent 主控官 (v6.2)](prd/需求文档：CEO%20Agent%20作为主控官%20-%20项目上下文协议与任务分派（PRD%20v6.2）.md) - 项目上下文协议 / 任务分派
-2. [行业插件架构升级](prd/需求文档：ProClaw%20插件化行业版架构升级.md) - 4 大行业 + 13 行业子目录 + AI Agent 模板
-3. [桌面端 UI 全面升级 (v11.0)](prd/需求文档：ProClaw%20桌面端%20UI%20全面升级（PRD%20v11.0）.md) - AI-Native 设计语言
-4. [进销存增强 (P0/P1/P2)](prd/SUPPLY_CHAIN_ENHANCEMENT_PRD.md) - 采购/销售/退货闭环
-5. [云托管商城 (v5.0)](prd/需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md) + [Token 计费 (v8.0)](prd/需求文档：ProClaw%20云托管商城%20Token%20计费模式改造（PRD%20v8.0）.md)
+1. [CEO Agent 主控官 (v6.2)](prd/ceo-agent/需求文档：CEO%20Agent%20作为主控官%20-%20项目上下文协议与任务分派（PRD%20v6.2）.md) - 项目上下文协议 / 任务分派
+2. [行业插件架构升级](prd/marketing/需求文档：ProClaw%20插件化行业版架构升级.md) - 4 大行业 + 13 行业子目录 + AI Agent 模板
+3. [桌面端 UI 全面升级 (v11.0)](prd/plugins-supply-chain/需求文档：ProClaw%20桌面端%20UI%20全面升级（PRD%20v11.0）.md) - AI-Native 设计语言
+4. [进销存增强 (P0/P1/P2)](prd/plugins-supply-chain/SUPPLY_CHAIN_ENHANCEMENT_PRD.md) - 采购/销售/退货闭环
+5. [云托管商城 (v5.0)](prd/cloud-store/需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md) + [Token 计费 (v8.0)](prd/cloud-store/需求文档：ProClaw%20云托管商城%20Token%20计费模式改造（PRD%20v8.0）.md)
 
 ## 📝 文档维护
 
@@ -122,4 +124,4 @@
 
 ---
 
-*最后更新: 2026-06-16 (全面整理 43 份 PRD 实施状态 + 新建 PRD_INDEX.md)*
+*最后更新: 2026-06-21 (按主题重组 docs/prd/ 目录 + 新建 REQUIREMENTS.md 需求总览)*

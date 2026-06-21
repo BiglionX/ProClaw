@@ -19,7 +19,7 @@ import {
   Alert,
   Chip,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   LineChart,
   Line,
@@ -33,21 +33,8 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import {
-  getInventoryStats,
-  type InventoryStats,
-} from '../lib/inventoryService';
-import {
-  getSalesTrend,
-  getProductAnalytics,
-  type SalesTrendData,
-  type ProductAnalytics,
-} from '../lib/analyticsService';
-import {
-  getFinancialSummary,
-  type FinancialSummary,
-} from '../lib/financeService';
-import { getDatabaseStats } from '../lib/productService';
+import { useSalesTrend } from '../lib/hooks/useAnalytics';
+import { useDashboardOverview, useInvalidateDashboard } from '../lib/hooks/useDashboard';
 import { useAppModeStore } from '../config/appMode';
 import FloatingAgentChat from '../components/Agent/FloatingAgentChat';
 import type { TeamChatContext } from '../components/Agent/FloatingAgentChat';
@@ -157,57 +144,36 @@ export default function DashboardPage() {
   const plugin = useAppModeStore(state => state.activePlugin);
   const quickActions = plugin?.ui.quickActions ?? [];
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // 数据状态
-  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
-  const [salesTrend, setSalesTrend] = useState<SalesTrendData | null>(null);
-  const [productAnalytics, setProductAnalytics] = useState<ProductAnalytics | null>(null);
-  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
-  const [dbStats, setDbStats] = useState<any>(null);
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    error: overviewError,
+    refetch: refetchOverview,
+  } = useDashboardOverview();
+  const {
+    data: salesTrend,
+    isLoading: trendLoading,
+    refetch: refetchTrend,
+  } = useSalesTrend('day');
+  const invalidateDashboard = useInvalidateDashboard();
+
+  const loading = overviewLoading || trendLoading;
+  const error = overviewError instanceof Error ? overviewError.message : null;
+  const inventoryStats = overview?.invStats ?? null;
+  const productAnalytics = overview?.prodAnalytics ?? null;
+  const financialSummary = overview?.finSummary ?? null;
+  const dbStats = overview?.dbStatistics ?? null;
+
+  const loadDashboardData = () => {
+    invalidateDashboard();
+    refetchOverview();
+    refetchTrend();
+  };
 
   // AI 团队交互状态
   const [chatContext, setChatContext] = useState<TeamChatContext | undefined>(undefined);
   const [chatOpen, setChatOpen] = useState(false);
   const [configTeam, setConfigTeam] = useState<{ id: string; name: string } | null>(null);
-
-  // 加载所有数据
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const [
-        invStats,
-        trendData,
-        prodAnalytics,
-        finSummary,
-        dbStatistics,
-      ] = await Promise.all([
-        getInventoryStats(),
-        getSalesTrend('day'),
-        getProductAnalytics(),
-        getFinancialSummary(),
-        getDatabaseStats(),
-      ]);
-
-      setInventoryStats(invStats);
-      setSalesTrend(trendData);
-      setProductAnalytics(prodAnalytics);
-      setFinancialSummary(finSummary);
-      setDbStats(dbStatistics);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
-      console.error('Dashboard data loading error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
 
   // 格式化货币
   const formatCurrency = (value: number) => {
@@ -285,7 +251,7 @@ export default function DashboardPage() {
 
       {/* 错误提示 */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
@@ -295,7 +261,7 @@ export default function DashboardPage() {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="产品总数"
-            value={dbStats?.products_count || 0}
+            value={dbStats?.spu_count || 0}
             icon={<InventoryIcon sx={{ fontSize: 32, color: 'primary.main' }} />}
             color="primary"
             subtitle={`${dbStats?.categories_count || 0} 个分类`}

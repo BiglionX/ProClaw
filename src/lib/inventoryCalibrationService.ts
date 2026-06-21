@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { ipcInvoke as invoke } from './tauri';
 import { isTauri } from './tauri';
 
 // ==================== 类型定义 ====================

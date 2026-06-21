@@ -25,9 +25,9 @@
 - [docs/features/avatar-navigation.md](file:///d:/BigLionX/ProClaw/docs/features/avatar-navigation.md) — 联系人头像跳转规则（v1.0 / 2026-06-14）
 - [src/pages/AgentProfilePage.tsx](file:///d:/BigLionX/ProClaw/src/pages/AgentProfilePage.tsx#L1-L15) — Agent 详情页 UX 流程注释
 - [src/pages/ChatPage.tsx](file:///d:/BigLionX/ProClaw/src/pages/ChatPage.tsx#L466-L484) — 聊天头部头像点击处理
-- [docs/prd/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md) — AI Team 分页 UI 改造
-- [docs/prd/需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md) — 桌面端整体 UI 升级
-- [docs/prd/需求文档：ProClaw 用户中心（PRD v5.1）.md](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：ProClaw 用户中心（PRD v5.1）.md) — 用户自身资料编辑（旁路）
+- [docs/prd/mobile/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md](file:///d:/BigLionX/ProClaw/docs/prd/mobile/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md) — AI Team 分页 UI 改造
+- [docs/prd/plugins-supply-chain/需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md](file:///d:/BigLionX/ProClaw/docs/prd/plugins-supply-chain/需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md) — 桌面端整体 UI 升级
+- [docs/prd/marketing/需求文档：ProClaw 用户中心（PRD v5.1）.md](file:///d:/BigLionX/ProClaw/docs/prd/marketing/需求文档：ProClaw 用户中心（PRD v5.1）.md) — 用户自身资料编辑（旁路）
 
 ---
 
@@ -564,7 +564,7 @@ if (targetType === 'agent') {
 
 ## 十二、AI Team 群聊特殊状态机
 
-> 配套实现：[src/lib/aiTeamChatService.ts](file:///d:/BigLionX/ProClaw/src/lib/aiTeamChatService.ts) / [docs/prd/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md)
+> 配套实现：[src/lib/aiTeamChatService.ts](file:///d:/BigLionX/ProClaw/src/lib/aiTeamChatService.ts) / [docs/prd/mobile/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md](file:///d:/BigLionX/ProClaw/docs/prd/mobile/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md)
 
 ### 12.1 AI Team 角色模型
 

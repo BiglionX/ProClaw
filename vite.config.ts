@@ -30,4 +30,16 @@ export default defineConfig({
       '@anthropic-ai/sdk/lib/transform-json-schema': path.resolve(__dirname, 'src/lib/polyfills/transform-json-schema.ts'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-mui': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+          'vendor-charts': ['recharts'],
+          'vendor-ai': ['langchain', '@langchain/core', '@langchain/openai', '@langchain/anthropic', '@langchain/ollama'],
+        },
+      },
+    },
+  },
 });

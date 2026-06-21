@@ -230,7 +230,7 @@ export const knowledgeQA = {
 
     // 5. 调用 LLM
     try {
-      const llm = getLLMForTask('business_insight');
+      const llm = await getLLMForTask('business_insight');
       const response = await llm.invoke(truncatedPrompt);
       const content = typeof response.content === 'string'
         ? response.content
@@ -298,7 +298,7 @@ export const knowledgeQA = {
     }
 
     const prompt = buildQAPrompt(question, matches);
-    const llm = getLLMForTask('business_insight');
+    const llm = await getLLMForTask('business_insight');
 
     try {
       const stream = await llm.stream(prompt);

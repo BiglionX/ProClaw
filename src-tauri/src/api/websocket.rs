@@ -145,7 +145,6 @@ pub struct OrderNotification {
 
 /// WebSocket 请求结构（客户端发送）
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct WsRequest {
     #[serde(rename = "type")]
     msg_type: String,
@@ -155,6 +154,11 @@ struct WsRequest {
     content: Option<String>,
     #[serde(rename = "contentType", default)]
     content_type: Option<String>,
+    // auth 消息字段（SEC-P1-08）
+    #[serde(default)]
+    token: Option<String>,
+    #[serde(default)]
+    user_id: Option<String>,
     // v4.1 通话信令 payload，包含额外数据
     #[serde(default)]
     payload: Option<serde_json::Value>,
@@ -189,69 +193,43 @@ struct WsResponse {
 // ============================================================
 
 /// WebSocket 升级处理
-/// 审计修复 SEC-P1-01: 使用中间件注入的 Claims 验证身份，而非信任 query 参数
+/// SEC-P1-08: 支持连接后 auth 消息认证；兼容 Header/query JWT（旧客户端）
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(claims): Extension<Claims>,
+    claims: Option<Extension<Claims>>,
 ) -> impl IntoResponse {
     println!("[WS] Connection request from: {:?}", addr);
 
-    // 审计修复 SEC-P1-01: 从 JWT Claims 提取 user_id，而非信任客户端提供的 query 参数
-    let user_id = Some(claims.sub.clone());
-    let token = None; // token 已经由中间件验证，不再传递给 handler
+    let pre_auth_user_id = claims.as_ref().map(|c| c.sub.clone());
 
-    // 记录客户端提供的 user_id 以检测潜在身份伪造尝试
-    if let Some(client_uid) = params.get("user_id") {
-        if client_uid != &claims.sub {
+    if let (Some(client_uid), Some(ref verified_uid)) = (params.get("user_id"), &pre_auth_user_id) {
+        if client_uid != verified_uid {
             eprintln!(
                 "[WS] SECURITY: client claimed user_id='{}' but JWT verified user_id='{}'",
-                client_uid, claims.sub
+                client_uid, verified_uid
             );
         }
     }
 
-    ws.on_upgrade(move |socket| handle_websocket(socket, state, user_id, token))
+    ws.on_upgrade(move |socket| handle_websocket(socket, state, pre_auth_user_id))
 }
 
 /// 核心 WebSocket 连接处理
 async fn handle_websocket(
     socket: WebSocket,
     state: AppState,
-    user_id: Option<String>,
-    _token: Option<String>,
+    pre_auth_user_id: Option<String>,
 ) {
     use futures_util::{SinkExt, StreamExt};
 
-    // 审计修复 SEC-P1-01: user_id 来自 JWT Claims 而非客户端 query 参数
-    let user_id = match user_id {
-        Some(uid) if !uid.is_empty() => uid,
-        _ => {
-            println!("[WS] Connection rejected: no verified user_id");
-            return;
-        }
-    };
-
-    println!("[WS] User '{}' connected", user_id);
-
     let (ws_sender, mut ws_receiver) = socket.split();
     let conn_id = Uuid::new_v4().to_string();
-
-    // 创建消息通道: outgoing_tx (多生产者) -> outgoing_rx (单消费者)
     let (outgoing_tx, outgoing_rx) = mpsc::unbounded_channel::<String>();
+    let self_tx = outgoing_tx.clone();
 
-    // 将 sender 副本存入管理器，用于外部（其他用户）向此连接推送消息
-    state
-        .ws_manager
-        .add_connection(&user_id, &conn_id, outgoing_tx.clone());
-
-    // 保留一个 sender 副本给主循环自己使用（pong, heartbeat, error 响应等）
-    let self_tx = outgoing_tx;
-
-    // ---- Writer Task: 从 outgoing_rx 读取并写入 WebSocket ----
-    // 审计修复 R4: 收集 JoinHandle 防止任务泄漏
     let writer_handle = tokio::spawn(async move {
         let mut sender = ws_sender;
         let mut rx = outgoing_rx;
@@ -262,36 +240,33 @@ async fn handle_websocket(
         }
     });
 
-    // ---- 推送离线消息 ----
-    push_offline_messages(&state, &user_id);
+    let mut user_id = pre_auth_user_id;
+    let mut authenticated = user_id.is_some();
 
-    // ---- 通知上线 ----
-    if self_tx
-        .send(
+    if authenticated {
+        let uid = user_id.as_ref().unwrap();
+        println!("[WS] User '{}' connected (pre-auth JWT)", uid);
+        state.ws_manager.add_connection(uid, &conn_id, outgoing_tx.clone());
+        on_ws_authenticated(&state, uid, &self_tx);
+    } else {
+        println!("[WS] Awaiting auth message");
+        let _ = self_tx.send(
             serde_json::json!({
-                "type": "connection_status",
-                "status": "connected",
-                "user_id": user_id,
-                "timestamp": Utc::now().timestamp_millis()
+                "type": "auth_required",
+                "message": "Send {\"type\":\"auth\",\"user_id\":\"...\",\"token\":\"...\"} as first message"
             })
             .to_string(),
-        )
-        .is_err()
-    {
-        eprintln!("[WS] Failed to send connected notification to {}", user_id);
+        );
     }
 
-    // 审计修复 SEC-P2-02: 消息速率和大小限制
-    const MAX_MSG_SIZE: usize = 64 * 1024; // 64KB
+    const MAX_MSG_SIZE: usize = 64 * 1024;
     const MAX_MSG_PER_SECOND: u32 = 10;
     let mut msg_count: u32 = 0;
     let mut window_start = std::time::Instant::now();
 
-    // ---- 主消息循环 ----
     while let Some(msg_result) = ws_receiver.next().await {
         match msg_result {
             Ok(Message::Text(text)) => {
-                // 审计修复 SEC-P2-02: 消息大小限制
                 let text_str = text.to_string();
                 if text_str.len() > MAX_MSG_SIZE {
                     let _ = self_tx.send(
@@ -303,7 +278,6 @@ async fn handle_websocket(
                     continue;
                 }
 
-                // 审计修复 SEC-P2-02: 速率限制 (10 msg/s)
                 let now = std::time::Instant::now();
                 if now.duration_since(window_start).as_secs() >= 1 {
                     msg_count = 0;
@@ -320,106 +294,177 @@ async fn handle_websocket(
                     continue;
                 }
 
-                // 心跳处理
                 if text_str.trim() == "ping" {
-                    if self_tx.send("pong".to_string()).is_err() {
-                        eprintln!("[WS] Failed to send pong to {}", user_id);
-                    }
+                    let _ = self_tx.send("pong".to_string());
                     continue;
                 }
 
-                // 解析消息
                 match serde_json::from_str::<WsRequest>(&text_str) {
                     Ok(req) => {
+                        if !authenticated {
+                            if req.msg_type == "auth" {
+                                match complete_ws_auth(&state, &req, &self_tx) {
+                                    Ok(uid) => {
+                                        user_id = Some(uid.clone());
+                                        authenticated = true;
+                                        state.ws_manager.add_connection(&uid, &conn_id, outgoing_tx.clone());
+                                        on_ws_authenticated(&state, &uid, &self_tx);
+                                    }
+                                    Err(err) => {
+                                        let _ = self_tx.send(
+                                            serde_json::json!({"type": "auth_error", "error": err}).to_string(),
+                                        );
+                                        break;
+                                    }
+                                }
+                            } else {
+                                let _ = self_tx.send(
+                                    serde_json::json!({
+                                        "type": "auth_error",
+                                        "error": "Authentication required before sending messages"
+                                    }).to_string(),
+                                );
+                            }
+                            continue;
+                        }
+
+                        let uid = user_id.as_deref().unwrap_or("");
                         match req.msg_type.as_str() {
+                            "auth" => {
+                                let _ = self_tx.send(
+                                    serde_json::json!({"type": "auth_ok", "user_id": uid}).to_string(),
+                                );
+                            }
                             "message" | "chat" => {
-                                // 审计修复 #9: 验证 to 字段非空，防止幽灵消息
                                 let to_user = req.to.as_deref().unwrap_or("");
                                 if to_user.is_empty() {
-                                    if self_tx.send(
+                                    let _ = self_tx.send(
                                         serde_json::json!({"type": "error", "error": "Missing 'to' field for chat message"}).to_string()
-                                    ).is_err() {
-                                        eprintln!("[WS] Failed to send 'missing to' error to {}", user_id);
-                                    }
+                                    );
                                     continue;
                                 }
                                 handle_chat_message(
                                     &state,
-                                    &user_id,
+                                    uid,
                                     to_user,
                                     req.content.as_deref().unwrap_or(""),
                                     req.content_type.as_deref().unwrap_or("text"),
                                 ).await;
                             }
                             "heartbeat" => {
-                                if self_tx.send(
+                                let _ = self_tx.send(
                                     serde_json::json!({"type": "heartbeat", "status": "ok"}).to_string()
-                                ).is_err() {
-                                    eprintln!("[WS] Failed to send heartbeat response to {}", user_id);
-                                }
+                                );
                             }
                             "typing" => {
                                 if let Some(ref to) = req.to {
                                     let typing_msg = serde_json::json!({
                                         "type": "typing",
-                                        "from": user_id,
+                                        "from": uid,
                                         "to": to,
                                         "timestamp": Utc::now().timestamp_millis()
                                     });
                                     state.ws_manager.send_to_user(to, &typing_msg.to_string());
                                 }
                             }
-                            // ============================================================
-                            // v4.1 音视频通话信令
-                            // ============================================================
                             "call_offer" | "call_answer" | "call_ice_candidate" | "call_hangup" | "call_reject" | "call_busy" => {
-                                handle_call_signaling(
-                                    &state,
-                                    &user_id,
-                                    &req.msg_type,
-                                    &req,
-                                ).await;
+                                handle_call_signaling(&state, uid, &req.msg_type, &req).await;
                             }
                             _ => {
-                                if self_tx.send(
+                                let _ = self_tx.send(
                                     serde_json::json!({"type": "error", "error": format!("Unknown message type: {}", req.msg_type)}).to_string()
-                                ).is_err() {
-                                    eprintln!("[WS] Failed to send unknown msg type error to {}", user_id);
-                                }
+                                );
                             }
                         }
                     }
                     Err(e) => {
-                        if self_tx.send(
+                        let _ = self_tx.send(
                             serde_json::json!({"type": "error", "error": format!("Invalid JSON: {}", e)}).to_string()
-                        ).is_err() {
-                            eprintln!("[WS] Failed to send JSON parse error to {}", user_id);
-                        }
+                        );
                     }
                 }
             }
             Ok(Message::Close(_)) => {
-                println!("[WS] User '{}' connection closed", user_id);
+                if let Some(ref uid) = user_id {
+                    println!("[WS] User '{}' connection closed", uid);
+                }
                 break;
             }
             Ok(Message::Ping(data)) => {
-                // Pong 必须直接用 ws_sender 发送...但我们没有 ws_sender 了。
-                // WebSocket 协议层会自动处理 ping/pong，所以这里忽略
-                let _ = data; // suppress unused warning
+                let _ = data;
             }
-            Ok(_) => {} // 忽略 Binary/Pong 等其他类型
+            Ok(_) => {}
             Err(e) => {
-                println!("[WS] Error from user '{}': {}", user_id, e);
+                if let Some(ref uid) = user_id {
+                    println!("[WS] Error from user '{}': {}", uid, e);
+                }
                 break;
             }
         }
     }
 
-    // ---- 清理 ----
-    state.ws_manager.remove_connection(&user_id, &conn_id);
-    // 审计修复 R4: 中止 writer task，防止任务泄漏
+    if let Some(ref uid) = user_id {
+        state.ws_manager.remove_connection(uid, &conn_id);
+    }
     writer_handle.abort();
-    println!("[WS] User '{}' disconnected", user_id);
+    if let Some(ref uid) = user_id {
+        println!("[WS] User '{}' disconnected", uid);
+    }
+}
+
+/// 验证 auth 消息中的 JWT，返回 verified user_id
+fn complete_ws_auth(
+    _state: &AppState,
+    req: &WsRequest,
+    _self_tx: &mpsc::UnboundedSender<String>,
+) -> Result<String, String> {
+    let token = req.token.as_deref().filter(|t| !t.is_empty()).ok_or_else(|| {
+        "Missing token in auth message".to_string()
+    })?;
+    let claimed_user_id = req
+        .user_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| "Missing user_id in auth message".to_string())?;
+
+    let secret = crate::api::JWT_SECRET
+        .get()
+        .cloned()
+        .expect("JWT_SECRET not initialized");
+
+    let claims = crate::api::auth::verify_token(token, &secret)
+        .map_err(|_| "Invalid or expired token".to_string())?;
+
+    if claims.sub != claimed_user_id {
+        return Err(format!(
+            "user_id mismatch: token subject '{}' != claimed '{}'",
+            claims.sub, claimed_user_id
+        ));
+    }
+
+    Ok(claims.sub)
+}
+
+/// 认证成功后：推送离线消息 + 发送 connection_status / auth_ok
+fn on_ws_authenticated(state: &AppState, user_id: &str, self_tx: &mpsc::UnboundedSender<String>) {
+    push_offline_messages(state, user_id);
+    let _ = self_tx.send(
+        serde_json::json!({
+            "type": "auth_ok",
+            "user_id": user_id,
+            "timestamp": Utc::now().timestamp_millis()
+        })
+        .to_string(),
+    );
+    let _ = self_tx.send(
+        serde_json::json!({
+            "type": "connection_status",
+            "status": "connected",
+            "user_id": user_id,
+            "timestamp": Utc::now().timestamp_millis()
+        })
+        .to_string(),
+    );
 }
 
 /// 处理聊天消息: 持久化 + 路由
@@ -829,4 +874,93 @@ pub fn extract_user_id_from_token(token: &str, jwt_secret: &[u8]) -> Option<Stri
     )
     .ok()
     .map(|data| data.claims.sub)
+}
+
+#[cfg(test)]
+mod ws_auth_tests {
+    use super::*;
+    use crate::api::auth;
+    use crate::database::Database;
+    use crate::services::cloud_backup_service::CloudBackupService;
+    use crate::utils::crypto::Aes256GcmCipher;
+    use std::sync::{Arc, Mutex};
+    use tokio::sync::mpsc;
+
+    fn init_jwt_secret() -> Vec<u8> {
+        let secret = b"proclaw-ws-auth-test-secret!!".to_vec();
+        let _ = crate::api::JWT_SECRET.set(secret.clone());
+        crate::api::JWT_SECRET.get().unwrap().clone()
+    }
+
+    fn dummy_state(jwt_secret: Vec<u8>) -> AppState {
+        let db = Database::new(std::path::PathBuf::from(":memory:")).unwrap();
+        let cipher = Arc::new(Aes256GcmCipher::new(&[0u8; 32]).expect("test key"));
+        let ws_manager = Arc::new(WebSocketManager::new());
+        let cloud_backup = Arc::new(CloudBackupService::new(
+            Database::new(std::path::PathBuf::from(":memory:")).unwrap(),
+            &[0u8; 32],
+        ));
+        AppState {
+            db: Arc::new(Mutex::new(db)),
+            cipher,
+            ws_manager,
+            cloud_backup,
+            jwt_secret: Arc::new(jwt_secret),
+        }
+    }
+
+    fn auth_request(user_id: &str, token: Option<&str>) -> WsRequest {
+        WsRequest {
+            msg_type: "auth".to_string(),
+            id: None,
+            to: None,
+            content: None,
+            content_type: None,
+            token: token.map(String::from),
+            user_id: Some(user_id.to_string()),
+            payload: None,
+        }
+    }
+
+    #[test]
+    fn complete_ws_auth_accepts_valid_token() {
+        let secret = init_jwt_secret();
+        let token = auth::generate_token("user-abc", "dev1", "user", &[], &secret, 3600).unwrap();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let state = dummy_state(secret);
+        let req = auth_request("user-abc", Some(&token));
+        assert_eq!(
+            complete_ws_auth(&state, &req, &tx).unwrap(),
+            "user-abc"
+        );
+    }
+
+    #[test]
+    fn complete_ws_auth_rejects_missing_token() {
+        let secret = init_jwt_secret();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let state = dummy_state(secret);
+        let req = auth_request("user-abc", None);
+        assert!(complete_ws_auth(&state, &req, &tx).is_err());
+    }
+
+    #[test]
+    fn complete_ws_auth_rejects_user_id_mismatch() {
+        let secret = init_jwt_secret();
+        let token = auth::generate_token("user-a", "dev1", "user", &[], &secret, 3600).unwrap();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let state = dummy_state(secret);
+        let req = auth_request("user-b", Some(&token));
+        let err = complete_ws_auth(&state, &req, &tx).unwrap_err();
+        assert!(err.contains("user_id mismatch"));
+    }
+
+    #[test]
+    fn complete_ws_auth_rejects_invalid_token() {
+        let secret = init_jwt_secret();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let state = dummy_state(secret);
+        let req = auth_request("user-abc", Some("not-a-jwt"));
+        assert!(complete_ws_auth(&state, &req, &tx).is_err());
+    }
 }

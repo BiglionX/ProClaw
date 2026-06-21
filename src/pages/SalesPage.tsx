@@ -28,31 +28,47 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   CreateCustomerInput,
-  Customer,
-  SalesOrder,
   createCustomer,
-  getCustomers,
-  getSalesOrders,
 } from '../lib/salesService';
+import {
+  useCustomers,
+  useInvalidateSales,
+  useSalesOrders,
+} from '../lib/hooks/useSales';
 import { useAppModeStore } from '../config/appMode';
 
 export default function SalesPage() {
   const mode = useAppModeStore(state => state.mode);
   const [tabValue, setTabValue] = useState(0);
+  const invalidateSales = useInvalidateSales();
 
   // 客户状态
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
   // 销售订单状态
-  const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [orderSearch, setOrderSearch] = useState('');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<string>('');
+  const [platformFilterQuery, setPlatformFilterQuery] = useState<string>('');
 
-  const [loading, setLoading] = useState(false);
+  const {
+    data: customers = [],
+    isLoading: loadingCustomers,
+  } = useCustomers(customerSearchQuery, tabValue === 0);
+  const {
+    data: orders = [],
+    isLoading: loadingOrders,
+  } = useSalesOrders(
+    { search: orderSearchQuery, platform: platformFilterQuery },
+    tabValue === 1
+  );
+
+  const loading = loadingCustomers || loadingOrders;
+  const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -71,38 +87,11 @@ export default function SalesPage() {
     notes: '',
   });
 
-  // 加载数据
-  const loadCustomers = async () => {
-    try {
-      setLoading(true);
-      const data = await getCustomers({ search: customerSearch || undefined });
-      setCustomers(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败');
-    } finally {
-      setLoading(false);
-    }
+  const loadCustomers = () => setCustomerSearchQuery(customerSearch);
+  const loadOrders = () => {
+    setOrderSearchQuery(orderSearch);
+    setPlatformFilterQuery(platformFilter);
   };
-
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      const data = await getSalesOrders({
-        search: orderSearch || undefined,
-        platform_source: platformFilter || undefined,
-      });
-      setOrders(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCustomers();
-    loadOrders();
-  }, []);
 
   const handleSubmit = async () => {
     try {
@@ -110,16 +99,16 @@ export default function SalesPage() {
         setError('客户名称不能为空');
         return;
       }
-      setLoading(true);
+      setMutating(true);
       await createCustomer(formData);
       setSuccessMessage('客户创建成功!');
       setDialogOpen(false);
       resetForm();
-      loadCustomers();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -594,7 +583,7 @@ export default function SalesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>取消</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+          <Button onClick={handleSubmit} variant="contained" disabled={mutating || loading}>
             确认
           </Button>
         </DialogActions>

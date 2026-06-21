@@ -60,89 +60,41 @@ import {
   TablePagination,
   Badge,
 } from '@mui/material';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-
-// ===== 类型定义 =====
-
-interface TransferItem {
-  id: string;
-  session_id: string;
-  customer_id: string;
-  customer_name: string | null;
-  question: string;
-  transfer_reason: string;
-  transfer_mode: string;
-  status: string;
-  created_at: string;
-}
-
-interface ChatLogItem {
-  id: string;
-  session_id: string;
-  customer_id: string;
-  customer_name: string | null;
-  question: string;
-  answer: string;
-  answer_source: string;
-  is_transferred: boolean;
-  created_at: string;
-}
-
-interface KBItem {
-  id: string;
-  question: string;
-  answer: string;
-  category: string;
-  keywords: string[];
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface CSSettings {
-  is_enabled: boolean;
-  auto_greeting: string;
-  transfer_mode: 'direct' | 'ai_judged';
-  avatar_url: string | null;
-  agent_name: string;
-  system_prompt: string;
-}
+import {
+  type TransferItem,
+  type ChatLogItem,
+  type KBItem,
+  type CSSettings,
+  DEFAULT_CS_SETTINGS,
+  deleteKnowledgeBaseItem,
+  saveKnowledgeBaseItem,
+} from '../lib/customerService';
+import {
+  useCSSettings,
+  useChatHistory,
+  useInvalidateCustomerService,
+  useKnowledgeBase,
+  usePendingTransfers,
+  useReplyTransfer,
+  useSaveCSSettings,
+} from '../lib/hooks/useCustomerService';
 
 // ===== 待回复标签页 =====
 
 function PendingTransfersTab() {
-  const [transfers, setTransfers] = useState<TransferItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [total, setTotal] = useState(0);
+  const { data, isLoading: loading, refetch } = usePendingTransfers(page);
+  const replyTransfer = useReplyTransfer();
+  const transfers = data?.data ?? [];
+  const total = data?.total ?? 0;
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<TransferItem | null>(null);
   const [replyText, setReplyText] = useState('');
   const [saveToKb, setSaveToKb] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
-
-  const fetchTransfers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/customer-service/transfers?status=pending&page=${page + 1}&page_size=20`);
-      const result = await res.json();
-      if (result.success) {
-        setTransfers(result.data);
-        setTotal(result.total);
-      }
-    } catch {
-      // 桌面端可能无法直接调用云端 API，显示空列表
-      setTransfers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
-
-  useEffect(() => {
-    fetchTransfers();
-  }, [fetchTransfers]);
 
   const handleOpenReply = (item: TransferItem) => {
     setSelectedTransfer(item);
@@ -155,20 +107,15 @@ function PendingTransfersTab() {
     if (!selectedTransfer || !replyText.trim()) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/customer-service/transfers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transfer_id: selectedTransfer.id,
-          answer: replyText.trim(),
-          save_to_kb: saveToKb,
-        }),
+      const result = await replyTransfer.mutateAsync({
+        transfer_id: selectedTransfer.id,
+        answer: replyText.trim(),
+        save_to_kb: saveToKb,
       });
-      const result = await res.json();
       if (result.success) {
         setSnackbar({ message: '回复已发送' + (saveToKb ? '，已保存到问答库' : ''), severity: 'success' });
         setReplyDialogOpen(false);
-        fetchTransfers();
+        refetch();
       } else {
         setSnackbar({ message: result.error || '回复失败', severity: 'error' });
       }
@@ -192,7 +139,7 @@ function PendingTransfersTab() {
             <Chip label={`${total} 条待处理`} color="error" size="small" sx={{ ml: 1.5 }} />
           )}
         </Typography>
-        <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={fetchTransfers}>
+        <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={() => refetch()}>
           刷新
         </Button>
       </Box>
@@ -312,34 +259,12 @@ function PendingTransfersTab() {
 // ===== 聊天记录标签页 =====
 
 function ChatHistoryTab() {
-  const [logs, setLogs] = useState<ChatLogItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [total, setTotal] = useState(0);
   const [keyword, setKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
-
-  const fetchLogs = useCallback(async (searchKeyword?: string) => {
-    setLoading(true);
-    try {
-      let url = `/api/customer-service/history?page=${page + 1}&page_size=20`;
-      if (searchKeyword) url += `&keyword=${encodeURIComponent(searchKeyword)}`;
-      const res = await fetch(url);
-      const result = await res.json();
-      if (result.success) {
-        setLogs(result.data);
-        setTotal(result.total);
-      }
-    } catch {
-      setLogs([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
-
-  useEffect(() => {
-    fetchLogs(keyword);
-  }, [fetchLogs, keyword]);
+  const { data, isLoading: loading } = useChatHistory(page, keyword);
+  const logs = data?.data ?? [];
+  const total = data?.total ?? 0;
 
   const handleSearch = () => {
     setKeyword(searchInput);
@@ -433,13 +358,14 @@ function ChatHistoryTab() {
 // ===== 问答库管理标签页 =====
 
 function KnowledgeBaseTab() {
-  const [items, setItems] = useState<KBItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [total, setTotal] = useState(0);
   const [category, setCategory] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [keyword, setKeyword] = useState('');
+  const invalidateCustomerService = useInvalidateCustomerService();
+  const { data, isLoading: loading, refetch } = useKnowledgeBase(page, keyword, category || undefined);
+  const items = data?.data ?? [];
+  const total = data?.total ?? 0;
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<KBItem | null>(null);
   const [editQuestion, setEditQuestion] = useState('');
@@ -457,29 +383,6 @@ function KnowledgeBaseTab() {
     { value: 'return', label: '售后' },
     { value: 'other', label: '其他' },
   ];
-
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      let url = `/api/customer-service/knowledge-base?page=${page + 1}&page_size=20`;
-      if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
-      if (category) url += `&category=${category}`;
-      const res = await fetch(url);
-      const result = await res.json();
-      if (result.success) {
-        setItems(result.data);
-        setTotal(result.total);
-      }
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, keyword, category]);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
 
   const handleSearch = () => {
     setKeyword(searchInput);
@@ -515,20 +418,13 @@ function KnowledgeBaseTab() {
         keywords,
       };
 
-      const url = '/api/customer-service/knowledge-base';
-      const method = editingItem ? 'PUT' : 'POST';
       const payload = editingItem ? { ...body, id: editingItem.id } : body;
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const result = await res.json();
+      const result = await saveKnowledgeBaseItem(payload, editingItem ? 'PUT' : 'POST');
       if (result.success) {
         setSnackbar({ message: editingItem ? '问答已更新' : '问答已添加', severity: 'success' });
         setEditDialogOpen(false);
-        fetchItems();
+        invalidateCustomerService();
+        refetch();
       } else {
         setSnackbar({ message: result.error || '保存失败', severity: 'error' });
       }
@@ -542,11 +438,11 @@ function KnowledgeBaseTab() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('确定删除此问答？')) return;
     try {
-      const res = await fetch(`/api/customer-service/knowledge-base?id=${id}`, { method: 'DELETE' });
-      const result = await res.json();
-      if (result.success) {
+      const success = await deleteKnowledgeBaseItem(id);
+      if (success) {
         setSnackbar({ message: '问答已删除', severity: 'success' });
-        fetchItems();
+        invalidateCustomerService();
+        refetch();
       }
     } catch {
       setSnackbar({ message: '删除失败', severity: 'error' });
@@ -701,53 +597,22 @@ function KnowledgeBaseTab() {
 // ===== 客服设置标签页 =====
 
 function SettingsTab() {
-  const [settings, setSettings] = useState<CSSettings>({
-    is_enabled: true,
-    auto_greeting: '您好，我是客服小如，请问有什么可以帮您？',
-    transfer_mode: 'direct',
-    avatar_url: null,
-    agent_name: '智能客服',
-    system_prompt: '',
-  });
-  const [loading, setLoading] = useState(true);
+  const { data: loadedSettings, isLoading: loading } = useCSSettings();
+  const saveSettings = useSaveCSSettings();
+  const [settings, setSettings] = useState<CSSettings>(DEFAULT_CS_SETTINGS);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/customer-service/settings');
-      const result = await res.json();
-      if (result.success && result.data) {
-        setSettings({
-          is_enabled: result.data.is_enabled ?? true,
-          auto_greeting: result.data.auto_greeting || '您好，我是客服小如，请问有什么可以帮您？',
-          transfer_mode: result.data.transfer_mode || 'direct',
-          avatar_url: result.data.avatar_url || null,
-          agent_name: result.data.agent_name || '智能客服',
-          system_prompt: result.data.system_prompt || '',
-        });
-      }
-    } catch {
-      // 使用默认设置
-    } finally {
-      setLoading(false);
+    if (loadedSettings) {
+      setSettings(loadedSettings);
     }
-  };
+  }, [loadedSettings]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/customer-service/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
-      const result = await res.json();
+      const result = await saveSettings.mutateAsync(settings);
       if (result.success) {
         setSnackbar({ message: '设置已保存', severity: 'success' });
       } else {

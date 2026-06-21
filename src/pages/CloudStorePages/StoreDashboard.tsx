@@ -26,7 +26,8 @@ import {
 } from '@mui/icons-material';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCloudStore, getStoreStats, getStoreUrl, CloudStore, StoreStats } from '../../lib/cloudStoreService';
+import { useCloudStore, useInvalidateCloudStore, useStoreStats } from '../../lib/hooks/useCloudStore';
+import { getStoreUrl } from '../../lib/cloudStoreService';
 import { safeNumber, safeFixed } from '../../lib/format';
 import CloudStoreSetupWizard from './StoreSetupWizard';
 import { isDemoAccount } from '../../lib/aiTeamTokenService';
@@ -43,11 +44,13 @@ interface StoreDashboardProps {
 }
 
 export default function StoreDashboard({
-  loading, setLoading, setError, setSuccessMessage,
+  loading: _parentLoading, setLoading, setError, setSuccessMessage,
 }: StoreDashboardProps) {
   const navigate = useNavigate();
-  const [store, setStore] = useState<CloudStore | null>(null);
-  const [stats, setStats] = useState<StoreStats | null>(null);
+  const { data: store, isLoading: storeLoading, refetch: refetchStore } = useCloudStore();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useStoreStats(store?.id, !!store);
+  const invalidateCloudStore = useInvalidateCloudStore();
+  const loading = storeLoading || statsLoading;
   const [openWizard, setOpenWizard] = useState(false);
   const [wizardSubdomain, setWizardSubdomain] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -56,24 +59,17 @@ export default function StoreDashboard({
   // 手机预览 Dialog
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const storeData = await getCloudStore();
-      setStore(storeData);
-      if (storeData) {
-        const statsData = await getStoreStats(storeData.id);
-        setStats(statsData);
-      }
-    } catch (err) {
-      console.error('加载商城数据失败:', err);
-    } finally {
-      setLoading(false);
-    }
+  const loadData = () => {
+    invalidateCloudStore();
+    refetchStore();
+    refetchStats();
   };
 
   useEffect(() => {
-    loadData();
+    setLoading(loading);
+  }, [loading, setLoading]);
+
+  useEffect(() => {
     setIsDemo(isDemoAccount() && !!readDemoFlag());
   }, []);
 
@@ -101,8 +97,7 @@ export default function StoreDashboard({
   };
 
   // 向导完成回调
-  const handleWizardComplete = (newStore: CloudStore) => {
-    setStore(newStore);
+  const handleWizardComplete = (_newStore: unknown) => {
     setOpenWizard(false);
     setSuccessMessage('商城开通成功！请同步商品到云端。');
     loadData();

@@ -36,7 +36,7 @@
         "endpoints": [
           "https://releases.proclaw.cc/{{target}}/{{arch}}/{{current_version}}"
         ],
-        "pubkey": "REPLACE_WITH_ACTUAL_PUBLIC_KEY",
+        "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM5MTFFQjcwRTZCMEU4QUUKUldTdTZMRG1jT3NST1lOZ09sMWVFeG53OU9seWZpbVg1R054bnpSSlpXMkU2TEpoRVBqb3V4aloK",
         "windows": {
           "installMode": "passive"
         }

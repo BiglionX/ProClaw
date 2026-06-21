@@ -7,7 +7,16 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 
 vi.mock('@tauri-apps/api/core');
-vi.mock('./tauri', () => ({ isTauri: () => true }));
+vi.mock('./tauri', async () => {
+  const core = await import('@tauri-apps/api/core');
+  return {
+    isTauri: () => true,
+    ipcInvoke: core.invoke,
+    ipcInvokeOrNull: core.invoke,
+    safeInvoke: core.invoke,
+    openExternalUrl: vi.fn(),
+  };
+});
 
 describe('financeService', () => {
   beforeEach(() => {

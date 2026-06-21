@@ -37,18 +37,18 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import {
-  CashFlowReport,
-  FinancialSummary,
-  ProfitLossReport,
-  getCashFlowReport,
-  getFinancialSummary,
-  getProfitLossReport,
-} from '../lib/financeService';
+  useARAPDetail,
+  useARAPSummary,
+  useCashFlowReport,
+  useFinancialSummary,
+  useInvalidateFinance,
+  useProfitLossReport,
+  useReconciliationRules,
+  useSmtpConfig,
+} from '../lib/hooks/useFinance';
 import {
   ARAPSummaryItem,
   ARAPDetailItem,
-  getARAPSummary,
-  getARAPDetail,
 } from '../lib/paymentService';
 import {
   ReconciliationRule,
@@ -58,24 +58,28 @@ import {
   createReconciliationRule,
   updateReconciliationRule,
   deleteReconciliationRule,
-  getReconciliationRules,
   setSmtpConfig,
-  getSmtpConfig,
   checkReconciliationRules,
 } from '../lib/reconciliationService';
 
 
 export default function FinancePage() {
   const [tabValue, setTabValue] = useState(0);
-  const [summary, setSummary] = useState<FinancialSummary | null>(null);
-  const [profitLoss, setProfitLoss] = useState<ProfitLossReport | null>(null);
-  const [cashFlow, setCashFlow] = useState<CashFlowReport | null>(null);
+  const invalidateFinance = useInvalidateFinance();
+
+  const { data: summary } = useFinancialSummary(tabValue === 0);
+  const { data: profitLoss } = useProfitLossReport(undefined, undefined, tabValue === 1);
+  const { data: cashFlow } = useCashFlowReport(undefined, undefined, tabValue === 2);
+  const { data: apSummary = [] } = useARAPSummary('supplier', tabValue === 3);
+  const { data: arSummary = [] } = useARAPSummary('customer', tabValue === 4);
+  const { data: rules = [], isLoading: rulesLoading } = useReconciliationRules(tabValue === 5 || tabValue === 6);
+  const { data: smtpConfig = null } = useSmtpConfig(tabValue === 6);
 
   // AR/AP 台账状态
-  const [arApSummary, setArApSummary] = useState<ARAPSummaryItem[]>([]);
   const [arApSearch, setArApSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [detailItems, setDetailItems] = useState<ARAPDetailItem[]>([]);
+  const [expandedType, setExpandedType] = useState<'supplier' | 'customer'>('supplier');
+  const { data: detailItems = [] } = useARAPDetail(expandedType, expandedRow, !!expandedRow);
 
   // 对账单状态
   const [stmtCounterpartyType, setStmtCounterpartyType] = useState('supplier');
@@ -87,112 +91,26 @@ export default function FinancePage() {
   const [stmtLoading, setStmtLoading] = useState(false);
 
   // 提醒设置状态
-  const [rules, setRules] = useState<ReconciliationRule[]>([]);
-  const [rulesLoading, setRulesLoading] = useState(false);
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<ReconciliationRule | null>(null);
   const [smtpDialogOpen, setSmtpDialogOpen] = useState(false);
-  const [smtpConfig, setSmtpConfig] = useState<SmtpConfig | null>(null);
-
-  // 加载财务概览
-  const loadSummary = async () => {
-    try {
-      const data = await getFinancialSummary();
-      setSummary(data);
-    } catch (err) {
-      console.error('Failed to load summary:', err);
-    }
-  };
-
-  // 加载利润表
-  const loadProfitLoss = async () => {
-    try {
-      const now = new Date();
-      const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .split('T')[0];
-      const endDate = now.toISOString().split('T')[0];
-      const data = await getProfitLossReport(startDate, endDate);
-      setProfitLoss(data);
-    } catch (err) {
-      console.error('Failed to load profit/loss:', err);
-    }
-  };
-
-  // 加载现金流量表
-  const loadCashFlow = async () => {
-    try {
-      const now = new Date();
-      const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .split('T')[0];
-      const endDate = now.toISOString().split('T')[0];
-      const data = await getCashFlowReport(startDate, endDate);
-      setCashFlow(data);
-    } catch (err) {
-      console.error('Failed to load cash flow:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadSummary();
-    loadProfitLoss();
-    loadCashFlow();
-  }, []);
-
-  // 加载 AR/AP 台账
-  const loadARAP = async (type: 'supplier' | 'customer') => {
-    try {
-      const data = await getARAPSummary(type);
-      setArApSummary(data);
-    } catch (err) {
-      console.error('Failed to load AR/AP summary:', err);
-    }
-  };
-
-  // 展开明细
-  const handleExpandRow = async (type: 'supplier' | 'customer', id: string) => {
-    if (expandedRow === id) {
-      setExpandedRow(null);
-      setDetailItems([]);
-      return;
-    }
-    setExpandedRow(id);
-    try {
-      const items = await getARAPDetail(type, id);
-      setDetailItems(items);
-    } catch (err) {
-      console.error('Failed to load AR/AP detail:', err);
-      setDetailItems([]);
-    }
-  };
 
   const formatCurrency = (value: number) => {
     return `¥${value.toFixed(2)}`;
   };
 
-  // 加载对账规则
-  const loadRules = async () => {
-    setRulesLoading(true);
-    try {
-      const data = await getReconciliationRules();
-      setRules(data);
-    } catch (err) {
-      console.error('Failed to load rules:', err);
-    } finally {
-      setRulesLoading(false);
+  const arApSummary = tabValue === 3 ? apSummary : arSummary;
+
+  const handleExpandRow = (type: 'supplier' | 'customer', id: string) => {
+    if (expandedRow === id && expandedType === type) {
+      setExpandedRow(null);
+      return;
     }
+    setExpandedType(type);
+    setExpandedRow(id);
   };
 
-  // 加载 SMTP 配置
-  const loadSmtpConfig = async () => {
-    try {
-      const config = await getSmtpConfig();
-      setSmtpConfig(config);
-    } catch (err) {
-      console.error('Failed to load SMTP config:', err);
-    }
-  };
+  const refreshFinance = () => invalidateFinance();
 
   return (
     <Box>
@@ -210,13 +128,7 @@ export default function FinancePage() {
       <Paper sx={{ mb: 3 }}>
         <Tabs
           value={tabValue}
-          onChange={(_, newValue) => {
-            setTabValue(newValue);
-            if (newValue === 3) loadARAP('supplier');
-            if (newValue === 4) loadARAP('customer');
-            if (newValue === 5) loadRules();
-            if (newValue === 6) { loadRules(); loadSmtpConfig(); }
-          }}
+          onChange={(_, newValue) => setTabValue(newValue)}
           variant="fullWidth"
         >
           <Tab icon={<BalanceIcon />} label="财务概览" />
@@ -624,7 +536,7 @@ export default function FinancePage() {
           setArApSearch={setArApSearch}
           expandedRow={expandedRow}
           detailItems={detailItems}
-          onRefresh={() => loadARAP(tabValue === 3 ? 'supplier' : 'customer')}
+          onRefresh={refreshFinance}
           onExpandRow={(id) => handleExpandRow(tabValue === 3 ? 'supplier' : 'customer', id)}
           formatCurrency={formatCurrency}
         />
@@ -656,7 +568,7 @@ export default function FinancePage() {
         <RulesTab
           rules={rules}
           rulesLoading={rulesLoading}
-          loadRules={loadRules}
+          onRefresh={refreshFinance}
           ruleDialogOpen={ruleDialogOpen}
           setRuleDialogOpen={setRuleDialogOpen}
           editingRule={editingRule}
@@ -664,7 +576,6 @@ export default function FinancePage() {
           smtpDialogOpen={smtpDialogOpen}
           setSmtpDialogOpen={setSmtpDialogOpen}
           smtpConfig={smtpConfig}
-          loadSmtpConfig={loadSmtpConfig}
         />
       )}
     </Box>
@@ -1147,7 +1058,7 @@ function StatementTab({
 interface RulesTabProps {
   rules: ReconciliationRule[];
   rulesLoading: boolean;
-  loadRules: () => void;
+  onRefresh: () => void;
   ruleDialogOpen: boolean;
   setRuleDialogOpen: (v: boolean) => void;
   editingRule: ReconciliationRule | null;
@@ -1155,13 +1066,12 @@ interface RulesTabProps {
   smtpDialogOpen: boolean;
   setSmtpDialogOpen: (v: boolean) => void;
   smtpConfig: SmtpConfig | null;
-  loadSmtpConfig: () => void;
 }
 
 function RulesTab({
   rules,
   rulesLoading,
-  loadRules,
+  onRefresh,
   ruleDialogOpen,
   setRuleDialogOpen,
   editingRule,
@@ -1169,7 +1079,6 @@ function RulesTab({
   smtpDialogOpen,
   setSmtpDialogOpen,
   smtpConfig,
-  loadSmtpConfig,
 }: RulesTabProps) {
   const [ruleName, setRuleName] = useState('');
   const [ruleScopeType, setRuleScopeType] = useState('all');
@@ -1269,7 +1178,7 @@ function RulesTab({
         await createReconciliationRule(ruleData);
       }
       setRuleDialogOpen(false);
-      loadRules();
+      onRefresh();
     } catch (err: any) {
       setRuleError(err.toString());
     } finally {
@@ -1282,7 +1191,7 @@ function RulesTab({
     if (!window.confirm('确定删除此规则？')) return;
     try {
       await deleteReconciliationRule(ruleId);
-      loadRules();
+      onRefresh();
     } catch (err: any) {
       setRuleMessage(err.toString());
     }
@@ -1327,7 +1236,7 @@ function RulesTab({
       await setSmtpConfig(smtpHost, parseInt(smtpPort) || 587, smtpUsername, smtpPassword, smtpFromEmail, smtpFromName || undefined);
       setSmtpMessage('SMTP 配置已保存');
       setSmtpDialogOpen(false);
-      loadSmtpConfig();
+      onRefresh();
     } catch (err: any) {
       setSmtpMessage(err.toString());
     } finally {
@@ -1449,7 +1358,7 @@ function RulesTab({
                           action_type: rule.action_type,
                           extra_emails: rule.extra_emails,
                         });
-                        loadRules();
+                        onRefresh();
                       } catch { /* ignore */ }
                     }}
                     size="small"

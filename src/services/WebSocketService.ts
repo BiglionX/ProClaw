@@ -1,5 +1,6 @@
 // WebSocket 客户端服务
 // v4.1: 桌面端 WebSocket 连接和通话信令
+// SEC-P1-08: Token 通过连接后 auth 消息发送，不再放入 URL
 
 type MessageHandler = (type: string, data: any) => void;
 
@@ -12,10 +13,13 @@ class DesktopWebSocketService {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map();
   private isConnected: boolean = false;
+  private isAuthenticated: boolean = false;
   private onStatusChange: ((connected: boolean) => void) | null = null;
 
   connect(serverUrl: string, userId: string, token: string): void {
-    this.url = serverUrl.replace(/^http/, 'ws') + '/ws/chat';
+    this.url = serverUrl
+      .replace(/^https:\/\//, 'wss://')
+      .replace(/^http:\/\//, 'ws://') + '/ws/chat';
     this.userId = userId;
     this.token = token;
     this.doConnect();
@@ -24,25 +28,36 @@ class DesktopWebSocketService {
   private doConnect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    // 审计修复 SEC-P1-08: Token 通过 URL query 传递会暴露在日志中
-    // 改用仅传递 user_id 在 URL 中，token 通过 WebSocket 消息发送
-    // 注意: 后端中间件仍从 query 读取 token 作为兼容，后续应迁移到消息体
-    const wsUrl = `${this.url}?user_id=${encodeURIComponent(this.userId)}&token=${encodeURIComponent(this.token)}`;
-    // 审计警告: 当前仍通过 URL 传递 token，后续应改为连接后发送 auth 消息
-    // TODO: 改为 wsUrl = `${this.url}?user_id=${...}` + onopen 后发送 {type:'auth', token}
-    this.ws = new WebSocket(wsUrl);
+    this.ws = new WebSocket(this.url);
 
     this.ws.onopen = () => {
-      console.log('[WS] Connected');
-      this.isConnected = true;
-      this.startHeartbeat();
-      this.onStatusChange?.(true);
+      this.isAuthenticated = false;
+      this.ws!.send(JSON.stringify({
+        type: 'auth',
+        user_id: this.userId,
+        token: this.token,
+      }));
     };
 
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        this.dispatchMessage(msg.type || 'unknown', msg);
+        const type = msg.type || 'unknown';
+
+        if (type === 'auth_ok' || type === 'connection_status') {
+          if (!this.isAuthenticated) {
+            this.isAuthenticated = true;
+            this.isConnected = true;
+            this.startHeartbeat();
+            this.onStatusChange?.(true);
+          }
+        } else if (type === 'auth_error') {
+          console.error('[WS] Auth failed:', msg.error);
+          this.ws?.close();
+          return;
+        }
+
+        this.dispatchMessage(type, msg);
       } catch {
         if (event.data === 'pong') {
           this.dispatchMessage('pong', {});
@@ -51,8 +66,8 @@ class DesktopWebSocketService {
     };
 
     this.ws.onclose = () => {
-      console.log('[WS] Disconnected');
       this.isConnected = false;
+      this.isAuthenticated = false;
       this.stopHeartbeat();
       this.onStatusChange?.(false);
       this.scheduleReconnect();
@@ -96,7 +111,7 @@ class DesktopWebSocketService {
   }
 
   send(type: string, payload?: any, toUserId?: string): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.isAuthenticated) return false;
     const msg: any = { type };
     if (payload) msg.payload = payload;
     if (toUserId) msg.to = toUserId;
@@ -105,7 +120,7 @@ class DesktopWebSocketService {
   }
 
   sendRaw(text: string): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN && this.isAuthenticated) {
       this.ws.send(text);
     }
   }
@@ -128,9 +143,10 @@ class DesktopWebSocketService {
     this.ws?.close();
     this.ws = null;
     this.isConnected = false;
+    this.isAuthenticated = false;
   }
 
-  get connected(): boolean { return this.isConnected; }
+  get connected(): boolean { return this.isConnected && this.isAuthenticated; }
   get currentUserId(): string { return this.userId; }
 }
 

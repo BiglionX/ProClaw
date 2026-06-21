@@ -33,48 +33,30 @@ import { useNavigate } from 'react-router-dom';
 import {
   Contact,
   addContact,
-  getContacts,
   AddContactInput,
 } from '../lib/contactService';
+import { useContacts, useInvalidateContacts } from '../lib/hooks/useContacts';
 import { useAppModeStore } from '../config/appMode';
 import { onProfileChanged } from '../lib/agentProfileService';
 
 export default function ContactsPage() {
   const mode = useAppModeStore(state => state.mode);
   const navigate = useNavigate();
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
+  const invalidateContacts = useInvalidateContacts();
+  const { data: contacts = [], isLoading: loading } = useContacts(search);
   const [filterType, setFilterType] = useState<string>('all');
-  const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [newContact, setNewContact] = useState<AddContactInput>({
     name: '', phone: '', email: '', external_type: 'customer',
   });
 
-  const loadContacts = async () => {
-    setLoading(true);
-    try {
-      const data = await getContacts({ search: search || undefined });
-      setContacts(data);
-    } catch (e) {
-      console.error('加载联系人失败:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadContacts();
-  }, [search]);
-
-  // 监听 Agent 个性化变更 → 重新加载联系人（更新名称/头像）
   useEffect(() => {
     const unsubscribe = onProfileChanged(() => {
-      loadContacts();
+      invalidateContacts();
     });
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [invalidateContacts]);
 
   /**
    * 点击头像事件（重要：与点击行/ChatIcon 一致）——
@@ -277,7 +259,7 @@ export default function ContactsPage() {
       await addContact(newContact);
       setAddOpen(false);
       setNewContact({ name: '', phone: '', email: '', external_type: 'customer' });
-      loadContacts();
+      invalidateContacts();
     } catch (e) {
       console.error('添加联系人失败:', e);
     }

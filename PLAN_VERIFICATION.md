@@ -200,14 +200,14 @@
 - [Cargo.toml](file:///d:/BigLionX/ProClaw/src-tauri/Cargo.toml) - Rust 依赖
 
 ### 关键 PRD 文档
-- [PRD v4.0（商务通基础）](file:///d:/BigLionX/ProClaw/docs/prd/ProClaw_PRD_v4.0.md)
-- [PRD v6.0（虚拟公司版）](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：ProClaw 虚拟公司版（Agent 化架构）PRD v6.0.md)
-- [PRD v6.2（CEO Agent）](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：CEO Agent 作为主控官 - 项目上下文协议与任务分派（PRD v6.2）.md)
-- [PRD v8.5（商务秘书）](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：ProClaw 内置商务秘书 Agent（PRD v8.5）.md)
-- [PRD v10.0（插件化架构）](file:///d:/BigLionX/ProClaw/docs/prd/需求文档ProClaw 插件系统 PRD——行业工作流插件（PRD v10.0）.md)
-- [PRD v11.0（UI 全面升级）](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md)
-- [PRD v12.0（AI Team UI 重构）](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md)
-- [PRD Light（双模式）](file:///d:/BigLionX/ProClaw/docs/prd/需求文档：ProClaw-Light 桌面端需求.md)
+- [PRD v4.0（商务通基础）](file:///d:/BigLionX/ProClaw/docs/prd/_deprecated/ProClaw_PRD_v4.0.md)
+- [PRD v6.0（虚拟公司版）](file:///d:/BigLionX/ProClaw/docs/prd/architecture/需求文档：ProClaw 虚拟公司版（Agent 化架构）PRD v6.0.md)
+- [PRD v6.2（CEO Agent）](file:///d:/BigLionX/ProClaw/docs/prd/ceo-agent/需求文档：CEO Agent 作为主控官 - 项目上下文协议与任务分派（PRD v6.2）.md)
+- [PRD v8.5（商务秘书）](file:///d:/BigLionX/ProClaw/docs/prd/marketing/需求文档：ProClaw 内置商务秘书 Agent（PRD v8.5）.md)
+- [PRD v10.0（插件化架构）](file:///d:/BigLionX/ProClaw/docs/prd/plugins-supply-chain/需求文档ProClaw 插件系统 PRD——行业工作流插件（PRD v10.0）.md)
+- [PRD v11.0（UI 全面升级）](file:///d:/BigLionX/ProClaw/docs/prd/plugins-supply-chain/需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md)
+- [PRD v12.0（AI Team UI 重构）](file:///d:/BigLionX/ProClaw/docs/prd/mobile/需求文档：AI Team 页面 UI 重构与交互体验优化（PRD v12.0）.md)
+- [PRD Light（双模式）](file:///d:/BigLionX/ProClaw/docs/prd/architecture/需求文档：ProClaw-Light 桌面端需求.md)
 - [demo-account-spec](file:///d:/BigLionX/ProClaw/docs/features/demo-account-spec.md)
 
 ### 核心实现入口

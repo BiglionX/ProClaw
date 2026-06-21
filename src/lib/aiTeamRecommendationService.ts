@@ -9,7 +9,7 @@
  * 2. LLM 增强  — 使用大模型生成详细描述和定制建议（需 LLM 配置）
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { ipcInvoke as invoke } from './tauri';
 import type { AiTeam, CreateTeamPayload, TeamMember } from './teamTypes';
 import { getAIConfig, type TaskType } from './aiConfig';
 import { getLLMForTask } from './llmProvider';

@@ -19,7 +19,8 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCloudStore, getStoreTheme, updateStoreTheme, generateThemeWithAI, StoreTheme as StoreThemeType, CloudStore, getSyncableProducts } from '../../lib/cloudStoreService';
+import { updateStoreTheme, generateThemeWithAI, StoreTheme as StoreThemeType, getSyncableProducts } from '../../lib/cloudStoreService';
+import { useCloudStore, useInvalidateCloudStore, useStoreTheme, useSyncableProducts } from '../../lib/hooks/useCloudStore';
 import { isTauri } from '../../lib/tauri';
 import { generateLogo, generateBanner, dataURLtoBlob } from '../../lib/brandAssetGenerator';
 
@@ -32,10 +33,13 @@ interface StoreThemeProps {
 }
 
 export default function StoreTheme({
-  loading, setLoading, setError, setSuccessMessage,
+  loading: _parentLoading, setLoading, setError, setSuccessMessage,
 }: StoreThemeProps) {
   const navigate = useNavigate();
-  const [store, setStore] = useState<CloudStore | null>(null);
+  const { data: store } = useCloudStore();
+  const { data: themeData, isLoading: themeLoading, refetch: refetchTheme } = useStoreTheme(store?.id, !!store);
+  const { data: syncableProducts = [] } = useSyncableProducts(!!store);
+  const invalidateCloudStore = useInvalidateCloudStore();
   const [theme, setTheme] = useState<StoreThemeType | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,59 +48,37 @@ export default function StoreTheme({
   const [generatingLogo, setGeneratingLogo] = useState(false);
   const [generatingBanner, setGeneratingBanner] = useState(false);
 
-  const loadStore = async () => {
-    try {
-      const storeData = await getCloudStore();
-      setStore(storeData);
-      return storeData;
-    } catch (err) {
-      console.error('加载商城信息失败:', err);
-      return null;
+  const defaultTheme = (storeId = ''): StoreThemeType => ({
+    store_id: storeId,
+    primary_color: '#1890ff',
+    secondary_color: '#f5f5f5',
+    layout_style: 'card',
+    font_family: 'PingFang SC, Microsoft YaHei, sans-serif',
+    banner_images: [],
+    theme_data: {},
+    updated_at: new Date().toISOString(),
+  });
+
+  useEffect(() => {
+    setLoading(themeLoading);
+  }, [themeLoading, setLoading]);
+
+  useEffect(() => {
+    if (themeData) {
+      setTheme(themeData);
+    } else if (!store) {
+      setTheme(defaultTheme());
     }
+  }, [themeData, store]);
+
+  const refreshTheme = () => {
+    invalidateCloudStore();
+    refetchTheme();
   };
 
-  const loadTheme = async (storeData?: CloudStore | null) => {
-    const currentStore = storeData || store;
-    if (!currentStore) {
-      // 使用默认值
-      setTheme({
-        store_id: '',
-        primary_color: '#1890ff',
-        secondary_color: '#f5f5f5',
-        layout_style: 'card',
-        font_family: 'PingFang SC, Microsoft YaHei, sans-serif',
-        banner_images: [],
-        theme_data: {},
-        updated_at: new Date().toISOString(),
-      });
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      const data = await getStoreTheme(currentStore.id);
-      setTheme(data);
-    } catch {
-      // 使用默认值
-      setTheme({
-        store_id: currentStore.id,
-        primary_color: '#1890ff',
-        secondary_color: '#f5f5f5',
-        layout_style: 'card',
-        font_family: 'PingFang SC, Microsoft YaHei, sans-serif',
-        banner_images: [],
-        theme_data: {},
-        updated_at: new Date().toISOString(),
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 获取商品分类和价格区间
   const getProductInfo = async (): Promise<{ categories: string[]; priceRange: string }> => {
     try {
-      const products = await getSyncableProducts();
+      const products = syncableProducts.length > 0 ? syncableProducts : await getSyncableProducts();
       const categories: string[] = [];
       let minPrice = Infinity;
       let maxPrice = 0;
@@ -119,14 +101,6 @@ export default function StoreTheme({
       return { categories: ['通用商品'], priceRange: '¥100-1000' };
     }
   };
-
-  useEffect(() => {
-    const init = async () => {
-      const storeData = await loadStore();
-      await loadTheme(storeData);
-    };
-    init();
-  }, []);
 
   const handleGenerateAI = async () => {
     if (!store) {
@@ -333,7 +307,7 @@ export default function StoreTheme({
     }
   };
 
-  if (loading) {
+  if (themeLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress />
@@ -580,7 +554,7 @@ export default function StoreTheme({
 
       {/* 保存按钮 */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => loadTheme()} disabled={saving}>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refreshTheme} disabled={saving}>
           重置
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={saving || !theme}>

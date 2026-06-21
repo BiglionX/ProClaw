@@ -27,29 +27,40 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   CreateSupplierInput,
-  PurchaseOrder,
-  Supplier,
   createSupplier,
-  getPurchaseOrders,
-  getSuppliers,
 } from '../lib/purchaseService';
+import {
+  useInvalidatePurchase,
+  usePurchaseOrders,
+  useSuppliers,
+} from '../lib/hooks/usePurchase';
 
 export default function PurchasePage() {
   const [tabValue, setTabValue] = useState(0);
+  const invalidatePurchase = useInvalidatePurchase();
 
-  // 供应商状态
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [orderSearchTerm, setOrderSearchTerm] = useState('');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+
+  const {
+    data: suppliers = [],
+    isLoading: loadingSuppliers,
+  } = useSuppliers(searchQuery, tabValue === 0);
+  const {
+    data: orders = [],
+    isLoading: loadingOrders,
+  } = usePurchaseOrders(orderSearchQuery, tabValue === 1);
+
+  const loading = loadingSuppliers || loadingOrders;
+  const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // 采购订单状态
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [orderSearchTerm, setOrderSearchTerm] = useState('');
 
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -65,47 +76,11 @@ export default function PurchasePage() {
     notes: '',
   });
 
-  // 加载供应商列表
-  const loadSuppliers = async () => {
-    try {
-      setLoading(true);
-      const data = await getSuppliers({
-        search: searchTerm || undefined,
-      });
-      setSuppliers(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadSuppliers = () => setSearchQuery(searchTerm);
+  const loadOrders = () => setOrderSearchQuery(orderSearchTerm);
 
-  useEffect(() => {
-    loadSuppliers();
-    loadOrders();
-  }, []);
+  const handleSearch = () => loadSuppliers();
 
-  // 加载采购订单
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      const data = await getPurchaseOrders({
-        search: orderSearchTerm || undefined,
-      });
-      setOrders(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 处理搜索
-  const handleSearch = () => {
-    loadSuppliers();
-  };
-
-  // 处理表单提交
   const handleSubmit = async () => {
     try {
       if (!formData.name) {
@@ -113,16 +88,16 @@ export default function PurchasePage() {
         return;
       }
 
-      setLoading(true);
+      setMutating(true);
       await createSupplier(formData);
       setSuccessMessage('供应商创建成功!');
       setDialogOpen(false);
       resetForm();
-      loadSuppliers();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建供应商失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -408,7 +383,7 @@ export default function PurchasePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>取消</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+          <Button onClick={handleSubmit} variant="contained" disabled={mutating || loading}>
             确认
           </Button>
         </DialogActions>

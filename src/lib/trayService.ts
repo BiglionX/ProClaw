@@ -9,7 +9,7 @@
  * - 通知权限：浏览器环境下需要用户授权（仅在用户交互中请求）
  * - 桌面端：Tauri 后端直接通过 Windows 通知中心发送
  */
-import { invoke } from '@tauri-apps/api/core';
+import { ipcInvoke as invoke } from './tauri';
 import { isTauri } from './tauri';
 
 /** 浏览器 Notification API 权限状态（仅浏览器环境使用） */

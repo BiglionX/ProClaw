@@ -19,6 +19,9 @@ const mockSafeInvoke = vi.fn();
 vi.mock('../lib/tauri', () => ({
   isTauri: () => mockIsTauri(),
   safeInvoke: (...args: any[]) => mockSafeInvoke(...args),
+  ipcInvokeOrNull: (...args: any[]) => mockSafeInvoke(...args),
+  ipcInvoke: (...args: any[]) => mockSafeInvoke(...args),
+  openExternalUrl: vi.fn(),
 }));
 
 // mock manifestRegistry

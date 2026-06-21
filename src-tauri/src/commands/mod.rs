@@ -297,6 +297,16 @@ pub mod core {
                     description: "获取邀请列表",
                 },
                 CommandDef {
+                    name: "create_employee_invitation_cmd",
+                    module: "invitation",
+                    description: "创建员工邀请",
+                },
+                CommandDef {
+                    name: "accept_employee_invitation_cmd",
+                    module: "invitation",
+                    description: "接受员工邀请",
+                },
+                CommandDef {
                     name: "check_installation_status",
                     module: "setup",
                     description: "检查安装状态",

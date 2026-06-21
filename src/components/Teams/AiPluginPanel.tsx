@@ -204,7 +204,7 @@ function PluginDetailDialog(props: {
  * Tab2: 插件商店 - 从商店API加载并过滤已安装插件
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box, Button, Card, CardContent, Chip, CircularProgress,
   Divider, IconButton, Switch, Tab, Tabs, TextField, Typography,
@@ -227,20 +227,15 @@ import {
   Security as SecurityIcon,
   Launch as LaunchIcon,
 } from '@mui/icons-material';
-import { PluginManager, IndustryPluginManifest } from '../../config/appMode';
+import { IndustryPluginManifest } from '../../config/appMode';
 import { pluginLoader } from '../../lib/pluginLoader';
-
-/** 插件商店卡片数据 */
-interface StoreCard {
-  id: string;
-  name: string;
-  version: string;
-  description: string;
-  icon: string;
-  downloads: number;
-  tags: string[];
-  published_at: string;
-}
+import {
+  useInstalledPlugins,
+  useInvalidatePlugins,
+  usePluginStore,
+  type InstalledPluginInfo,
+  type PluginStoreCard,
+} from '../../lib/hooks/usePlugins';
 
 const CATEGORIES = [
   { id: 'all', label: '全部' },
@@ -261,87 +256,6 @@ const INDUSTRY_COLORS: Record<string, string> = {
   'cloud-proclaw': '#0ea5e5',
 };
 
-const STORE_API_URL = 'https://flowhub.proclaw.cc';
-
-/**
- * 本地兜底商店列表（云端 API 不可达时使用）
- * 包含内置插件 + 行业推荐插件,保证商店 Tab 永远有内容
- */
-function getLocalStoreFallback(): StoreCard[] {
-  const now = new Date().toISOString();
-  // 内置插件在「已使用」中会显示,商店中只显示推荐插件
-  // （避免重复;用户切换 Tab 时看到一致数据）
-  const recommended: StoreCard[] = [
-    {
-      id: 'retail-pos',
-      name: '零售收银 POS',
-      version: '1.0.0',
-      description: '完整的零售门店收银、扫码、打印小票、库存联动一体化方案',
-      icon: '🛒',
-      downloads: 1280,
-      tags: ['零售', 'POS', '进销存'],
-      published_at: now,
-    },
-    {
-      id: 'beauty-booking',
-      name: '美业预约系统',
-      version: '1.2.0',
-      description: '美容院、美发、美甲等服务的预约、会员卡、技师排班一站式管理',
-      icon: '💇',
-      downloads: 856,
-      tags: ['美业', '预约', '会员'],
-      published_at: now,
-    },
-    {
-      id: 'catering-kds',
-      name: '餐饮 KDS 后厨显示',
-      version: '2.0.0',
-      description: '后厨实时显示订单状态,出餐提醒,出品顺序智能调度',
-      icon: '🍳',
-      downloads: 2103,
-      tags: ['餐饮', '后厨', '出餐'],
-      published_at: now,
-    },
-    {
-      id: 'pet-medical',
-      name: '宠物医院管理',
-      version: '1.5.0',
-      description: '宠物诊疗档案、疫苗提醒、寄养预约、商品销售一站式',
-      icon: '🐶',
-      downloads: 654,
-      tags: ['宠物', '医疗', '寄养'],
-      published_at: now,
-    },
-    {
-      id: 'cloud-backup-pro',
-      name: '云端备份 Pro',
-      version: '3.1.0',
-      description: 'ProClaw 业务数据云端加密备份,7 天循环,一键恢复',
-      icon: '☁️',
-      downloads: 3210,
-      tags: ['云服务', '备份', '安全'],
-      published_at: now,
-    },
-  ];
-  // 内置插件在「已使用」中,所以商店中只显示推荐插件
-  return recommended;
-}
-
-interface InstalledPluginInfo {
-  plugin_id: string;
-  name: string;
-  version: string;
-  install_path: string;
-  // 可选扩展字段 (pluginLoader 可能返回)
-  installed_at?: string;
-  builtin?: boolean;
-  /** 兼容 Tauri 端 list_installed_plugins 返回的 path 字段 */
-  path?: string;
-  /** 插件大小（字节） */
-  size?: number;
-  manifest: IndustryPluginManifest;
-}
-
 function extractTags(manifest: IndustryPluginManifest | null | undefined): string[] {
   if (!manifest) return [];
   if (manifest.tags && manifest.tags.length > 0) return manifest.tags;
@@ -351,48 +265,33 @@ function extractTags(manifest: IndustryPluginManifest | null | undefined): strin
 
 export default function AiPluginPanel() {
   const [pluginTab, setPluginTab] = useState(0);
-
-  // installed state
-  const [installedPlugins, setInstalledPlugins] = useState<InstalledPluginInfo[]>([]);
-  const [loadingInstalled, setLoadingInstalled] = useState(false);
+  const invalidatePlugins = useInvalidatePlugins();
+  const { data: installedData, isLoading: loadingInstalled } = useInstalledPlugins();
+  const { data: storeItems = [], isLoading: loadingStore } = usePluginStore(pluginTab === 1);
+  const installedPlugins = installedData?.plugins ?? [];
   const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
   const [uninstallConfirm, setUninstallConfirm] = useState<string | null>(null);
-  // 详情弹窗状态：点击插件卡片后弹出，显示 manifest 完整字段
   const [detailPlugin, setDetailPlugin] = useState<InstalledPluginInfo | null>(null);
-
-  // store state
-  const [storeItems, setStoreItems] = useState<StoreCard[]>([]);
-  const [loadingStore, setLoadingStore] = useState(false);
-  const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
   const [category, setCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'downloads' | 'newest'>('downloads');
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
-  const loadInstalled = useCallback(async () => {
-    setLoadingInstalled(true);
-    try {
-      const installed = await pluginLoader.getInstalledPlugins();
-      setInstalledPlugins(installed || []);
-      const statuses = await pluginLoader.getAllPluginEnabledStatuses();
-      const map: Record<string, boolean> = {};
-      for (const s of statuses) map[s.plugin_id] = s.enabled;
-      setEnabledMap(map);
-      const ids = new Set<string>();
-      for (const p of (installed || [])) {
-        if (p.plugin_id) ids.add(p.plugin_id);
-        if (p.id) ids.add(p.id);
-      }
-      setInstalledIds(ids);
-    } catch (err) {
-      console.error('load installed plugins error:', err);
-    } finally {
-      setLoadingInstalled(false);
+  useEffect(() => {
+    if (installedData?.enabledMap) {
+      setEnabledMap(installedData.enabledMap);
     }
-  }, []);
+  }, [installedData?.enabledMap]);
 
-  useEffect(() => { loadInstalled(); }, [loadInstalled]);
+  const installedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of installedPlugins) {
+      if (p.plugin_id) ids.add(p.plugin_id);
+      if (p.id) ids.add(p.id);
+    }
+    return ids;
+  }, [installedPlugins]);
 
   const handleToggleEnabled = async (pluginId: string, enabled: boolean) => {
     const fn = enabled ? pluginLoader.enablePlugin : pluginLoader.disablePlugin;
@@ -407,72 +306,21 @@ export default function AiPluginPanel() {
     try {
       await pluginLoader.uninstallPlugin(pluginId);
       setSnackbar({ message: '已卸载', severity: 'success' });
-      await loadInstalled();
-    } catch (err: any) {
-      setSnackbar({ message: '卸载失败: ' + (err.message || ''), severity: 'error' });
+      await invalidatePlugins();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      setSnackbar({ message: '卸载失败: ' + message, severity: 'error' });
     }
     setUninstallConfirm(null);
   };
 
-  const loadStore = async () => {
-    setLoadingStore(true);
-    try {
-      const [rawInstalled, rawStore] = await Promise.all([
-        pluginLoader.getInstalledPlugins().catch(() => []),
-        PluginManager.getInstance().getStorePlugins(STORE_API_URL).catch(() => []),
-      ]);
-      const installed = new Set<string>();
-      for (const p of rawInstalled) {
-        if (p.plugin_id) installed.add(p.plugin_id);
-        if (p.id) installed.add(p.id);
-      }
-      setInstalledIds(installed);
-
-      // 商店 API 不可达时使用本地兜底列表,保证 UI 永远有内容
-      const sourceList = rawStore.length > 0 ? rawStore : getLocalStoreFallback();
-      const isFallback = rawStore.length === 0;
-      if (isFallback) {
-        console.info('[AiPluginPanel] 商店 API 不可达,使用本地推荐列表');
-      }
-
-      const cards: StoreCard[] = [];
-      for (const item of sourceList) {
-        let manifest: IndustryPluginManifest | null = null;
-        if ((item as any).manifest) manifest = (item as any).manifest;
-        else if ((item as any).manifest_json) {
-          try { manifest = JSON.parse((item as any).manifest_json); } catch { /* ignore */ }
-        }
-        cards.push({
-          id: item.id,
-          name: item.name,
-          version: item.version,
-          description: item.description || '',
-          icon: item.icon || '',
-          downloads: (item as any).downloads || 0,
-          tags: extractTags(manifest),
-          published_at: (item as any).published_at || '',
-        });
-      }
-      setStoreItems(cards);
-    } catch (err) {
-      console.error('load store error:', err);
-      // 极端情况:连 try 都失败时,直接兜底
-      setStoreItems(getLocalStoreFallback());
-    } finally {
-      setLoadingStore(false);
-    }
-  };
-
-  useEffect(() => { if (pluginTab === 1) loadStore(); }, [pluginTab]);
-
-  const handleInstall = async (card: StoreCard) => {
+  const handleInstall = async (card: PluginStoreCard) => {
     setInstallingId(card.id);
-    const url = STORE_API_URL + '/api/plugins/' + card.id + '/download/' + card.version;
+    const url = 'https://flowhub.proclaw.cc/api/plugins/' + card.id + '/download/' + card.version;
     const ok = await pluginLoader.downloadAndInstall(card.id, card.version, url);
     if (ok) {
       setSnackbar({ message: '已安装 ' + card.name, severity: 'success' });
-      await loadStore();
-      await loadInstalled();
+      await invalidatePlugins();
     } else {
       setSnackbar({ message: '安装 ' + card.name + ' 失败', severity: 'error' });
     }

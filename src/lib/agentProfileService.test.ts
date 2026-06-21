@@ -4,6 +4,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('./tauri', () => ({
   isTauri: () => false,
   safeInvoke: async () => null,
+  ipcInvokeOrNull: async () => null,
+  ipcInvoke: async () => { throw new Error('Tauri required'); },
+  openExternalUrl: vi.fn(),
 }));
 
 import {

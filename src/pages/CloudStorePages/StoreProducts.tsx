@@ -44,7 +44,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ProductSPU } from '../../lib/productService';
 import { isTauri } from '../../lib/tauri';
-import { getCloudStore, getSyncableProducts, syncAllProducts, syncIncremental, toggleProductVisible, SyncStatus, CloudStore } from '../../lib/cloudStoreService';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCloudStore, useInvalidateCloudStore, useSyncableProducts, cloudStoreQueryKey } from '../../lib/hooks/useCloudStore';
+import { syncAllProducts, syncIncremental, toggleProductVisible, SyncStatus } from '../../lib/cloudStoreService';
 import {
   searchProductImages,
   searchBatchProductImages,
@@ -75,10 +77,23 @@ interface StoreProductsProps {
 type SyncFilter = 'all' | 'synced' | 'pending' | 'failed';
 
 export default function StoreProducts({
-  loading, setLoading, setError, setSuccessMessage,
+  loading: _parentLoading, setLoading, setError, setSuccessMessage,
 }: StoreProductsProps) {
-  const [store, setStore] = useState<CloudStore | null>(null);
-  const [products, setProducts] = useState<ProductSPU[]>([]);
+  const { data: store } = useCloudStore();
+  const queryClient = useQueryClient();
+  const {
+    data: products = [],
+    isLoading: productsLoading,
+    refetch: refetchProducts,
+  } = useSyncableProducts();
+  const invalidateCloudStore = useInvalidateCloudStore();
+
+  const updateProductsCache = (updater: (prev: ProductSPU[]) => ProductSPU[]) => {
+    queryClient.setQueryData<ProductSPU[]>(
+      [...cloudStoreQueryKey, 'syncableProducts'],
+      (old) => updater(old ?? []),
+    );
+  };
   const [search, setSearch] = useState('');
   const [syncFilter, setSyncFilter] = useState<SyncFilter>('all');
   const [syncing, setSyncing] = useState(false);
@@ -113,31 +128,14 @@ export default function StoreProducts({
     );
   }, []);
 
-  const loadStore = async () => {
-    try {
-      const storeData = await getCloudStore();
-      setStore(storeData);
-    } catch (err) {
-      console.error('加载商城信息失败:', err);
-    }
-  };
-
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      const data = await getSyncableProducts();
-      setProducts(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载商品失败');
-    } finally {
-      setLoading(false);
-    }
+  const loadProducts = () => {
+    invalidateCloudStore();
+    refetchProducts();
   };
 
   useEffect(() => {
-    loadStore();
-    loadProducts();
-  }, []);
+    setLoading(productsLoading);
+  }, [productsLoading, setLoading]);
 
   const handleToggleVisible = async (spu: ProductSPU) => {
     try {
@@ -193,7 +191,7 @@ export default function StoreProducts({
   };
 
   const applyProductImage = (spuId: string, dataUrl: string) => {
-    setProducts(prev => prev.map(p =>
+    updateProductsCache(prev => prev.map(p =>
       p.id === spuId
         ? { ...p, images: [{ id: `img_${Date.now()}`, spu_id: spuId, image_url: dataUrl, image_type: 'main' as const, sort_order: 1 }] }
         : p
@@ -341,7 +339,7 @@ export default function StoreProducts({
       if (results.length > 0 && results[0].source !== 'fallback') {
         try {
           const dataUrl = await downloadImageAsDataUrl(results[0].medium);
-          setProducts(prev => prev.map(p =>
+          updateProductsCache(prev => prev.map(p =>
             p.id === spuId
               ? { ...p, images: [{ id: `img_${Date.now()}`, spu_id: spuId, image_url: dataUrl, image_type: 'main' as const, sort_order: 1 }] }
               : p
@@ -467,7 +465,7 @@ export default function StoreProducts({
         <Button variant="outlined" startIcon={<SyncIcon />} onClick={handleSyncIncremental} disabled={syncing}>
           增量同步
         </Button>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadProducts} disabled={loading}>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadProducts} disabled={productsLoading}>
           刷新
         </Button>
       </Paper>
@@ -492,7 +490,7 @@ export default function StoreProducts({
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {productsLoading ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                     <CircularProgress />
@@ -983,7 +981,7 @@ export default function StoreProducts({
                               onClick={async () => {
                                 try {
                                   const dataUrl = await downloadImageAsDataUrl(result.medium);
-                                  setProducts(prev => prev.map(p =>
+                                  updateProductsCache(prev => prev.map(p =>
                                     p.id === spuId
                                       ? { ...p, images: [{ id: `img_${Date.now()}`, spu_id: spuId, image_url: dataUrl, image_type: 'main' as const, sort_order: 1 }] }
                                       : p

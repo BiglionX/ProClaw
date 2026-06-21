@@ -1,7 +1,7 @@
 // ProClaw Cloud 云备份前端服务
 // 封装 Tauri invoke 调用
 
-import { invoke } from '@tauri-apps/api/core';
+import { ipcInvoke as invoke } from './tauri';
 
 export interface BackupJob {
   id: string;

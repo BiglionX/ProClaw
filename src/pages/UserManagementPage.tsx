@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -34,29 +34,25 @@ import {
   QrCode as QrCodeIcon,
 } from '@mui/icons-material';
 import { QRCodeCanvas } from 'qrcode.react';
+import { useUsersAndRoles, useInvalidateUsers } from '../lib/hooks/useUsers';
+import {
+  createEmployeeInvitation,
+  createManagedUser,
+  deleteManagedUser,
+  updateManagedUser,
+  type ManagedUser,
+  type ManagedRole,
+} from '../lib/userManagementService';
 
-interface User {
-  id: string;
-  name: string;
-  phone?: string;
-  email?: string;
-  user_type: 'internal' | 'external';
-  external_type?: 'customer' | 'supplier' | 'both';
-  roles: string[];
-  created_at: string;
-}
-
-interface Role {
-  id: number;
-  name: string;
-  description?: string;
-  permissions: string[];
-}
+type User = ManagedUser;
+type Role = ManagedRole;
 
 const UserManagementPage: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const { data, isLoading: loading, refetch } = useUsersAndRoles();
+  const invalidateUsers = useInvalidateUsers();
+  const users = data?.users ?? [];
+  const roles = data?.roles ?? [];
+  const [saving, setSaving] = useState(false);
   const [openDialog, setOpenDialog] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   
@@ -98,52 +94,11 @@ const UserManagementPage: React.FC = () => {
     role_ids: number[];
   } | null>(null);
 
-  // 加载用户和角色数据
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // 模拟API调用
-      // const usersResponse = await apiClient.get('/api/users');
-      // const rolesResponse = await apiClient.get('/api/roles');
-      
-      // 模拟数据
-      setUsers([
-        {
-          id: '1',
-          name: '管理员',
-          phone: '13800138000',
-          email: 'admin@proclaw.com',
-          user_type: 'internal',
-          roles: ['admin'],
-          created_at: '2024-01-01',
-        },
-        {
-          id: '2',
-          name: '张三',
-          phone: '13900139000',
-          user_type: 'internal',
-          roles: ['sales'],
-          created_at: '2024-01-15',
-        },
-      ]);
-
-      setRoles([
-        { id: 1, name: 'admin', description: '管理员', permissions: ['*'] },
-        { id: 2, name: 'sales', description: '销售员', permissions: ['sales_order:create', 'sales_order:read'] },
-        { id: 3, name: 'warehouse', description: '仓库员', permissions: ['inventory:read', 'inventory:update'] },
-        { id: 4, name: 'finance', description: '财务', permissions: ['finance:read', 'report:read'] },
-      ]);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-      showSnackbar('数据加载失败', 'error');
-    } finally {
-      setLoading(false);
-    }
+  // 加载用户和角色数据（React Query 自动加载）
+  const loadData = () => {
+    invalidateUsers();
+    refetch();
   };
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -180,44 +135,54 @@ const UserManagementPage: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!formData.name.trim()) {
+      showSnackbar('请输入姓名', 'error');
+      return;
+    }
+
+    setSaving(true);
     try {
-      setLoading(true);
-      
       if (editingUser) {
-        // 更新用户
-        // await apiClient.put(`/api/users/${editingUser.id}`, formData);
+        await updateManagedUser(editingUser.id, {
+          name: formData.name.trim(),
+          phone: formData.phone.trim() || undefined,
+          email: formData.email.trim() || undefined,
+          roles: formData.roles,
+        });
         showSnackbar('用户更新成功', 'success');
       } else {
-        // 创建用户
-        // await apiClient.post('/api/users`, formData);
+        await createManagedUser({
+          name: formData.name.trim(),
+          phone: formData.phone.trim() || undefined,
+          email: formData.email.trim() || undefined,
+          user_type: formData.user_type,
+          roles: formData.roles,
+        });
         showSnackbar('用户创建成功', 'success');
       }
-      
+
       handleCloseDialog();
       loadData();
     } catch (error) {
       console.error('Failed to save user:', error);
-      showSnackbar('保存失败', 'error');
+      showSnackbar(error instanceof Error ? error.message : '保存失败', 'error');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (_userId: string) => {
+  const handleDelete = async (userId: string) => {
     if (!window.confirm('确定要删除此用户吗？')) {
       return;
     }
 
     try {
-      setLoading(true);
-      // await apiClient.delete(`/api/users/${userId}`);
+      await deleteManagedUser(userId);
       showSnackbar('用户删除成功', 'success');
       loadData();
     } catch (error) {
       console.error('Failed to delete user:', error);
-      showSnackbar('删除失败', 'error');
-    } finally {
-      setLoading(false);
+      showSnackbar(error instanceof Error ? error.message : '删除失败', 'error');
     }
   };
 
@@ -251,19 +216,10 @@ const UserManagementPage: React.FC = () => {
 
     setInviteLoading(true);
     try {
-      const response = await fetch('/api/invitations/create_employee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role_ids: inviteRoles,
-          target_phone: invitePhone || null,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || '创建邀请失败');
-      }
+      const data = await createEmployeeInvitation(
+        inviteRoles,
+        invitePhone.trim() || undefined,
+      );
 
       setInviteResult({
         invite_code: data.invite_code,
@@ -271,9 +227,9 @@ const UserManagementPage: React.FC = () => {
         role_ids: data.role_ids,
       });
       showSnackbar('邀请已生成', 'success');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create invitation:', error);
-      showSnackbar(error.message || '创建邀请失败', 'error');
+      showSnackbar(error instanceof Error ? error.message : '创建邀请失败', 'error');
     } finally {
       setInviteLoading(false);
     }
@@ -339,7 +295,20 @@ const UserManagementPage: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map((user) => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <CircularProgress size={28} />
+                </TableCell>
+              </TableRow>
+            ) : users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                  暂无用户
+                </TableCell>
+              </TableRow>
+            ) : (
+            users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
                   <Typography fontWeight={500}>{user.name}</Typography>
@@ -377,7 +346,8 @@ const UserManagementPage: React.FC = () => {
                   </Tooltip>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -465,8 +435,8 @@ const UserManagementPage: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>取消</Button>
-          <Button onClick={handleSave} variant="contained" disabled={loading}>
-            {loading ? '保存中...' : '保存'}
+          <Button onClick={handleSave} variant="contained" disabled={saving}>
+            {saving ? '保存中...' : '保存'}
           </Button>
         </DialogActions>
       </Dialog>

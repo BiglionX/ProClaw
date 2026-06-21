@@ -31,9 +31,11 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Contact, Message, getContacts, getMessages, sendMessage, isAITeamGroupId, getAITeamGroupConfig, getAgentGreeting, parseTeamId, type AITeamGroupConfig } from '../lib/contactService';
+import { Message, sendMessage, isAITeamGroupId, getAITeamGroupConfig, parseTeamId, type AITeamGroupConfig } from '../lib/contactService';
+import { useChatContact, useChatMessages, chatQueryKey } from '../lib/hooks/useChat';
 import { generateGroupChatResponse, type ChatHistoryItem } from '../lib/aiTeamChatService';
 import { OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
 import { getTokenBalance, isDemoAccount } from '../lib/aiTeamTokenService';
@@ -72,10 +74,10 @@ const CEO_COMMANDS = [
 export default function ChatPage() {
   const { contactId } = useParams<{ contactId: string }>();
   const navigate = useNavigate();
-  const [contact, setContact] = useState<Contact | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const queryClient = useQueryClient();
+  const { data: contact = null } = useChatContact(contactId);
+  const { data: messages = [], isLoading: loading } = useChatMessages(contactId);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [aiResponding, setAiResponding] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -98,9 +100,17 @@ export default function ChatPage() {
   // 获取所有聊天上下文的快捷操作
   const quickActions = agentRuntime.getAllQuickActions('chat');
 
-  useEffect(() => {
-    loadData();
-  }, [contactId]);
+  const appendMessage = useCallback(
+    (msg: Message | ((prev: Message[]) => Message[])) => {
+      if (!contactId) return;
+      const key = [...chatQueryKey, 'messages', contactId];
+      queryClient.setQueryData<Message[]>(key, (old) => {
+        const prev = old ?? [];
+        return typeof msg === 'function' ? msg(prev) : [...prev, msg];
+      });
+    },
+    [contactId, queryClient],
+  );
 
   // 加载 Agent 个性化 override（仅对 team 类型联系人有意义）
   useEffect(() => {
@@ -128,38 +138,6 @@ export default function ChatPage() {
     return () => unsubscribe();
   }, [contactId]);
 
-  const loadData = async () => {
-    if (!contactId) return;
-    setLoading(true);
-    try {
-      const contacts = await getContacts();
-      const found = contacts.find(c => c.id === contactId);
-      setContact(found || null);
-
-      const msgs = await getMessages('self', contactId);
-      setMessages(msgs);
-
-      // Agent 主动问候：首次进入 Agent/AI Team 群聊且无历史消息时，
-      // Agent 会主动发一条消息：“老板，有啥吩咐？”
-      if (msgs.length === 0) {
-        const greeting = getAgentGreeting(contactId);
-        if (greeting) {
-          try {
-            const greetingMsg = await sendMessage(greeting.fromUser, contactId, greeting.content);
-            greetingMsg.from_user_name = greeting.fromUserName;
-            setMessages([greetingMsg]);
-          } catch (e) {
-            console.error('发送 Agent 问候失败:', e);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('加载对话失败:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -182,7 +160,7 @@ export default function ChatPage() {
       if (isGroupChat) {
         newMsg.from_user_name = 'Boss 👑';
       }
-      setMessages(prev => [...prev, newMsg]);
+      appendMessage(newMsg);
       scrollToBottom();
 
       // 群聊模式：调用 LLM 让 CEO Agent 自动响应
@@ -231,7 +209,7 @@ export default function ChatPage() {
           const aiMsg = await sendMessage('ceo-agent', contactId, aiResponse.replyContent);
           aiMsg.from_user_name = 'CEO Agent';
           aiMsg.content_type = 'text';
-          setMessages(prev => [...prev, aiMsg]);
+          appendMessage(aiMsg);
 
           // 更新 token 余额
           if (isDemoAccount()) {

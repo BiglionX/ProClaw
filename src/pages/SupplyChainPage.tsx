@@ -44,9 +44,27 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import PaymentDialog from '../components/PaymentDialog';
 import MicroStocktakingPrompt from '../components/Inventory/MicroStocktakingPrompt';
+import {
+  useInventoryDashboard,
+  useInvalidateInventoryDashboard,
+} from '../lib/hooks/useInventoryDashboard';
+import {
+  useInvalidatePurchase,
+  usePurchaseOrders,
+  usePurchaseReturns,
+  useSuppliers,
+} from '../lib/hooks/usePurchase';
+import {
+  useCustomers,
+  useInvalidateSales,
+  useSalesOrders,
+  useSalesReturns,
+  useShippedSalesOrders,
+} from '../lib/hooks/useSales';
+import { useProductSPUs } from '../lib/hooks/useProducts';
 import {
   shouldTriggerPostSalesCalibration,
   shouldTriggerPostPurchaseCalibration,
@@ -55,13 +73,9 @@ import {
 } from '../lib/inventoryCalibrationService';
 import {
   CreateTransactionInput,
-  InventoryStats,
-  InventoryTransaction,
   createInventoryTransaction,
-  getInventoryStats,
-  getInventoryTransactions,
 } from '../lib/inventoryService';
-import { ProductSPU, getProductSPUs } from '../lib/productService';
+import { ProductSPU } from '../lib/productService';
 import {
   CreateSupplierInput,
   PurchaseOrder,
@@ -69,9 +83,7 @@ import {
   Supplier,
   createSupplier,
   createPurchaseOrder,
-  getPurchaseOrders,
   getPurchaseOrderDetail,
-  getSuppliers,
   generateSupplierCode,
   receivePurchaseOrder,
   deletePurchaseOrder,
@@ -85,8 +97,6 @@ import {
   SalesOrderDetail,
   createCustomer,
   createSalesOrder,
-  getCustomers,
-  getSalesOrders,
   getSalesOrderDetail,
   generateCustomerCode,
   submitSalesOrder,
@@ -99,7 +109,6 @@ import {
   PurchaseReturn,
   PurchaseReturnDetail,
   createPurchaseReturn,
-  getPurchaseReturns,
   getPurchaseReturnDetail,
   confirmPurchaseReturn,
   cancelPurchaseReturn,
@@ -108,7 +117,6 @@ import {
   SalesReturn,
   SalesReturnDetail,
   createSalesReturn,
-  getSalesReturns,
   getSalesReturnDetail,
   confirmSalesReturn,
   cancelSalesReturn,
@@ -205,53 +213,42 @@ async function maybePromptPostPurchaseCalibration(
 /* ========== 库存管理 Tab ========== */
 
 function InventoryTab({
-  loading, setLoading, setError, setSuccessMessage,
+  setError, setSuccessMessage,
 }: {
-  loading: boolean; setLoading: (v: boolean) => void;
-  setError: (e: string | null) => void; setSuccessMessage: (e: string | null) => void;
+  setError: (e: string | null) => void;
+  setSuccessMessage: (e: string | null) => void;
 }) {
-  const [stats, setStats] = useState<InventoryStats | null>(null);
-  const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
-  const [products, setProducts] = useState<ProductSPU[]>([]);
+  const invalidateDashboard = useInvalidateInventoryDashboard();
+  const { data, isLoading: loading } = useInventoryDashboard();
+  const stats = data?.stats ?? null;
+  const transactions = data?.transactions ?? [];
+  const products = data?.products ?? [];
+  const [mutating, setMutating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<CreateTransactionInput>({
     product_id: '', transaction_type: 'inbound', quantity: 0, reference_no: '', reason: '', notes: '',
   });
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [statsData, txData, prodData] = await Promise.all([
-        getInventoryStats(), getInventoryTransactions(), getProductSPUs({ limit: 100 }),
-      ]);
-      setStats(statsData);
-      setTransactions(txData);
-      setProducts(prodData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载库存数据失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadData(); }, []);
+  const loadData = () => invalidateDashboard();
 
   const handleSubmit = async () => {
     if (!form.product_id) { setError('请选择产品'); return; }
     if (form.quantity <= 0) { setError('数量必须大于0'); return; }
     try {
-      setLoading(true);
+      setMutating(true);
       await createInventoryTransaction(form);
       setSuccessMessage('库存交易创建成功!');
       setDialogOpen(false);
       setForm({ product_id: '', transaction_type: 'inbound', quantity: 0, reference_no: '', reason: '', notes: '' });
-      loadData();
+      invalidateDashboard();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建交易失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
+
+  const busy = loading || mutating;
 
   return (
     <Box>
@@ -306,10 +303,10 @@ function InventoryTab({
 
       {/* 操作栏 */}
       <Paper elevation={0} sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)} disabled={loading}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)} disabled={busy}>
           新建库存交易
         </Button>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData} disabled={loading}>刷新</Button>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData} disabled={busy}>刷新</Button>
       </Paper>
 
       {/* 交易记录表 */}
@@ -391,7 +388,7 @@ function InventoryTab({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>取消</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={loading}>确认</Button>
+          <Button onClick={handleSubmit} variant="contained" disabled={busy}>确认</Button>
         </DialogActions>
       </Dialog>
     </Box>
@@ -401,65 +398,52 @@ function InventoryTab({
 /* ========== 采购管理 Tab ========== */
 
 function PurchaseTab({
-  loading, setLoading, setError, setSuccessMessage,
+  setError, setSuccessMessage,
 }: {
-  loading: boolean; setLoading: (v: boolean) => void;
-  setError: (e: string | null) => void; setSuccessMessage: (e: string | null) => void;
+  setError: (e: string | null) => void;
+  setSuccessMessage: (e: string | null) => void;
 }) {
+  const invalidatePurchase = useInvalidatePurchase();
   const [subTab, setSubTab] = useState(0);
-  // 供应商
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  // 采购订单
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
-  const [products, setProducts] = useState<ProductSPU[]>([]);
-  // 对话框
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [mutating, setMutating] = useState(false);
+
+  const { data: suppliers = [], isLoading: loadingSuppliers } = useSuppliers(
+    supplierSearchQuery,
+    subTab === 0
+  );
+  const { data: orders = [], isLoading: loadingOrders } = usePurchaseOrders(
+    orderSearchQuery,
+    subTab === 1
+  );
+  const { data: products = [] } = useProductSPUs(100, subTab === 1);
+
+  const loading = loadingSuppliers || loadingOrders || detailLoading || mutating;
+  const loadSuppliers = () => setSupplierSearchQuery(searchTerm);
+  const loadOrders = () => setOrderSearchQuery(orderSearch);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<CreateSupplierInput>({
     name: '', code: generateSupplierCode(), contact_person: '', phone: '', email: '',
     address: '', website: '', payment_terms: '月结30天', tax_number: '', notes: '', is_active: true,
   });
 
-  useEffect(() => { loadSuppliers(); loadOrders(); loadProducts(); }, []);
-
-  const loadProducts = async () => {
-    try {
-      const data = await getProductSPUs({ limit: 100 });
-      setProducts(data);
-    } catch (err) {
-      console.error('加载产品失败', err);
-    }
-  };
-
-  const loadSuppliers = async () => {
-    try {
-      setLoading(true);
-      setSuppliers(await getSuppliers({ search: searchTerm || undefined }));
-    } catch (err) { setError(err instanceof Error ? err.message : '加载供应商失败'); }
-    finally { setLoading(false); }
-  };
-
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      setOrders(await getPurchaseOrders({ search: orderSearch || undefined }));
-    } catch (err) { setError(err instanceof Error ? err.message : '加载采购订单失败'); }
-    finally { setLoading(false); }
-  };
-
   const handleSupplierSubmit = async () => {
     if (!formData.name) { setError('供应商名称不能为空'); return; }
     try {
-      setLoading(true);
+      setMutating(true);
       await createSupplier(formData);
       setSuccessMessage('供应商创建成功!');
       setDialogOpen(false);
       setFormData({ name: '', code: generateSupplierCode(), contact_person: '', phone: '', email: '',
         address: '', website: '', payment_terms: '月结30天', tax_number: '', notes: '', is_active: true });
-      loadSuppliers();
+      invalidatePurchase();
     } catch (err) { setError(err instanceof Error ? err.message : '创建供应商失败'); }
-    finally { setLoading(false); }
+    finally { setMutating(false); }
   };
 
   const openSupplierDialog = () => {
@@ -555,7 +539,7 @@ function PurchaseTab({
       });
       setSuccessMessage(`采购订单 ${result.po_number} 创建成功!`);
       setOrderDialogOpen(false);
-      loadOrders();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建采购订单失败');
     } finally {
@@ -565,7 +549,7 @@ function PurchaseTab({
 
   const loadOrderDetail = async (orderId: string) => {
     try {
-      setLoading(true);
+      setDetailLoading(true);
       const detail = await getPurchaseOrderDetail(orderId);
       setSelectedOrderDetail(detail);
       // 加载付款历史
@@ -576,7 +560,7 @@ function PurchaseTab({
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载订单详情失败');
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
   };
 
@@ -591,25 +575,25 @@ function PurchaseTab({
   // 采购订单状态操作
   const handleConfirmOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await confirmPurchaseOrder(orderId);
       setSuccessMessage('采购订单已确认!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '确认订单失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleReceiveOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await receivePurchaseOrder(orderId);
       setSuccessMessage('收货成功，库存已更新!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidatePurchase();
       // PRD v12.0 灵活库存：进货后检查是否需要微盘点
       if (selectedOrderDetail) {
         await maybePromptPostPurchaseCalibration(selectedOrderDetail, setCalibrationPrompt);
@@ -619,35 +603,35 @@ function PurchaseTab({
     } catch (err) {
       setError(err instanceof Error ? err.message : '收货失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleCancelOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await cancelPurchaseOrder(orderId);
       setSuccessMessage('采购订单已取消!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '取消订单失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await deletePurchaseOrder(orderId);
       setSuccessMessage('采购订单已删除!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除订单失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -787,7 +771,7 @@ function PurchaseTab({
 
       {/* 采购退货 */}
       {subTab === 2 && (
-        <PurchaseReturnTab loading={loading} setLoading={setLoading} setError={setError} setSuccessMessage={setSuccessMessage} />
+        <PurchaseReturnTab setError={setError} setSuccessMessage={setSuccessMessage} />
       )}
 
       {/* 添加供应商对话框 */}
@@ -1041,7 +1025,7 @@ function PurchaseTab({
         currentStock={calibrationPrompt.currentStock}
         onCalibrated={() => {
           setCalibrationPrompt(prev => ({ ...prev, open: false }));
-          loadOrders();
+          invalidatePurchase();
           window.dispatchEvent(new CustomEvent('proclaw:inventory-calibrated'));
         }}
       />
@@ -1052,15 +1036,23 @@ function PurchaseTab({
 /* ========== 采购退货 Tab ========== */
 
 function PurchaseReturnTab({
-  loading, setLoading, setError, setSuccessMessage,
+  setError, setSuccessMessage,
 }: {
-  loading: boolean; setLoading: (v: boolean) => void;
-  setError: (e: string | null) => void; setSuccessMessage: (e: string | null) => void;
+  setError: (e: string | null) => void;
+  setSuccessMessage: (e: string | null) => void;
 }) {
-  const [returns, setReturns] = useState<PurchaseReturn[]>([]);
-  const [orders] = useState<PurchaseOrder[]>([]);
+  const invalidatePurchase = useInvalidatePurchase();
   const [search, setSearch] = useState('');
-  // 创建对话框
+  const [searchQuery, setSearchQuery] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [mutating, setMutating] = useState(false);
+
+  const { data: returns = [], isLoading: loadingReturns } = usePurchaseReturns(searchQuery);
+  const { data: orders = [] } = usePurchaseOrders(undefined, true);
+
+  const loading = loadingReturns || detailLoading || mutating;
+  const loadReturns = () => setSearchQuery(search);
+
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [returnForm, setReturnForm] = useState<{
@@ -1076,15 +1068,8 @@ function PurchaseReturnTab({
     unit_price: number;
     max_quantity?: number;
   }>>([]);
-  // 详情对话框
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<PurchaseReturnDetail | null>(null);
-
-  const loadReturns = async () => {
-    try { setLoading(true); setReturns(await getPurchaseReturns({ search: search || undefined })); }
-    catch (err) { setError(err instanceof Error ? err.message : '加载采购退货单失败'); }
-    finally { setLoading(false); }
-  };
 
   const openCreateDialog = () => {
     setReturnForm({ purchase_order_id: '', return_date: new Date().toISOString().slice(0, 10), reason: '', notes: '' });
@@ -1142,7 +1127,7 @@ function PurchaseReturnTab({
       });
       setSuccessMessage(`采购退货单 ${result.pr_number} 创建成功!`);
       setCreateDialogOpen(false);
-      loadReturns();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建采购退货单失败');
     } finally {
@@ -1152,40 +1137,40 @@ function PurchaseReturnTab({
 
   const loadDetail = async (returnId: string) => {
     try {
-      setLoading(true);
+      setDetailLoading(true);
       const detail = await getPurchaseReturnDetail(returnId);
       setSelectedDetail(detail);
       setDetailDialogOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载退货单详情失败');
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
   };
 
   const handleConfirm = async (returnId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await confirmPurchaseReturn(returnId);
       setSuccessMessage('退货确认成功，库存已扣减!');
-      loadReturns();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '确认退货失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleCancel = async (returnId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await cancelPurchaseReturn(returnId);
       setSuccessMessage('退货单已取消');
-      loadReturns();
+      invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '取消退货单失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -1364,62 +1349,52 @@ function PurchaseReturnTab({
 /* ========== 销售管理 Tab ========== */
 
 function SalesTab({
-  loading, setLoading, setError, setSuccessMessage,
+  setError, setSuccessMessage,
 }: {
-  loading: boolean; setLoading: (v: boolean) => void;
-  setError: (e: string | null) => void; setSuccessMessage: (e: string | null) => void;
+  setError: (e: string | null) => void;
+  setSuccessMessage: (e: string | null) => void;
 }) {
+  const invalidateSales = useInvalidateSales();
   const [subTab, setSubTab] = useState(0);
-  // 客户
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [custSearch, setCustSearch] = useState('');
-  // 销售订单
-  const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
-  // 对话框
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [mutating, setMutating] = useState(false);
+
+  const { data: customers = [], isLoading: loadingCustomers } = useCustomers(
+    customerSearchQuery,
+    subTab === 0
+  );
+  const { data: orders = [], isLoading: loadingOrders } = useSalesOrders(
+    { search: orderSearchQuery },
+    subTab === 1
+  );
+  const { data: products = [] } = useProductSPUs(100, subTab === 1);
+
+  const loading = loadingCustomers || loadingOrders || detailLoading || mutating;
+  const loadCustomers = () => setCustomerSearchQuery(custSearch);
+  const loadOrders = () => setOrderSearchQuery(orderSearch);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<CreateCustomerInput>({
     name: '', code: generateCustomerCode(), contact_person: '', phone: '', email: '',
     address: '', website: '', customer_type: 'company', tax_number: '', credit_limit: 0, notes: '', is_active: true,
   });
 
-  const [products, setProducts] = useState<ProductSPU[]>([]);
-
-  useEffect(() => { loadCustomers(); loadOrders(); loadProducts(); }, []);
-
-  const loadProducts = async () => {
-    try {
-      const data = await getProductSPUs({ limit: 100 });
-      setProducts(data);
-    } catch (err) {
-      console.error('加载产品失败', err);
-    }
-  };
-
-  const loadCustomers = async () => {
-    try { setLoading(true); setCustomers(await getCustomers({ search: custSearch || undefined })); }
-    catch (err) { setError(err instanceof Error ? err.message : '加载客户失败'); }
-    finally { setLoading(false); }
-  };
-
-  const loadOrders = async () => {
-    try { setLoading(true); setOrders(await getSalesOrders({ search: orderSearch || undefined })); }
-    catch (err) { setError(err instanceof Error ? err.message : '加载销售订单失败'); }
-    finally { setLoading(false); }
-  };
-
   const handleSubmit = async () => {
     if (!formData.name) { setError('客户名称不能为空'); return; }
     try {
-      setLoading(true);
+      setMutating(true);
       await createCustomer(formData);
       setSuccessMessage('客户创建成功!');
       setDialogOpen(false);
       setFormData({ name: '', code: generateCustomerCode(), contact_person: '', phone: '', email: '',
         address: '', website: '', customer_type: 'company', tax_number: '', credit_limit: 0, notes: '', is_active: true });
-      loadCustomers();
+      invalidateSales();
     } catch (err) { setError(err instanceof Error ? err.message : '创建客户失败'); }
-    finally { setLoading(false); }
+    finally { setMutating(false); }
   };
 
   const openDialog = () => {
@@ -1519,7 +1494,7 @@ function SalesTab({
       });
       setSuccessMessage(`销售订单 ${result.so_number} 创建成功!`);
       setOrderDialogOpen(false);
-      loadOrders();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建销售订单失败');
     } finally {
@@ -1529,7 +1504,7 @@ function SalesTab({
 
   const loadOrderDetail = async (orderId: string) => {
     try {
-      setLoading(true);
+      setDetailLoading(true);
       const detail = await getSalesOrderDetail(orderId);
       setSelectedOrderDetail(detail);
       // 加载收款历史
@@ -1540,7 +1515,7 @@ function SalesTab({
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载订单详情失败');
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
   };
 
@@ -1554,11 +1529,11 @@ function SalesTab({
   // 销售订单状态操作
   const handleSubmitOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await submitSalesOrder(orderId);
       setSuccessMessage('销售订单已确认出库，库存已扣减!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidateSales();
       // PRD v12.0 灵活库存：检查每个明细商品是否需要微盘点
       if (selectedOrderDetail) {
         await maybePromptPostSalesCalibration(selectedOrderDetail, setCalibrationPrompt);
@@ -1566,63 +1541,63 @@ function SalesTab({
     } catch (err) {
       setError(err instanceof Error ? err.message : '确认出库失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleCancelOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await cancelSalesOrder(orderId);
       setSuccessMessage('销售订单已取消!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '取消订单失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleMarkShipped = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await markSalesShipped(orderId);
       setSuccessMessage('已标记为已发货!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '标记发货失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleMarkDelivered = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await markSalesDelivered(orderId);
       setSuccessMessage('已标记为已送达!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '标记送达失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await deleteSalesOrder(orderId);
       setSuccessMessage('销售订单已删除!');
       setDetailDialogOpen(false);
-      loadOrders();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除订单失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -1763,7 +1738,7 @@ function SalesTab({
 
       {/* 销售退货 */}
       {subTab === 2 && (
-        <SalesReturnTab loading={loading} setLoading={setLoading} setError={setError} setSuccessMessage={setSuccessMessage} />
+        <SalesReturnTab setError={setError} setSuccessMessage={setSuccessMessage} />
       )}
 
       {/* 添加客户对话框 */}
@@ -2031,7 +2006,7 @@ function SalesTab({
         currentStock={calibrationPrompt.currentStock}
         onCalibrated={() => {
           setCalibrationPrompt(prev => ({ ...prev, open: false }));
-          loadOrders();
+          invalidateSales();
           window.dispatchEvent(new CustomEvent('proclaw:inventory-calibrated'));
         }}
       />
@@ -2042,14 +2017,23 @@ function SalesTab({
 /* ========== 销售退货 Tab ========== */
 
 function SalesReturnTab({
-  loading, setLoading, setError, setSuccessMessage,
+  setError, setSuccessMessage,
 }: {
-  loading: boolean; setLoading: (v: boolean) => void;
-  setError: (e: string | null) => void; setSuccessMessage: (e: string | null) => void;
+  setError: (e: string | null) => void;
+  setSuccessMessage: (e: string | null) => void;
 }) {
-  const [returns, setReturns] = useState<SalesReturn[]>([]);
-  const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const invalidateSales = useInvalidateSales();
   const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [mutating, setMutating] = useState(false);
+
+  const { data: returns = [], isLoading: loadingReturns } = useSalesReturns(searchQuery);
+  const { data: orders = [] } = useShippedSalesOrders(true);
+
+  const loading = loadingReturns || detailLoading || mutating;
+  const loadReturns = () => setSearchQuery(search);
+
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [returnForm, setReturnForm] = useState<{
@@ -2067,21 +2051,6 @@ function SalesReturnTab({
   }>>([]);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<SalesReturnDetail | null>(null);
-
-  useEffect(() => { loadReturns(); loadShippedOrders(); }, []);
-
-  const loadReturns = async () => {
-    try { setLoading(true); setReturns(await getSalesReturns({ search: search || undefined })); }
-    catch (err) { setError(err instanceof Error ? err.message : '加载销售退货单失败'); }
-    finally { setLoading(false); }
-  };
-
-  const loadShippedOrders = async () => {
-    try {
-      const allOrders = await getSalesOrders({});
-      setOrders(allOrders.filter(o => o.status === 'confirmed' || o.status === 'shipped' || o.status === 'delivered'));
-    } catch (err) { console.error('加载销售订单失败', err); }
-  };
 
   const openCreateDialog = () => {
     setReturnForm({ sales_order_id: '', return_date: new Date().toISOString().slice(0, 10), reason: '', notes: '' });
@@ -2138,7 +2107,7 @@ function SalesReturnTab({
       });
       setSuccessMessage(`销售退货单 ${result.sr_number} 创建成功!`);
       setCreateDialogOpen(false);
-      loadReturns();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建销售退货单失败');
     } finally {
@@ -2148,40 +2117,40 @@ function SalesReturnTab({
 
   const loadDetail = async (returnId: string) => {
     try {
-      setLoading(true);
+      setDetailLoading(true);
       const detail = await getSalesReturnDetail(returnId);
       setSelectedDetail(detail);
       setDetailDialogOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载退货单详情失败');
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
   };
 
   const handleConfirm = async (returnId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await confirmSalesReturn(returnId);
       setSuccessMessage('退货确认成功，库存已恢复!');
-      loadReturns();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '确认退货失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
   const handleCancel = async (returnId: string) => {
     try {
-      setLoading(true);
+      setMutating(true);
       await cancelSalesReturn(returnId);
       setSuccessMessage('退货单已取消');
-      loadReturns();
+      invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '取消退货单失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -2361,7 +2330,6 @@ function SalesReturnTab({
 
 export default function SupplyChainPage() {
   const [tabValue, setTabValue] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -2440,9 +2408,9 @@ export default function SupplyChainPage() {
         </Tabs>
       </Paper>
 
-      {tabValue === 0 && <InventoryTab loading={loading} setLoading={setLoading} setError={setError} setSuccessMessage={setSuccessMessage} />}
-      {tabValue === 1 && <PurchaseTab loading={loading} setLoading={setLoading} setError={setError} setSuccessMessage={setSuccessMessage} />}
-      {tabValue === 2 && <SalesTab loading={loading} setLoading={setLoading} setError={setError} setSuccessMessage={setSuccessMessage} />}
+      {tabValue === 0 && <InventoryTab setError={setError} setSuccessMessage={setSuccessMessage} />}
+      {tabValue === 1 && <PurchaseTab setError={setError} setSuccessMessage={setSuccessMessage} />}
+      {tabValue === 2 && <SalesTab setError={setError} setSuccessMessage={setSuccessMessage} />}
 
       {/* 共享错误提示 */}
       <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>

@@ -34,6 +34,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, getBrands } from '../lib/brandService';
 import { Category, getCategories } from '../lib/categoryService';
 import { uploadImage } from '../lib/imageService';
@@ -69,11 +70,19 @@ export default function ProductsPage() {
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
 
   // ==================== 原有状态 ====================
-  const [products, setProducts] = useState<ProductType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedBrand, setSelectedBrand] = useState<string>('');
+  const { data: products = [], isLoading: loading, refetch: refetchProducts } = useQuery({
+    queryKey: ['products', searchTerm, selectedCategory, selectedBrand],
+    queryFn: () => getProducts({
+      limit: 100,
+      search: searchTerm || undefined,
+      category_id: selectedCategory || undefined,
+      brand_id: selectedBrand || undefined,
+    }),
+  });
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -96,24 +105,10 @@ export default function ProductsPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [mutating, setMutating] = useState(false);
 
-  // 加载产品列表
   const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const data = await getProducts({
-        limit: 100,
-        search: searchTerm || undefined,
-        category_id: selectedCategory || undefined,
-        brand_id: selectedBrand || undefined,
-      });
-      setProducts(data);
-    } catch (err: any) {
-      setError(err.message || '加载产品列表失败');
-      console.error('Failed to load products:', err);
-    } finally {
-      setLoading(false);
-    }
+    await refetchProducts();
   };
 
   // 加载分类和品牌
@@ -139,17 +134,13 @@ export default function ProductsPage() {
       }
     };
 
-    loadProducts();
     loadFilters();
     initMode();
   }, []);
 
-  // 监听演示数据引导完成 / 产品变更事件，自动刷新产品列表
-  // 修复：演示账号登录后 bootstrap 异步注入 20 个 iPhone 电池 SPU，
-  // 如果 ProductsPage 先于 bootstrap 完成首次加载，会出现空表不刷新的问题。
   useEffect(() => {
     const refreshOnBootstrap = () => {
-      loadProducts();
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       loadFilters();
     };
     window.addEventListener('proclaw:demo-bootstrapped', refreshOnBootstrap);
@@ -160,12 +151,7 @@ export default function ProductsPage() {
     };
   }, []);
 
-  // 当筛选条件改变时重新加载
-  useEffect(() => {
-    if (categories.length > 0 || brands.length > 0) {
-      loadProducts();
-    }
-  }, [selectedCategory, selectedBrand]);
+  // 筛选条件变化时 React Query 自动 refetch（queryKey 已包含筛选字段）
 
   // 打开新建/编辑对话框
   const handleOpenDialog = (product?: ProductType) => {
@@ -275,7 +261,7 @@ export default function ProductsPage() {
   // 保存产品
   const handleSave = async () => {
     try {
-      setLoading(true);
+      setMutating(true);
 
       let imageUrl = editingProduct?.image_url || undefined;
 
@@ -296,7 +282,7 @@ export default function ProductsPage() {
           }
         } catch (err) {
           setError('图片上传失败');
-          setLoading(false);
+          setMutating(false);
           return;
         }
       }
@@ -319,7 +305,7 @@ export default function ProductsPage() {
     } catch (err: any) {
       setError(err.message || '保存失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -328,7 +314,7 @@ export default function ProductsPage() {
     if (!confirm('确定要删除这个产品吗?')) return;
 
     try {
-      setLoading(true);
+      setMutating(true);
       await deleteProduct(id);
       setSuccessMessage('产品已删除');
       await loadProducts();
@@ -336,7 +322,7 @@ export default function ProductsPage() {
     } catch (err: any) {
       setError(err.message || '删除失败');
     } finally {
-      setLoading(false);
+      setMutating(false);
     }
   };
 
@@ -583,7 +569,7 @@ export default function ProductsPage() {
             loadProducts();
             loadFilters();
           }}
-          disabled={loading}
+          disabled={loading || mutating}
         >
           刷新
         </Button>
@@ -986,8 +972,8 @@ export default function ProductsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenDialog(false)}>取消</Button>
-          <Button onClick={handleSave} variant="contained" disabled={loading}>
-            {loading ? <CircularProgress size={20} /> : '保存'}
+          <Button onClick={handleSave} variant="contained" disabled={loading || mutating}>
+            {loading || mutating ? <CircularProgress size={20} /> : '保存'}
           </Button>
         </DialogActions>
       </Dialog>

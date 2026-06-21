@@ -36,19 +36,15 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { useInventoryDashboard, useInvalidateInventoryDashboard } from '../lib/hooks/useInventoryDashboard';
 import {
   CreateTransactionInput,
   InventoryStats,
   InventoryTransaction,
   createInventoryTransaction,
-  getInventoryStats,
-  getInventoryTransactions,
 } from '../lib/inventoryService';
-import { ProductSPU, getProductSPUs } from '../lib/productService';
-import {
-  StockConfidenceInfo,
-  getLowConfidenceProducts,
-} from '../lib/inventoryCalibrationService';
+import { ProductSPU } from '../lib/productService';
+import { StockConfidenceInfo } from '../lib/inventoryCalibrationService';
 import StockCalibrationDialog from '../components/Inventory/StockCalibrationDialog';
 import {
   CreateSupplierInput,
@@ -153,6 +149,10 @@ export default function InventoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const { data: dashboardData, refetch: refetchDashboard } =
+    useInventoryDashboard(tabValue === 0);
+  const invalidateDashboard = useInvalidateInventoryDashboard();
+
   // 库存交易对话框状态
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
   const [transactionForm, setTransactionForm] =
@@ -165,31 +165,17 @@ export default function InventoryPage() {
       notes: '',
     });
 
-  // 加载数据
+  // 同步 React Query 库存仪表盘数据到本地 state（兼容现有渲染逻辑）
+  useEffect(() => {
+    if (!dashboardData) return;
+    setStats(dashboardData.stats);
+    setTransactions(dashboardData.transactions);
+    setProducts(dashboardData.products);
+    setLowConfidence(dashboardData.lowConfidence);
+  }, [dashboardData]);
+
   const loadInventoryData = async () => {
-    try {
-      setLoading(true);
-      const [statsData, transactionsData, productsData] = await Promise.all([
-        getInventoryStats(),
-        getInventoryTransactions(),
-        getProductSPUs({ limit: 100 }),
-      ]);
-      setStats(statsData);
-      setTransactions(transactionsData);
-      setProducts(productsData);
-      // 加载低置信度商品（PRD v12.0）
-      try {
-        const lc = await getLowConfidenceProducts();
-        setLowConfidence(lc);
-      } catch {
-        // 非阻塞：即使获取失败也不影响主流程
-        setLowConfidence([]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载库存数据失败');
-    } finally {
-      setLoading(false);
-    }
+    await refetchDashboard();
   };
 
   const loadSuppliers = async () => {
@@ -226,10 +212,9 @@ export default function InventoryPage() {
     }
   }, [tabValue]);
 
-  // 监听全局库存变更事件（PRD v12.0 灵活库存）
   useEffect(() => {
     const handler = () => {
-      if (tabValue === 0) loadInventoryData();
+      if (tabValue === 0) invalidateDashboard();
     };
     window.addEventListener('proclaw:inventory-calibrated', handler);
     window.addEventListener('proclaw:products-changed', handler);
@@ -237,7 +222,7 @@ export default function InventoryPage() {
       window.removeEventListener('proclaw:inventory-calibrated', handler);
       window.removeEventListener('proclaw:products-changed', handler);
     };
-  }, [tabValue]);
+  }, [tabValue, invalidateDashboard]);
 
   // Tab 切换处理
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {

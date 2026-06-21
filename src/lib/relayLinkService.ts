@@ -13,7 +13,6 @@
  */
 
 import { supabase, isSupabaseConfigured } from './supabase';
-import { safeInvoke, isTauri } from './tauri';
 
 // ==================== 类型定义 ====================
 
@@ -82,7 +81,7 @@ async function subscribeChannel(
   channel: string,
   onMessage: (msg: RelayMessage) => void
 ): Promise<() => void> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured) {
     console.warn('[RelayLinkService] Supabase 未配置，无法订阅');
     return () => {};
   }
@@ -146,7 +145,7 @@ function scheduleReconnect(channel: string, onMessage: (msg: RelayMessage) => vo
  * 发布消息到 channel
  */
 async function publishMessage(msg: RelayMessage): Promise<boolean> {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured) {
     console.warn('[RelayLinkService] Supabase 未配置，无法发布');
     return false;
   }
@@ -166,7 +165,7 @@ async function publishMessage(msg: RelayMessage): Promise<boolean> {
             timestamp: msg.timestamp,
           },
         },
-        (response) => {
+        (response: { error?: unknown } | null) => {
           clearTimeout(timer);
           resolve(!!response);
         }
@@ -295,7 +294,7 @@ async function detectConnectionMode(
   }
 
   // 2. 检测 Supabase 中继
-  if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured) {
     try {
       // 简单 ping
       const { error } = await supabase.from('relay_health').select('*').limit(1);
@@ -364,7 +363,7 @@ export const relayLinkService = {
     }
 
     // 尝试中继发布
-    if (isSupabaseConfigured()) {
+    if (isSupabaseConfigured) {
       const ok = await publishMessage({
         id: `relay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         channel,

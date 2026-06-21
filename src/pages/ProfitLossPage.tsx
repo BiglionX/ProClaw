@@ -9,27 +9,12 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
-import {
-  getProfitLossReport,
-  type ProfitLossReport,
-} from '../lib/financeService';
+import { useProfitLossReport } from '../lib/hooks/useFinance';
 
 const formatCurrency = (value: number) => `¥${value.toFixed(2)}`;
 
 export default function ProfitLossPage() {
-  const [profitLoss, setProfitLoss] = useState<ProfitLossReport | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const endDate = now.toISOString().split('T')[0];
-    getProfitLossReport(startDate, endDate)
-      .then(setProfitLoss)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: profitLoss, isLoading: loading } = useProfitLossReport();
 
   if (loading) {
     return (
@@ -81,7 +66,7 @@ export default function ProfitLossPage() {
                     <Typography sx={{ color: '#EF4444', fontWeight: 600, fontSize: '0.875rem' }}>-{formatCurrency(profitLoss.operating_expenses)}</Typography>
                   </TableCell>
                 </TableRow>
-                <TableRow sx={{ bgcolor: 'rgba(99,102,241,0.04)' }}>
+                <TableRow sx={{ bgcolor: 'action.hover' }}>
                   <TableCell><Typography sx={{ fontWeight: 700, fontSize: '0.875rem' }}>净利润</Typography></TableCell>
                   <TableCell align="right">
                     <Typography sx={{
@@ -92,25 +77,12 @@ export default function ProfitLossPage() {
                     </Typography>
                   </TableCell>
                 </TableRow>
-                <TableRow>
-                  <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>利润率</Typography></TableCell>
-                  <TableCell align="right">
-                    <Typography sx={{
-                      fontWeight: 600, fontSize: '0.875rem',
-                      color: profitLoss.profit_margin >= 20 ? '#10B981' : profitLoss.profit_margin >= 10 ? '#F59E0B' : '#EF4444'
-                    }}>
-                      {profitLoss.profit_margin.toFixed(2)}%
-                    </Typography>
-                  </TableCell>
-                </TableRow>
               </TableBody>
             </Table>
           </TableContainer>
         </Paper>
       ) : (
-        <Paper elevation={0} sx={{ p: 4, borderRadius: 2, border: '1px solid', borderColor: 'divider', textAlign: 'center' }}>
-          <Typography color="text.secondary">暂无利润数据</Typography>
-        </Paper>
+        <Typography color="text.secondary">暂无数据</Typography>
       )}
     </Box>
   );

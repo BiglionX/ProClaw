@@ -9,27 +9,12 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
-import {
-  getCashFlowReport,
-  type CashFlowReport,
-} from '../lib/financeService';
+import { useCashFlowReport } from '../lib/hooks/useFinance';
 
 const formatCurrency = (value: number) => `¥${value.toFixed(2)}`;
 
 export default function CashFlowPage() {
-  const [cashFlow, setCashFlow] = useState<CashFlowReport | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const endDate = now.toISOString().split('T')[0];
-    getCashFlowReport(startDate, endDate)
-      .then(setCashFlow)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: cashFlow, isLoading: loading } = useCashFlowReport();
 
   if (loading) {
     return (
