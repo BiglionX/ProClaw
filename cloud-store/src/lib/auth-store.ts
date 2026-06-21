@@ -1,16 +1,17 @@
-// ProClaw Cloud 托管版 - 认证状态管理 (Zustand)
-// 基于桌面端 src/lib/authStore.ts 适配 Next.js 版本
-
 import { create } from 'zustand';
 import { getSupabaseClient, type User, type Session } from './supabase';
+import { startOidcAuth, exchangeCodeForToken, getUserInfo, logout as oidcLogout } from './oidc-client';
 
 interface AuthState {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
   error: string | null;
+  oidcTokens: { access_token: string; refresh_token: string; id_token: string } | null;
 
   login: (email: string, password: string) => Promise<void>;
+  loginWithOidc: () => Promise<void>;
+  handleOidcCallback: (code: string, state: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -28,6 +29,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   session: null,
   isLoading: false,
   error: null,
+  oidcTokens: null,
 
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
@@ -116,7 +118,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       } = await supabase.auth.getSession();
 
       if (sessionError) {
-        // 会话获取失败，记录错误但继续
         console.error('获取会话失败:', sessionError);
         set({
           user: null,
@@ -140,6 +141,62 @@ export const useAuthStore = create<AuthState>((set) => ({
         error: getErrorMessage(error),
         isLoading: false,
       });
+    }
+  },
+
+  loginWithOidc: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const authUrl = await startOidcAuth();
+      window.location.href = authUrl;
+    } catch (error: unknown) {
+      set({
+        error: getErrorMessage(error),
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  handleOidcCallback: async (code: string, state: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const tokens = await exchangeCodeForToken(code, state);
+      const userInfo = await getUserInfo(tokens.access_token);
+
+      const oidcUser = {
+        id: userInfo.sub,
+        email: userInfo.email || '',
+        created_at: new Date().toISOString(),
+      } as User;
+
+      const oidcSession = {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_in: tokens.expires_in,
+        expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
+        token_type: tokens.token_type,
+        user: oidcUser,
+      } as Session;
+
+      set({
+        user: oidcUser,
+        session: oidcSession,
+        oidcTokens: {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          id_token: tokens.id_token,
+        },
+        isLoading: false,
+      });
+
+      window.location.href = '/app/dashboard';
+    } catch (error: unknown) {
+      set({
+        error: getErrorMessage(error),
+        isLoading: false,
+      });
+      throw error;
     }
   },
 

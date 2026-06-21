@@ -1,11 +1,11 @@
-// ProClaw Shop - 多租户子域名路由中间件
-// 根据子域名自动识别租户并设置上下文
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// 需要跳过路由检查的路径
 const SKIP_PATHS = ['/_next', '/favicon', '/api/health', '/public'];
+const AUTH_PATHS = ['/app', '/dashboard'];
+const OIDC_ISSUER = process.env.NEXT_PUBLIC_OIDC_ISSUER || 'https://account.proclaw.cc';
+const OIDC_CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || 'proclaw_web';
+const OIDC_REDIRECT_URI = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || 'https://app.proclaw.cc/auth/callback';
 
 /**
  * 获取平台主域名列表
@@ -93,12 +93,34 @@ function shouldSkipPath(pathname: string): boolean {
   return SKIP_PATHS.some(prefix => pathname.startsWith(prefix));
 }
 
+function isAuthPath(pathname: string): boolean {
+  return AUTH_PATHS.some(prefix => pathname.startsWith(prefix));
+}
+
+function buildOidcAuthUrl(redirectUri: string): string {
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: OIDC_CLIENT_ID,
+    redirect_uri: redirectUri,
+    scope: 'openid profile email',
+    state: crypto.randomUUID(),
+  });
+  return OIDC_ISSUER + '/oauth/authorize?' + params.toString();
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // 静态资源和特殊路径跳过
   if (shouldSkipPath(pathname)) {
     return NextResponse.next();
+  }
+  
+  if (isAuthPath(pathname)) {
+    const sessionCookie = request.cookies.get('pc_session');
+    if (!sessionCookie) {
+      const authUrl = buildOidcAuthUrl(OIDC_REDIRECT_URI);
+      return NextResponse.redirect(new URL(authUrl, request.url));
+    }
   }
   
   // 路径格式: /shop/[store] 或 /[store] (租户商城)

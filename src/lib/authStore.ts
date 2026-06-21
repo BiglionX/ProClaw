@@ -1,11 +1,9 @@
 import { create } from 'zustand';
 import { Session, supabase, User } from '../lib/supabase';
+import { startOidcAuth, exchangeCodeForToken, getUserInfo, logout as oidcLogout, refreshToken } from './oidc-client';
 
-// 导出 mock 密码，供登录页显示
-// 密码从环境变量读取，生产环境自动失效
 export const MOCK_PASSWORD = import.meta.env.VITE_MOCK_PASSWORD || `mock-${Date.now()}`;
 
-// 模拟账号配置 - 用于快速体验软件功能
 const MOCK_ACCOUNTS = [
   {
     username: 'boss',
@@ -40,9 +38,11 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   loginDialogOpen: boolean;
+  oidcTokens: { access_token: string; refresh_token: string; id_token: string } | null;
 
-  // Actions
   login: (email: string, password: string) => Promise<void>;
+  loginWithOidc: () => Promise<string>;
+  handleOidcCallback: (code: string, state: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -57,6 +57,7 @@ export const useAuthStore = create<AuthState>(set => ({
   isLoading: false,
   error: null,
   loginDialogOpen: false,
+  oidcTokens: null,
 
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
@@ -159,6 +160,63 @@ export const useAuthStore = create<AuthState>(set => ({
         error: error.message || '认证检查失败',
         isLoading: false,
       });
+    }
+  },
+
+  loginWithOidc: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const authUrl = await startOidcAuth();
+      set({ isLoading: false });
+      return authUrl;
+    } catch (error: any) {
+      set({
+        error: error.message || 'OIDC login initialization failed',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  handleOidcCallback: async (code: string, state: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const tokens = await exchangeCodeForToken(code, state);
+      const userInfo = await getUserInfo(tokens.access_token);
+
+      const oidcUser = {
+        id: userInfo.sub,
+        email: userInfo.email || '',
+        role: userInfo.is_admin ? 'admin' : 'user',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as User;
+
+      const oidcSession = {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_in: tokens.expires_in,
+        expires_at: Math.floor(Date.now() / 1000) + tokens.expires_in,
+        token_type: tokens.token_type,
+        user: oidcUser,
+      } as Session;
+
+      set({
+        user: oidcUser,
+        session: oidcSession,
+        oidcTokens: {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          id_token: tokens.id_token,
+        },
+        isLoading: false,
+      });
+    } catch (error: any) {
+      set({
+        error: error.message || 'OIDC callback handling failed',
+        isLoading: false,
+      });
+      throw error;
     }
   },
 

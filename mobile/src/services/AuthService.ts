@@ -4,10 +4,12 @@ import { secureGet, secureSet, secureDelete } from './SecureConfig';
 import { logger } from '../utils/logger';
 import { getErrorMessage } from '../utils/errorUtils';
 import { OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
+import { startOidcAuth, exchangeCodeForToken, getUserInfo, logout as oidcLogout } from './OidcService';
 
 const TOKEN_KEY = 'proclaw_auth_token';
 const REFRESH_TOKEN_KEY = 'proclaw_refresh_token';
 const SERVER_URL_KEY = 'proclaw_server_url';
+const OIDC_ID_TOKEN_KEY = 'proclaw_oidc_id_token';
 
 let apiClient: AxiosInstance | null = null;
 
@@ -214,6 +216,51 @@ export const isDemoMode = async (): Promise<boolean> => {
   return token !== null && token.startsWith('demo_');
 };
 
+export const loginWithOidc = async (): Promise<string> => {
+  try {
+    logger.log('Starting OIDC auth flow');
+    const authUrl = await startOidcAuth();
+    logger.log('OIDC auth URL generated:', authUrl);
+    return authUrl;
+  } catch (error) {
+    logger.error('OIDC login failed:', error);
+    throw error;
+  }
+};
+
+export const handleOidcCallback = async (
+  code: string,
+  state: string
+): Promise<{ token: string; refresh_token: string; user: { name: string; email?: string; is_admin?: boolean } }> => {
+  try {
+    logger.log('Handling OIDC callback');
+    
+    const tokens = await exchangeCodeForToken(code, state);
+    const userInfo = await getUserInfo(tokens.access_token);
+    
+    await saveToken(tokens.access_token);
+    await saveRefreshToken(tokens.refresh_token);
+    await secureSet(OIDC_ID_TOKEN_KEY, tokens.id_token);
+    
+    resetApiClient();
+    
+    logger.log('OIDC login successful, user:', userInfo.email || 'unknown');
+    
+    return {
+      token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      user: {
+        name: userInfo.name || '用户',
+        email: userInfo.email,
+        is_admin: userInfo.is_admin,
+      },
+    };
+  } catch (error) {
+    logger.error('OIDC callback handling failed:', error);
+    throw error;
+  }
+};
+
 export default {
   saveToken,
   loadToken,
@@ -224,4 +271,6 @@ export default {
   pairDevice,
   setDemoMode,
   isDemoMode,
+  loginWithOidc,
+  handleOidcCallback,
 };

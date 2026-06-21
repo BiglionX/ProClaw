@@ -13,13 +13,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
 import { MOCK_PASSWORD } from '../lib/authStore';
+import { open } from '@tauri-apps/api/shell';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, loginWithOidc, isLoading, error, clearError } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isOidcLoading, setIsOidcLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +178,35 @@ export default function LoginPage() {
               sx={{ mb: 2, borderColor: '#666', color: '#666' }}
             >
               ⚡ 一键体验 (boss)
+            </Button>
+
+            <Box sx={{ my: 2, display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ flex: 1, borderBottom: 1, borderColor: 'divider' }}></Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mx: 2 }}>
+                或
+              </Typography>
+              <Box sx={{ flex: 1, borderBottom: 1, borderColor: 'divider' }}></Box>
+            </Box>
+
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              onClick={async () => {
+                try {
+                  setIsOidcLoading(true);
+                  const authUrl = await loginWithOidc();
+                  await open(authUrl);
+                } catch (err) {
+                  console.error('OIDC login failed:', err);
+                } finally {
+                  setIsOidcLoading(false);
+                }
+              }}
+              sx={{ mb: 2, bgcolor: '#0F62FE', '&:hover': { bgcolor: '#0D47A1' } }}
+              disabled={isOidcLoading}
+            >
+              {isOidcLoading ? <CircularProgress size={24} /> : '🔑 使用 ProClaw 账号登录'}
             </Button>
 
             <Box sx={{ textAlign: 'center' }}>
