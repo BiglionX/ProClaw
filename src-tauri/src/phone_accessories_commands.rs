@@ -5,6 +5,53 @@ use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
 
+fn seed_pa_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
+    let model_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM pa_device_models", [], |row| row.get(0))
+        .unwrap_or(0);
+    let now = chrono::Utc::now().to_rfc3339();
+    if model_count == 0 {
+        let models = [
+            ("pa1", "Apple", "iPhone 15 Pro", 2023),
+            ("pa2", "Apple", "iPhone 14", 2022),
+            ("pa3", "Huawei", "Mate 60 Pro", 2023),
+        ];
+        for (id, brand, model, year) in models {
+            conn.execute(
+                "INSERT OR IGNORE INTO pa_device_models (id, brand, model_name, release_year, is_active, created_at)
+                 VALUES (?1, ?2, ?3, ?4, 1, ?5)",
+                params![id, brand, model, year, now],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    let quote_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM pa_quotations", [], |row| row.get(0))
+        .unwrap_or(0);
+    if quote_count > 0 {
+        return Ok(());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO customers (id, name, contact_person, is_active, created_at, updated_at)
+         VALUES ('pa_c1', '华强北配件商行', '陈经理', 1, ?1, ?1)",
+        params![now],
+    )
+    .ok();
+    let quotes = [
+        ("pq1", "pa_c1", "[]", 12800.0, "sent", "2026-07-01"),
+        ("pq2", "pa_c1", "[]", 5600.0, "draft", "2026-07-10"),
+    ];
+    for (id, cust, items, total, status, valid) in quotes {
+        conn.execute(
+            "INSERT OR IGNORE INTO pa_quotations (id, customer_id, items, total_amount, status, valid_until, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![id, cust, items, total, status, valid, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn pa_get_device_models(
     db: tauri::State<Mutex<Database>>,
@@ -12,6 +59,7 @@ pub fn pa_get_device_models(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_pa_demo_if_empty(&conn)?;
     let models: Vec<Value>;
     if let Some(ref b) = brand {
         models = {
@@ -54,6 +102,8 @@ pub fn pa_get_quotations(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_pa_demo_if_empty(&conn)?;
+
     let quotations: Vec<Value>;
     if let Some(ref cid) = customer_id {
         quotations = {

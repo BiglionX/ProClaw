@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, Button, IconButton, Chip,
   TextField, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -14,6 +14,7 @@ import {
   Coffee as CoffeeIcon, LunchDining as FoodIcon,
   LocalBar as DrinkIcon, SetMeal as SetMealIcon,
 } from '@mui/icons-material';
+import { safeInvoke } from '../../lib/tauri';
 
 // ============ 类型定义 ============
 interface MenuItem {
@@ -44,15 +45,14 @@ interface Category {
 }
 
 // ============ 模拟数据 ============
-const MOCK_CATEGORIES: Category[] = [
-  { id: 'all', name: '全部', icon: 'all' },
-  { id: 'cat_hotpot', name: '火锅', icon: 'hotpot' },
-  { id: 'cat_appetizer', name: '凉菜', icon: 'appetizer' },
-  { id: 'cat_main', name: '热菜', icon: 'main' },
-  { id: 'cat_drink', name: '饮品', icon: 'drink' },
-  { id: 'cat_dessert', name: '甜品', icon: 'dessert' },
-  { id: 'cat_rice', name: '主食', icon: 'rice' },
-];
+const CATEGORY_LABELS: Record<string, string> = {
+  cat_hotpot: '火锅',
+  cat_appetizer: '凉菜',
+  cat_main: '热菜',
+  cat_drink: '饮品',
+  cat_dessert: '甜品',
+  cat_rice: '主食',
+};
 
 const MOCK_MENU_ITEMS: MenuItem[] = [
   { id: 'm1', category_id: 'cat_hotpot', name: '麻辣锅底', price: 68, is_available: true },
@@ -204,9 +204,75 @@ export default function PosPage() {
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [orderHistory, setOrderHistory] = useState<{ id: string; table: string; total: number; method: string; time: string }[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(MOCK_MENU_ITEMS);
+  const [tables, setTables] = useState<PosTable[]>(MOCK_TABLES);
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      const [menuRes, tableRes] = await Promise.all([
+        safeInvoke<{ data?: Array<Record<string, unknown>> }>('catering_get_menu_items', {}),
+        safeInvoke<{ data?: Array<Record<string, unknown>> }>('catering_get_tables', {}),
+      ]);
+      const items = menuRes?.data ?? [];
+      if (items.length > 0) {
+        setMenuItems(items.map((row) => ({
+          id: String(row.id ?? ''),
+          category_id: String(row.category_id ?? ''),
+          name: String(row.name ?? ''),
+          price: Number(row.price ?? 0),
+          is_available: row.is_available !== false,
+        })));
+      }
+      const tableRows = tableRes?.data ?? [];
+      if (tableRows.length > 0) {
+        setTables(tableRows.map((row) => ({
+          id: String(row.id ?? ''),
+          area: String(row.area ?? ''),
+          name: String(row.name ?? ''),
+          capacity: Number(row.capacity ?? 0),
+          status: (String(row.status ?? 'vacant') as PosTable['status']),
+        })));
+      }
+    } catch {
+      /* keep MOCK in browser dev */
+    }
+  }, []);
+
+  const loadOrderHistory = useCallback(async () => {
+    try {
+      const res = await safeInvoke<{ data?: Array<Record<string, unknown>> }>('catering_get_pos_orders', {});
+      const rows = res?.data ?? [];
+      setOrderHistory(rows.map((o) => ({
+        id: String(o.id ?? ''),
+        table: String(o.table_id ?? 'takeout'),
+        total: Number(o.total_amount ?? 0),
+        method: String(o.payment_method ?? '-'),
+        time: String(o.created_at ?? ''),
+      })));
+    } catch {
+      /* keep local state in browser dev */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCatalog();
+    loadOrderHistory();
+  }, [loadCatalog, loadOrderHistory]);
+
+  const categories = useMemo(() => {
+    const ids = [...new Set(menuItems.map((item) => item.category_id))];
+    return [
+      { id: 'all', name: '全部', icon: 'all' },
+      ...ids.map((id) => ({
+        id,
+        name: CATEGORY_LABELS[id] ?? id,
+        icon: id.replace('cat_', ''),
+      })),
+    ];
+  }, [menuItems]);
 
   const filteredItems = useMemo(() => {
-    let items = MOCK_MENU_ITEMS.filter((item) => item.is_available);
+    let items = menuItems.filter((item) => item.is_available);
     if (activeCategory !== 'all') {
       items = items.filter((item) => item.category_id === activeCategory);
     }
@@ -215,7 +281,7 @@ export default function PosPage() {
       items = items.filter((item) => item.name.toLowerCase().includes(q));
     }
     return items;
-  }, [activeCategory, searchQuery]);
+  }, [menuItems, activeCategory, searchQuery]);
 
   const cartTotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
@@ -257,27 +323,55 @@ export default function PosPage() {
     setCart([]);
   }
 
-  function handlePayment(method: string, _amount: number) {
-    const order = {
-      id: `ORD${Date.now()}`,
-      table: selectedTable?.name || '外带',
-      total: cartTotal,
-      method,
-      time: new Date().toLocaleString('zh-CN'),
-    };
-    setOrderHistory((prev) => [order, ...prev]);
+  async function handlePayment(method: string, _amount: number) {
+    const items = cart.map((ci) => ({
+      name: ci.menuItem.name,
+      price: ci.menuItem.price,
+      quantity: ci.quantity,
+    }));
+    try {
+      const created = await safeInvoke<{ id?: string }>('catering_create_pos_order', {
+        tableId: selectedTable?.id ?? 'takeout',
+        items,
+        paymentMethod: method,
+      });
+      if (created?.id) {
+        await safeInvoke('catering_settle_pos_order', {
+          orderId: created.id,
+          paymentMethod: method,
+          amount: cartTotal,
+        });
+        await loadOrderHistory();
+      } else {
+        setOrderHistory((prev) => [{
+          id: `ORD${Date.now()}`,
+          table: selectedTable?.name || 'takeout',
+          total: cartTotal,
+          method,
+          time: new Date().toLocaleString('zh-CN'),
+        }, ...prev]);
+      }
+    } catch {
+      setOrderHistory((prev) => [{
+        id: `ORD${Date.now()}`,
+        table: selectedTable?.name || 'takeout',
+        total: cartTotal,
+        method,
+        time: new Date().toLocaleString('zh-CN'),
+      }, ...prev]);
+    }
     setCart([]);
     setPaymentOpen(false);
   }
 
   const groupedByArea = useMemo(() => {
     const groups: Record<string, PosTable[]> = {};
-    MOCK_TABLES.forEach((t) => {
+    tables.forEach((t) => {
       if (!groups[t.area]) groups[t.area] = [];
       groups[t.area].push(t);
     });
     return groups;
-  }, []);
+  }, [tables]);
 
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', bgcolor: '#f5f5f5' }}>
@@ -315,7 +409,7 @@ export default function PosPage() {
           {/* 分类侧栏 */}
           <Paper sx={{ width: 80, overflow: 'auto', borderRadius: 0 }} elevation={1}>
             <List dense disablePadding>
-              {MOCK_CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <ListItem key={cat.id} disablePadding>
                   <ListItemButton
                     selected={activeCategory === cat.id}

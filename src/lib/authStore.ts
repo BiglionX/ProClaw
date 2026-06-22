@@ -1,8 +1,10 @@
 import { create } from 'zustand';
-import { Session, supabase, User } from '../lib/supabase';
-import { startOidcAuth, exchangeCodeForToken, getUserInfo, logout as oidcLogout, refreshToken } from './oidc-client';
+import { Session, supabase, User, isSupabaseConfigured } from '../lib/supabase';
+import { startOidcAuth, exchangeCodeForToken, getUserInfo, logout as oidcLogout } from './oidc-client';
 
 export const MOCK_PASSWORD = import.meta.env.VITE_MOCK_PASSWORD || `mock-${Date.now()}`;
+
+const AUTH_STORAGE_KEY = 'proclaw-auth-session';
 
 const MOCK_ACCOUNTS = [
   {
@@ -31,6 +33,32 @@ const MOCK_ACCOUNTS = [
     } as Session,
   },
 ];
+
+function persistAuth(user: User, session: Session) {
+  try {
+    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user, session }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadPersistedAuth(): { user: User; session: Session } | null {
+  try {
+    const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedAuth() {
+  try {
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 interface AuthState {
   user: User | null;
@@ -62,13 +90,12 @@ export const useAuthStore = create<AuthState>(set => ({
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
-      // 检查是否为模拟账号登录
       const mockAccount = MOCK_ACCOUNTS.find(
         acc => acc.username === email && acc.password === password
       );
 
       if (mockAccount) {
-        // 模拟账号登录成功
+        persistAuth(mockAccount.user, mockAccount.session);
         set({
           user: mockAccount.user,
           session: mockAccount.session,
@@ -77,13 +104,20 @@ export const useAuthStore = create<AuthState>(set => ({
         return;
       }
 
-      // 如果不是模拟账号,尝试真实 Supabase 登录
+      if (!isSupabaseConfigured) {
+        throw new Error('账号或密码错误');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
+
+      if (data.user && data.session) {
+        persistAuth(data.user as User, data.session as Session);
+      }
 
       set({
         user: data.user,
@@ -102,12 +136,20 @@ export const useAuthStore = create<AuthState>(set => ({
   register: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
+      if (!isSupabaseConfigured) {
+        throw new Error('桌面版请使用本地账号登录，云端注册需配置 Supabase');
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
 
       if (error) throw error;
+
+      if (data.user && data.session) {
+        persistAuth(data.user as User, data.session as Session);
+      }
 
       set({
         user: data.user,
@@ -125,34 +167,69 @@ export const useAuthStore = create<AuthState>(set => ({
 
   logout: async () => {
     set({ isLoading: true });
+    const { oidcTokens } = useAuthStore.getState();
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      }
 
+      if (oidcTokens?.refresh_token) {
+        try {
+          await oidcLogout(oidcTokens.refresh_token);
+        } catch {
+          /* ignore OIDC logout errors */
+        }
+      }
+
+      clearPersistedAuth();
       set({
         user: null,
         session: null,
+        oidcTokens: null,
         isLoading: false,
       });
     } catch (error: any) {
+      clearPersistedAuth();
       set({
+        user: null,
+        session: null,
+        oidcTokens: null,
         error: error.message || '登出失败',
         isLoading: false,
       });
-      throw error;
     }
   },
 
   checkAuth: async () => {
     set({ isLoading: true });
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const persisted = loadPersistedAuth();
+      if (persisted) {
+        set({
+          user: persisted.user,
+          session: persisted.session,
+          isLoading: false,
+        });
+        return;
+      }
+
+      if (isSupabaseConfigured) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        set({
+          user: session?.user || null,
+          session: session,
+          isLoading: false,
+        });
+        return;
+      }
 
       set({
-        user: session?.user || null,
-        session: session,
+        user: null,
+        session: null,
         isLoading: false,
       });
     } catch (error: any) {
@@ -200,6 +277,8 @@ export const useAuthStore = create<AuthState>(set => ({
         token_type: tokens.token_type,
         user: oidcUser,
       } as Session;
+
+      persistAuth(oidcUser, oidcSession);
 
       set({
         user: oidcUser,

@@ -12,6 +12,9 @@ pub fn hw_get_spec_templates(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_hw_demo_if_empty(&conn)?;
+    seed_hw_spec_if_empty(&conn, &product_spu_id)?;
+
     let mut stmt = conn.prepare(
         "SELECT id, product_spu_id, spec_type, spec_values, sort_order FROM hw_spec_templates WHERE product_spu_id = ?1 ORDER BY sort_order"
     ).map_err(|e| e.to_string())?;
@@ -75,9 +78,11 @@ pub fn hw_calculate_cutting(
 pub fn hw_get_credit_accounts(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_hw_demo_if_empty(&conn)?;
+
     let mut stmt = conn.prepare(
         "SELECT ca.id, ca.customer_id, c.name as customer_name, ca.credit_limit, ca.current_balance
-         FROM lw_credit_accounts ca LEFT JOIN customers c ON ca.customer_id = c.id ORDER BY ca.current_balance DESC"
+         FROM hw_credit_accounts ca LEFT JOIN customers c ON ca.customer_id = c.id ORDER BY ca.current_balance DESC"
     ).map_err(|e| e.to_string())?;
     let accounts: Vec<Value> = stmt.query_map([], |row| {
         Ok(json!({"id":row.get::<_,String>(0)?,"customer_id":row.get::<_,String>(1)?,"customer_name":row.get::<_,Option<String>>(2)?,"credit_limit":row.get::<_,f64>(3)?,"current_balance":row.get::<_,f64>(4)?}))
@@ -92,6 +97,9 @@ pub fn hw_get_unit_conversions(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_hw_demo_if_empty(&conn)?;
+    seed_hw_unit_conversions_if_empty(&conn, &product_id)?;
+
     let mut stmt = conn.prepare(
         "SELECT id, product_id, base_unit, target_unit, conversion_factor, created_at FROM hw_unit_conversions WHERE product_id = ?1"
     ).map_err(|e| e.to_string())?;
@@ -115,4 +123,104 @@ pub fn hw_add_unit_conversion(
     conn.execute("INSERT INTO hw_unit_conversions (id, product_id, base_unit, target_unit, conversion_factor) VALUES (?1,?2,?3,?4,?5)",
         params![id, product_id, base_unit, target_unit, conversion_factor]).map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "message": "单位转换已添加" }))
+}
+
+fn seed_hw_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM hw_credit_accounts", [], |row| row.get(0))
+        .unwrap_or(0);
+    if count > 0 {
+        return Ok(());
+    }
+    let now = chrono::Utc::now().to_rfc3339();
+    let customers = [
+        ("hw_c1", "建材城五金店", "赵老板"),
+        ("hw_c2", "装修工程队", "刘工"),
+    ];
+    for (id, name, contact) in customers {
+        conn.execute(
+            "INSERT OR IGNORE INTO customers (id, name, contact_person, is_active, created_at, updated_at)
+             VALUES (?1, ?2, ?3, 1, ?4, ?4)",
+            params![id, name, contact, now],
+        )
+        .ok();
+    }
+    let accounts = [
+        ("hca1", "hw_c1", 30000.0, 8600.0),
+        ("hca2", "hw_c2", 50000.0, 15200.0),
+    ];
+    for (id, cust, limit, balance) in accounts {
+        conn.execute(
+            "INSERT OR IGNORE INTO hw_credit_accounts (id, customer_id, credit_limit, current_balance, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, cust, limit, balance, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    let specs = [
+        ("hs1", "hw_spu_demo", "diameter", "[\"M6\",\"M8\",\"M10\",\"M12\"]", 1),
+        ("hs2", "hw_spu_demo", "length", "[\"20mm\",\"30mm\",\"50mm\",\"80mm\"]", 2),
+        ("hs3", "hw_spu_demo", "material", "[\"304不锈钢\",\"镀锌\",\"黄铜\"]", 3),
+    ];
+    for (id, spu, spec_type, values, sort) in specs {
+        conn.execute(
+            "INSERT OR IGNORE INTO hw_spec_templates (id, product_spu_id, spec_type, spec_values, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, spu, spec_type, values, sort],
+        )
+        .ok();
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO hw_unit_conversions (id, product_id, base_unit, target_unit, conversion_factor)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params!["huc1", "hw_prod_demo", "kg", "\u{4ef6}", 0.05],
+    )
+    .ok();
+    Ok(())
+}
+
+fn seed_hw_spec_if_empty(conn: &rusqlite::Connection, product_spu_id: &str) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM hw_spec_templates WHERE product_spu_id = ?1",
+            params![product_spu_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    if count > 0 || product_spu_id != "hw_spu_demo" {
+        return Ok(());
+    }
+    let specs = [
+        ("hs1", "hw_spu_demo", "diameter", "[\"M6\",\"M8\",\"M10\",\"M12\"]", 1),
+        ("hs2", "hw_spu_demo", "length", "[\"20mm\",\"30mm\",\"50mm\",\"80mm\"]", 2),
+    ];
+    for (id, spu, spec_type, values, sort) in specs {
+        conn.execute(
+            "INSERT OR IGNORE INTO hw_spec_templates (id, product_spu_id, spec_type, spec_values, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, spu, spec_type, values, sort],
+        )
+        .ok();
+    }
+    Ok(())
+}
+
+fn seed_hw_unit_conversions_if_empty(conn: &rusqlite::Connection, product_id: &str) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM hw_unit_conversions WHERE product_id = ?1",
+            params![product_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    if count > 0 || product_id != "hw_prod_demo" {
+        return Ok(());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO hw_unit_conversions (id, product_id, base_unit, target_unit, conversion_factor)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params!["huc1", "hw_prod_demo", "kg", "\u{4ef6}", 0.05],
+    )
+    .ok();
+    Ok(())
 }

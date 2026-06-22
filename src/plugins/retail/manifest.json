@@ -15,9 +15,9 @@
       { "text": "商品管理", "icon": "package", "path": "/products", "group": "业务" },
       { "text": "销售管理", "icon": "shopping-cart", "path": "/sales", "group": "业务" },
       { "text": "库存管理", "icon": "truck", "path": "/inventory", "group": "业务" },
-      { "text": "客户管理", "icon": "phone", "path": "/customers", "group": "业务" },
+      { "text": "客户管理", "icon": "phone", "path": "/contacts", "group": "业务" },
       { "text": "数据看板", "icon": "bar-chart", "path": "/analytics", "group": "分析" },
-      { "text": "AI 团队", "icon": "users", "path": "/ai-teams", "group": "AI" },
+      { "text": "AI 团队", "icon": "users", "path": "/teams", "group": "AI" },
       { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" }
     ],
     "remove": ["/datacenter", "/supplychain", "/cloud-store", "/ucenter", "/teams", "/contacts", "/messages"]

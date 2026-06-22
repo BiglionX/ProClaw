@@ -50,6 +50,8 @@ export const REDIRECT_ROUTES: Array<{ from: string; to: string }> = [
   { from: '/media-library', to: '/ai-knowledge' },
   { from: '/qa-library', to: '/ai-knowledge' },
   { from: '/knowledge-base', to: '/ai-knowledge' },
+  { from: '/customers', to: '/contacts' },
+  { from: '/ai-teams', to: '/teams' },
 ];
 
 export const PUBLIC_ROUTES: Array<{ path: string; loader: RouteLoader }> = [
@@ -79,14 +81,11 @@ export const PROTECTED_ROUTES: Array<{ path: string; loader: RouteLoader }> = [
   { path: '/operations', loader: () => import('../components/OperationsCenter/OperationsDashboard') },
   { path: '/shop/*', loader: () => import('../pages/CloudStorePage') },
   { path: '/foreign-counter', loader: () => import('../pages/ForeignCounter/ForeignCounterPage') },
-  { path: '/foreign-counter/*', loader: () => import('../pages/ForeignCounter/ForeignCounterPage') },
   { path: '/customer-service', loader: () => import('../pages/CustomerServicePage') },
   { path: '/ai-knowledge', loader: () => import('../pages/AIKnowledgePage') },
   { path: '/sales', loader: () => import('../pages/SalesPage') },
   { path: '/inventory', loader: () => import('../pages/InventoryPage') },
-  { path: '/customers', loader: () => import('../pages/ContactsPage') },
   { path: '/analytics', loader: () => import('../pages/AnalyticsPage') },
-  { path: '/ai-teams', loader: () => import('../pages/TeamsPage') },
   { path: '/plugin-store', loader: () => import('../pages/PluginStorePage') },
   { path: '/agents', loader: () => import('../pages/AgentManagerPage') },
   { path: '/project-overview', loader: () => import('../pages/ProjectDashboardPage') },

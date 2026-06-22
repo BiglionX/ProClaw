@@ -5,6 +5,30 @@ use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
 
+fn seed_ap_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM ap_vehicle_models", [], |row| row.get(0))
+        .unwrap_or(0);
+    if count > 0 {
+        return Ok(());
+    }
+    let now = chrono::Utc::now().to_rfc3339();
+    let models = [
+        ("ap1", "Toyota", "Camry", "2018-2024", "2.0L"),
+        ("ap2", "Honda", "Accord", "2019-2024", "1.5T"),
+        ("ap3", "Volkswagen", "Passat", "2020-2024", "2.0T"),
+    ];
+    for (id, brand, series, years, disp) in models {
+        conn.execute(
+            "INSERT OR IGNORE INTO ap_vehicle_models (id, brand, series, year_range, displacement, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![id, brand, series, years, disp, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn ap_search_by_oe(
     db: tauri::State<Mutex<Database>>,
@@ -34,6 +58,7 @@ pub fn ap_get_vehicle_models(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_ap_demo_if_empty(&conn)?;
     let models: Vec<Value>;
     if let Some(ref b) = brand {
         models = {

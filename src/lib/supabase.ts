@@ -1,3 +1,4 @@
+// 桌面端主数据在本地 SQLite；Supabase 为可选能力（云中继 / 多设备 / 云端统计）
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/supabase';
 
@@ -16,8 +17,8 @@ export const isSupabaseConfigured = !!(
 );
 
 if (!isSupabaseConfigured && !isDemoMode) {
-  console.warn(
-    'Supabase credentials not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local, or enable demo mode with VITE_DEMO_MODE=true'
+  console.info(
+    'Supabase 未配置：桌面端将使用本地 SQLite。如需云中继或多设备同步，请配置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY。'
   );
 }
 

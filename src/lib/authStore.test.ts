@@ -4,6 +4,7 @@ import { useAuthStore } from '../lib/authStore';
 
 // Mock Supabase
 vi.mock('../lib/supabase', () => ({
+  isSupabaseConfigured: true,
   supabase: {
     auth: {
       signInWithPassword: vi.fn().mockResolvedValue({ data: null, error: null }),

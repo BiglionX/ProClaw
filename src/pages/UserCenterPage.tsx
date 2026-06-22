@@ -195,23 +195,22 @@ export default function UserCenterPage() {
   const handleGeneratePairingCode = async () => {
     setPairingLoading(true);
     try {
-      const res = await invoke<any>('get_pairing_code_cmd', { userId }).catch(() => null);
-      if (res) {
+      const res = await invoke<any>('get_pairing_code_cmd', { userId });
+      if (res?.pairing_code) {
         setPairingCode(res.pairing_code);
         setPairingExpires(res.expires_at);
-      } else {
-        setPairingCode(String(Math.floor(100000 + Math.random() * 900000)));
-        setPairingExpires(Date.now() / 1000 + 300);
-        setSnackbar('配对码已生成（模拟）');
+        setSnackbar('配对码已生成');
       }
-    } catch { /* demo */ }
+    } catch {
+      setSnackbar('生成配对码失败');
+    }
     setPairingLoading(false);
   };
 
   const handleRevokeDevice = async () => {
     if (!revokeTarget) return;
     try {
-      await invoke('revoke_device_cmd', { userId, deviceId: revokeTarget.id }).catch(() => {});
+      await invoke('revoke_device_cmd', { deviceId: revokeTarget.id, userId }).catch(() => {});
       setSnackbar(`已踢除设备: ${revokeTarget.device_name}`);
       setRevokeOpen(false);
       refetchDevices();

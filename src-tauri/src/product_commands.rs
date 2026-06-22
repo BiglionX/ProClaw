@@ -161,6 +161,45 @@ pub fn get_products(
         .map_err(|e| e.to_string())
 }
 
+/// Keyword search for POS barcode scan (ConveniencePosPage)
+#[tauri::command]
+pub fn filter_products(
+    db: tauri::State<Mutex<Database>>,
+    keyword: Option<String>,
+    limit: Option<i64>,
+) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let kw = keyword.unwrap_or_default();
+    let limit = limit.unwrap_or(10);
+    let pattern = format!("%{}%", kw.trim());
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, sku, name, sell_price, barcode FROM products
+         WHERE deleted_at IS NULL AND is_active = 1
+           AND (sku LIKE ?1 OR name LIKE ?1 OR barcode LIKE ?1)
+         ORDER BY name LIMIT ?2",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![pattern, limit], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "code": row.get::<_, String>(1)?,
+                "name": row.get::<_, String>(2)?,
+                "price": row.get::<_, f64>(3)?,
+                "sale_price": row.get::<_, f64>(3)?,
+                "barcode": row.get::<_, Option<String>>(4)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let data: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
+    Ok(serde_json::json!({ "data": data }))
+}
+
 /// 根据 ID 获取产品
 #[tauri::command]
 pub fn get_product_by_id(

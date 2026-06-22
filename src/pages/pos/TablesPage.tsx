@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, Chip, Button,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -11,6 +11,7 @@ import {
   ViewModule as GridViewIcon,
   ViewList as ListViewIcon,
 } from '@mui/icons-material';
+import { safeInvoke } from '../../lib/tauri';
 
 interface PosTable {
   id: string;
@@ -54,6 +55,28 @@ export default function TablesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterArea, setFilterArea] = useState<string>('all');
 
+  const loadTables = useCallback(async () => {
+    try {
+      const res = await safeInvoke<{ data?: Array<Record<string, unknown>> }>('catering_get_tables', {});
+      const rows = res?.data ?? [];
+      if (rows.length > 0) {
+        setTables(rows.map((row) => ({
+          id: String(row.id ?? ''),
+          area: String(row.area ?? ''),
+          name: String(row.name ?? ''),
+          capacity: Number(row.capacity ?? 0),
+          status: (String(row.status ?? 'vacant') as PosTable['status']),
+        })));
+      }
+    } catch {
+      /* keep mock in browser dev */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTables();
+  }, [loadTables]);
+
   const groupedByArea = useMemo(() => {
     const groups: Record<string, PosTable[]> = {};
     const filtered = filterArea === 'all' ? tables : tables.filter((t) => t.area === filterArea);
@@ -78,8 +101,13 @@ export default function TablesPage() {
     setDialogOpen(true);
   }
 
-  function handleChangeStatus(tableId: string, newStatus: PosTable['status']) {
-    setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status: newStatus } : t)));
+  async function handleChangeStatus(tableId: string, newStatus: PosTable['status']) {
+    try {
+      await safeInvoke('catering_update_table_status', { tableId, status: newStatus });
+      await loadTables();
+    } catch {
+      setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status: newStatus } : t)));
+    }
     setDialogOpen(false);
   }
 

@@ -1,9 +1,39 @@
 // 装修材料行业插件 Tauri 命令
 use crate::database::Database;
+use chrono::Utc;
 use rusqlite::params;
 use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
+
+fn seed_dm_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM dm_projects", [], |row| row.get(0))
+        .unwrap_or(0);
+    if count > 0 {
+        return Ok(());
+    }
+    let now = Utc::now().to_rfc3339();
+    let projects = [
+        ("dm1", "阳光花园 3-1202", "dm_c1", "阳光花园3栋1202", "active", 85000.0, "2026-04-01"),
+        ("dm2", "写字楼前台改造", "dm_c2", "科技路88号", "active", 42000.0, "2026-05-10"),
+    ];
+    for (id, name, cust, addr, status, budget, start) in projects {
+        conn.execute(
+            "INSERT OR IGNORE INTO dm_projects (id, name, customer_id, address, status, budget, start_date, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![id, name, cust, addr, status, budget, start, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO dm_material_bom_templates (id, name, room_type, items, created_at)
+         VALUES ('bom1', '标准卫生间材料清单', 'bathroom', '[]', ?1)",
+        params![now],
+    )
+    .ok();
+    Ok(())
+}
 
 #[tauri::command]
 pub fn dm_get_projects(
@@ -12,6 +42,7 @@ pub fn dm_get_projects(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_dm_demo_if_empty(&conn)?;
     let projects: Vec<Value>;
     if let Some(ref s) = status {
         projects = {
@@ -59,6 +90,7 @@ pub fn dm_get_bom_templates(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_dm_demo_if_empty(&conn)?;
     let templates: Vec<Value>;
     if let Some(ref rt) = room_type {
         templates = {

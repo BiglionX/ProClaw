@@ -259,7 +259,7 @@ export default function DatabaseSettings() {
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <CloudIcon sx={{ mr: 1, color: 'info.main' }} />
-            <Typography variant="h6">云端同步（Supabase）</Typography>
+            <Typography variant="h6">云端中继（Supabase，可选）</Typography>
             <Chip
               label="可选"
               size="small"
@@ -272,8 +272,8 @@ export default function DatabaseSettings() {
 
           <Alert severity="info" sx={{ mb: 3 }}>
             <Typography variant="body2">
-              配置 Supabase 可实现多设备数据同步。本地数据会自动同步到云端，
-              确保您的业务数据在任何设备上都可访问。
+              配置 Supabase 可用于移动端云中继、多设备消息转发及 Token 用量汇总。
+              桌面端核心业务数据默认保存在本地 SQLite，无需 Supabase 即可使用。
             </Typography>
           </Alert>
 

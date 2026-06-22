@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, Card, CardContent, CardActions,
   Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -9,6 +9,25 @@ import {
   Add as AddIcon, Edit as EditIcon,
   Delete as DeleteIcon, Cake as CakeIcon, MonitorWeight as WeightIcon,
 } from '@mui/icons-material';
+import { safeInvoke } from '../../lib/tauri';
+
+function mapApiPet(row: Record<string, unknown>): Pet {
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    species: String(row.species ?? 'dog'),
+    breed: String(row.breed ?? ''),
+    gender: String(row.gender ?? 'male'),
+    birth_date: String(row.birth_date ?? ''),
+    weight: Number(row.weight ?? 0),
+    color: String(row.color ?? ''),
+    chip_no: String(row.chip_no ?? ''),
+    owner_name: String(row.owner_id ?? ''),
+    owner_phone: String(row.owner_id ?? ''),
+    is_neutered: Boolean(row.is_neutered ?? false),
+    notes: String(row.notes ?? ''),
+  };
+}
 
 interface Pet {
   id: string;
@@ -67,6 +86,22 @@ export default function PetProfilesPage() {
   const [speciesFilter, setSpeciesFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const loadPets = useCallback(async () => {
+    try {
+      const res = await safeInvoke<{ data?: Array<Record<string, unknown>> }>('pet_get_profiles', {});
+      const rows = res?.data ?? [];
+      if (rows.length > 0) {
+        setPets(rows.map(mapApiPet));
+      }
+    } catch {
+      /* keep mock in browser dev */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPets();
+  }, [loadPets]);
+
   const filteredPets = useMemo(() => {
     let result = pets;
     if (speciesFilter !== 'all') result = result.filter((p) => p.species === speciesFilter);
@@ -82,11 +117,27 @@ export default function PetProfilesPage() {
     setDialogOpen(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (editingPet.id) {
       setPets((prev) => prev.map((p) => p.id === editingPet.id ? editingPet : p));
     } else {
-      setPets((prev) => [...prev, { ...editingPet, id: `p${Date.now()}` }]);
+      try {
+        await safeInvoke('pet_create_profile', {
+          ownerId: editingPet.owner_phone || editingPet.owner_name || 'owner',
+          name: editingPet.name,
+          options: {
+            species: editingPet.species,
+            breed: editingPet.breed,
+            gender: editingPet.gender,
+            birth_date: editingPet.birth_date,
+            weight: editingPet.weight,
+            chip_no: editingPet.chip_no,
+          },
+        });
+        await loadPets();
+      } catch {
+        setPets((prev) => [...prev, { ...editingPet, id: `p${Date.now()}` }]);
+      }
     }
     setDialogOpen(false);
   }

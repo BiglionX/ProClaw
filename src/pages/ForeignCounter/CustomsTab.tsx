@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Box,
@@ -49,19 +49,6 @@ interface CustomsDeclaration {
   declared_at: string;
 }
 
-const HS_DATABASE: HSCode[] = [
-  { code: '8507.60.00', description: '锂离子电池 (Lithium-ion batteries)', duty_rate: '3.5%', category: '电子配件' },
-  { code: '8504.40.95', description: '其他变压器、静止式变流器 (Static converters)', duty_rate: '2.5%', category: '电子配件' },
-  { code: '3926.90.99', description: '其他塑料制品 (Other articles of plastics)', duty_rate: '5.3%', category: '包装材料' },
-  { code: '4819.10.00', description: '瓦楞纸或纸板制的箱、盒、匣 (Cartons, boxes of paper)', duty_rate: '0%', category: '包装材料' },
-];
-
-const MOCK_DECLARATIONS: CustomsDeclaration[] = [
-  { id: 'cd1', order_no: 'FO-2025-0078', hs_code: '8507.60.00', product_name: 'iPhone 15 Pro Max 电池', quantity: 200, unit_price: 12.5, total_value: 2500, origin_country: 'CN', destination_country: 'US', status: 'cleared', declared_at: '2025-06-15' },
-  { id: 'cd2', order_no: 'FO-2025-0079', hs_code: '8507.60.00', product_name: 'iPhone 14 Plus 电池', quantity: 150, unit_price: 10.8, total_value: 1620, origin_country: 'CN', destination_country: 'DE', status: 'submitted', declared_at: '2025-07-08' },
-  { id: 'cd3', order_no: 'FO-2025-0080', hs_code: '8507.60.00', product_name: 'iPhone SE (第三代) 电池', quantity: 500, unit_price: 5.5, total_value: 2750, origin_country: 'CN', destination_country: 'BR', status: 'draft', declared_at: '2025-07-10' },
-];
-
 const STATUS_LABEL: Record<CustomsDeclaration['status'], { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
   draft: { label: '草稿', color: 'default' },
   submitted: { label: '已申报', color: 'warning' },
@@ -71,52 +58,45 @@ const STATUS_LABEL: Record<CustomsDeclaration['status'], { label: string; color:
 
 export default function CustomsTab() {
   const [keyword, setKeyword] = useState('电池');
-  const [hsResults, setHsResults] = useState<HSCode[]>(HS_DATABASE);
-  const [declarations, setDeclarations] = useState<CustomsDeclaration[]>(MOCK_DECLARATIONS);
+  const [hsResults, setHsResults] = useState<HSCode[]>([]);
+  const [declarations, setDeclarations] = useState<CustomsDeclaration[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState('');
 
-  useEffect(() => {
-    loadDeclarations();
-  }, []);
-
-  const loadDeclarations = async () => {
+  const loadDeclarations = useCallback(async () => {
     setLoading(true);
     try {
       const list = await safeInvoke<CustomsDeclaration[]>('list_customs_declarations', { limit: 50 });
-      if (list && list.length > 0) {
-        setDeclarations(list);
-      }
+      setDeclarations(Array.isArray(list) ? list : []);
     } catch {
-      /* keep mock */
+      setDeclarations([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleSearchHS = async () => {
+  const handleSearchHS = useCallback(async () => {
     setLoading(true);
     setAiSuggestion('');
     try {
       const result = await safeInvoke<HSCode[]>('search_hs_code', { keyword });
-      if (result && result.length > 0) {
-        setHsResults(result);
-      } else if (keyword.trim()) {
-        const filtered = HS_DATABASE.filter(h => h.code.includes(keyword) || h.description.toLowerCase().includes(keyword.toLowerCase()));
-        setHsResults(filtered);
-        if (filtered.length > 0) {
-          setAiSuggestion(`💡 AI 推荐：${filtered[0].code} - ${filtered[0].description}（税率 ${filtered[0].duty_rate}）`);
-        }
-      } else {
-        setHsResults(HS_DATABASE);
+      const rows = Array.isArray(result) ? result : [];
+      setHsResults(rows);
+      if (rows.length > 0) {
+        const first = rows[0];
+        setAiSuggestion(`💡 AI 推荐：${first.code} - ${first.description}（税率 ${first.duty_rate}）`);
       }
     } catch {
-      const filtered = HS_DATABASE.filter(h => h.code.includes(keyword) || h.description.toLowerCase().includes(keyword.toLowerCase()));
-      setHsResults(filtered);
+      setHsResults([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [keyword]);
+
+  useEffect(() => {
+    loadDeclarations();
+    handleSearchHS();
+  }, [loadDeclarations, handleSearchHS]);
 
   const handleCopy = (text: string) => {
     try {

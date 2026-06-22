@@ -6,6 +6,35 @@ use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
 
+fn seed_ff_demo_if_empty(conn: &rusqlite::Connection, route_date: &str) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM ff_delivery_routes", [], |row| row.get(0))
+        .unwrap_or(0);
+    if count > 0 {
+        return Ok(());
+    }
+    let now = Utc::now().to_rfc3339();
+    let routes = [
+        ("ff_r1", route_date, "张师傅", "pending"),
+        ("ff_r2", route_date, "李师傅", "completed"),
+    ];
+    for (id, date, driver, status) in routes {
+        conn.execute(
+            "INSERT OR IGNORE INTO ff_delivery_routes (id, route_date, driver_name, stops, status, created_at)
+             VALUES (?1, ?2, ?3, '[]', ?4, ?5)",
+            params![id, date, driver, status, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO ff_recurring_order_templates (id, customer_id, items, schedule_type, week_days, is_active, next_generate_date, created_at)
+         VALUES ('ff_t1', 'ff_c1', '[]', 'weekly', '1,3,5', 1, ?1, ?2)",
+        params![route_date, now],
+    )
+    .ok();
+    Ok(())
+}
+
 #[tauri::command]
 pub fn ff_get_delivery_routes(
     db: tauri::State<Mutex<Database>>,
@@ -14,6 +43,7 @@ pub fn ff_get_delivery_routes(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let target_date = date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
+    seed_ff_demo_if_empty(&conn, &target_date)?;
 
     let mut stmt = conn
         .prepare(
@@ -62,6 +92,8 @@ pub fn ff_get_recurring_templates(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    seed_ff_demo_if_empty(&conn, &today)?;
     let templates: Vec<Value>;
     if let Some(ref cid) = customer_id {
         templates = {

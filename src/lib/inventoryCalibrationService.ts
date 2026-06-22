@@ -116,7 +116,7 @@ export interface PostPurchaseCheckResult {
 export async function calibrateStock(
   input: StockCalibrationInput
 ): Promise<{ id: string; message: string; new_stock: number }> {
-  return await invoke('calibrate_stock_cmd', { input });
+  return await invoke('calibrate_stock', { input });
 }
 
 /**
@@ -125,7 +125,7 @@ export async function calibrateStock(
 export async function getStockConfidence(
   productId: string
 ): Promise<StockConfidenceInfo> {
-  return await invoke('get_stock_confidence_cmd', { productId });
+  return await invoke('get_stock_confidence', { productId });
 }
 
 /**
@@ -140,7 +140,7 @@ export async function getCalibrationHistory(
     limit?: number;
   }
 ): Promise<StockCalibrationRecord[]> {
-  return await invoke('get_calibration_history_cmd', { options });
+  return await invoke('get_calibration_history', { options });
 }
 
 /**
@@ -151,7 +151,7 @@ export async function forceClearNegative(
   expectedStock: number,
   reason?: string
 ): Promise<{ id: string; message: string; new_stock: number }> {
-  return await invoke('force_clear_negative_cmd', {
+  return await invoke('force_clear_negative', {
     productId,
     expectedStock,
     reason,
@@ -166,7 +166,7 @@ export async function supplementInbound(
   supplementQuantity: number,
   reason?: string
 ): Promise<{ id: string; message: string; new_stock: number }> {
-  return await invoke('supplement_inbound_cmd', {
+  return await invoke('supplement_inbound', {
     productId,
     supplementQuantity,
     reason,
@@ -187,14 +187,14 @@ export async function checkNegativeAging(
   aging_days: number;
   severity: 'warning' | 'critical';
 }>> {
-  return await invoke('check_negative_aging_cmd', { productId });
+  return await invoke('check_negative_aging', { productId });
 }
 
 /**
  * 计算所有需要 AI 提醒的产品
  */
 export async function computeReminders(): Promise<CalibrationReminder[]> {
-  return await invoke('compute_reminders_cmd');
+  return await invoke('compute_reminders');
 }
 
 /**
@@ -204,7 +204,7 @@ export async function markReminderDismissed(
   productId: string,
   reminderType: CalibrationReminder['reminder_type']
 ): Promise<{ id: string; message: string }> {
-  return await invoke('mark_reminder_dismissed_cmd', {
+  return await invoke('mark_reminder_dismissed', {
     productId,
     reminderType,
   });

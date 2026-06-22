@@ -644,6 +644,165 @@ impl Database {
             migration_errors.push(format!("flexible_inventory: {}", e));
         }
 
+        for (label, sql) in [
+            (
+                "011_catering",
+                include_str!("../../database/migrations/011_catering_plugin.sql"),
+            ),
+            (
+                "012_beauty",
+                include_str!("../../database/migrations/012_beauty_plugin.sql"),
+            ),
+            (
+                "013_pet",
+                include_str!("../../database/migrations/013_pet_plugin.sql"),
+            ),
+            (
+                "030_convenience",
+                include_str!("../../database/migrations/030_convenience_store_plugin.sql"),
+            ),
+            (
+                "031_liquor",
+                include_str!("../../database/migrations/031_liquor_wholesale_plugin.sql"),
+            ),
+            (
+                "032_phone_accessories",
+                include_str!("../../database/migrations/032_phone_accessories_plugin.sql"),
+            ),
+            (
+                "033_fresh_food",
+                include_str!("../../database/migrations/033_fresh_food_delivery_plugin.sql"),
+            ),
+            (
+                "034_auto_parts",
+                include_str!("../../database/migrations/034_auto_parts_plugin.sql"),
+            ),
+            (
+                "035_hardware",
+                include_str!("../../database/migrations/035_hardware_plugin.sql"),
+            ),
+            (
+                "036_decoration",
+                include_str!("../../database/migrations/036_decoration_material_plugin.sql"),
+            ),
+            (
+                "037_group_buy",
+                include_str!("../../database/migrations/037_community_group_buy_plugin.sql"),
+            ),
+        ] {
+            if let Err(e) = self.conn.execute_batch(sql) {
+                eprintln!("[DB Migration WARNING] {}: {}", label, e);
+                migration_errors.push(format!("{}: {}", label, e));
+            }
+        }
+
+        if let Err(e) = self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS foreign_hs_codes (
+                code TEXT PRIMARY KEY, description TEXT NOT NULL,
+                duty_rate TEXT NOT NULL, category TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS foreign_translations (
+                id TEXT PRIMARY KEY, spu_id TEXT NOT NULL, spu_name TEXT NOT NULL,
+                language TEXT NOT NULL, translated_name TEXT NOT NULL,
+                translated_description TEXT, updated_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS foreign_customs_declarations (
+                id TEXT PRIMARY KEY, order_no TEXT NOT NULL, hs_code TEXT NOT NULL,
+                product_name TEXT NOT NULL, quantity INTEGER NOT NULL, unit_price REAL NOT NULL,
+                total_value REAL NOT NULL, origin_country TEXT NOT NULL,
+                destination_country TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft',
+                declared_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS foreign_logistics_tracks (
+                tracking_no TEXT PRIMARY KEY, carrier TEXT NOT NULL, status TEXT NOT NULL,
+                origin TEXT NOT NULL, destination TEXT NOT NULL, estimated_delivery TEXT NOT NULL,
+                events_json TEXT NOT NULL, updated_at TEXT NOT NULL);
+            INSERT OR IGNORE INTO foreign_hs_codes VALUES
+                ('8507.60.00','Lithium-ion batteries','3.5%','Electronics'),
+                ('8504.40.95','Static converters','2.5%','Electronics'),
+                ('3926.90.99','Other articles of plastics','5.3%','Packaging'),
+                ('4819.10.00','Cartons boxes of paper','0%','Packaging');
+            INSERT OR IGNORE INTO foreign_translations VALUES
+                ('t1','spu_iphone15pm_bat','iPhone 15 Pro Max Battery','en',
+                 'iPhone 15 Pro Max Battery','4422mAh replacement','2025-01-15'),
+                ('t2','spu_iphone15pro_bat','iPhone 15 Pro Battery','en',
+                 'iPhone 15 Pro Battery','3274mAh replacement','2025-01-16'),
+                ('t3','spu_iphone15pm_bat','iPhone 15 Pro Max Battery','ja',
+                 'iPhone 15 Pro Max Battery JA','4422mAh replacement','2025-01-15');
+            INSERT OR IGNORE INTO foreign_customs_declarations VALUES
+                ('cd1','FO-2025-0078','8507.60.00','iPhone 15 Pro Max Battery',
+                 200,12.5,2500,'CN','US','cleared','2025-06-15'),
+                ('cd2','FO-2025-0079','8507.60.00','iPhone 14 Plus Battery',
+                 150,10.8,1620,'CN','DE','submitted','2025-07-08');
+            INSERT OR IGNORE INTO foreign_logistics_tracks VALUES
+                ('DHL7894561230','dhl','in_transit','Shenzhen (SZX)','Los Angeles (LAX)',
+                 '2025-07-15',
+                 '[{\"time\":\"2025-07-10 09:30\",\"location\":\"Shenzhen\",\"description\":\"包裹已揽收\",\"status\":\"picked_up\"},{\"time\":\"2025-07-10 14:00\",\"location\":\"Shenzhen宝安机场\",\"description\":\"到达机场，等待出境安检\",\"status\":\"in_transit\"},{\"time\":\"2025-07-11 03:20\",\"location\":\"香港 HKG\",\"description\":\"已出境，搭乘 CX2088 航班\",\"status\":\"in_transit\"},{\"time\":\"2025-07-12 18:45\",\"location\":\"洛杉矶 LAX\",\"description\":\"到达目的地机场，等待清关\",\"status\":\"customs\"}]',
+                 '2025-07-12T18:45:00Z');",
+        ) {
+            eprintln!("[DB Migration WARNING] foreign_counter: {}", e);
+            migration_errors.push(format!("foreign_counter: {}", e));
+        }
+
+        if let Err(e) = self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS operations_content_queue (
+                id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL);
+            INSERT OR IGNORE INTO operations_content_queue VALUES
+                ('oc1','ProClaw AI best practices','Content Agent','pending','2026-06-20T10:00:00Z'),
+                ('oc2','Announcing v2.0 Release','Content Agent','pending','2026-06-20T09:00:00Z'),
+                ('oc3','SEO optimization report','SEO Agent','approved','2026-06-20T08:00:00Z'),
+                ('oc4','Product feature tweet','Social Ops','pending','2026-06-20T07:00:00Z');",
+        ) {
+            eprintln!("[DB Migration WARNING] operations_content_queue: {}", e);
+            migration_errors.push(format!("operations_content_queue: {}", e));
+        }
+
+        if let Err(e) = self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS operations_seo_metrics (
+                id TEXT PRIMARY KEY, label TEXT NOT NULL, value TEXT NOT NULL,
+                detail TEXT NOT NULL, trend TEXT NOT NULL DEFAULT 'up', sort_order INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS operations_seo_recommendations (
+                id TEXT PRIMARY KEY, priority TEXT NOT NULL, title TEXT NOT NULL,
+                description TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS operations_social_accounts (
+                id TEXT PRIMARY KEY, platform TEXT NOT NULL, region TEXT NOT NULL,
+                followers TEXT NOT NULL, engagement TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active', sort_order INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS operations_alerts (
+                id TEXT PRIMARY KEY, level TEXT NOT NULL, title TEXT NOT NULL,
+                description TEXT NOT NULL, created_at TEXT NOT NULL, is_dismissed INTEGER NOT NULL DEFAULT 0);
+            INSERT OR IGNORE INTO operations_seo_metrics VALUES
+                ('sm1','关键词排名','12 个跟踪','前10: 3个','up',1),
+                ('sm2','页面加载时间','2.8s','目标: 2.5s','down',2),
+                ('sm3','死链数量','2 个','需修复','warning',3),
+                ('sm4','索引页面','47 页','上周: 45','up',4);
+            INSERT OR IGNORE INTO operations_seo_recommendations VALUES
+                ('sr1','高','首页加载速度优化','LCP 3.2s，建议优化至 2.5s 以下',1),
+                ('sr2','中','缺失 meta description','3 个页面缺少 meta description',2),
+                ('sr3','低','内部链接优化','建议增加产品页之间的关联链接',3);
+            INSERT OR IGNORE INTO operations_social_accounts VALUES
+                ('sa1','Twitter/X','欧美','1,247','3.4%','active',1),
+                ('sa2','Facebook','欧美','892','2.1%','active',2),
+                ('sa3','Instagram','欧美','1,568','4.2%','active',3),
+                ('sa4','LinkedIn','欧美','634','2.8%','active',4),
+                ('sa5','TikTok','东南亚','4,200','6.5%','paused',5),
+                ('sa6','微信公众号','国内','2,100','2.3%','active',6),
+                ('sa7','小红书','国内','1,468','3.1%','active',7);
+            INSERT OR IGNORE INTO operations_alerts VALUES
+                ('al1','warning','首页跳出率异常升高','首页跳出率从 35% 升至 52%','2026-06-22T10:30:00Z',0),
+                ('al2','warning','博客分类流量下降','技术博客分类流量下降 28%','2026-06-22T10:00:00Z',0),
+                ('al3','info','东南亚社媒 Team 已暂停','TikTok 账号需重新授权','2026-06-22T08:00:00Z',0);
+            CREATE TABLE IF NOT EXISTS operations_ai_teams (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'running',
+                agents_json TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0);
+            INSERT OR IGNORE INTO operations_ai_teams VALUES
+                ('ot1','网站运营 AI Team','running','[\"SEO 优化\",\"内容生成\",\"数据分析\",\"转化优化\"]',1),
+                ('ot2','欧美社媒 Team','running','[\"Twitter\",\"Facebook\",\"Instagram\",\"LinkedIn\"]',2),
+                ('ot3','东南亚社媒 Team','paused','[\"TikTok\",\"Instagram\",\"Facebook\"]',3),
+                ('ot4','国内社媒 Team','running','[\"微信公众号\",\"小红书\",\"知乎\",\"微博\"]',4);",
+        ) {
+            eprintln!("[DB Migration WARNING] operations_seo_social_alerts: {}", e);
+            migration_errors.push(format!("operations_seo_social_alerts: {}", e));
+        }
+
         // 自动安装内置 Agent
         let builtin_count: i64 = self
             .conn

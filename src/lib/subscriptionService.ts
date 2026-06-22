@@ -1,17 +1,18 @@
 // 订阅服务封装层 (Phase 7)
 // 封装 Tauri invoke 调用，提供类型安全的订阅操作
-// 桌面端 Token 用量同时同步到 Supabase（平台统一统计）
+// 桌面端 Token 用量记录在本地 SQLite；Supabase 同步为可选
 
 import { ipcInvoke as invoke } from './tauri';
-import { supabase } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 
-// Supabase Token 用量同步（平台侧统一统计）
+// Supabase Token 用量同步（可选，平台侧统一统计）
 async function syncTokenToSupabase(
   userId: string,
   resourceType: string,
   tokensUsed: number,
   endpoint?: string
 ): Promise<void> {
+  if (!isSupabaseConfigured) return;
   try {
     // @ts-expect-error - api_usage_logs 表类型未定义
     const { error } = await supabase.from('api_usage_logs').insert({

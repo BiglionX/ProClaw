@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, Card, CardContent, CardActions,
   Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -10,6 +10,30 @@ import {
   Person as PersonIcon,
   AccessTime as TimeIcon,
 } from '@mui/icons-material';
+import { safeInvoke } from '../../lib/tauri';
+
+function parseServiceLabel(raw: unknown): string {
+  if (typeof raw !== 'string') return String(raw ?? '');
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.join(', ');
+  } catch { /* plain string */ }
+  return raw;
+}
+
+function mapApiAppointment(row: Record<string, unknown>, employeeMap: Map<string, string>): Appointment {
+  const employeeId = String(row.employee_id ?? '');
+  return {
+    id: String(row.id ?? ''),
+    customer_name: String(row.customer_id ?? ''),
+    customer_phone: String(row.customer_id ?? ''),
+    employee_name: employeeMap.get(employeeId) ?? employeeId,
+    service_name: parseServiceLabel(row.service_ids),
+    start_at: String(row.start_at ?? ''),
+    duration: Number(row.duration ?? 60),
+    status: (row.status as Appointment['status']) ?? 'pending',
+  };
+}
 
 interface Appointment {
   id: string;
@@ -44,7 +68,13 @@ const STATUS_CONFIG: Record<Appointment['status'], { label: string; color: strin
 };
 
 const MOCK_EMPLOYEES = ['发型师小王', '美容师小刘', '美甲师小李'];
-const MOCK_SERVICES = ['剪发', '染发', '烫发', '洗吹', '面部护理', 'SPA套餐', '美甲'];
+const FALLBACK_SERVICES = ['剪发', '染发', '烫发', '洗吹', '面部护理', 'SPA套餐', '美甲'];
+
+interface ServiceOption {
+  id: string;
+  name: string;
+  duration: number;
+}
 
 function getStatusChip(status: Appointment['status']) {
   const c = STATUS_CONFIG[status];
@@ -71,6 +101,8 @@ function getAppointmentEmoji(status: Appointment['status']): string {
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>(MOCK_APPOINTMENTS);
+  const [employeeOptions, setEmployeeOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [serviceOptions, setServiceOptions] = useState<ServiceOption[]>([]);
   const [tabValue, setTabValue] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterEmployee, setFilterEmployee] = useState('all');
@@ -78,6 +110,58 @@ export default function AppointmentsPage() {
     customer_name: '', customer_phone: '', employee_name: '', service_name: '',
     date: TODAY, time: '09:00', duration: 60,
   });
+
+  const loadAppointments = useCallback(async () => {
+    try {
+      const [apptRes, empRes, svcRes] = await Promise.all([
+        safeInvoke<{ data?: Array<Record<string, unknown>> }>('beauty_get_appointments', {}),
+        safeInvoke<{ data?: Array<Record<string, unknown>> }>('beauty_get_employees', {}),
+        safeInvoke<{ data?: Array<Record<string, unknown>> }>('beauty_get_services', {}),
+      ]);
+      const rows = apptRes?.data ?? [];
+      const employees = empRes?.data ?? [];
+      const employeeMap = new Map(
+        employees.map((e) => [String(e.id ?? ''), String(e.name ?? '')]),
+      );
+      setEmployeeOptions(
+        employees.map((e) => ({ id: String(e.id ?? ''), name: String(e.name ?? '') })),
+      );
+      if (rows.length > 0) {
+        setAppointments(rows.map((r) => mapApiAppointment(r, employeeMap)));
+      }
+      const svcRows = svcRes?.data ?? [];
+      if (svcRows.length > 0) {
+        setServiceOptions(svcRows.map((s) => ({
+          id: String(s.id ?? ''),
+          name: String(s.name ?? ''),
+          duration: Number(s.duration ?? 60),
+        })));
+      }
+    } catch {
+      /* keep mock in browser dev */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  const employeeNames = employeeOptions.length > 0
+    ? employeeOptions.map((e) => e.name)
+    : MOCK_EMPLOYEES;
+
+  const serviceNames = serviceOptions.length > 0
+    ? serviceOptions.map((s) => s.name)
+    : FALLBACK_SERVICES;
+
+  function handleServiceSelect(serviceName: string) {
+    const svc = serviceOptions.find((s) => s.name === serviceName);
+    setNewAppt((prev) => ({
+      ...prev,
+      service_name: serviceName,
+      duration: svc?.duration ?? prev.duration,
+    }));
+  }
 
   const todayAppts = useMemo(() => {
     let result = appointments.filter((a) => a.start_at.startsWith(TODAY));
@@ -91,20 +175,37 @@ export default function AppointmentsPage() {
 
   const filteredAppts = tabValue === 0 ? todayAppts : appointments.filter((a) => a.status === tabStatuses[tabValue]);
 
-  function handleCreateAppointment() {
-    const id = `a${Date.now()}`;
+  async function handleCreateAppointment() {
     const startAt = `${newAppt.date}T${newAppt.time}`;
-    setAppointments((prev) => [...prev, {
-      id, customer_name: newAppt.customer_name, customer_phone: newAppt.customer_phone,
-      employee_name: newAppt.employee_name, service_name: newAppt.service_name,
-      start_at: startAt, duration: newAppt.duration, status: 'pending',
-    }]);
+    const employee = employeeOptions.find((e) => e.name === newAppt.employee_name);
+    try {
+      await safeInvoke('beauty_create_appointment', {
+        customerId: newAppt.customer_phone || newAppt.customer_name,
+        employeeId: employee?.id ?? newAppt.employee_name,
+        serviceIds: [newAppt.service_name],
+        startAt,
+        duration: newAppt.duration,
+      });
+      await loadAppointments();
+    } catch {
+      const id = `a${Date.now()}`;
+      setAppointments((prev) => [...prev, {
+        id, customer_name: newAppt.customer_name, customer_phone: newAppt.customer_phone,
+        employee_name: newAppt.employee_name, service_name: newAppt.service_name,
+        start_at: startAt, duration: newAppt.duration, status: 'pending',
+      }]);
+    }
     setDialogOpen(false);
     setNewAppt({ customer_name: '', customer_phone: '', employee_name: '', service_name: '', date: TODAY, time: '09:00', duration: 60 });
   }
 
-  function handleUpdateStatus(apptId: string, newStatus: Appointment['status']) {
-    setAppointments((prev) => prev.map((a) => a.id === apptId ? { ...a, status: newStatus } : a));
+  async function handleUpdateStatus(apptId: string, newStatus: Appointment['status']) {
+    try {
+      await safeInvoke('beauty_update_appointment_status', { id: apptId, status: newStatus });
+      await loadAppointments();
+    } catch {
+      setAppointments((prev) => prev.map((a) => a.id === apptId ? { ...a, status: newStatus } : a));
+    }
   }
 
   const hours = Array.from({ length: 14 }, (_, i) => `${String(i + 8).padStart(2, '0')}:00`);
@@ -122,7 +223,7 @@ export default function AppointmentsPage() {
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <Select value={filterEmployee} onChange={(e) => setFilterEmployee(e.target.value)} displayEmpty>
             <MenuItem value="all">全部技师</MenuItem>
-            {MOCK_EMPLOYEES.map((e) => <MenuItem key={e} value={e}>{e}</MenuItem>)}
+            {employeeNames.map((e) => <MenuItem key={e} value={e}>{e}</MenuItem>)}
           </Select>
         </FormControl>
         <Box sx={{ flexGrow: 1 }} />
@@ -269,15 +370,15 @@ export default function AppointmentsPage() {
               <FormControl fullWidth>
                 <InputLabel>选择技师</InputLabel>
                 <Select value={newAppt.employee_name} label="选择技师" onChange={(e) => setNewAppt({ ...newAppt, employee_name: e.target.value })}>
-                  {MOCK_EMPLOYEES.map((e) => <MenuItem key={e} value={e}>{e}</MenuItem>)}
+                  {employeeNames.map((e) => <MenuItem key={e} value={e}>{e}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
             <Grid item xs={6}>
               <FormControl fullWidth>
                 <InputLabel>服务项目</InputLabel>
-                <Select value={newAppt.service_name} label="服务项目" onChange={(e) => setNewAppt({ ...newAppt, service_name: e.target.value })}>
-                  {MOCK_SERVICES.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                <Select value={newAppt.service_name} label="服务项目" onChange={(e) => handleServiceSelect(e.target.value)}>
+                  {serviceNames.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>

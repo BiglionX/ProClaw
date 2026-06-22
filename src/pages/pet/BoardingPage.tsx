@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, Card, CardContent, CardActions,
   Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -11,6 +11,22 @@ import {
   Logout as CheckOutIcon,
   Pets as PetsIcon,
 } from '@mui/icons-material';
+import { safeInvoke } from '../../lib/tauri';
+
+function mapApiBoarding(row: Record<string, unknown>): BoardingRecord {
+  return {
+    id: String(row.id ?? ''),
+    pet_name: String(row.pet_id ?? ''),
+    owner_name: '',
+    room_name: String(row.room_id ?? ''),
+    check_in_at: String(row.check_in_at ?? ''),
+    check_out_at: String(row.check_out_at ?? ''),
+    daily_rate: Number(row.daily_rate ?? 0),
+    total_amount: row.total_amount == null ? null : Number(row.total_amount),
+    status: (row.status as BoardingRecord['status']) ?? 'active',
+    notes: String(row.notes ?? ''),
+  };
+}
 
 interface BoardingRecord {
   id: string;
@@ -89,25 +105,79 @@ export default function BoardingPage() {
 
   const vacantRooms = rooms.filter((r) => r.status === 'vacant');
 
-  function handleCheckIn() {
+  const loadBoardings = useCallback(async () => {
+    try {
+      const res = await safeInvoke<{ data?: Array<Record<string, unknown>> }>('pet_get_boarding_records', {});
+      const rows = res?.data ?? [];
+      if (rows.length > 0) {
+        setBoardings(rows.map(mapApiBoarding));
+      }
+    } catch {
+      /* keep mock in browser dev */
+    }
+  }, []);
+
+  const loadRooms = useCallback(async () => {
+    try {
+      const res = await safeInvoke<{ data?: Array<Record<string, unknown>> }>('pet_get_boarding_rooms', {});
+      const rows = res?.data ?? [];
+      if (rows.length > 0) {
+        setRooms(rows.map((row) => ({
+          id: String(row.id ?? ''),
+          name: String(row.name ?? ''),
+          room_type: String(row.room_type ?? 'standard'),
+          capacity: Number(row.capacity ?? 1),
+          daily_rate: Number(row.daily_rate ?? 0),
+          status: (String(row.status ?? 'vacant') as BoardingRoom['status']),
+        })));
+      }
+    } catch {
+      /* keep mock in browser dev */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBoardings();
+    loadRooms();
+  }, [loadBoardings, loadRooms]);
+
+  async function handleCheckIn() {
     const room = rooms.find((r) => r.id === newBoarding.room_id);
     if (!room) return;
-    const id = `b${Date.now()}`;
-    setBoardings((prev) => [...prev, {
-      id, pet_name: newBoarding.pet_name, owner_name: newBoarding.owner_name,
-      room_name: room.name, check_in_at: newBoarding.check_in,
-      check_out_at: newBoarding.check_out, daily_rate: room.daily_rate,
-      total_amount: null, status: 'active', notes: '',
-    }]);
-    setRooms((prev) => prev.map((r) => r.id === newBoarding.room_id ? { ...r, status: 'occupied' as const } : r));
+    try {
+      await safeInvoke('pet_create_boarding', {
+        petId: newBoarding.pet_name,
+        roomId: newBoarding.room_id,
+        checkIn: newBoarding.check_in,
+        checkOut: newBoarding.check_out,
+        dailyRate: room.daily_rate,
+      });
+      await loadBoardings();
+      await loadRooms();
+    } catch {
+      const id = `b${Date.now()}`;
+      setBoardings((prev) => [...prev, {
+        id, pet_name: newBoarding.pet_name, owner_name: newBoarding.owner_name,
+        room_name: room.name, check_in_at: newBoarding.check_in,
+        check_out_at: newBoarding.check_out, daily_rate: room.daily_rate,
+        total_amount: null, status: 'active', notes: '',
+      }]);
+      setRooms((prev) => prev.map((r) => r.id === newBoarding.room_id ? { ...r, status: 'occupied' as const } : r));
+    }
     setCheckInDialog(false);
     setNewBoarding({ pet_name: '', owner_name: '', room_id: '', daily_rate: 80, check_in: '', check_out: '' });
   }
 
-  function handleCheckOut(boarding: BoardingRecord) {
+  async function handleCheckOut(boarding: BoardingRecord) {
     const days = Math.ceil((new Date(boarding.check_out_at).getTime() - new Date(boarding.check_in_at).getTime()) / 86400000);
     const amount = days * boarding.daily_rate;
-    setBoardings((prev) => prev.map((b) => b.id === boarding.id ? { ...b, status: 'checked_out' as const, total_amount: amount } : b));
+    try {
+      await safeInvoke('pet_check_out_boarding', { boardingId: boarding.id, finalAmount: amount });
+      await loadBoardings();
+      await loadRooms();
+    } catch {
+      setBoardings((prev) => prev.map((b) => b.id === boarding.id ? { ...b, status: 'checked_out' as const, total_amount: amount } : b));
+    }
     setCheckOutDialog(null);
   }
 

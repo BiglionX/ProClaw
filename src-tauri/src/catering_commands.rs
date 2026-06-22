@@ -202,3 +202,148 @@ pub fn catering_mark_kds_item_done(
 
     Ok(json!({ "message": "菜品已标记完成", "order_id": order_id }))
 }
+
+/// 获取 POS 菜品列表
+#[tauri::command]
+pub fn catering_get_menu_items(
+    db: tauri::State<Mutex<Database>>,
+) -> Result<Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    seed_catering_menu_if_empty(&conn)?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, category_id, name, price, is_available FROM pos_menu_items ORDER BY sort_order, name",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "category_id": row.get::<_, String>(1)?,
+                "name": row.get::<_, String>(2)?,
+                "price": row.get::<_, f64>(3)?,
+                "is_available": row.get::<_, bool>(4)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "data": rows.filter_map(|r| r.ok()).collect::<Vec<_>>() }))
+}
+
+/// 获取 POS 桌台列表
+#[tauri::command]
+pub fn catering_get_tables(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    seed_catering_tables_if_empty(&conn)?;
+
+    let mut stmt = conn
+        .prepare("SELECT id, area, name, capacity, status FROM pos_tables ORDER BY area, name")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "area": row.get::<_, String>(1)?,
+                "name": row.get::<_, String>(2)?,
+                "capacity": row.get::<_, i64>(3)?,
+                "status": row.get::<_, String>(4)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "data": rows.filter_map(|r| r.ok()).collect::<Vec<_>>() }))
+}
+
+/// 更新桌台状态
+#[tauri::command]
+pub fn catering_update_table_status(
+    db: tauri::State<Mutex<Database>>,
+    table_id: String,
+    status: String,
+) -> Result<Value, String> {
+    if !["vacant", "occupied", "reserved", "cleaning"].contains(&status.as_str()) {
+        return Err("Invalid table status".to_string());
+    }
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let updated = conn
+        .execute(
+            "UPDATE pos_tables SET status = ?1 WHERE id = ?2",
+            params![status, table_id],
+        )
+        .map_err(|e| e.to_string())?;
+    if updated == 0 {
+        return Err("Table not found".to_string());
+    }
+    Ok(json!({ "id": table_id, "status": status }))
+}
+
+fn seed_catering_menu_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM pos_menu_items", [], |row| row.get(0))
+        .unwrap_or(0);
+    if count > 0 {
+        return Ok(());
+    }
+    let items = [
+        ("m1", "cat_hotpot", "麻辣锅底", 68.0),
+        ("m2", "cat_hotpot", "番茄锅底", 58.0),
+        ("m3", "cat_hotpot", "菌汤锅底", 48.0),
+        ("m4", "cat_appetizer", "拍黄瓜", 18.0),
+        ("m5", "cat_appetizer", "口水鸡", 28.0),
+        ("m6", "cat_appetizer", "皮蛋豆腐", 16.0),
+        ("m7", "cat_main", "回锅肉", 38.0),
+        ("m8", "cat_main", "鱼香肉丝", 32.0),
+        ("m9", "cat_main", "宫保鸡丁", 35.0),
+        ("m10", "cat_main", "麻婆豆腐", 22.0),
+        ("m11", "cat_main", "水煮鱼", 58.0),
+        ("m12", "cat_drink", "可乐", 5.0),
+        ("m13", "cat_drink", "雪碧", 5.0),
+        ("m14", "cat_drink", "酸梅汤", 8.0),
+        ("m15", "cat_dessert", "冰粉", 12.0),
+        ("m16", "cat_dessert", "红糖糍粑", 18.0),
+        ("m17", "cat_rice", "米饭", 2.0),
+        ("m18", "cat_rice", "炒面", 15.0),
+        ("m19", "cat_rice", "炒饭", 15.0),
+    ];
+    for (id, cat, name, price) in items {
+        conn.execute(
+            "INSERT OR IGNORE INTO pos_menu_items (id, category_id, name, price, is_available, sort_order) VALUES (?1, ?2, ?3, ?4, 1, 0)",
+            params![id, cat, name, price],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn seed_catering_tables_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM pos_tables", [], |row| row.get(0))
+        .unwrap_or(0);
+    if count > 0 {
+        return Ok(());
+    }
+    let tables = [
+        ("t1", "大厅", "A1", 4, "vacant"),
+        ("t2", "大厅", "A2", 4, "occupied"),
+        ("t3", "大厅", "A3", 6, "occupied"),
+        ("t4", "大厅", "A5", 8, "reserved"),
+        ("t5", "包间", "V1", 10, "vacant"),
+        ("t6", "包间", "V2", 12, "vacant"),
+        ("t7", "包间", "V3", 8, "cleaning"),
+        ("t8", "包间", "V5", 16, "occupied"),
+        ("t9", "大厅", "A6", 4, "vacant"),
+        ("t10", "大厅", "A7", 4, "vacant"),
+        ("t11", "大厅", "A8", 6, "vacant"),
+        ("t12", "包间", "V6", 20, "vacant"),
+    ];
+    for (id, area, name, cap, status) in tables {
+        conn.execute(
+            "INSERT OR IGNORE INTO pos_tables (id, area, name, capacity, status) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, area, name, cap, status],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}

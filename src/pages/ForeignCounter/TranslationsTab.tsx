@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Box,
@@ -55,39 +55,29 @@ const LANGUAGES = [
   { code: 'id', name: '印尼语 (Indonesian)', flag: '🇮🇩' },
 ];
 
-const MOCK_TRANSLATIONS: Translation[] = [
-  { id: 't1', spu_id: 'spu_iphone15pm_bat', spu_name: 'iPhone 15 Pro Max 电池', language: 'en', translated_name: 'iPhone 15 Pro Max Battery', translated_description: 'Original replacement battery for iPhone 15 Pro Max, high-capacity 4422mAh, with installation tools.', updated_at: '2025-01-15' },
-  { id: 't2', spu_id: 'spu_iphone15pro_bat', spu_name: 'iPhone 15 Pro 电池', language: 'en', translated_name: 'iPhone 15 Pro Battery', translated_description: 'Original replacement battery for iPhone 15 Pro, high-capacity 3274mAh, with installation tools.', updated_at: '2025-01-16' },
-  { id: 't3', spu_id: 'spu_iphone15pm_bat', spu_name: 'iPhone 15 Pro Max 电池', language: 'ja', translated_name: 'iPhone 15 Pro Max バッテリー', translated_description: 'iPhone 15 Pro Max 用のオリジナル交換バッテリー、大容量 4422mAh、取り付け工具付き。', updated_at: '2025-01-15' },
-  { id: 't4', spu_id: 'spu_iphone15pm_bat', spu_name: 'iPhone 15 Pro Max 电池', language: 'es', translated_name: 'Batería iPhone 15 Pro Max', translated_description: 'Batería de reemplazo original para iPhone 15 Pro Max, alta capacidad 4422mAh, con herramientas de instalación.', updated_at: '2025-01-15' },
-];
-
 export default function TranslationsTab() {
-  const [translations, setTranslations] = useState<Translation[]>(MOCK_TRANSLATIONS);
+  const [translations, setTranslations] = useState<Translation[]>([]);
   const [language, setLanguage] = useState('en');
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [aiHint, setAiHint] = useState('');
 
-  useEffect(() => {
-    loadTranslations();
-  }, [language]);
-
-  const loadTranslations = async () => {
+  const loadTranslations = useCallback(async () => {
     setLoading(true);
     try {
       const list = await safeInvoke<Translation[]>('list_foreign_translations', { language });
-      if (list && list.length > 0) {
-        setTranslations(list);
-      }
-      // 否则保留 MOCK_TRANSLATIONS
+      setTranslations(Array.isArray(list) ? list : []);
     } catch {
-      /* keep mock */
+      setTranslations([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [language]);
+
+  useEffect(() => {
+    loadTranslations();
+  }, [loadTranslations]);
 
   const handleAITranslate = async () => {
     if (!keyword.trim()) {
@@ -97,7 +87,6 @@ export default function TranslationsTab() {
     setTranslating(true);
     setAiHint('');
     try {
-      // 模拟 AI 翻译：返回 12 个语种的预览
       const preview = LANGUAGES.map(l => `${l.flag} ${l.name.split(' ')[0]}：${keyword} (Pro)`).join('\n');
       setAiHint(`🤖 AI 批量翻译预览（${LANGUAGES.length} 个语种）：\n\n${preview}\n\n（演示版：实际接入后将调用 DeepSeek / 谷歌翻译 API）`);
     } catch (err) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Box,
@@ -56,47 +56,41 @@ const STATUS_MAP: Record<LogisticsTrack['status'], { label: string; color: 'defa
 
 const STEPS = ['已下单', '已揽收', '运输中', '清关中', '已签收'];
 
-const MOCK_TRACK: LogisticsTrack = {
-  tracking_no: 'DHL7894561230',
-  carrier: 'DHL',
-  status: 'in_transit',
-  origin: '深圳 (SZX)',
-  destination: '洛杉矶 (LAX)',
-  estimated_delivery: '2025-07-15',
-  events: [
-    { time: '2025-07-10 09:30', location: '深圳', description: '包裹已揽收', status: 'picked_up' },
-    { time: '2025-07-10 14:00', location: '深圳宝安机场', description: '到达机场，等待出境安检', status: 'in_transit' },
-    { time: '2025-07-11 03:20', location: '香港 HKG', description: '已出境，搭乘 CX2088 航班', status: 'in_transit' },
-    { time: '2025-07-12 18:45', location: '洛杉矶 LAX', description: '到达目的地机场，等待清关', status: 'customs' },
-  ],
-};
+const DEFAULT_TRACKING_NO = 'DHL7894561230';
 
 export default function LogisticsTab() {
-  const [trackingNo, setTrackingNo] = useState('DHL7894561230');
+  const [trackingNo, setTrackingNo] = useState(DEFAULT_TRACKING_NO);
   const [carrier, setCarrier] = useState('dhl');
-  const [track, setTrack] = useState<LogisticsTrack | null>(MOCK_TRACK);
+  const [track, setTrack] = useState<LogisticsTrack | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!trackingNo.trim()) return;
     setLoading(true);
+    setError('');
     try {
       const result = await safeInvoke<LogisticsTrack>('track_foreign_logistics', { trackingNo, carrier });
-      if (result) {
-        setTrack(result);
+      if (result?.tracking_no) {
+        setTrack({
+          ...result,
+          events: Array.isArray(result.events) ? result.events : [],
+        });
       } else {
-        setTrack(MOCK_TRACK); // 演示数据兜底
+        setTrack(null);
+        setError('未找到该运单的物流信息');
       }
     } catch {
-      setTrack(MOCK_TRACK);
+      setTrack(null);
+      setError('查询失败，请确认运单号后重试');
     } finally {
       setLoading(false);
     }
-  };
+  }, [trackingNo, carrier]);
 
   useEffect(() => {
     handleSearch();
-  }, []);
+  }, [handleSearch]);
 
   const statusInfo = track ? STATUS_MAP[track.status] : null;
   const stepIndex = statusInfo?.index ?? 0;
@@ -146,6 +140,10 @@ export default function LogisticsTab() {
           </Grid>
         </CardContent>
       </Card>
+
+      {error && !loading && (
+        <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>
+      )}
 
       {track && (
         <>
@@ -199,24 +197,28 @@ export default function LogisticsTab() {
           <Paper sx={{ p: 3 }} variant="outlined">
             <Typography variant="h6" sx={{ mb: 2 }}>轨迹明细</Typography>
             <Stack spacing={2}>
-              {track.events.map((evt, idx) => (
-                <Stack key={idx} direction="row" spacing={2} alignItems="flex-start">
-                  <Box sx={{ minWidth: 140 }}>
-                    <Typography variant="body2" color="text.secondary">{evt.time}</Typography>
-                  </Box>
-                  <Box sx={{ minWidth: 120 }}>
-                    <Chip size="small" label={evt.location} variant="outlined" />
-                  </Box>
-                  <Typography variant="body2">{evt.description}</Typography>
-                </Stack>
-              ))}
+              {track.events.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">暂无轨迹节点</Typography>
+              ) : (
+                track.events.map((evt, idx) => (
+                  <Stack key={idx} direction="row" spacing={2} alignItems="flex-start">
+                    <Box sx={{ minWidth: 140 }}>
+                      <Typography variant="body2" color="text.secondary">{evt.time}</Typography>
+                    </Box>
+                    <Box sx={{ minWidth: 120 }}>
+                      <Chip size="small" label={evt.location} variant="outlined" />
+                    </Box>
+                    <Typography variant="body2">{evt.description}</Typography>
+                  </Stack>
+                ))
+              )}
             </Stack>
           </Paper>
         </>
       )}
 
-      {!track && !loading && (
-        <Alert severity="info">输入运单号查询物流轨迹，或使用演示数据默认查询。</Alert>
+      {!track && !loading && !error && (
+        <Alert severity="info">输入运单号查询物流轨迹。</Alert>
       )}
     </Box>
   );

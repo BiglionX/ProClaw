@@ -1,6 +1,8 @@
 //! ProClaw 命令注册表模块
 //!
-//! 本模块提供统一的命令注册和管理机制，用于替代分散的 `#[cfg(feature = "...")]` 注解。
+//! **运行时命令注册以 `invoke_handler.rs` 中的 `generate_handler!` 为准。**
+//! 本模块的 `ModuleRegistry` 仅用于文档、开发与 `commandValidator` 参考，
+//! 不参与实际 Tauri 命令挂载（`main.rs` 不再调用 `build_command_registry`）。
 
 // 子模块
 pub mod stats;

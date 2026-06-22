@@ -1,9 +1,39 @@
 // 社区团购行业插件 Tauri 命令
 use crate::database::Database;
+use chrono::Utc;
 use rusqlite::params;
 use serde_json::{json, Value};
 use std::sync::Mutex;
 use uuid::Uuid;
+
+fn seed_gb_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM gb_groups", [], |row| row.get(0))
+        .unwrap_or(0);
+    if count > 0 {
+        return Ok(());
+    }
+    let now = Utc::now().to_rfc3339();
+    let groups = [
+        ("gb1", "周末生鲜团", "2026-06-20 08:00", "2026-06-22 20:00", 10, "open"),
+        ("gb2", "端午粽子预售", "2026-06-01 10:00", "2026-06-08 18:00", 20, "closed"),
+    ];
+    for (id, name, start, end, min_p, status) in groups {
+        conn.execute(
+            "INSERT OR IGNORE INTO gb_groups (id, name, start_at, end_at, min_participants, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![id, name, start, end, min_p, status, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO gb_orders (id, group_id, customer_name, items, total_amount, status, pickup_code, created_at)
+         VALUES ('gbo1', 'gb1', '王阿姨', '[]', 86.5, 'confirmed', 'PK8866', ?1)",
+        params![now],
+    )
+    .ok();
+    Ok(())
+}
 
 #[tauri::command]
 pub fn gb_get_groups(
@@ -12,6 +42,7 @@ pub fn gb_get_groups(
 ) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+    seed_gb_demo_if_empty(&conn)?;
     let groups: Vec<Value>;
     if let Some(ref s) = status {
         groups = {

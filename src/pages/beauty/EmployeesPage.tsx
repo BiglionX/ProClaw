@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Paper, Grid, Card, CardContent, CardActions,
   Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -10,6 +10,16 @@ import {
   Phone as PhoneIcon,
   CheckCircle as ActiveIcon,
 } from '@mui/icons-material';
+import { safeInvoke } from '../../lib/tauri';
+
+function parseServiceIds(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch { /* plain */ }
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
 
 interface Employee {
   id: string;
@@ -21,7 +31,7 @@ interface Employee {
   is_active: boolean;
 }
 
-const MOCK_SERVICES = ['剪发', '染发', '烫发', '面部护理', 'SPA套餐', '美甲'];
+const FALLBACK_SERVICES = ['剪发', '染发', '烫发', '面部护理', 'SPA套餐', '美甲'];
 
 const MOCK_EMPLOYEES: Employee[] = [
   { id: 'e1', name: '发型师小王', phone: '1380002001', hire_date: '2024-01-15', service_ids: ['剪发', '染发', '烫发'], commission_rate: 0.3, is_active: true },
@@ -36,19 +46,61 @@ const emptyEmployee: Employee = {
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+  const [serviceOptions, setServiceOptions] = useState<string[]>(FALLBACK_SERVICES);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Employee>(emptyEmployee);
+
+  const loadEmployees = useCallback(async () => {
+    try {
+      const [empRes, svcRes] = await Promise.all([
+        safeInvoke<{ data?: Array<Record<string, unknown>> }>('beauty_get_employees', {}),
+        safeInvoke<{ data?: Array<Record<string, unknown>> }>('beauty_get_services', {}),
+      ]);
+      const rows = empRes?.data ?? [];
+      if (rows.length > 0) {
+        setEmployees(rows.map((e) => ({
+          id: String(e.id ?? ''),
+          name: String(e.name ?? ''),
+          phone: String(e.phone ?? ''),
+          hire_date: String(e.hire_date ?? ''),
+          service_ids: parseServiceIds(e.service_ids),
+          commission_rate: Number(e.commission_rate ?? 0),
+          is_active: Boolean(e.is_active ?? true),
+        })));
+      }
+      const svcRows = svcRes?.data ?? [];
+      if (svcRows.length > 0) {
+        setServiceOptions(svcRows.map((s) => String(s.name ?? '')));
+      }
+    } catch {
+      /* keep mock in browser dev */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadEmployees();
+  }, [loadEmployees]);
 
   function handleOpen(emp?: Employee) {
     setEditing(emp || emptyEmployee);
     setDialogOpen(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (editing.id) {
       setEmployees((prev) => prev.map((e) => e.id === editing.id ? editing : e));
     } else {
-      setEmployees((prev) => [...prev, { ...editing, id: `e${Date.now()}` }]);
+      try {
+        await safeInvoke('beauty_create_employee', {
+          name: editing.name,
+          phone: editing.phone,
+          serviceIds: editing.service_ids,
+          commissionRate: editing.commission_rate,
+        });
+        await loadEmployees();
+      } catch {
+        setEmployees((prev) => [...prev, { ...editing, id: `e${Date.now()}` }]);
+      }
     }
     setDialogOpen(false);
   }
@@ -141,7 +193,7 @@ export default function EmployeesPage() {
                   onChange={(e) => setEditing({ ...editing, service_ids: e.target.value as string[] })}
                   renderValue={(selected) => (selected as string[]).join(', ')}
                 >
-                  {MOCK_SERVICES.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  {serviceOptions.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>

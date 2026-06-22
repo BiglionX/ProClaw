@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Grid, Chip, Button,
   Card, CardContent, CardActions, CircularProgress,
@@ -7,6 +7,7 @@ import {
   CheckCircle as DoneIcon, AccessTime as PendingIcon,
   LocalFireDepartment as UrgentIcon, Refresh as RefreshIcon,
 } from '@mui/icons-material';
+import { safeInvoke } from '../../lib/tauri';
 
 // ============ 类型 ============
 interface KdsOrder {
@@ -45,16 +46,44 @@ export default function KitchenDisplayPage() {
   const [orders, setOrders] = useState<KdsOrder[]>(MOCK_ORDERS);
   const [completingId, setCompletingId] = useState<string | null>(null);
 
-  function handleMarkDone(orderId: string) {
+  const loadOrders = useCallback(async () => {
+    try {
+      const res = await safeInvoke<{ data?: Array<Record<string, unknown>> }>('catering_get_kds_orders', {});
+      const rows = res?.data ?? [];
+      if (rows.length > 0) {
+        setOrders(rows.map((o) => ({
+          id: String(o.id ?? ''),
+          table_id: String(o.table_id ?? ''),
+          items: String(o.items ?? '[]'),
+          status: String(o.status ?? 'pending'),
+          created_at: String(o.created_at ?? new Date().toISOString()),
+        })));
+      }
+    } catch {
+      /* keep mock in browser dev */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+    const timer = setInterval(loadOrders, 15000);
+    return () => clearInterval(timer);
+  }, [loadOrders]);
+
+  async function handleMarkDone(orderId: string) {
     setCompletingId(orderId);
-    setTimeout(() => {
+    try {
+      await safeInvoke('catering_mark_kds_item_done', { orderId });
+      await loadOrders();
+    } catch {
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    } finally {
       setCompletingId(null);
-    }, 500);
+    }
   }
 
   function handleRefresh() {
-    setOrders([...MOCK_ORDERS]);
+    loadOrders();
   }
 
   const pendingOrders = orders.filter((o) => o.status === 'pending' || o.status === 'preparing');
