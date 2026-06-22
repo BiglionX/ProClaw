@@ -8,6 +8,7 @@ function ScanLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get('code');
+  const demoMode = searchParams.get('demo') === '1' || searchParams.get('auto') === 'demo';
   
   // 预生成二维码图案（静态）
   const qrPattern: boolean[] = [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false, true];
@@ -54,7 +55,39 @@ function ScanLoginContent() {
     }
   }, [code, router]);
 
+  const runDemoLogin = useCallback(async () => {
+    setStatus('loading');
+    setMessage('正在为演示账号登录…');
+    try {
+      const res = await fetch('/api/auth/qrcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'demo', username: 'boss' }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setStatus('success');
+        setMessage('登录成功！正在跳转…');
+        localStorage.setItem('tenant_id', result.data.tenant_id);
+        localStorage.setItem('is_admin', 'true');
+        setTimeout(() => {
+          router.push(result.data.redirect || '/tenant/dashboard');
+        }, 800);
+      } else {
+        setStatus('error');
+        setMessage(result.error || '演示登录失败');
+      }
+    } catch {
+      setStatus('error');
+      setMessage('网络错误，请重试');
+    }
+  }, [router]);
+
   useEffect(() => {
+    if (demoMode) {
+      runDemoLogin();
+      return;
+    }
     if (code) {
       // 短暂延迟后显示扫描状态
       const timer1 = setTimeout(() => {
@@ -72,7 +105,7 @@ function ScanLoginContent() {
         clearTimeout(timer2);
       };
     }
-  }, [code, verifyCode]);
+  }, [code, demoMode, verifyCode, runDemoLogin]);
   
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">

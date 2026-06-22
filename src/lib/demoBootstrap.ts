@@ -3,7 +3,7 @@
  * ------------------------------------------------------------------
  * 演示账号 `boss / IamBigBoss` 首次登录（或检测到无预置数据时）自动注入：
  *   - 20 个 iPhone 电池 SPU（demo 产品）
- *   - 1 个已开通的云商城（proclaw.cc/demo）
+ *   - 1 个已开通的云商城（proclaw.cc/shop/demo）
  *   - 3 个 AI Team（AI 经营团队 / 国内社媒 / 海外社媒）从 Nvwax 下载，失败回退到 localTeamSkillMap
  *   - 1 个外贸柜台运营助手插件（注册到 manifestRegistry）
  *   - 数据标记为「演示数据」方便后续识别/重置（demoFlag）
@@ -12,7 +12,7 @@
 
 import { isDemoAccount } from './aiTeamTokenService';
 import { safeInvoke, isTauri } from './tauri';
-import { createCloudStore, getCloudStore, type CloudStore, type PlanType } from './cloudStoreService';
+import { createCloudStore, getCloudStore, ensureRemoteDemoTenant, getDemoStorePublicUrl, type CloudStore, type PlanType } from './cloudStoreService';
 import { AgentMarketService } from './agentMarketService';
 import { markAsDemoData, clearDemoData, isDemoDataInitialized } from './demoFlag';
 import { registerForeignCounterPlugin } from './manifestRegistry';
@@ -58,12 +58,13 @@ export const DEMO_TEAM_SKILL_IDS = [
 /** 演示账号默认云商城子域名（与 cloud-store/src/middleware.ts 的 /shop/[store] 路由对齐） */
 export const DEMO_CLOUD_STORE_SUBDOMAIN = 'demo';
 
-/**
- * 演示账号云商城的访问 URL（路径模式而非子域名模式）。
- * - 桌面端展示与云端中间件都使用此 URL
- * - 与 marketing-site 的「proclaw.cc/shop/demo」保持一致
- */
-export const DEMO_CLOUD_STORE_URL = 'https://proclaw.cc/demo';
+/** 演示账号云商城访问 URL（路径模式） */
+export function getDemoCloudStoreUrl(): string {
+  return getDemoStorePublicUrl();
+}
+
+/** @deprecated 使用 getDemoCloudStoreUrl() */
+export const DEMO_CLOUD_STORE_URL = 'https://proclaw.cc/shop/demo';
 
 /** 演示账号默认云商城套餐 */
 export const DEMO_CLOUD_STORE_PLAN: PlanType = 'free';
@@ -163,7 +164,7 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
       name: 'ensure-cloud-store',
       success: cloudStoreActivated,
       message: cloudStoreActivated
-        ? `云商城已开通（${DEMO_CLOUD_STORE_URL}）`
+        ? `云商城已开通（${getDemoCloudStoreUrl()}）`
         : '云商城激活失败',
       durationMs: performance.now() - t3,
     });
@@ -274,6 +275,8 @@ async function ensureCloudStore(force: boolean): Promise<boolean> {
     // 创建演示云商城
     const store = await createCloudStore(DEMO_CLOUD_STORE_PLAN, DEMO_CLOUD_STORE_SUBDOMAIN);
     markCloudStoreAsDemo(store);
+    // 同步云端租户（失败不阻塞本地演示）
+    ensureRemoteDemoTenant().catch(() => {});
     return !!store;
   } catch (err) {
     console.error('[demoBootstrap] ensureCloudStore 失败：', err);

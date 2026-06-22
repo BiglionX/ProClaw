@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
+import { storePath } from '@/lib/utils';
 
 interface CartItem {
   id: string;
@@ -206,7 +207,7 @@ export default function CartPage() {
                       联系客服
                     </a>
                     <button
-                      onClick={() => router.push('/checkout')}
+                      onClick={() => router.push(storePath(subdomain, 'checkout'))}
                       className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                     >
                       去结算
@@ -225,7 +226,7 @@ export default function CartPage() {
             <h3 className="mt-4 text-lg font-medium text-gray-900">购物车是空的</h3>
             <p className="mt-2 text-gray-500">快去挑选心仪的商品吧</p>
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push(storePath(subdomain))}
               className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
             >
               去购物

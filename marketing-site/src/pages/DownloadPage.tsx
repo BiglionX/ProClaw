@@ -186,7 +186,7 @@ const cloudTokenPricing = {
     { item: '商品免费同步', value: '前 20 个', desc: '免费体验商城基础功能' },
     { item: '商品免月租', value: '20 个永久免费', desc: '与免费同步配套' },
     { item: '图片免存储', value: '100 MB 永久免费', desc: '覆盖基础商品图片需求' },
-    { item: '子域名', value: '永久免费', desc: 'xxx.proclaw.cc 格式' },
+    { item: '商城地址', value: '永久免费', desc: 'proclaw.cc/shop/商店名 格式' },
     { item: '商城页面托管', value: '永久免费', desc: '基础页面托管不收费' },
   ],
 };

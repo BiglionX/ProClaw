@@ -37,6 +37,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  // 对外 URL：proclaw.cc/shop/{store} → 内部仍走 /[store] 动态路由
+  async rewrites() {
+    return [
+      {
+        source: "/shop/:store",
+        destination: "/:store",
+      },
+      {
+        source: "/shop/:store/:path*",
+        destination: "/:store/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

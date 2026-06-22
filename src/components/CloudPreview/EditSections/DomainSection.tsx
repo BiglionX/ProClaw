@@ -209,7 +209,7 @@ export default function DomainSection({ onDomainChange }: DomainSectionProps) {
         )}
         {hasCustomDomain && !editing && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontSize: 10 }}>
-            请确保 CNAME 已指向 {store.subdomain}.proclaw.cc
+            请确保 CNAME 已指向 proclaw.cc
           </Typography>
         )}
       </Box>

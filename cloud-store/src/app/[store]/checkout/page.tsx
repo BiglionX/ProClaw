@@ -2,7 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
+import { storePath } from '@/lib/utils';
 
 interface CartItem {
   id: string;
@@ -16,6 +17,8 @@ interface CartItem {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const params = useParams();
+  const subdomain = (params.store as string) || '';
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -71,7 +74,7 @@ export default function CheckoutPage() {
       const result = await res.json();
       
       if (result.success) {
-        router.push(`/checkout/success?order_id=${result.data.order_id}`);
+        router.push(`${storePath(subdomain, 'checkout', 'success')}?order_id=${result.data.order_id}`);
       } else {
         alert(result.error || '创建订单失败');
       }

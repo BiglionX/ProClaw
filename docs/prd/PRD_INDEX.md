@@ -85,7 +85,7 @@
 
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
-| [ProClaw 云托管商城（AI 生成独立站）](cloud-store/需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md) | v5.0 | ✅ 已实现 v1.0+ | 演示账号预置 proclaw.cc/demo |
+| [ProClaw 云托管商城（AI 生成独立站）](cloud-store/需求文档：ProClaw%20云托管商城（AI%20生成独立站）PRD%20v5.0.md) | v5.0 | ✅ 已实现 v1.0+ | 标准 URL：proclaw.cc/shop/{商店名} |
 | [ProClaw 云托管商城 Token 计费模式改造](cloud-store/需求文档：ProClaw%20云托管商城%20Token%20计费模式改造（PRD%20v8.0）.md) | v8.0 | ✅ 已实现 v1.0+ | Token 购买/余额/明细上线 |
 | [ProClaw 云商城开通引导流程](cloud-store/需求文档：云商城开通引导流程（PRD%20v6.0）.md) | v6.0 | ✅ 已实现 v1.0+ | 5 步引导流程 |
 | [云商城 AI 客服模块](cloud-store/需求文档：云商城%20AI%20客服模块.md) | v1.0 | 🔵 部分实现 ~60% | 独立 AI 客服 Agent 上线；人工坐席待 v1.x |

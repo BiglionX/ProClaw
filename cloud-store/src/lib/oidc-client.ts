@@ -2,7 +2,7 @@ import { generateCodeVerifier, generateCodeChallenge } from './pkce';
 
 const ISSUER = process.env.NEXT_PUBLIC_OIDC_ISSUER || 'https://account.proclaw.cc';
 const CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || 'proclaw_web';
-const REDIRECT_URI = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || 'https://app.proclaw.cc/auth/callback';
+const REDIRECT_URI = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || 'https://proclaw.cc/auth/callback';
 
 export interface TokenResponse {
   access_token: string;

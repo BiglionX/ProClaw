@@ -6,6 +6,37 @@
 import { safeInvoke, isTauri } from './tauri';
 import { ProductSPU } from './productService';
 
+/** 云商城公网根地址（与 marketing-site 反向代理对齐，默认 proclaw.cc） */
+export function getCloudStorePublicOrigin(): string {
+  const fromEnv = import.meta.env.VITE_CLOUD_STORE_URL?.replace(/\/$/, '');
+  return fromEnv || 'https://proclaw.cc';
+}
+
+/** 演示商城路径 URL */
+export function getDemoStorePublicUrl(): string {
+  return `${getCloudStorePublicOrigin()}/shop/demo`;
+}
+
+/** 商户后台登录（演示账号可 auto=demo 直通） */
+export function getTenantLoginUrl(autoDemo = false): string {
+  const base = `${getCloudStorePublicOrigin()}/tenant/login`;
+  return autoDemo ? `${base}?auto=demo` : base;
+}
+
+/** 幂等同步云端 demo 租户（浏览器一键体验后调用） */
+export async function ensureRemoteDemoTenant(): Promise<boolean> {
+  try {
+    const res = await fetch(`${getCloudStorePublicOrigin()}/api/tenant/init`, {
+      method: 'GET',
+    });
+    const data = await res.json();
+    return data?.success === true;
+  } catch (err) {
+    console.warn('[CloudStore] ensureRemoteDemoTenant failed:', err);
+    return false;
+  }
+}
+
 // ========== 类型定义 ==========
 
 export type StoreStatus = 'inactive' | 'active' | 'expired' | 'suspended';
@@ -428,28 +459,14 @@ export const PLAN_INFO: Record<PlanType, PlanInfo> = {
 // ========== 工具函数 ==========
 
 /**
- * 演示账号专用的 URL 模板（路径模式而非子域名模式）。
- * - 普通账号：`{subdomain}.proclaw.cc`（子域名）
- * - 演示账号：`proclaw.cc/demo`（与 cloud-store/src/middleware.ts 的 /shop/[store] 路由对齐）
- *
- * 仅在 store.subdomain === 'demo' 且无 custom_domain 时触发，便于
- * 演示账号（boss@proclaw.demo）使用统一路径访问云商城。
- */
-const DEMO_PATH_SUBDOMAIN = 'demo';
-const DEMO_PATH_URL = 'https://proclaw.cc/demo';
-
-/**
  * 获取商城访问 URL
+ * 标准路径：proclaw.cc/shop/{subdomain}
  */
 export function getStoreUrl(store: CloudStore): string {
   if (store.custom_domain) {
     return `https://${store.custom_domain}`;
   }
-  // 演示账号走路径模式（proclaw.cc/demo），与 cloud-store 中间件 /shop/[store] 路由对齐
-  if (store.subdomain === DEMO_PATH_SUBDOMAIN) {
-    return DEMO_PATH_URL;
-  }
-  return `https://${store.subdomain}.proclaw.cc`;
+  return `${getCloudStorePublicOrigin()}/shop/${store.subdomain}`;
 }
 
 /**

@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { storePath } from '@/lib/utils';
 
 interface Order {
   id: string;
@@ -187,7 +188,7 @@ export default function OrdersPage() {
             <h3 className="mt-4 text-lg font-medium text-gray-900">暂无订单</h3>
             <p className="mt-2 text-gray-500">快去选购心仪的商品吧</p>
             <Link
-              href="/"
+              href={storePath(subdomain)}
               className="mt-6 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
             >
               去购物

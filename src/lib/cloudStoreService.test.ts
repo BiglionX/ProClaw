@@ -481,9 +481,9 @@ describe('cloudStoreService', () => {
 
   // ---------- 套件 19: getStoreUrl ----------
   describe('getStoreUrl', () => {
-    it('无自定义域名时返回 proclaw.cc 子域', () => {
+    it('无自定义域名时返回 proclaw.cc/shop/{subdomain} 路径', () => {
       const url = getStoreUrl({ ...MOCK_STORE, custom_domain: undefined });
-      expect(url).toBe('https://iphone-battery-pro.proclaw.cc');
+      expect(url).toBe('https://proclaw.cc/shop/iphone-battery-pro');
     });
 
     it('有自定义域名时返回自定义域名', () => {
@@ -496,12 +496,10 @@ describe('cloudStoreService', () => {
       expect(getStoreUrl({ ...MOCK_STORE, custom_domain: 'x.com' }).startsWith('https://')).toBe(true);
     });
 
-    it('演示账号（subdomain=demo）应返回路径模式 URL：https://proclaw.cc/demo', () => {
-      // 与 cloud-store 的 /shop/[store] 路由对齐
+    it('演示账号（subdomain=demo）应返回 /shop/demo 路径 URL', () => {
       const demoStore: CloudStore = { ...MOCK_STORE, subdomain: 'demo', custom_domain: undefined };
       const url = getStoreUrl(demoStore);
-      expect(url).toBe('https://proclaw.cc/demo');
-      // 演示账号不能用子域名模式（避免 demo.proclaw.cc 被错误指向）
+      expect(url).toBe('https://proclaw.cc/shop/demo');
       expect(url).not.toMatch(/^https:\/\/demo\./);
     });
 

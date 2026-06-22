@@ -27,7 +27,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCloudStore, useInvalidateCloudStore, useStoreStats } from '../../lib/hooks/useCloudStore';
-import { getStoreUrl } from '../../lib/cloudStoreService';
+import { getStoreUrl, getTenantLoginUrl } from '../../lib/cloudStoreService';
 import { safeNumber, safeFixed } from '../../lib/format';
 import CloudStoreSetupWizard from './StoreSetupWizard';
 import { isDemoAccount } from '../../lib/aiTeamTokenService';
@@ -114,7 +114,7 @@ export default function StoreDashboard({
       setError('请先开通云商城');
       return;
     }
-    // 弹出手机模拟器预览 Dialog（使用真实域名 https://${subdomain}.proclaw.cc）
+    // 弹出手机模拟器预览 Dialog（使用 getStoreUrl：proclaw.cc/shop/{subdomain}）
     setMobilePreviewOpen(true);
   };
 
@@ -188,7 +188,7 @@ export default function StoreDashboard({
   }
 
   // 已开通状态 - 显示概览
-  // 使用 getStoreUrl 而非硬编码，演示账号会自动走 proclaw.cc/demo 路径
+  // 使用 getStoreUrl：标准路径 proclaw.cc/shop/{subdomain}
   const storeUrl = getStoreUrl(store);
 
   return (
@@ -238,6 +238,16 @@ export default function StoreDashboard({
               <Typography variant="body1" color="primary.main" sx={{ fontWeight: 600 }}>{storeUrl}</Typography>
               <Button size="small" onClick={() => navigator.clipboard.writeText(storeUrl)}>复制</Button>
               <Button size="small" endIcon={<LaunchIcon />} onClick={() => window.open(storeUrl, '_blank')}>访问</Button>
+              {isDemo && isDemoResource('cloudStore', store.subdomain) && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => window.open(getTenantLoginUrl(true), '_blank')}
+                >
+                  管理云端后台
+                </Button>
+              )}
               <Button
                 size="small"
                 variant="contained"
@@ -319,7 +329,7 @@ export default function StoreDashboard({
         </DialogActions>
       </Dialog>
 
-      {/* 手机模拟器预览 Dialog（使用真实域名 https://${subdomain}.proclaw.cc） */}
+      {/* 手机模拟器预览 Dialog（proclaw.cc/shop/{subdomain}） */}
       {store && (
         <StoreMobilePreviewDialog
           open={mobilePreviewOpen}

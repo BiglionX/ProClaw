@@ -11,7 +11,7 @@
 | **代码入口** | `cloud-store/`（Next.js 16 完整 Web 端）、`cloud-store/vercel.json`、`cloud-store/Dockerfile`、`cloud-store/src/lib/billing/` |
 | **数据库依赖** | `database/complete_schema.sql`（云商城全表 + token 计费） |
 | **测试覆盖** | `e2e/cloud-store-flow.spec.ts` |
-| **差异与遗留** | 无显著差异；演示账号已预置 `proclaw.cc/demo` |
+| **差异与遗留** | 无显著差异；演示账号已预置 `proclaw.cc/shop/demo` |
 | **后续动作** | 维持现状；按市场反馈扩展功能 |
 
 ### 状态变更日志

@@ -1143,7 +1143,7 @@ test.describe('云商城创建 - 创建后功能验证', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
-    // 商城 URL 显示（如 xxx.proclaw.cc）
+    // 商城 URL 显示（如 proclaw.cc/shop/xxx）
     const hasUrl = await page.locator('text=proclaw.cc').first().isVisible({ timeout: 3000 }).catch(() => false);
     // 复制按钮
     const hasCopyBtn = await page.locator('button:has-text("复制")').first().isVisible({ timeout: 1000 }).catch(() => false);

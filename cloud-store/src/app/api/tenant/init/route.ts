@@ -4,6 +4,28 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createRouteSupabaseClient } from '@/lib/supabase-server';
 import { initializeTenantSchema } from '@/lib/tenant';
+import { ensureDemoTenant } from '@/lib/multi-tenant';
+import { storePublicUrl } from '@/lib/utils';
+
+/** 幂等初始化演示租户（ProClaw 一键体验后调用） */
+export async function GET() {
+  const result = await ensureDemoTenant();
+  if (!result.success) {
+    return NextResponse.json(
+      { success: false, error: result.error || '初始化失败' },
+      { status: 500 }
+    );
+  }
+  return NextResponse.json({
+    success: true,
+    data: {
+      tenant_id: result.tenant_id,
+      subdomain: result.subdomain,
+      created: result.created,
+      store_url: storePublicUrl(result.subdomain!),
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
   const response = NextResponse.next();

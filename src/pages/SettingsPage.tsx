@@ -411,7 +411,7 @@ export default function SettingsPage() {
                   <ListItem>
                     <ListItemIcon sx={{ minWidth: 32 }}>🏪</ListItemIcon>
                     <ListItemText
-                      primary={`已开通云商城（${demoFlag?.cloudStoreSubdomain ?? 'demo'}.proclaw.cc）`}
+                      primary={`已开通云商城（proclaw.cc/shop/${demoFlag?.cloudStoreSubdomain ?? 'demo'}）`}
                       secondary="云商城 8 个管理 Tab + 预览"
                     />
                   </ListItem>

@@ -175,15 +175,13 @@ export const storeRouteConfig = {
 
 /**
  * 获取租户商城的完整 URL
+ * 标准路径：proclaw.cc/shop/{subdomain}
  */
 export function getStoreUrl(subdomain: string, customDomain?: string): string {
   if (customDomain) {
     return `https://${customDomain}`;
   }
-  
-  // 开发环境和生产环境判断
-  const isDev = process.env.NODE_ENV === 'development';
-  const baseDomain = isDev ? `${subdomain}.localhost:3000` : `${subdomain}.proclaw.cc`;
-  
-  return `https://${baseDomain}`;
+
+  const siteOrigin = (process.env.NEXT_PUBLIC_SITE_URL || 'https://proclaw.cc').replace(/\/$/, '');
+  return `${siteOrigin}/shop/${subdomain}`;
 }

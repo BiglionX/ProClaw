@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { updateCloudStore, resetApiKey } from '../../lib/cloudStoreService';
+import { updateCloudStore, resetApiKey, getStoreUrl } from '../../lib/cloudStoreService';
 import { useCloudStore, useInvalidateCloudStore } from '../../lib/hooks/useCloudStore';
 
 interface StoreSettingsProps {
@@ -103,6 +103,7 @@ export default function StoreSettings({
   const maskedApiKey = store.api_key
     ? `${store.api_key.slice(0, 8)}${'*'.repeat(Math.max(0, store.api_key.length - 8))}`
     : '';
+  const storePublicUrl = getStoreUrl(store);
 
   return (
     <Box>
@@ -120,9 +121,9 @@ export default function StoreSettings({
           <Divider sx={{ mb: 3 }} />
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>默认子域名</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>商城地址</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip label={`${store.subdomain}.proclaw.cc`} color="primary" />
+                <Chip label={storePublicUrl.replace(/^https?:\/\//, '')} color="primary" />
                 <Chip icon={<SslIcon sx={{ fontSize: 16 }} />} label="SSL 已启用" size="small" color="success" variant="outlined" />
               </Box>
             </Box>
@@ -134,7 +135,7 @@ export default function StoreSettings({
                   value={customDomain}
                   onChange={e => setCustomDomain(e.target.value)}
                   size="small"
-                  helperText="请先将域名 CNAME 指向 ${store.subdomain}.proclaw.cc"
+                  helperText={`请先将域名 CNAME 指向 proclaw.cc（当前商城路径：/shop/${store.subdomain}）`}
                   sx={{ minWidth: 320 }}
                 />
                 <Button variant="contained" onClick={handleSaveDomain} disabled={!customDomain.trim() || saving}>

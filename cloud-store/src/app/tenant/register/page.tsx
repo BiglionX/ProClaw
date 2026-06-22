@@ -236,22 +236,22 @@ export default function TenantRegisterPage() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                选择子域名 <span className="text-red-500">*</span>
+                商店名（URL 路径） <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center">
+                <span className="px-3 py-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-500 text-sm whitespace-nowrap">
+                  proclaw.cc/shop/
+                </span>
                 <input
                   type="text"
                   name="subdomain"
                   value={formData.subdomain}
                   onChange={handleInputChange}
                   placeholder="myshop"
-                  className={`flex-1 px-4 py-3 rounded-l-lg border ${
+                  className={`flex-1 px-4 py-3 rounded-r-lg border ${
                     errors.subdomain ? 'border-red-500' : 'border-gray-300'
                   } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                 />
-                <span className="px-4 py-3 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-500">
-                  .proclaw.cc
-                </span>
               </div>
               {errors.subdomain && <p className="text-red-500 text-sm mt-1">{errors.subdomain}</p>}
               
@@ -278,7 +278,7 @@ export default function TenantRegisterPage() {
             <div className="bg-blue-50 rounded-lg p-4">
               <h4 className="font-medium text-blue-900 mb-2">您的商城地址</h4>
               <p className="text-blue-700 font-mono">
-                {formData.subdomain || 'xxxxx'}.proclaw.cc
+                proclaw.cc/shop/{formData.subdomain || 'xxxxx'}
               </p>
             </div>
             

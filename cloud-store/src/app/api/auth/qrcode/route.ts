@@ -3,7 +3,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteSupabaseClient } from '@/lib/supabase-server';
-import { getTenantContext } from '@/lib/multi-tenant';
+import {
+  DEMO_ACCOUNT_EMAIL,
+  DEMO_TENANT_SUBDOMAIN,
+  ensureDemoTenant,
+  getTenantContext,
+} from '@/lib/multi-tenant';
 import { randomBytes } from 'crypto';
 
 // 存储待验证的登录码（使用 Redis 或数据库，生产环境避免内存存储）
@@ -28,6 +33,8 @@ export async function POST(request: NextRequest) {
       return handleVerify(request);
     } else if (action === 'check') {
       return handleCheck(request);
+    } else if (action === 'demo') {
+      return handleDemoLogin(request);
     }
     
     return NextResponse.json(
@@ -201,4 +208,71 @@ async function handleCheck(request: NextRequest) {
       tenant_id: session.tenant_id,
     },
   });
+}
+
+const DEMO_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+
+/**
+ * 演示账号直通登录（boss / boss@proclaw.demo）
+ */
+async function handleDemoLogin(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const username = String(body.username || 'boss').trim().toLowerCase();
+  const isBoss =
+    username === 'boss' || username === DEMO_ACCOUNT_EMAIL;
+
+  if (!isBoss) {
+    return NextResponse.json(
+      { success: false, error: '仅支持 ProClaw 演示账号登录' },
+      { status: 403 }
+    );
+  }
+
+  const ensured = await ensureDemoTenant();
+  if (!ensured.success || !ensured.tenant_id) {
+    return NextResponse.json(
+      { success: false, error: ensured.error || '演示租户未就绪' },
+      { status: 500 }
+    );
+  }
+
+  const response = NextResponse.json({
+    success: true,
+    data: {
+      email: DEMO_ACCOUNT_EMAIL,
+      tenant_id: ensured.tenant_id,
+      subdomain: DEMO_TENANT_SUBDOMAIN,
+      redirect: '/tenant/dashboard',
+    },
+  });
+
+  const secure = process.env.NODE_ENV === 'production';
+  response.cookies.set('pc_demo_auth', DEMO_ACCOUNT_EMAIL, {
+    path: '/',
+    maxAge: DEMO_COOKIE_MAX_AGE,
+    sameSite: 'lax',
+    httpOnly: true,
+    secure,
+  });
+  response.cookies.set('pc_session', `demo:${ensured.tenant_id}`, {
+    path: '/',
+    maxAge: DEMO_COOKIE_MAX_AGE,
+    sameSite: 'lax',
+    httpOnly: true,
+    secure,
+  });
+  response.cookies.set('tenant_subdomain', DEMO_TENANT_SUBDOMAIN, {
+    path: '/',
+    maxAge: DEMO_COOKIE_MAX_AGE,
+    sameSite: 'lax',
+    httpOnly: false,
+  });
+  response.cookies.set('tenant_id', ensured.tenant_id, {
+    path: '/',
+    maxAge: DEMO_COOKIE_MAX_AGE,
+    sameSite: 'lax',
+    httpOnly: false,
+  });
+
+  return response;
 }

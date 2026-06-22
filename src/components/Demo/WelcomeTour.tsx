@@ -90,7 +90,7 @@ export default function WelcomeTour() {
     },
     {
       icon: <StorefrontIcon sx={{ color: '#F59E0B' }} />,
-      title: `已开通云商城（${storeSub}.proclaw.cc）`,
+      title: `已开通云商城（proclaw.cc/shop/${storeSub}）`,
       desc: '点击「预览」按钮即可访问，支持 8 个管理 Tab',
       action: { label: '查看云商城', path: '/shop' },
     },

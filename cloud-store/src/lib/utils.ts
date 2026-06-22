@@ -66,3 +66,23 @@ export function formatTokens(amount: number): string {
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
 }
+
+/** Shop storefront path prefix: proclaw.cc/shop/{subdomain} */
+export const SHOP_PATH_PREFIX = '/shop';
+
+/** Build storefront path, e.g. /shop/mystore/cart */
+export function storePath(subdomain: string, ...segments: string[]): string {
+  const base = `${SHOP_PATH_PREFIX}/${subdomain}`;
+  if (segments.length === 0) return base;
+  return `${base}/${segments.join('/')}`;
+}
+
+/** Build full public storefront URL */
+export function storePublicUrl(
+  subdomain: string,
+  siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://proclaw.cc',
+  ...segments: string[]
+): string {
+  const origin = siteOrigin.replace(/\/$/, '');
+  return `${origin}${storePath(subdomain, ...segments)}`;
+}

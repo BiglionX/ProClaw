@@ -5,7 +5,7 @@ const SKIP_PATHS = ['/_next', '/favicon', '/api/health', '/public'];
 const AUTH_PATHS = ['/app', '/dashboard'];
 const OIDC_ISSUER = process.env.NEXT_PUBLIC_OIDC_ISSUER || 'https://account.proclaw.cc';
 const OIDC_CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || 'proclaw_web';
-const OIDC_REDIRECT_URI = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || 'https://app.proclaw.cc/auth/callback';
+const OIDC_REDIRECT_URI = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || 'https://proclaw.cc/auth/callback';
 
 /**
  * 获取平台主域名列表
@@ -110,6 +110,13 @@ function buildOidcAuthUrl(redirectUri: string): string {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // 商户登录页 → 演示直通登录（boss 测试账号）
+  if (pathname === '/tenant/login') {
+    const auto = request.nextUrl.searchParams.get('auto');
+    const dest = auto === 'demo' ? '/auth/scan?auto=demo' : '/auth/scan?demo=1';
+    return NextResponse.redirect(new URL(dest, request.url));
+  }
   
   if (shouldSkipPath(pathname)) {
     return NextResponse.next();
@@ -123,29 +130,27 @@ export function middleware(request: NextRequest) {
     }
   }
   
-  // 路径格式: /shop/[store] 或 /[store] (租户商城)
-  // 例如: /shop/demo, /demo
+  // 路径格式: /shop/[store]（标准）或 /[store]（兼容，会 302 到 /shop/[store]）
   let subdomain: string | null = null;
   
-  // 情况1: /shop/[store] 路径格式
-  const shopMatch = pathname.match(new RegExp('^/shop/([a-z0-9-]+)'));
+  // 情况1: /shop/[store] 路径格式（推荐）
+  const shopMatch = pathname.match(/^\/shop\/([a-z0-9-]+)/);
   if (shopMatch) {
     subdomain = shopMatch[1];
   }
   
-  // 情况2: /[store] 直接路径格式（不匹配已知的平台路径）
+  // 情况2: /[store] 根路径（兼容旧链接，重定向到 /shop/[store]）
   if (!subdomain) {
     const knownPaths = ['api', 'app', 'auth', 'cart', 'checkout', 'login', 'orders', 'products', 'register', 'tenant', 'shop', 'admin'];
-    const pathMatch = pathname.match(new RegExp('^/([a-z0-9-]+)'));
+    const pathMatch = pathname.match(/^\/([a-z0-9-]+)(\/.*)?$/);
     if (pathMatch) {
       const firstPath = pathMatch[1].toLowerCase();
       if (!knownPaths.includes(firstPath)) {
-        subdomain = pathMatch[1];
+        const rest = pathMatch[2] || '';
+        return NextResponse.redirect(new URL(`/shop/${pathMatch[1]}${rest}`, request.url));
       }
     }
   }
-  
-  // 情况3: 子域名格式 (e.g., demo.localhost:3000)
   if (!subdomain) {
     subdomain = extractSubdomain(request.headers.get('host') || '');
   }

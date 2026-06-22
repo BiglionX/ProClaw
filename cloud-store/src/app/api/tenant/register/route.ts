@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       data: {
         tenant_id: tenant.id,
         subdomain: tenant.subdomain,
-        store_url: `https://${tenant.subdomain}.proclaw.cc`,
+        store_url: `https://proclaw.cc/shop/${tenant.subdomain}`,
         schema_name: schemaName,
       },
     });

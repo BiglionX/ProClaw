@@ -15,7 +15,7 @@ interface StoreStats {
   views: number;
 }
 
-const DEMO_STORE_URL = 'https://proclaw.cc/demo';
+const DEMO_STORE_URL = 'https://proclaw.cc/shop/demo';
 const DEMO_STORE_SUBDOMAIN = 'demo';
 
 export default function CloudStoreScreen() {
@@ -74,7 +74,7 @@ export default function CloudStoreScreen() {
             <MaterialCommunityIcons name="store" size={40} color="#6366f1" />
           </View>
           <Text variant="headlineSmall" style={styles.storeName}>
-            {demo ? `proclaw.cc/demo` : '未开通云商城'}
+            {demo ? `proclaw.cc/shop/demo` : '未开通云商城'}
           </Text>
           <View style={[styles.statusBadge, { backgroundColor: demo ? '#10b981' : '#f59e0b' }]}>
             <Text style={styles.statusBadgeText}>

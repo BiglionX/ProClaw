@@ -5,7 +5,7 @@
  * 设计：参照 StorePreviewEditor 内的 PhoneSimulator，但内容改为 iframe
  *
  * 关键点：
- * - 使用真实域名 getStoreUrl(store)（演示账号走 proclaw.cc/demo 路径）
+ * - 使用真实域名 getStoreUrl(store)（proclaw.cc/shop/{subdomain}）
  * - iframe 加载 H5 商城，模拟用户用手机访问
  * - 顶部地址栏显示当前 URL（含复制 + 新窗口打开）
  * - 检测 iframe 加载失败时降级提示
@@ -47,7 +47,7 @@ export default function StoreMobilePreviewDialog({
   onClose,
   subdomain,
 }: StoreMobilePreviewDialogProps) {
-  // 使用 getStoreUrl，演示账号走 proclaw.cc/demo 路径模式
+  // 使用 getStoreUrl：proclaw.cc/shop/{subdomain}
   const storeUrl = getStoreUrl({
     id: 'preview',
     user_id: '',

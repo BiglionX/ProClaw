@@ -2,17 +2,19 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { storePath } from '@/lib/utils';
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
+  const params = useParams();
+  const subdomain = (params.store as string) || searchParams.get('store') || '';
   const orderId = searchParams.get('order_id');
-  const store = searchParams.get('store');
   
   // 构建联系客服 URL
-  const customerServiceUrl = store 
-    ? `https://proclaw.cc/customer-service?store=${encodeURIComponent(store)}${orderId ? `&order=${encodeURIComponent(orderId)}` : ''}`
+  const customerServiceUrl = subdomain
+    ? `https://proclaw.cc/customer-service?store=${encodeURIComponent(subdomain)}${orderId ? `&order=${encodeURIComponent(orderId)}` : ''}`
     : `https://proclaw.cc/customer-service${orderId ? `?order=${encodeURIComponent(orderId)}` : ''}`;
   
   return (
@@ -62,13 +64,13 @@ function OrderSuccessContent() {
         {/* 操作按钮 */}
         <div className="space-y-3">
           <Link
-            href="/orders"
+            href={storePath(subdomain, 'orders')}
             className="block w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
           >
             查看我的订单
           </Link>
           <Link
-            href="/"
+            href={storePath(subdomain)}
             className="block w-full py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
           >
             继续购物

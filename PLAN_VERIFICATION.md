@@ -161,7 +161,7 @@
 |--------|----------|------|
 | 演示账号 `boss / IamBigBoss` | [authStore.ts](file:///d:/BigLionX/ProClaw/src/lib/authStore.ts) `MOCK_ACCOUNTS` + `VITE_MOCK_PASSWORD` | 🟢 |
 | **20 个 iPhone 电池 SPU**（iPhone 6 ~ iPhone 15 全系列） | [demoBootstrapData.ts](file:///d:/BigLionX/ProClaw/src/lib/demoBootstrapData.ts)（20 个 SPU，含 SKU/价格 ¥59~¥259/库存 35~60） | 🟢 |
-| **1 个云商城**（free 套餐, demo 子域名） | `DEMO_CLOUD_STORE_SUBDOMAIN='demo'` + `DEMO_CLOUD_STORE_URL='https://proclaw.cc/demo'` + `DEMO_CLOUD_STORE_PLAN='free'` | 🟢 |
+| **1 个云商城**（free 套餐, demo 子域名） | `DEMO_CLOUD_STORE_SUBDOMAIN='demo'` + `DEMO_CLOUD_STORE_URL='https://proclaw.cc/shop/demo'` + `DEMO_CLOUD_STORE_PLAN='free'` | 🟢 |
 | **3 个 AI Team** | `DEMO_TEAM_SKILL_IDS` = ['team-skill-biz-ops-001', 'team-skill-social-cn-001', 'team-skill-social-us-eu-001'] | 🟢 |
 | **1 个外贸柜台插件** | `registerForeignCounterPlugin()` + `public/plugins/ma_foreign_counter/` | 🟢 |
 | 演示标记 (DemoFlag) | [demoFlag.ts](file:///d:/BigLionX/ProClaw/src/lib/demoFlag.ts) + localStorage `proclaw_demo_flag_v1` | 🟢 |

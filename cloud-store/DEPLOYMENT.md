@@ -4,7 +4,10 @@
 
 云商城是面向终端用户的 B2C 独立商城，支持 AI 生成主题、商品管理、购物车、订单处理等功能。
 
-**目标域名**: `proclaw.cc/shop` 或自定义域名
+**目标域名**: `proclaw.cc`（路径模式：`/shop/{store}`、`/tenant/*`）
+
+> **与营销站分工**：`proclaw.cc` 绑定 **cloud-store** 项目；营销官网建议绑定 `www.proclaw.cc`（`marketing-site` 项目）。  
+> 勿将 cloud-store 代理到 `app.proclaw.cc`。用户商城标准 URL：`https://proclaw.cc/shop/{商店名}`。
 
 ## 部署要求
 
@@ -26,8 +29,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# 站点配置
-NEXT_PUBLIC_SITE_URL=https://your-domain.com
+# 站点配置（必须与绑定域名一致）
+NEXT_PUBLIC_SITE_URL=https://proclaw.cc
 
 # 存储配置
 NEXT_PUBLIC_STORAGE_BUCKET=tenant-files
@@ -56,23 +59,23 @@ NEXT_PUBLIC_PAYMENT_METHOD=mock
 
 ### 3. 域名绑定
 
-两种方式：
+**cloud-store 项目绑定主域名 `proclaw.cc`**。
 
-**方式一：子目录模式（推荐）**
-- 使用 Vercel Rewrites 将 `/shop` 路径指向应用
-- 或使用 Nginx/Cloudflare 规则进行反向代理
+营销官网（`marketing-site`）建议绑定 `www.proclaw.cc`，避免与云商城路径（`/shop`、`/tenant`）冲突。
 
-**方式二：子域名模式**
+**路径模式（标准，与 PRD 一致）**
+- cloud-store 项目 → Domains → 添加 `proclaw.cc`
+- 用户商城：`https://proclaw.cc/shop/{商店名}`（开通时设定的 subdomain）
+- 演示商城：`https://proclaw.cc/shop/demo`
+- 商户后台：`https://proclaw.cc/tenant/login?auto=demo`
+- 旧链接 `/mystore` 会自动 302 重定向到 `/shop/mystore`
+
+**自定义域名（可选）**
 1. 进入项目设置 → Domains
-2. 添加自定义域名（如 `shop.proclaw.cc`）
-3. 按提示配置 DNS 记录
+2. 商户在桌面端绑定独立域名（如 `shop.merchant.com`）
+3. 按提示配置 DNS CNAME 指向 `proclaw.cc`
 
-```
-# CNAME 记录
-shop.proclaw.cc -> cname.vercel-dns.com
-```
-
-### 5. 部署触发
+### 4. 部署触发
 
 推送代码到 main 分支将自动触发部署。
 
@@ -97,12 +100,13 @@ shop.proclaw.cc -> cname.vercel-dns.com
 部署完成后验证以下功能：
 
 - [ ] 用户注册/登录
+- [ ] 开通商城后访问 `https://proclaw.cc/shop/{商店名}`
 - [ ] AI 生成商城主题
 - [ ] 商品浏览和搜索
 - [ ] 购物车添加/删除
 - [ ] 结算和订单创建
 - [ ] 订单状态查看
-- [ ] 商品评价
+- [ ] 演示账号：`https://proclaw.cc/shop/demo`
 - [ ] Token 充值（Mock 模式）
 - [ ] 移动端响应式布局
 

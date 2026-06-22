@@ -12,7 +12,7 @@
 | 数据项 | 数量 | 来源 | 展示位置 |
 |--------|------|------|----------|
 | 产品 SPU | 20 | 本地 SQLite（`seed_demo_products` Tauri 命令） | 「商品库」页 |
-| 云商城 | 1 | `proclaw.cc/demo` | 「云商城 → 仪表盘」 |
+| 云商城 | 1 | `proclaw.cc/shop/demo` | 「云商城 → 仪表盘」 |
 | AI 团队 | 3 | Nvwax → `localTeamSkillMap` 回退 | 「AI 团队」页 |
 | 行业插件 | 1 | `ma_foreign_counter` 内置 manifest | 「插件商店」+「外贸柜台」页 |
 

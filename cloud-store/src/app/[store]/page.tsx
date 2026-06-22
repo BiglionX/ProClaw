@@ -3,6 +3,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getCurrentTenantSubdomain } from '@/lib/tenant-router';
+import { storePath } from '@/lib/utils';
 import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
@@ -101,13 +102,13 @@ export default async function StoreHomePage({ params }: PageProps) {
             
             {/* 导航 */}
             <nav className="hidden md:flex space-x-8">
-              <a href={`/${subdomain}`} className="text-gray-900 font-medium hover:text-blue-600">
+              <a href={storePath(subdomain)} className="text-gray-900 font-medium hover:text-blue-600">
                 首页
               </a>
-              <a href={`/${subdomain}/products`} className="text-gray-500 hover:text-blue-600">
+              <a href={storePath(subdomain, 'products')} className="text-gray-500 hover:text-blue-600">
                 商品
               </a>
-              <a href={`/${subdomain}/cart`} className="text-gray-500 hover:text-blue-600">
+              <a href={storePath(subdomain, 'cart')} className="text-gray-500 hover:text-blue-600">
                 购物车
               </a>
             </nav>
@@ -138,13 +139,13 @@ export default async function StoreHomePage({ params }: PageProps) {
         <div className="bg-white border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex space-x-8 py-4 overflow-x-auto">
-              <a href={`/${subdomain}/products`} className="text-gray-700 hover:text-blue-600 whitespace-nowrap">
+              <a href={storePath(subdomain, 'products')} className="text-gray-700 hover:text-blue-600 whitespace-nowrap">
                 全部商品
               </a>
               {categories.map((cat: string) => (
                 <a 
                   key={cat} 
-                  href={`/${subdomain}/products?category=${encodeURIComponent(cat)}`}
+                  href={`${storePath(subdomain, 'products')}?category=${encodeURIComponent(cat)}`}
                   className="text-gray-700 hover:text-blue-600 whitespace-nowrap"
                 >
                   {cat}
@@ -159,7 +160,7 @@ export default async function StoreHomePage({ params }: PageProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-gray-900">热门商品</h3>
-          <a href={`/${subdomain}/products`} className="text-blue-600 hover:underline">
+          <a href={storePath(subdomain, 'products')} className="text-blue-600 hover:underline">
             查看全部 &rarr;
           </a>
         </div>
@@ -175,7 +176,7 @@ export default async function StoreHomePage({ params }: PageProps) {
             {products.map((product: any) => (
               <a 
                 key={product.id} 
-                href={`/${subdomain}/product/${product.id}`}
+                href={storePath(subdomain, 'product', product.id)}
                 className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
               >
                 {/* 商品图片 */}

@@ -6,6 +6,12 @@ import { cookies } from 'next/headers';
 import { getCurrentTenantSubdomain } from './tenant-router';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+/** 演示账号常量（与 ProClaw 桌面端 boss 一键体验对齐） */
+export const DEMO_ACCOUNT_EMAIL = 'boss@proclaw.demo';
+export const DEMO_TENANT_SUBDOMAIN = 'demo';
+export const DEMO_TENANT_ID = 'a0000000-0000-0000-0000-000000000001';
+export const DEMO_TENANT_SCHEMA = 'tenant_demo';
+
 // ========== 类型定义 ==========
 
 /**
@@ -396,4 +402,97 @@ export function createTenantErrorResponse(
     { success: false, error, code },
     { status }
   );
+}
+
+export interface EnsureDemoTenantResult {
+  success: boolean;
+  tenant_id?: string;
+  subdomain?: string;
+  created?: boolean;
+  error?: string;
+}
+
+/**
+ * 幂等：确保 Supabase 中存在 demo 租户、schema 与示例商品
+ */
+export async function ensureDemoTenant(): Promise<EnsureDemoTenantResult> {
+  try {
+    const supabase = createServiceSupabaseClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    const { data: existing } = await sb
+      .from('tenants')
+      .select('id, subdomain, status')
+      .eq('subdomain', DEMO_TENANT_SUBDOMAIN)
+      .maybeSingle();
+
+    let created = false;
+
+    if (!existing) {
+      const { error: insertError } = await sb.from('tenants').upsert(
+        {
+          id: DEMO_TENANT_ID,
+          subdomain: DEMO_TENANT_SUBDOMAIN,
+          name: '演示商城',
+          email: DEMO_ACCOUNT_EMAIL,
+          schema_name: DEMO_TENANT_SCHEMA,
+          status: 'active',
+          plan: 'trial',
+          token_balance: 50000,
+          token_used: 0,
+        },
+        { onConflict: 'id' }
+      );
+
+      if (insertError) {
+        console.error('[ensureDemoTenant] insert tenant:', insertError);
+        return { success: false, error: '创建演示租户失败' };
+      }
+      created = true;
+    } else if (existing.status !== 'active') {
+      await sb.from('tenants').update({ status: 'active' }).eq('id', existing.id);
+    }
+
+    const tenantId = existing?.id || DEMO_TENANT_ID;
+
+    const { error: schemaError } = await sb.rpc('create_tenant_schema', {
+      tenant_schema: DEMO_TENANT_SCHEMA,
+    });
+    if (schemaError) {
+      console.warn('[ensureDemoTenant] create_tenant_schema:', schemaError.message);
+    }
+
+    const demoProducts = [
+      { id: 'p0000001-0000-0000-0000-000000000001', local_id: 'spu001', name: 'iPhone 15 Pro Max 电池', price: 199, stock: 50, category: 'iPhone 15' },
+      { id: 'p0000001-0000-0000-0000-000000000002', local_id: 'spu002', name: 'iPhone 15 Pro 电池', price: 179, stock: 60, category: 'iPhone 15' },
+      { id: 'p0000001-0000-0000-0000-000000000003', local_id: 'spu003', name: 'iPhone 15 电池', price: 159, stock: 45, category: 'iPhone 15' },
+    ];
+
+    for (const p of demoProducts) {
+      await sb.from(`${DEMO_TENANT_SCHEMA}.products`).upsert(
+        {
+          id: p.id,
+          local_id: p.local_id,
+          name: p.name,
+          price: p.price,
+          stock: p.stock,
+          category: p.category,
+          is_on_sale: true,
+          description: p.name,
+        },
+        { onConflict: 'id' }
+      );
+    }
+
+    return {
+      success: true,
+      tenant_id: tenantId,
+      subdomain: DEMO_TENANT_SUBDOMAIN,
+      created,
+    };
+  } catch (err) {
+    console.error('[ensureDemoTenant]', err);
+    return { success: false, error: err instanceof Error ? err.message : '未知错误' };
+  }
 }

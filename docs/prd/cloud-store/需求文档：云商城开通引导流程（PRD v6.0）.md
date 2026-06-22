@@ -210,7 +210,7 @@
 [成功] 商品库初始化完成！
 [统计] 共同步 20 个商品到云端
 [生成] 商城页面已生成
-[链接] https://your-store.proclaw.cc
+[链接] https://proclaw.cc/shop/your-store
 ```
 
 ### 4.4 动画效果规格
