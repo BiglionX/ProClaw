@@ -325,6 +325,7 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
             // 云托管商城 (PRD v5.0)
             get_cloud_store,
             create_cloud_store,
+            update_cloud_store,
             upgrade_store_plan,
             reset_store_api_key,
             get_syncable_products,

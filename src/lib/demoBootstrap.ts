@@ -12,9 +12,9 @@
 
 import { isDemoAccount } from './aiTeamTokenService';
 import { safeInvoke, isTauri } from './tauri';
-import { createCloudStore, getCloudStore, ensureRemoteDemoTenant, getDemoStorePublicUrl, syncAllProducts, type CloudStore, type PlanType } from './cloudStoreService';
+import { createCloudStore, getCloudStore, getSyncableProducts, ensureRemoteDemoTenant, getDemoStorePublicUrl, syncAllProducts, updateCloudStore, type CloudStore, type PlanType } from './cloudStoreService';
 import { AgentMarketService } from './agentMarketService';
-import { markAsDemoData, clearDemoData, isDemoDataInitialized } from './demoFlag';
+import { markAsDemoData, clearDemoData, isDemoDataInitialized, readDemoFlag } from './demoFlag';
 import { registerForeignCounterPlugin } from './manifestRegistry';
 
 // =============== 类型定义 ===============
@@ -46,7 +46,7 @@ export interface DemoBootstrapStep {
 // =============== 常量 ===============
 
 /** 演示数据版本号（每次结构调整时递增） */
-export const DEMO_DATA_VERSION = '1.0.0';
+export const DEMO_DATA_VERSION = '1.0.1';
 
 /** 3 个预置 AI Team 的 Skill ID（顺序：经营 → 国内 → 海外） */
 export const DEMO_TEAM_SKILL_IDS = [
@@ -98,10 +98,29 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
     return { ...empty, durationMs: performance.now() - t0 };
   }
 
-  // 已初始化过且非强制刷新：直接返回缓存结果
-  if (!force && isDemoDataInitialized()) {
+  // 已初始化过且非强制刷新：版本一致且数据完整时快速返回，但仍修复商品/云商城
+  const existingFlag = readDemoFlag();
+  const flagOutdated = !existingFlag || existingFlag.version !== DEMO_DATA_VERSION;
+  const dataIncomplete =
+    !existingFlag ||
+    existingFlag.productsCount < 20 ||
+    existingFlag.cloudStoreSubdomain !== DEMO_CLOUD_STORE_SUBDOMAIN;
+
+  if (!force && isDemoDataInitialized() && !flagOutdated && !dataIncomplete) {
     const cached = readBootstrapCache();
     if (cached) {
+      // 静默修复：幂等补种商品 + 校验云商城（修复旧版 API 包装导致 subdomain 丢失等问题）
+      try {
+        await ensureProducts(false);
+        await ensureCloudStore(false);
+        const store = await getCloudStore();
+        if (store?.id) {
+          await syncAllProducts(store.id).catch(() => {});
+        }
+        await ensureRemoteDemoTenant().catch(() => {});
+      } catch {
+        /* ignore repair errors */
+      }
       if (!silent) console.info('[demoBootstrap] 已完成初始化，返回缓存结果');
       return {
         ...cached,
@@ -268,21 +287,19 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
 
 // =============== 子模块 ===============
 
-/** 注入 20 个演示产品（幂等）。返回实际新增的产品数 */
+/** 注入 20 个演示产品（幂等）。返回库中实际可同步商品数 */
 async function ensureProducts(force: boolean): Promise<number> {
   // Tauri 环境：通过后端命令批量 seed
   if (isTauri()) {
     try {
-      const inserted = await safeInvoke<number>('seed_demo_products', { force });
-      return typeof inserted === 'number' ? inserted : 0;
+      await safeInvoke<number>('seed_demo_products', { force });
+      const syncable = await getSyncableProducts();
+      if (syncable.length > 0) return syncable.length;
     } catch (err) {
       console.warn('[demoBootstrap] seed_demo_products 失败，回退到本地 mock：', err);
-      // 继续走本地 mock 分支
     }
   }
 
-  // 浏览器环境 / 后端无 seed 命令：通过 cloudStoreService.getSyncableProducts 已有的 DEMO_PRODUCTS 兜底
-  // 这里不重复插入，因为 cloudStoreService 已经初始化了 mockProducts
   const { DEMO_PRODUCTS_FOR_BOOTSTRAP } = await import('./demoBootstrapData');
   return DEMO_PRODUCTS_FOR_BOOTSTRAP.length;
 }
@@ -290,13 +307,30 @@ async function ensureProducts(force: boolean): Promise<number> {
 /** 确保云商城已开通。返回是否激活。 */
 async function ensureCloudStore(force: boolean): Promise<boolean> {
   try {
-    if (!force) {
-      const existing = await getCloudStore();
-      if (existing && existing.status === 'active') {
-        // 标记为演示数据
+    const existing = await getCloudStore();
+    if (existing?.subdomain && existing.status === 'active' && !force) {
+      markCloudStoreAsDemo(existing);
+      return true;
+    }
+
+    // 已有记录但状态/子域异常：演示账号强制修复为 demo
+    if (existing?.id && !force) {
+      try {
+        await updateCloudStore(existing.id, {
+          subdomain: DEMO_CLOUD_STORE_SUBDOMAIN,
+          status: 'active',
+          plan_type: DEMO_CLOUD_STORE_PLAN,
+        } as Partial<CloudStore>);
         markCloudStoreAsDemo(existing);
         return true;
+      } catch (repairErr) {
+        console.warn('[demoBootstrap] 修复演示云商城失败，尝试重新创建：', repairErr);
       }
+    }
+
+    if (!force && existing?.id) {
+      markCloudStoreAsDemo(existing);
+      return existing.status === 'active' && !!existing.subdomain;
     }
 
     // 创建演示云商城
@@ -304,6 +338,22 @@ async function ensureCloudStore(force: boolean): Promise<boolean> {
     markCloudStoreAsDemo(store);
     return !!store;
   } catch (err) {
+    // 已开通时 getCloudStore 修复路径
+    if (String(err).includes('已开通')) {
+      const existing = await getCloudStore();
+      if (existing?.id) {
+        try {
+          await updateCloudStore(existing.id, {
+            subdomain: DEMO_CLOUD_STORE_SUBDOMAIN,
+            status: 'active',
+          } as Partial<CloudStore>);
+        } catch {
+          /* ignore */
+        }
+        markCloudStoreAsDemo(existing);
+        return true;
+      }
+    }
     console.error('[demoBootstrap] ensureCloudStore 失败：', err);
     return false;
   }

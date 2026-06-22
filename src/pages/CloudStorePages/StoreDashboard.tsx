@@ -73,6 +73,20 @@ export default function StoreDashboard({
     setIsDemo(isDemoAccount() && !!readDemoFlag());
   }, []);
 
+  useEffect(() => {
+    const refresh = () => {
+      invalidateCloudStore();
+      refetchStore();
+      refetchStats();
+    };
+    window.addEventListener('proclaw:demo-bootstrapped', refresh);
+    window.addEventListener('proclaw:cloud-store-changed', refresh);
+    return () => {
+      window.removeEventListener('proclaw:demo-bootstrapped', refresh);
+      window.removeEventListener('proclaw:cloud-store-changed', refresh);
+    };
+  }, [invalidateCloudStore, refetchStore, refetchStats]);
+
   const handleResetDemoData = async () => {
     setResetting(true);
     try {

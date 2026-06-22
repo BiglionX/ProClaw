@@ -35,8 +35,8 @@ pub fn get_cloud_store(db: tauri::State<Mutex<Database>>) -> Result<Value, Strin
             }))
         },
     ) {
-        Ok(store) => Ok(serde_json::json!({"data": store})),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(serde_json::json!({"data": null})),
+        Ok(store) => Ok(store),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(serde_json::Value::Null),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -100,13 +100,87 @@ pub fn create_cloud_store(
         );
     }
 
+    let now = chrono::Utc::now().to_rfc3339();
     Ok(serde_json::json!({
         "id": id,
+        "user_id": "u_test001",
         "subdomain": subdomain,
+        "custom_domain": null,
         "api_key": api_key,
+        "status": "active",
         "plan_type": plan_type,
-        "message": "商城开通成功"
+        "created_at": now,
+        "updated_at": now,
     }))
+}
+
+/// 更新云商城配置（演示账号修复 subdomain / status 等）
+#[tauri::command]
+pub fn update_cloud_store(
+    db: tauri::State<Mutex<Database>>,
+    store_id: String,
+    data: Value,
+) -> Result<Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let mut sets: Vec<&str> = Vec::new();
+    let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(v) = data.get("subdomain").and_then(|v| v.as_str()) {
+        sets.push("subdomain = ?");
+        params_vec.push(Box::new(v.to_string()));
+    }
+    if let Some(v) = data.get("custom_domain") {
+        if v.is_null() {
+            sets.push("custom_domain = NULL");
+        } else if let Some(s) = v.as_str() {
+            sets.push("custom_domain = ?");
+            params_vec.push(Box::new(s.to_string()));
+        }
+    }
+    if let Some(v) = data.get("status").and_then(|v| v.as_str()) {
+        sets.push("status = ?");
+        params_vec.push(Box::new(v.to_string()));
+    }
+    if let Some(v) = data.get("plan_type").and_then(|v| v.as_str()) {
+        sets.push("plan_type = ?");
+        params_vec.push(Box::new(v.to_string()));
+    }
+
+    if sets.is_empty() {
+        return Err("没有可更新的字段".to_string());
+    }
+
+    sets.push("updated_at = (strftime('%s','now') * 1000)");
+    params_vec.push(Box::new(store_id.clone()));
+
+    let sql = format!("UPDATE cloud_stores SET {} WHERE id = ?", sets.join(", "));
+    let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    conn.execute(&sql, params_refs.as_slice())
+        .map_err(|e| e.to_string())?;
+
+    conn.query_row(
+        "SELECT id, user_id, subdomain, custom_domain, api_key, status, plan_type,
+                expires_at, created_at, updated_at
+         FROM cloud_stores WHERE id = ?1",
+        params![store_id],
+        |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "user_id": row.get::<_, String>(1)?,
+                "subdomain": row.get::<_, String>(2)?,
+                "custom_domain": row.get::<_, Option<String>>(3).ok(),
+                "api_key": row.get::<_, String>(4)?,
+                "status": row.get::<_, String>(5)?,
+                "plan_type": row.get::<_, String>(6)?,
+                "expires_at": row.get::<_, Option<i64>>(7).ok(),
+                "created_at": row.get::<_, String>(8)?,
+                "updated_at": row.get::<_, String>(9)?,
+            }))
+        },
+    )
+    .map_err(|e| e.to_string())
 }
 
 /// 升级套餐

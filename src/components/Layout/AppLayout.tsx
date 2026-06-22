@@ -72,8 +72,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (!cancelled && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('proclaw:teams-changed'));
           window.dispatchEvent(new CustomEvent('proclaw:agents-changed'));
-          // 通知商品库页面刷新（修复演示数据注入后空表不刷新问题）
           window.dispatchEvent(new CustomEvent('proclaw:products-changed'));
+          window.dispatchEvent(new CustomEvent('proclaw:demo-bootstrapped'));
+          window.dispatchEvent(new CustomEvent('proclaw:cloud-store-changed'));
         }
       } catch (err) {
         console.warn('[AppLayout] 演示数据引导失败：', err);

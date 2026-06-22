@@ -196,6 +196,21 @@ const DEMO_PRODUCTS = [
 /** 浏览器模式：可变的 mock 商品列表（支持上下架/同步操作） */
 let mockProducts: ProductSPU[] = JSON.parse(JSON.stringify(DEMO_PRODUCTS));
 
+/** 兼容旧版 Tauri 命令返回 { data: store } 的包装格式 */
+function unwrapCloudStorePayload(raw: unknown): CloudStore | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const obj = raw as Record<string, unknown>;
+  if ('data' in obj) {
+    const inner = obj.data;
+    if (!inner || typeof inner !== 'object') return null;
+    return inner as CloudStore;
+  }
+  if ('id' in obj && 'subdomain' in obj) {
+    return raw as CloudStore;
+  }
+  return null;
+}
+
 async function callBackend<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
     if (!isTauri()) {
@@ -212,6 +227,15 @@ async function callBackend<T>(command: string, args?: Record<string, unknown>): 
           );
           mockTheme = generateMockTheme(mockStore.id);
           return { ...mockStore } as T;
+        case 'update_cloud_store': {
+          if (mockStore && args?.data) {
+            Object.assign(mockStore, args.data as Partial<CloudStore>);
+            if (!mockStore.subdomain) mockStore.subdomain = 'demo';
+            if (!mockStore.status) mockStore.status = 'active';
+            mockStore.updated_at = new Date().toISOString();
+          }
+          return (mockStore ? { ...mockStore } : null) as T;
+        }
         case 'get_store_theme':
           return (mockTheme ? { ...mockTheme } : null) as T;
         case 'update_store_theme':
@@ -276,11 +300,23 @@ async function callBackend<T>(command: string, args?: Record<string, unknown>): 
           return null as T;
       }
     }
-    const result = await safeInvoke<T>(command, args);
+    const result = await safeInvoke<unknown>(command, args);
+    if (command === 'get_cloud_store') {
+      if (result === null || result === undefined) return null as T;
+      return unwrapCloudStorePayload(result) as T;
+    }
     if (result === null) {
       throw new Error(`Command "${command}" returned null`);
     }
-    return result;
+    if (command === 'create_cloud_store') {
+      const store = unwrapCloudStorePayload(result) ?? (result as CloudStore);
+      return store as T;
+    }
+    if (command === 'update_cloud_store') {
+      const store = unwrapCloudStorePayload(result) ?? (result as CloudStore);
+      return store as T;
+    }
+    return result as T;
   } catch (error) {
     console.error(`[CloudStore] ${command} failed:`, error);
     throw error;
