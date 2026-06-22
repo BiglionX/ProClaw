@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { Box, CircularProgress } from '@mui/material';
-import { Navigate, Route } from 'react-router-dom';
+import { Navigate, Route, useLocation } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import { useAuthStore } from '../lib/authStore';
 import { SetupWizard } from '../components/SetupWizard';
@@ -42,7 +42,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 type RouteLoader = () => Promise<{ default: React.ComponentType }>;
 
+/** 旧版云商城路径 /cloud-store → /shop（兼容插件 manifest 历史路径） */
+function CloudStoreRedirect() {
+  const location = useLocation();
+  const suffix = location.pathname.replace(/^\/cloud-store\/?/, '');
+  const target = suffix ? `/shop/${suffix}` : '/shop';
+  return <Navigate to={`${target}${location.search}${location.hash}`} replace />;
+}
+
 export const REDIRECT_ROUTES: Array<{ from: string; to: string }> = [
+  { from: '/cloud-store', to: '/shop' },
   { from: '/', to: '/datacenter' },
   { from: '/dashboard', to: '/datacenter' },
   { from: '/finance', to: '/datacenter' },
@@ -129,6 +138,7 @@ export function renderAppRoutes() {
       {REDIRECT_ROUTES.map(({ from, to }) => (
         <Route key={from} path={from} element={<Navigate to={to} replace />} />
       ))}
+      <Route path="/cloud-store/*" element={<CloudStoreRedirect />} />
       {PUBLIC_ROUTES.map(({ path, loader }) => (
         <Route key={path} path={path} element={<LazyPage loader={loader} />} />
       ))}

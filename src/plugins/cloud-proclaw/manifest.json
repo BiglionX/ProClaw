@@ -32,7 +32,7 @@
   },
   "navigation": {
     "add": [
-      { "text": "云商城管理", "icon": "shopping-bag", "path": "/cloud-store", "group": "云服务" },
+      { "text": "云商城管理", "icon": "shopping-bag", "path": "/shop", "group": "云服务" },
       { "text": "Token 计费", "icon": "finance", "path": "/token-billing", "group": "云服务" },
       { "text": "云备份", "icon": "database", "path": "/cloud-backup", "group": "云服务" },
       { "text": "用户管理", "icon": "user", "path": "/ucenter", "group": "运营" },
@@ -41,7 +41,7 @@
       { "text": "运营后台", "icon": "settings", "path": "/settings", "group": "系统" }
     ],
     "remove": ["/products", "/supplychain", "/purchase", "/sales", "/inventory", "/contacts", "/messages"],
-    "reorder": ["/", "/cloud-store", "/token-billing", "/cloud-backup", "/ucenter", "/analytics", "/teams", "/settings"]
+    "reorder": ["/", "/shop", "/token-billing", "/cloud-backup", "/ucenter", "/analytics", "/teams", "/settings"]
   },
   "dataModels": {
     "tables": [

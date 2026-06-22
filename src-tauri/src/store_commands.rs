@@ -294,12 +294,18 @@ pub fn sync_all_products_to_cloud(db: tauri::State<Mutex<Database>>) -> Result<V
             Err(e) => return Err(e.to_string()),
         };
 
-    // 获取所有商品
+    // 获取所有可同步商品（join 默认 SKU 取价格/库存）
     let mut stmt = conn
-        .prepare("SELECT id, name, sku, price, image FROM product_spus WHERE is_cloud_visible = 1")
+        .prepare(
+            "SELECT spu.id, spu.name, spu.spu_code,
+                COALESCE(sku.sell_price, 0), COALESCE(sku.current_stock, 0)
+         FROM product_spus spu
+         LEFT JOIN product_skus sku ON sku.spu_id = spu.id AND sku.is_default = 1
+         WHERE spu.is_cloud_visible = 1 AND spu.deleted_at IS NULL",
+        )
         .map_err(|e| e.to_string())?;
 
-    let products: Vec<(String, String, String, f64, Option<String>)> = stmt
+    let products: Vec<(String, String, String, f64, i32)> = stmt
         .query_map([], |row: &rusqlite::Row| {
             Ok((
                 row.get(0)?,
@@ -366,14 +372,16 @@ pub fn sync_incremental_products(db: tauri::State<Mutex<Database>>) -> Result<Va
     // 获取需要同步的商品（未同步或更新时间晚于同步时间）
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, sku, price, image, cloud_sync_time 
-         FROM product_spus 
-         WHERE is_cloud_visible = 1 
-         AND (cloud_sync_status IS NULL OR cloud_sync_status != 'synced')",
+            "SELECT spu.id, spu.name, spu.spu_code,
+                    COALESCE(sku.sell_price, 0), COALESCE(sku.current_stock, 0), spu.cloud_sync_time
+             FROM product_spus spu
+             LEFT JOIN product_skus sku ON sku.spu_id = spu.id AND sku.is_default = 1
+             WHERE spu.is_cloud_visible = 1 AND spu.deleted_at IS NULL
+             AND (spu.cloud_sync_status IS NULL OR spu.cloud_sync_status != 'synced')",
         )
         .map_err(|e| e.to_string())?;
 
-    let products: Vec<(String, String, String, f64, Option<String>, Option<String>)> = stmt
+    let products: Vec<(String, String, String, f64, i32, Option<String>)> = stmt
         .query_map([], |row: &rusqlite::Row| {
             Ok((
                 row.get(0)?,

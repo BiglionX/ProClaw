@@ -8,7 +8,7 @@ import { getProducts, getCustomers } from '../services/ApiService';
 import { isDemoMode } from '../services/AuthService';
 import type { AppNavigation } from '../types/navigation';
 
-const DEMO_PRODUCT_COUNT = 42;
+const DEMO_PRODUCT_COUNT = 20;
 const DEMO_CONTACT_COUNT = 10;
 
 const HomeScreen: React.FC = () => {

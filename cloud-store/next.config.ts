@@ -23,6 +23,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // 公开商城页允许桌面端 iframe 手机预览（覆盖下方全局 DENY）
+        source: "/shop/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors *",
+          },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           {

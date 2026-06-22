@@ -65,6 +65,7 @@ const ROUTE_TO_FEATURE_MAP: Record<string, RouteFeatureId> = {
   '/media-library': 'common',
   '/user-management': 'common',
   '/shop': 'cloud_backup',
+  '/cloud-store': 'cloud_backup',
   '/cloud-backup': 'cloud_backup',
   '/teams': 'team',
   // 行业插件路由

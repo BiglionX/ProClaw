@@ -20,7 +20,7 @@ import { getDatabase } from '../services/DatabaseFactory';
 import { useAppStore } from '../stores/AppStore';
 import type { AppNavigation, RootStackParamList } from '../types/navigation';
 
-const DEMO_PRODUCT_COUNT = 42;
+const DEMO_PRODUCT_COUNT = 20;
 const DEMO_CONTACT_COUNT = 10;
 
 // ============ 快捷操作配置 ============

@@ -412,6 +412,30 @@ export interface EnsureDemoTenantResult {
   error?: string;
 }
 
+/** 20 个演示商品（与桌面端 seed_demo_products / demoBootstrapData 对齐） */
+const DEMO_CLOUD_PRODUCTS = [
+  { id: 'p0000001-0000-0000-0000-000000000001', local_id: 'spu_iphone15pm_bat', name: 'iPhone 15 Pro Max 电池', price: 199, stock: 50, category: 'iPhone 15' },
+  { id: 'p0000001-0000-0000-0000-000000000002', local_id: 'spu_iphone15pro_bat', name: 'iPhone 15 Pro 电池', price: 179, stock: 50, category: 'iPhone 15' },
+  { id: 'p0000001-0000-0000-0000-000000000003', local_id: 'spu_iphone15_bat', name: 'iPhone 15 电池', price: 159, stock: 60, category: 'iPhone 15' },
+  { id: 'p0000001-0000-0000-0000-000000000004', local_id: 'spu_iphone15plus_bat', name: 'iPhone 15 Plus 电池', price: 189, stock: 45, category: 'iPhone 15' },
+  { id: 'p0000001-0000-0000-0000-000000000005', local_id: 'spu_iphone14pm_bat', name: 'iPhone 14 Pro Max 电池', price: 179, stock: 45, category: 'iPhone 14' },
+  { id: 'p0000001-0000-0000-0000-000000000006', local_id: 'spu_iphone14pro_bat', name: 'iPhone 14 Pro 电池', price: 159, stock: 55, category: 'iPhone 14' },
+  { id: 'p0000001-0000-0000-0000-000000000007', local_id: 'spu_iphone14_bat', name: 'iPhone 14 电池', price: 149, stock: 60, category: 'iPhone 14' },
+  { id: 'p0000001-0000-0000-0000-000000000008', local_id: 'spu_iphone14plus_bat', name: 'iPhone 14 Plus 电池', price: 169, stock: 40, category: 'iPhone 14' },
+  { id: 'p0000001-0000-0000-0000-000000000009', local_id: 'spu_iphone13pm_bat', name: 'iPhone 13 Pro Max 电池', price: 169, stock: 50, category: 'iPhone 13' },
+  { id: 'p0000001-0000-0000-0000-00000000000a', local_id: 'spu_iphone13pro_bat', name: 'iPhone 13 Pro 电池', price: 149, stock: 55, category: 'iPhone 13' },
+  { id: 'p0000001-0000-0000-0000-00000000000b', local_id: 'spu_iphone13_bat', name: 'iPhone 13 电池', price: 139, stock: 60, category: 'iPhone 13' },
+  { id: 'p0000001-0000-0000-0000-00000000000c', local_id: 'spu_iphone13mini_bat', name: 'iPhone 13 mini 电池', price: 119, stock: 35, category: 'iPhone 13' },
+  { id: 'p0000001-0000-0000-0000-00000000000d', local_id: 'spu_iphone12pm_bat', name: 'iPhone 12 Pro Max 电池', price: 159, stock: 45, category: 'iPhone 12' },
+  { id: 'p0000001-0000-0000-0000-00000000000e', local_id: 'spu_iphone12pro_bat', name: 'iPhone 12 Pro 电池', price: 139, stock: 55, category: 'iPhone 12' },
+  { id: 'p0000001-0000-0000-0000-00000000000f', local_id: 'spu_iphone12_bat', name: 'iPhone 12 电池', price: 129, stock: 60, category: 'iPhone 12' },
+  { id: 'p0000001-0000-0000-0000-000000000010', local_id: 'spu_iphone12mini_bat', name: 'iPhone 12 mini 电池', price: 109, stock: 40, category: 'iPhone 12' },
+  { id: 'p0000001-0000-0000-0000-000000000011', local_id: 'spu_iphone11pm_bat', name: 'iPhone 11 Pro Max 电池', price: 149, stock: 40, category: 'iPhone 11' },
+  { id: 'p0000001-0000-0000-0000-000000000012', local_id: 'spu_iphone11pro_bat', name: 'iPhone 11 Pro 电池', price: 129, stock: 50, category: 'iPhone 11' },
+  { id: 'p0000001-0000-0000-0000-000000000013', local_id: 'spu_iphone11_bat', name: 'iPhone 11 电池', price: 119, stock: 60, category: 'iPhone 11' },
+  { id: 'p0000001-0000-0000-0000-000000000014', local_id: 'spu_iphonese3_bat', name: 'iPhone SE (第三代) 电池', price: 59, stock: 45, category: 'iPhone SE' },
+] as const;
+
 /**
  * 幂等：确保 Supabase 中存在 demo 租户、schema 与示例商品
  */
@@ -463,13 +487,7 @@ export async function ensureDemoTenant(): Promise<EnsureDemoTenantResult> {
       console.warn('[ensureDemoTenant] create_tenant_schema:', schemaError.message);
     }
 
-    const demoProducts = [
-      { id: 'p0000001-0000-0000-0000-000000000001', local_id: 'spu001', name: 'iPhone 15 Pro Max 电池', price: 199, stock: 50, category: 'iPhone 15' },
-      { id: 'p0000001-0000-0000-0000-000000000002', local_id: 'spu002', name: 'iPhone 15 Pro 电池', price: 179, stock: 60, category: 'iPhone 15' },
-      { id: 'p0000001-0000-0000-0000-000000000003', local_id: 'spu003', name: 'iPhone 15 电池', price: 159, stock: 45, category: 'iPhone 15' },
-    ];
-
-    for (const p of demoProducts) {
+    for (const p of DEMO_CLOUD_PRODUCTS) {
       await sb.from(`${DEMO_TENANT_SCHEMA}.products`).upsert(
         {
           id: p.id,

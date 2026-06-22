@@ -139,15 +139,15 @@ export default function StoreMobilePreviewDialog({
         {iframeError ? (
           <Box sx={{ maxWidth: 480, width: '100%' }}>
             <Alert severity="warning" sx={{ mb: 2 }}>
-              无法在 iframe 中加载 {storeUrl}，可能是域名尚未解析或服务器不可达。
+              无法在 iframe 中加载 {storeUrl}。常见原因：X-Frame-Options 限制或网络不可达。
             </Alert>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              提示：
+              演示账号可尝试：
             </Typography>
             <Box component="ul" sx={{ pl: 3, color: 'text.secondary', fontSize: 14 }}>
-              <li>请确认 {storeUrl.replace('https://', '')} 的 DNS 已正确解析到商城服务器</li>
-              <li>如需本地编辑预览，请点击下方「打开本地编辑器」</li>
-              <li>可点击右上角「浏览器中打开」直接访问</li>
+              <li>点击右上角「浏览器中打开」访问 {storeUrl.replace('https://', '')}</li>
+              <li>或前往「云商城 → 预览编辑」查看本地 20 个演示商品</li>
+              <li>演示商城地址：<strong>https://proclaw.cc/shop/demo</strong></li>
             </Box>
             <Button
               variant="outlined"

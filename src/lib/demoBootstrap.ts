@@ -12,7 +12,7 @@
 
 import { isDemoAccount } from './aiTeamTokenService';
 import { safeInvoke, isTauri } from './tauri';
-import { createCloudStore, getCloudStore, ensureRemoteDemoTenant, getDemoStorePublicUrl, type CloudStore, type PlanType } from './cloudStoreService';
+import { createCloudStore, getCloudStore, ensureRemoteDemoTenant, getDemoStorePublicUrl, syncAllProducts, type CloudStore, type PlanType } from './cloudStoreService';
 import { AgentMarketService } from './agentMarketService';
 import { markAsDemoData, clearDemoData, isDemoDataInitialized } from './demoFlag';
 import { registerForeignCounterPlugin } from './manifestRegistry';
@@ -177,6 +177,33 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
     });
   }
 
+  // 3b) 同步演示商品到云商城（本地标记 + 远端 demo 租户 20 个商品）
+  if (cloudStoreActivated) {
+    try {
+      const t3b = performance.now();
+      const store = await getCloudStore();
+      if (store) {
+        await syncAllProducts(store.id);
+      }
+      const remoteOk = await ensureRemoteDemoTenant();
+      steps.push({
+        name: 'sync-demo-products',
+        success: remoteOk,
+        message: remoteOk
+          ? '已同步 20 个演示商品到云商城（本地 + proclaw.cc/shop/demo）'
+          : '本地商品已就绪，远端 demo 租户初始化失败（可稍后重试）',
+        durationMs: performance.now() - t3b,
+      });
+    } catch (err) {
+      steps.push({
+        name: 'sync-demo-products',
+        success: false,
+        message: String(err),
+        durationMs: 0,
+      });
+    }
+  }
+
   // 4) 安装 3 个 AI Team
   for (const skillId of DEMO_TEAM_SKILL_IDS) {
     try {
@@ -275,8 +302,6 @@ async function ensureCloudStore(force: boolean): Promise<boolean> {
     // 创建演示云商城
     const store = await createCloudStore(DEMO_CLOUD_STORE_PLAN, DEMO_CLOUD_STORE_SUBDOMAIN);
     markCloudStoreAsDemo(store);
-    // 同步云端租户（失败不阻塞本地演示）
-    ensureRemoteDemoTenant().catch(() => {});
     return !!store;
   } catch (err) {
     console.error('[demoBootstrap] ensureCloudStore 失败：', err);
