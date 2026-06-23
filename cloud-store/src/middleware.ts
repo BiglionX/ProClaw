@@ -5,7 +5,7 @@ import { generateCodeVerifier, generateCodeChallenge } from '@/lib/pkce';
 const SKIP_PATHS = ['/_next', '/favicon', '/api/health', '/public'];
 const AUTH_PATHS = ['/app', '/dashboard'];
 const OIDC_ISSUER = process.env.NEXT_PUBLIC_OIDC_ISSUER || 'https://account.proclaw.cc';
-const OIDC_CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || 'proclaw_web';
+const OIDC_CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || 'proclaw-web';
 
 /**
  * 根据请求动态生成 OIDC 回调 URI
