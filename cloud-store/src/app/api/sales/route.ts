@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteSupabaseClient } from '@/lib/supabase-server';
 import { getTenantSchema, schemaTable } from '@/lib/tenant';
+import { tokenGuard, tokenInsufficientResponse } from '@/lib/tokenGuard';
 
 interface SalesQueryParams {
   page?: number;
@@ -92,6 +93,15 @@ export async function POST(request: NextRequest) {
     const schema = getTenantSchema(session.user.id);
     const body = await request.json();
 
+    // Token 预检查：创建销售单消耗 1 token（PRD §5: 业务 API 请求 1 token）
+    const guardResult = await tokenGuard(session.user.id, {
+      resourceType: 'api_write',
+      costPerUnit: 1,
+    });
+    if (!guardResult.allowed) {
+      return tokenInsufficientResponse(guardResult.error || 'Token 余额不足');
+    }
+
     const { data: order, error: orderError } = await supabase
       .from(schemaTable(schema, 'sales_orders'))
       .insert({
@@ -132,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     await supabase.rpc('deduct_tokens', { p_user_id: session.user.id, p_tokens: 1 });
     await supabase.from('api_usage_logs').insert({
-      user_id: session.user.id, resource_type: 'product_sync', tokens_used: 1,
+      user_id: session.user.id, resource_type: 'sales_order', tokens_used: 1,
       endpoint: 'POST /api/sales', metadata: { order_id: order.id, so_number: order.so_number },
     });
 
@@ -155,6 +165,15 @@ export async function PUT(request: NextRequest) {
     const { id, ...updateData } = body;
 
     if (!id) return NextResponse.json({ error: '缺少销售单 ID' }, { status: 400 });
+
+    // Token 预检查：更新销售单消耗 1 token（PRD §5: 业务 API 请求 1 token）
+    const guardResult = await tokenGuard(session.user.id, {
+      resourceType: 'api_write',
+      costPerUnit: 1,
+    });
+    if (!guardResult.allowed) {
+      return tokenInsufficientResponse(guardResult.error || 'Token 余额不足');
+    }
 
     const { data: order, error: orderError } = await supabase
       .from(schemaTable(schema, 'sales_orders'))
@@ -191,6 +210,13 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Token 扣费（更新销售单消耗 1 token）
+    await supabase.rpc('deduct_tokens', { p_user_id: session.user.id, p_tokens: 1 });
+    await supabase.from('api_usage_logs').insert({
+      user_id: session.user.id, resource_type: 'api_write', tokens_used: 1,
+      endpoint: 'PUT /api/sales', metadata: { order_id: id },
+    });
+
     return NextResponse.json({ data: order, success: true });
   } catch (error: unknown) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
@@ -209,8 +235,24 @@ export async function DELETE(request: NextRequest) {
     const id = request.nextUrl.searchParams.get('id');
     if (!id) return NextResponse.json({ error: '缺少销售单 ID' }, { status: 400 });
 
+    // Token 预检查：删除销售单消耗 1 token（PRD §5: 业务 API 请求 1 token）
+    const guardResult = await tokenGuard(session.user.id, {
+      resourceType: 'api_write',
+      costPerUnit: 1,
+    });
+    if (!guardResult.allowed) {
+      return tokenInsufficientResponse(guardResult.error || 'Token 余额不足');
+    }
+
     const { error } = await supabase.from(schemaTable(schema, 'sales_orders')).delete().eq('id', id);
     if (error) throw error;
+
+    // Token 扣费（删除销售单消耗 1 token）
+    await supabase.rpc('deduct_tokens', { p_user_id: session.user.id, p_tokens: 1 });
+    await supabase.from('api_usage_logs').insert({
+      user_id: session.user.id, resource_type: 'api_write', tokens_used: 1,
+      endpoint: 'DELETE /api/sales', metadata: { order_id: id },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

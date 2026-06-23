@@ -7,11 +7,15 @@ import crypto from 'crypto';
 
 /**
  * 创建 Supabase 客户端的工厂函数
+ * 服务端操作使用 service role key 以绕过 RLS（token 扣费、余额查询等特权操作）
  * 避免跨请求复用单例导致的认证状态泄漏
  */
 function createSupabaseClient(): SupabaseClient {
-  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const sbUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  if (!sbUrl || !sbKey) {
+    throw new Error('Missing Supabase environment variables for token API');
+  }
   return createClient(sbUrl, sbKey);
 }
 

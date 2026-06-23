@@ -14,5 +14,5 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  return NextResponse.redirect(new URL('/app/auth/callback?code=' + code + '&state=' + state, request.url));
+  return NextResponse.redirect(new URL('/app/dashboard?code=' + code + '&state=' + state, request.url));
 }

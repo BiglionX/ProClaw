@@ -5,12 +5,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteSupabaseClient } from '@/lib/supabase-server';
 import { getTokenBalance, getDebtStatus, checkDailyLimit } from '@/lib/tokenApi';
 
+// PRD §5 计费标准
 const PT_COST = {
-  product_sync: 50,
+  api_write: 1,           // 业务 API 请求（增删改查）
+  api_read: 1,            // 业务 API 请求（读取，PRD 统一 1 token）
+  chat_message: 1,        // 聊天消息（发送/接收）
+  websocket_hour: 5,      // WebSocket 长连接（1 小时）
+  file_upload_mb: 10,     // 文件上传（每 1 MB）
+  ai_image_recognition: 5, // AI 识别图片（每次）
+  storage_gb_month: 100,  // 存储空间（每 GB·月）
+  // 保留旧 key 以兼容现有代码
+  product_sync: 1,
   ai_theme: 5000,
-  order_process: 10,
-  api_write: 5,
-  api_read: 1,
+  order_process: 1,
 };
 
 // ========== 欠费保护状态码 ==========

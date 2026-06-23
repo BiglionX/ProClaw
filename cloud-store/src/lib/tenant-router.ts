@@ -101,7 +101,7 @@ export function isValidSubdomain(subdomain: string): boolean {
   
   const reservedSubdomains = [
     'www', 'mail', 'ftp', 'admin', 'api', 'blog', 'shop', 'store',
-    'dev', 'test', 'demo', ' staging', 'prod', 'platform',
+    'dev', 'test', 'demo', 'staging', 'prod', 'platform',
     'proclaw', 'admin', 'dashboard', 'console',
   ];
   

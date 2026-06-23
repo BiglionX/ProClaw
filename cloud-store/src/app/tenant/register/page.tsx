@@ -284,7 +284,7 @@ export default function TenantRegisterPage() {
             
             <div className="bg-amber-50 rounded-lg p-4">
               <p className="text-amber-800 text-sm">
-                💡 <strong>提示：</strong> 注册即表示同意我们的服务条款。您将获得 100 Token 试用额度，有效期 7 天。
+                💡 <strong>提示：</strong> 注册即表示同意我们的服务条款。新用户赠送 1000 Token 体验额度，无有效期。
               </p>
             </div>
             

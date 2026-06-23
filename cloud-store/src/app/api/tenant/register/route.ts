@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         owner_phone: owner_phone || null,
         plan,
         status: 'active',
-        token_balance: plan === 'trial' ? 100 : 0, // 试用账号送 100 Token
+        token_balance: plan === 'trial' ? 1000 : 0, // 新用户赠送 1000 Token（无有效期）
       })
       .select()
       .single();

@@ -133,13 +133,48 @@ npm install @sentry/nextjs
 
 ## 备份和恢复
 
-### 数据库备份
+### 数据库备份（PRD §6: 每日自动备份，保留 30 天）
 
-Supabase 自动每日备份，保留 30 天。
+**方案一：Supabase 内置备份（推荐）**
+
+1. 在 Supabase Dashboard > Database > Backups 中启用：
+   - **每日自动备份**：Supabase 免费版自动每日备份，保留 7 天；Pro 版保留 30 天
+   - **Point-in-Time Recovery (PITR)**：Pro 版支持，可恢复到过去 7 天内任意时间点
+2. 建议升级到 Supabase Pro 版以满足 PRD 30 天保留要求
+
+**方案二：脚本备份（补充）**
+
+使用 `scripts/backup-daily.sh` 脚本进行异地备份：
+
+```bash
+# 设置环境变量
+export SUPABASE_DB_URL="postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres"
+export BACKUP_DIR="/data/backups/proclaw"
+
+# 手动执行
+bash scripts/backup-daily.sh
+
+# 或添加到 crontab（每天凌晨 2 点执行）
+0 2 * * * SUPABASE_DB_URL=... BACKUP_DIR=... bash /path/to/backup-daily.sh
+```
+
+脚本功能：
+- 使用 `pg_dump` 导出完整数据库
+- gzip 压缩存储
+- 自动清理 30 天前的过期备份
+- 输出备份文件大小和当前备份数
 
 ### 商城数据导出
 
-管理员可使用后台导出功能备份订单和商品数据。
+管理员可使用后台导出功能备份订单和商品数据（JSON/CSV 格式）。
+
+### 账户数据删除
+
+用户可在设置页面注销账户，系统将：
+- 删除该租户的所有数据库 schema 和表
+- 清除 token 余额、消费记录、配置数据
+- 删除认证账户
+- 操作不可逆，建议用户先导出数据
 
 ## 联系支持
 

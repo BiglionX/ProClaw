@@ -5,21 +5,39 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { NextRequest, NextResponse } from 'next/server';
 
-// 强制使用正确的 Supabase URL
-const SUPABASE_URL = 'https://ourolpgrntjrtapgaztt.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_SQoKN2LQZ2Y15XtZplLoDw_R7KVviPC';
+/**
+ * 获取 Supabase URL（优先服务端环境变量，其次公开变量）
+ */
+function getSupabaseUrl(): string {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    throw new Error('Missing SUPABASE_URL environment variable');
+  }
+  return url;
+}
 
-console.log('[supabase-server] SUPABASE_URL:', SUPABASE_URL);
+/**
+ * 获取 Supabase 服务端密钥
+ * 服务端使用 service role key 以绕过 RLS 执行特权操作（如 schema 创建、token 扣费）
+ * 降级到 anon key 仅用于无特权操作的场景
+ */
+function getSupabaseServerKey(): string {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable');
+  }
+  return key;
+}
 
 /**
  * 创建服务端 Supabase 客户端 (用于 Server Components / Route Handlers)
  */
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
-  
+
   return createServerClient(
-    SUPABASE_URL,
-    SUPABASE_KEY,
+    getSupabaseUrl(),
+    getSupabaseServerKey(),
     {
       cookies: {
         getAll() {
@@ -48,8 +66,8 @@ export function createMiddlewareSupabaseClient(
   response: NextResponse
 ) {
   return createServerClient(
-    SUPABASE_URL,
-    SUPABASE_KEY,
+    getSupabaseUrl(),
+    getSupabaseServerKey(),
     {
       cookies: {
         getAll() {
@@ -73,8 +91,8 @@ export function createRouteSupabaseClient(
   response: NextResponse
 ) {
   return createServerClient(
-    SUPABASE_URL,
-    SUPABASE_KEY,
+    getSupabaseUrl(),
+    getSupabaseServerKey(),
     {
       cookies: {
         getAll() {

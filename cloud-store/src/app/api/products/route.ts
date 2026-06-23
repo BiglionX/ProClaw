@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteSupabaseClient } from '@/lib/supabase-server';
 import { getTenantSchema, schemaTable } from '@/lib/tenant';
+import { tokenGuard, tokenInsufficientResponse } from '@/lib/tokenGuard';
 
 interface ProductQueryParams {
   page?: number;
@@ -118,6 +119,15 @@ export async function POST(request: NextRequest) {
     const schema = getTenantSchema(session.user.id);
     const body = await request.json();
 
+    // Token 预检查：创建商品消耗 1 token（PRD §5: 业务 API 请求 1 token）
+    const guardResult = await tokenGuard(session.user.id, {
+      resourceType: 'api_write',
+      costPerUnit: 1,
+    });
+    if (!guardResult.allowed) {
+      return tokenInsufficientResponse(guardResult.error || 'Token 余额不足');
+    }
+
     // 使用 RPC 执行事务：创建 SPU 和 SKU（原子操作）
     // 如果 RPC 不可用，降级到分离调用
     const { data: spu, error: spuError } = await supabase
@@ -208,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     await supabase.from('api_usage_logs').insert({
       user_id: session.user.id,
-      resource_type: 'product_sync',
+      resource_type: 'api_write',
       tokens_used: 1,
       endpoint: 'POST /api/products',
       metadata: { product_id: spu.id, product_name: body.name },
@@ -243,6 +253,15 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: '缺少商品 ID' }, { status: 400 });
+    }
+
+    // Token 预检查：更新商品消耗 1 token（PRD §5: 业务 API 请求 1 token）
+    const guardResult = await tokenGuard(session.user.id, {
+      resourceType: 'api_write',
+      costPerUnit: 1,
+    });
+    if (!guardResult.allowed) {
+      return tokenInsufficientResponse(guardResult.error || 'Token 余额不足');
     }
 
     // 更新 SPU
@@ -291,6 +310,19 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Token 扣费（更新商品消耗 1 token）
+    await supabase.rpc('deduct_tokens', {
+      p_user_id: session.user.id,
+      p_tokens: 1,
+    });
+    await supabase.from('api_usage_logs').insert({
+      user_id: session.user.id,
+      resource_type: 'api_write',
+      tokens_used: 1,
+      endpoint: 'PUT /api/products',
+      metadata: { product_id: id },
+    });
+
     return NextResponse.json({ data: spu, success: true });
   } catch (error: unknown) {
     console.error('更新商品失败:', error);
@@ -321,6 +353,15 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '缺少商品 ID' }, { status: 400 });
     }
 
+    // Token 预检查：删除商品消耗 1 token（PRD §5: 业务 API 请求 1 token）
+    const guardResult = await tokenGuard(session.user.id, {
+      resourceType: 'api_write',
+      costPerUnit: 1,
+    });
+    if (!guardResult.allowed) {
+      return tokenInsufficientResponse(guardResult.error || 'Token 余额不足');
+    }
+
     // 删除 SPU（SKU 通过 CASCADE 自动删除）
     const { error } = await supabase
       .from(schemaTable(schema, 'products_spu'))
@@ -328,6 +369,19 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) throw error;
+
+    // Token 扣费（删除商品消耗 1 token）
+    await supabase.rpc('deduct_tokens', {
+      p_user_id: session.user.id,
+      p_tokens: 1,
+    });
+    await supabase.from('api_usage_logs').insert({
+      user_id: session.user.id,
+      resource_type: 'api_write',
+      tokens_used: 1,
+      endpoint: 'DELETE /api/products',
+      metadata: { product_id: id },
+    });
 
     return NextResponse.json({ success: true, message: '商品已删除' });
   } catch (error: unknown) {

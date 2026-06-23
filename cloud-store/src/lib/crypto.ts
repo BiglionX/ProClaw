@@ -83,8 +83,9 @@ export function decrypt(encryptedText: string, key?: Buffer): string {
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
-  } catch {
-    // 解密失败，返回原文
+  } catch (error) {
+    // 解密失败（可能是密钥轮换或数据损坏），记录警告并返回原文
+    console.warn('[crypto] 解密失败，返回原文:', error instanceof Error ? error.message : 'unknown error');
     return encryptedText;
   }
 }

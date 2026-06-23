@@ -129,7 +129,7 @@ export default function ExportPage() {
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
-            <div className="text-2xl mb-2">{ }</div>
+            <div className="text-2xl mb-2">📋</div>
             <div className="font-medium text-gray-900">JSON 格式</div>
             <div className="text-sm text-gray-500 mt-1">适用于程序处理</div>
           </button>

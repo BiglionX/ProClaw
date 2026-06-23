@@ -22,6 +22,10 @@ export default function SettingsPage() {
   const [selectedTables, setSelectedTables] = useState<{ tableName: string; fields: ExportField[] }[]>([]);
   const [selectingTable, setSelectingTable] = useState('');
 
+  // 账户注销状态
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
   const handleExport = async () => {
     if (exporting) return;
 
@@ -116,6 +120,39 @@ export default function SettingsPage() {
     }));
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleting) return;
+    if (deleteConfirm !== 'DELETE') {
+      toast.error('请输入 DELETE 以确认注销账户');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/tenant/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: deleteConfirm }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast.error(result.error || '注销账户失败');
+        setDeleting(false);
+        return;
+      }
+
+      toast.success('账户已彻底删除');
+      // 清除本地状态并跳转到登录页
+      await logout();
+      window.location.href = '/';
+    } catch {
+      toast.error('注销请求失败，请检查网络');
+      setDeleting(false);
+    }
+  };
+
   const sections = [
     { key: 'account' as const, label: '账户信息' },
     { key: 'export' as const, label: '数据导出' },
@@ -173,6 +210,48 @@ export default function SettingsPage() {
                 className="w-full px-4 py-2.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-left"
               >
                 退出登录
+              </button>
+            </div>
+          </div>
+
+          {/* 危险操作 - 账户注销 */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-red-200">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xl">⚠️</span>
+              <h2 className="text-lg font-semibold text-red-700">危险操作</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-red-50 rounded-lg p-4 text-sm text-red-800">
+                <p className="font-medium mb-2">🗑️ 注销账户将永久删除以下数据，且不可恢复：</p>
+                <ul className="list-disc list-inside space-y-1 text-red-700">
+                  <li>您的所有业务数据（商品、订单、库存、客户、供应商等）</li>
+                  <li>您的租户 Schema 及其全部数据表</li>
+                  <li>您的 Token 余额、用量记录与配置</li>
+                  <li>您的账户登录凭证与租户记录</li>
+                </ul>
+                <p className="mt-2 text-red-700">建议在注销前先通过「数据导出」备份所有数据。</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  请输入 <span className="font-mono font-bold text-red-600">DELETE</span> 以确认注销
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirm}
+                  onChange={e => setDeleteConfirm(e.target.value)}
+                  placeholder="DELETE"
+                  disabled={deleting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none disabled:opacity-50"
+                />
+              </div>
+
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting || deleteConfirm !== 'DELETE'}
+                className="w-full px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {deleting ? '注销中...' : '注销账户'}
               </button>
             </div>
           </div>

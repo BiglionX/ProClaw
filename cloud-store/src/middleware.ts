@@ -123,8 +123,15 @@ export function middleware(request: NextRequest) {
   }
   
   if (isAuthPath(pathname)) {
-    const sessionCookie = request.cookies.get('pc_session');
-    if (!sessionCookie) {
+    // 检查 Supabase 会话 cookie（格式: sb-<project-ref>-auth-token）
+    // 或自定义 pc_session cookie
+    const allCookies = request.cookies.getAll();
+    const hasSupabaseSession = allCookies.some(c =>
+      c.name.startsWith('sb-') && c.name.includes('auth-token')
+    );
+    const hasCustomSession = request.cookies.get('pc_session');
+
+    if (!hasSupabaseSession && !hasCustomSession) {
       const authUrl = buildOidcAuthUrl(OIDC_REDIRECT_URI);
       return NextResponse.redirect(new URL(authUrl, request.url));
     }

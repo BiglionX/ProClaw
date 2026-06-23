@@ -10,11 +10,23 @@ import { formatTokens } from '@/lib/utils';
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const [balanceSummary, setBalanceSummary] = useState<TokenBalanceSummary | null>(null);
+  const [productCount, setProductCount] = useState<number | null>(null);
+  const [lowStockCount, setLowStockCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (user?.id) {
       getTokenBalanceSummary(user.id).then(setBalanceSummary).catch(() => {});
     }
+    // 获取商品总数
+    fetch('/api/products?page=1&pageSize=1')
+      .then(res => res.ok ? res.json() : { total: 0 })
+      .then(data => setProductCount(data.total ?? 0))
+      .catch(() => setProductCount(0));
+    // 获取低库存预警数
+    fetch('/api/inventory?summary=true')
+      .then(res => res.ok ? res.json() : { low_stock_count: 0 })
+      .then(data => setLowStockCount(data.low_stock_count ?? data.data?.low_stock_count ?? 0))
+      .catch(() => setLowStockCount(0));
   }, [user?.id]);
 
   // 快捷操作卡片
@@ -61,12 +73,16 @@ export default function DashboardPage() {
 
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <div className="text-sm text-gray-500 mb-1">商品总数</div>
-          <div className="text-2xl font-bold text-blue-600">--</div>
+          <div className="text-2xl font-bold text-blue-600">
+            {productCount !== null ? productCount : '--'}
+          </div>
         </div>
 
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <div className="text-sm text-gray-500 mb-1">低库存预警</div>
-          <div className="text-2xl font-bold text-red-600">--</div>
+          <div className="text-2xl font-bold text-red-600">
+            {lowStockCount !== null ? lowStockCount : '--'}
+          </div>
         </div>
       </div>
 

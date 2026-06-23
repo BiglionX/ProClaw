@@ -16,6 +16,30 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.supabase.co",
       },
+      {
+        protocol: "https",
+        hostname: "live.staticflickr.com",
+      },
+      {
+        protocol: "https",
+        hostname: "upload.wikimedia.org",
+      },
+      {
+        protocol: "https",
+        hostname: "images.pexels.com",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.pixabay.com",
+      },
+      {
+        protocol: "https",
+        hostname: "storage.googleapis.com",
+      },
+      {
+        protocol: "https",
+        hostname: "images.openverse.org",
+      },
     ],
   },
 
@@ -23,7 +47,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // 公开商城页允许桌面端 iframe 手机预览（覆盖下方全局 DENY）
+        // 公开商城页允许桌面端 iframe 手机预览
         source: "/shop/:path*",
         headers: [
           {
@@ -33,7 +57,8 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/(.*)",
+        // 管理后台等页面禁止被 iframe 嵌入（商城页走 /shop/* 规则，不含 X-Frame-Options）
+        source: "/((?!shop).*)",
         headers: [
           {
             key: "X-Content-Type-Options",

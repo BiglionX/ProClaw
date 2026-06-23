@@ -15,7 +15,7 @@
       ]
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!shop).*)",
       "headers": [
         {
           "key": "X-Content-Type-Options",

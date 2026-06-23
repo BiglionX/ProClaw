@@ -12,6 +12,8 @@ export const DEMO_TENANT_SUBDOMAIN = 'demo';
 export const DEMO_TENANT_ID = 'a0000000-0000-0000-0000-000000000001';
 export const DEMO_TENANT_SCHEMA = 'tenant_demo';
 
+import { fetchDemoProductImageUrl, isPlaceholderDemoImage } from './demo-product-images';
+
 // ========== 类型定义 ==========
 
 /**
@@ -146,17 +148,6 @@ export function isSubdomainLengthValid(subdomain: string): boolean {
  */
 export function getMaxSubdomainLength(): number {
   return MAX_SUBDOMAIN_LENGTH;
-}
-
-/**
- * 租户上下文 Hook 类型定义
- */
-export interface TenantContext {
-  subdomain: string;
-  schema: string;
-  tenantId: string | null;
-  status: 'active' | 'suspended' | 'expired' | 'unknown';
-  plan: 'trial' | 'basic' | 'pro' | 'enterprise' | 'unknown';
 }
 
 /**
@@ -488,6 +479,9 @@ export async function ensureDemoTenant(): Promise<EnsureDemoTenantResult> {
     }
 
     for (const p of DEMO_CLOUD_PRODUCTS) {
+      const imageUrl = await fetchDemoProductImageUrl(p.name);
+      const images = imageUrl && !isPlaceholderDemoImage(imageUrl) ? [imageUrl] : [];
+
       await sb.from(`${DEMO_TENANT_SCHEMA}.products`).upsert(
         {
           id: p.id,
@@ -498,9 +492,12 @@ export async function ensureDemoTenant(): Promise<EnsureDemoTenantResult> {
           category: p.category,
           is_on_sale: true,
           description: p.name,
+          ...(images.length > 0 ? { images } : {}),
         },
         { onConflict: 'id' }
       );
+
+      await new Promise((r) => setTimeout(r, 400));
     }
 
     return {

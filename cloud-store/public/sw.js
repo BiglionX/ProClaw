@@ -4,18 +4,30 @@
 const CACHE_NAME = 'proclaw-cloud-v1';
 const STATIC_CACHE = 'proclaw-cloud-static-v1';
 
-// 需要预缓存的静态资源
+// 需要预缓存的静态资源（使用实际存在的路由）
 const PRECACHE_URLS = [
   '/',
-  '/login',
-  '/register',
+  '/auth/scan',
+  '/tenant/register',
+  '/manifest.json',
 ];
 
 // Service Worker 安装事件：预缓存静态资源
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(PRECACHE_URLS);
+      // 使用 Promise.allSettled 避免单个 URL 404 导致整个预缓存失败
+      return Promise.allSettled(
+        PRECACHE_URLS.map((url) =>
+          fetch(url).then((res) => {
+            if (res.ok) {
+              return cache.put(url, res);
+            }
+          }).catch(() => {
+            // 忽略预缓存失败的单个资源
+          })
+        )
+      );
     })
   );
   // 立即激活
