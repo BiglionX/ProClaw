@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { generateCodeVerifier, generateCodeChallenge } from '@/lib/pkce';
 
 const SKIP_PATHS = ['/_next', '/favicon', '/api/health', '/public'];
 const AUTH_PATHS = ['/app', '/dashboard'];
@@ -97,18 +98,34 @@ function isAuthPath(pathname: string): boolean {
   return AUTH_PATHS.some(prefix => pathname.startsWith(prefix));
 }
 
-function buildOidcAuthUrl(redirectUri: string): string {
+/**
+ * 构建 OIDC 授权 URL（含 PKCE）
+ * 返回授权 URL、state 和 code_verifier
+ * verifier 和 state 需存入 cookie 供 callback 使用
+ */
+async function buildOidcAuthUrl(redirectUri: string): Promise<{ url: string; state: string; verifier: string }> {
+  const verifier = generateCodeVerifier();
+  const challenge = await generateCodeChallenge(verifier);
+  const state = crypto.randomUUID();
+
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: OIDC_CLIENT_ID,
     redirect_uri: redirectUri,
     scope: 'openid profile email',
-    state: crypto.randomUUID(),
+    state,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
   });
-  return OIDC_ISSUER + '/oauth/authorize?' + params.toString();
+
+  return {
+    url: OIDC_ISSUER + '/oauth/authorize?' + params.toString(),
+    state,
+    verifier,
+  };
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 商户登录页 → 演示直通登录（boss 测试账号）
@@ -132,8 +149,22 @@ export function middleware(request: NextRequest) {
     const hasCustomSession = request.cookies.get('pc_session');
 
     if (!hasSupabaseSession && !hasCustomSession) {
-      const authUrl = buildOidcAuthUrl(OIDC_REDIRECT_URI);
-      return NextResponse.redirect(new URL(authUrl, request.url));
+      // 生成含 PKCE 的 OIDC 授权 URL
+      const { url, state, verifier } = await buildOidcAuthUrl(OIDC_REDIRECT_URI);
+      const redirectResponse = NextResponse.redirect(new URL(url, request.url));
+
+      // 将 PKCE verifier 和 state 存入 httpOnly cookie（10 分钟有效）
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: 60 * 10, // 10 分钟
+      };
+      redirectResponse.cookies.set('pkce_verifier', verifier, cookieOptions);
+      redirectResponse.cookies.set('oidc_state', state, cookieOptions);
+
+      return redirectResponse;
     }
   }
   

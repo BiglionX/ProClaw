@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getSupabaseClient, type User, type Session } from './supabase';
-import { startOidcAuth, exchangeCodeForToken, getUserInfo, logout as oidcLogout } from './oidc-client';
+import { exchangeCodeForToken, getUserInfo, logout as oidcLogout } from './oidc-client';
 
 interface AuthState {
   user: User | null;
@@ -145,17 +145,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   loginWithOidc: async () => {
+    // 通过中间件触发服务端 OIDC + PKCE 流程
+    // 中间件会生成 PKCE、存入 cookie、重定向到 account.proclaw.cc/oauth/authorize
+    // 回调由 /auth/callback 服务端处理，建立 Supabase session
     set({ isLoading: true, error: null });
-    try {
-      const authUrl = await startOidcAuth();
-      window.location.href = authUrl;
-    } catch (error: unknown) {
-      set({
-        error: getErrorMessage(error),
-        isLoading: false,
-      });
-      throw error;
-    }
+    window.location.href = '/app/dashboard';
   },
 
   handleOidcCallback: async (code: string, state: string) => {
