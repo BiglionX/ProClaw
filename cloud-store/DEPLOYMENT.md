@@ -2,12 +2,16 @@
 
 ## 部署概述
 
-云商城是面向终端用户的 B2C 独立商城，支持 AI 生成主题、商品管理、购物车、订单处理等功能。
+cloud-store 项目同时承载两个产品，共用同一代码仓库和同一 Vercel 项目：
 
-**目标域名**: `proclaw.cc`（路径模式：`/shop/{store}`、`/tenant/*`）
+| 域名 | 产品 | 路由 | 说明 |
+|------|------|------|------|
+| `proclaw.cc` | 云商城（B2C 独立商城） | `/shop/{store}`、`/tenant/*` | 面向终端消费者的商城 |
+| `cloud.proclaw.cc` | 云托管版（Web 端进销存） | `/app/*` | 面向商户的 Web 端管理后台 |
 
-> **与营销站分工**：`proclaw.cc` 绑定 **cloud-store** 项目；营销官网建议绑定 `www.proclaw.cc`（`marketing-site` 项目）。  
-> 勿将 cloud-store 代理到 `app.proclaw.cc`。用户商城标准 URL：`https://proclaw.cc/shop/{商店名}`。
+> **无需分仓**：两个域名指向同一 Vercel 项目，代码通过路由前缀区分产品，OIDC 回调地址根据请求域名动态生成。
+
+> **与营销站分工**：`proclaw.cc` + `cloud.proclaw.cc` 绑定 **cloud-store** 项目；营销官网建议绑定 `www.proclaw.cc`（`marketing-site` 项目）。
 
 ## 部署要求
 
@@ -59,21 +63,43 @@ NEXT_PUBLIC_PAYMENT_METHOD=mock
 
 ### 3. 域名绑定
 
-**cloud-store 项目绑定主域名 `proclaw.cc`**。
+**同一 Vercel 项目绑定两个域名**：
 
-营销官网（`marketing-site`）建议绑定 `www.proclaw.cc`，避免与云商城路径（`/shop`、`/tenant`）冲突。
+1. cloud-store 项目 → Settings → Domains
+2. 添加 `proclaw.cc`（云商城）
+3. 添加 `cloud.proclaw.cc`（云托管版）
+
+**DNS 配置**（在域名注册商/DNS 管理处添加）：
+
+| 类型 | 主机记录 | 记录值 | 说明 |
+|------|----------|--------|------|
+| A / CNAME | `@` | `cname.vercel-dns.com` | proclaw.cc 主域名 |
+| CNAME | `cloud` | `cname.vercel-dns.com` | cloud.proclaw.cc 子域名 |
+
+> Vercel 添加域名后会自动检测 DNS，按提示配置即可。DNS 生效通常需要几分钟到 48 小时。
 
 **路径模式（标准，与 PRD 一致）**
-- cloud-store 项目 → Domains → 添加 `proclaw.cc`
-- 用户商城：`https://proclaw.cc/shop/{商店名}`（开通时设定的 subdomain）
+- 云商城：`https://proclaw.cc/shop/{商店名}`（开通时设定的 subdomain）
 - 演示商城：`https://proclaw.cc/shop/demo`
 - 商户后台：`https://proclaw.cc/tenant/login?auto=demo`
+- 云托管版：`https://cloud.proclaw.cc/app/dashboard`
 - 旧链接 `/mystore` 会自动 302 重定向到 `/shop/mystore`
 
 **自定义域名（可选）**
 1. 进入项目设置 → Domains
 2. 商户在桌面端绑定独立域名（如 `shop.merchant.com`）
 3. 按提示配置 DNS CNAME 指向 `proclaw.cc`
+
+### 3.1 OIDC 回调地址注册
+
+在 `account.proclaw.cc` OIDC 提供方的客户端配置中，添加以下两个回调地址到 **Allowed Redirect URIs**：
+
+```
+https://proclaw.cc/auth/callback
+https://cloud.proclaw.cc/auth/callback
+```
+
+> 代码已实现动态适配：根据请求来源域名自动生成对应的 `redirect_uri`，无需在环境变量中固定。
 
 ### 4. 部署触发
 

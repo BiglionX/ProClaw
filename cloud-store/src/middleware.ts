@@ -6,7 +6,20 @@ const SKIP_PATHS = ['/_next', '/favicon', '/api/health', '/public'];
 const AUTH_PATHS = ['/app', '/dashboard'];
 const OIDC_ISSUER = process.env.NEXT_PUBLIC_OIDC_ISSUER || 'https://account.proclaw.cc';
 const OIDC_CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || 'proclaw_web';
-const OIDC_REDIRECT_URI = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || 'https://proclaw.cc/auth/callback';
+
+/**
+ * 根据请求动态生成 OIDC 回调 URI
+ * 支持多域名：cloud.proclaw.cc（云托管版）、proclaw.cc（云商城）等
+ */
+function getOidcRedirectUri(request: NextRequest): string {
+  // 优先使用环境变量（如果配置了固定回调地址）
+  const envUri = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI;
+  if (envUri) return envUri;
+
+  // 根据请求域名动态生成
+  const url = new URL(request.url);
+  return `${url.origin}/auth/callback`;
+}
 
 /**
  * 获取平台主域名列表
@@ -149,8 +162,9 @@ export async function middleware(request: NextRequest) {
     const hasCustomSession = request.cookies.get('pc_session');
 
     if (!hasSupabaseSession && !hasCustomSession) {
-      // 生成含 PKCE 的 OIDC 授权 URL
-      const { url, state, verifier } = await buildOidcAuthUrl(OIDC_REDIRECT_URI);
+      // 根据请求域名动态生成回调 URI（支持 cloud.proclaw.cc / proclaw.cc 等）
+      const redirectUri = getOidcRedirectUri(request);
+      const { url, state, verifier } = await buildOidcAuthUrl(redirectUri);
       const redirectResponse = NextResponse.redirect(new URL(url, request.url));
 
       // 将 PKCE verifier 和 state 存入 httpOnly cookie（10 分钟有效）

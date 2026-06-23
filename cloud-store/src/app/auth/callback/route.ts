@@ -13,7 +13,18 @@ export const dynamic = 'force-dynamic';
 
 const OIDC_ISSUER = process.env.NEXT_PUBLIC_OIDC_ISSUER || 'https://account.proclaw.cc';
 const OIDC_CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || 'proclaw_web';
-const OIDC_REDIRECT_URI = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI || 'https://proclaw.cc/auth/callback';
+
+/**
+ * 根据请求动态生成 OIDC 回调 URI
+ * 支持多域名：cloud.proclaw.cc（云托管版）、proclaw.cc（云商城）等
+ * 必须与中间件 buildOidcAuthUrl 中使用的 redirect_uri 一致
+ */
+function getOidcRedirectUri(request: NextRequest): string {
+  const envUri = process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI;
+  if (envUri) return envUri;
+  const url = new URL(request.url);
+  return `${url.origin}/auth/callback`;
+}
 
 /**
  * OIDC 回调处理
@@ -53,13 +64,15 @@ export async function GET(request: NextRequest) {
 
   try {
     // ── 步骤 1: 服务端交换 code → tokens ──
+    // redirect_uri 必须与中间件发起授权时使用的完全一致
+    const redirectUri = getOidcRedirectUri(request);
     const tokenRes = await fetch(OIDC_ISSUER + '/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: OIDC_REDIRECT_URI,
+        redirect_uri: redirectUri,
         client_id: OIDC_CLIENT_ID,
         code_verifier: verifier,
       }),
