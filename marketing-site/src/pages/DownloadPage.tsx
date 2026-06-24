@@ -28,7 +28,7 @@ const productCards = [
       '离线完全可用',
     ],
     cta: '免费下载',
-    ctaLink: 'https://github.com/BigLionX/ProClaw/releases/latest',
+    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/1.0.7/ProClaw_1.0.7_x64-setup.exe',
     platforms: 'Windows · macOS · Linux',
     highlighted: true,
     color: 'black',
@@ -52,7 +52,7 @@ const productCards = [
       '离线完全可用',
     ],
     cta: '免费下载',
-    ctaLink: 'https://github.com/BigLionX/ProClaw/releases/latest',
+    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/1.0.7/ProClaw_1.0.7_x64-setup.exe',
     platforms: 'Windows · macOS · Linux',
     highlighted: false,
     color: 'gray',
@@ -98,7 +98,7 @@ const productCards = [
       '消息推送提醒',
     ],
     cta: '免费下载 APK',
-    ctaLink: 'https://github.com/BigLionX/ProClaw/releases/latest',
+    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/1.0.7/proclaw-mobile-1.0.3.apk',
     platforms: 'Android 6.0+',
     highlighted: false,
     color: 'gray',
@@ -219,7 +219,7 @@ const DownloadPage: React.FC = () => {
       <PageHeader
         title="下载 ProClaw"
         description="ProClaw Plus / Light 桌面端 · Cloud 云商城 · 手机端 App"
-        subtitle="Plus 版 v1.0.0-beta.2 | Light 版 v1.0.0-beta.2 | 发布日期：2026-05-31"
+        subtitle="Plus 版 v1.0.7 | Light 版 v1.0.7 | 发布日期：2026-06-24"
       />
 
       {/* 四产品并列卡片 */}
@@ -564,16 +564,12 @@ const DownloadPage: React.FC = () => {
                 </thead>
                 <tbody>
                   <tr className="border-b border-gray-100">
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (桌面端)</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">44550F0DAEC1F449E67F5B0ABFE95B50DA7FBD0C18AF13C65F3E24364F2D3050</td>
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (桌面端 v1.0.7)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">bb6a85e774f1a4174e9576e50336de8effc3b7b499272e6092c2c87739d4c959</td>
                   </tr>
                   <tr className="border-b border-gray-100">
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (移动端 Android APK)</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">C48D33A8819EF5BC554CD749AFDF1AB4AE96824FF0D125A79A00E4FC5792B9E4</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (移动端 Android APK)</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">C48D33A8819EF5BC554CD749AFDF1AB4AE96824FF0D125A79A00E4FC5792B9E4</td>
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (移动端 Android APK v1.0.3)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">5117fcdd423b3ab8dc336b2af81764df4c95492b2bdeade0ddc590ed9eb34313</td>
                   </tr>
                 </tbody>
               </table>
