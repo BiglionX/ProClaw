@@ -126,9 +126,10 @@ describe('cloudStoreService', () => {
       expect(safeInvoke).toHaveBeenCalledWith('get_cloud_store', undefined);
     });
 
-    it('后端返回 null 时应抛出异常', async () => {
+    it('后端返回 null 时应返回 null', async () => {
       (safeInvoke as any).mockResolvedValue(null);
-      await expect(getCloudStore()).rejects.toThrow('Command "get_cloud_store" returned null');
+      const result = await getCloudStore();
+      expect(result).toBeNull();
     });
 
     it('网络错误时应抛出异常', async () => {

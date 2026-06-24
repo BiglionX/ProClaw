@@ -165,52 +165,44 @@ const MOCK_AGENT_DETAILS: Record<string, AgentDetail> = Object.fromEntries(
       requirements: { minAppVersion: '1.0.0' },
       changelog: '## 1.2.0\n- 性能优化\n- 修复已知问题',
       reviews: [],
+      config: {},
     },
   ])
 );
 
 const MOCK_AI_TEAMS: AiTeamListResponse = {
-  teams: [
+  aiteams: [
     {
       id: 'team-mock-001',
       name: 'AI 经营团队',
       description: 'CEO + 财务 + 供应链 全方位经营决策',
-      avatar: '👔',
-      memberCount: 5,
       industry: '通用',
-      price: 0,
-      downloads: 2340,
-      rating: 4.7,
-      isFeatured: true,
+      member_count: 5,
+      status: 'active',
     },
     {
       id: 'team-mock-002',
       name: '国内社媒运营 Team',
       description: '抖音/小红书/视频号 多平台内容运营',
-      avatar: '📱',
-      memberCount: 4,
       industry: '社媒',
-      price: 0,
-      downloads: 1890,
-      rating: 4.5,
-      isFeatured: true,
+      member_count: 4,
+      status: 'active',
     },
     {
       id: 'team-mock-003',
       name: '欧美社媒运营 Team',
       description: 'Facebook/Instagram/Twitter 海外内容运营',
-      avatar: '🌍',
-      memberCount: 4,
       industry: '社媒',
-      price: 0,
-      downloads: 1120,
-      rating: 4.4,
-      isFeatured: false,
+      member_count: 4,
+      status: 'active',
     },
   ],
-  total: 3,
-  page: 1,
-  pageSize: 20,
+  pagination: {
+    page: 1,
+    limit: 20,
+    total: 3,
+    total_pages: 1,
+  },
 };
 
 // ==================== 工具函数 ====================
@@ -230,15 +222,16 @@ function filterAgents(agents: AgentSummary[], params: SearchParams): AgentSummar
     const q = params.q.toLowerCase();
     result = result.filter(a =>
       a.name.toLowerCase().includes(q) ||
-      a.description.toLowerCase().includes(q) ||
+      (a.description ?? '').toLowerCase().includes(q) ||
       a.tags.some(t => t.toLowerCase().includes(q))
     );
   }
   if (params.category && params.category !== 'all') {
     result = result.filter(a => a.category === params.category);
   }
-  if (params.tags && params.tags.length > 0) {
-    result = result.filter(a => params.tags!.every(t => a.tags.includes(t)));
+  if (params.tags) {
+    const tags = typeof params.tags === 'string' ? [params.tags] : params.tags;
+    result = result.filter(a => tags.every(t => a.tags.includes(t)));
   }
   return result;
 }
@@ -250,14 +243,17 @@ export const nvwaMockServer = {
   async searchAgents(params: SearchParams = {}): Promise<AgentListResponse> {
     const filtered = filterAgents(MOCK_AGENTS, params);
     const page = params.page || 1;
-    const pageSize = params.limit || 20;
-    const items = paginate(filtered, page, pageSize);
+    const limit = params.limit || 20;
+    const items = paginate(filtered, page, limit);
 
     return delay({
-      data: items,
-      total: filtered.length,
-      page,
-      page_size: pageSize,
+      agents: items,
+      pagination: {
+        page,
+        limit,
+        total: filtered.length,
+        total_pages: Math.ceil(filtered.length / limit),
+      },
     });
   },
 
@@ -282,71 +278,75 @@ export const nvwaMockServer = {
 
   /** 搜索 AI Team */
   async searchAiTeams(params: ListParams = {}): Promise<AiTeamListResponse> {
-    let teams = MOCK_AI_TEAMS.teams;
+    let teams = [...MOCK_AI_TEAMS.aiteams];
     if (params.q) {
       const q = params.q.toLowerCase();
       teams = teams.filter(t =>
         t.name.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q)
+        (t.description ?? '').toLowerCase().includes(q)
       );
     }
     if (params.industry) {
       teams = teams.filter(t => t.industry === params.industry);
     }
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const items = paginate(teams, page, limit);
     return delay({
-      teams: paginate(teams, params.page || 1, params.limit || 20),
-      total: teams.length,
-      page: params.page || 1,
-      pageSize: params.limit || 20,
+      aiteams: items,
+      pagination: {
+        page,
+        limit,
+        total: teams.length,
+        total_pages: Math.ceil(teams.length / limit),
+      },
     });
   },
 
   /** 获取 AI Team 详情 */
   async getAiTeamDetail(id: string): Promise<AiTeamDetail> {
-    const team = MOCK_AI_TEAMS.teams.find(t => t.id === id);
+    const team = MOCK_AI_TEAMS.aiteams.find(t => t.id === id);
     if (!team) {
       throw new Error(`AI Team ${id} 不存在`);
     }
+    const memberCount = team.member_count || 3;
     return delay({
       ...team,
-      members: Array.from({ length: team.memberCount }, (_, i) => ({
-        id: `${id}-member-${i}`,
-        name: `成员 ${i + 1}`,
+      members: Array.from({ length: memberCount }, (_, i) => ({
+        agent_id: `${id}-member-${i}`,
+        agent_name: `成员 ${i + 1}`,
         role: ['负责人', '运营', '内容', '数据', '客服'][i] || '助理',
-        avatar: ['👤', '👨', '👩', '🧑', '👨‍💼'][i] || '👤',
       })),
-      longDescription: team.description,
-      capabilities: [],
-      installCount: team.downloads,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
   },
 
   /** 获取 Token 余额 */
   async getTokenBalance(): Promise<TokenBalance> {
     return delay({
+      user_id: 'mock-user-001',
       balance: 9850,
-      used: 150,
-      total: 10000,
-      expiresAt: '2026-12-31',
-      isUnlimited: false,
+      total_consumed: 150,
+      monthly_consumed: 150,
+      free_monthly_quota: 10000,
     });
   },
 
   /** 获取使用统计 */
   async getUsageStats(): Promise<UsageStats> {
     return delay({
-      totalCalls: 150,
-      totalTokens: 12450,
-      agentBreakdown: MOCK_AGENTS.slice(0, 3).map(a => ({
-        agentId: a.id,
-        agentName: a.name,
-        callCount: Math.floor(Math.random() * 50) + 10,
-        tokenCount: Math.floor(Math.random() * 3000) + 500,
-      })),
-      dailyStats: Array.from({ length: 7 }, (_, i) => ({
+      period: 'month',
+      total_tokens: 12450,
+      calls: 150,
+      by_model: [
+        { model: 'gpt-4', tokens: 8000, calls: 80 },
+        { model: 'gpt-3.5', tokens: 4450, calls: 70 },
+      ],
+      daily: Array.from({ length: 7 }, (_, i) => ({
         date: new Date(Date.now() - (6 - i) * 86400000).toISOString().split('T')[0],
-        callCount: Math.floor(Math.random() * 30) + 5,
-        tokenCount: Math.floor(Math.random() * 2000) + 200,
+        tokens: Math.floor(Math.random() * 2000) + 200,
+        calls: Math.floor(Math.random() * 30) + 5,
       })),
     });
   },
@@ -356,8 +356,10 @@ export const nvwaMockServer = {
     const agentResults = filterAgents(MOCK_AGENTS, params);
     return delay({
       agents: agentResults.slice(0, 5),
-      teams: MOCK_AI_TEAMS.teams.slice(0, 3),
-      totalCount: agentResults.length + MOCK_AI_TEAMS.teams.length,
+      skills: [
+        { id: 'skill-mock-001', name: '文档生成', description: '自动生成文档', type: 'tool', tags: ['文档', '生成'] },
+        { id: 'skill-mock-002', name: '数据可视化', description: '图表生成', type: 'tool', tags: ['图表', '可视化'] },
+      ],
     });
   },
 
@@ -365,7 +367,7 @@ export const nvwaMockServer = {
   async exportData(items: ExportItem[]): Promise<ExportResult> {
     return delay({
       url: `https://mock-nvwa.proclaw.cc/exports/${Date.now()}.zip`,
-      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      success: true,
       size: items.length * 1024,
     });
   },
