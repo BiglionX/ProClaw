@@ -8,12 +8,24 @@ const STORAGE_KEY = 'proclaw_ai_team_tokens';
 const DEMO_TOKEN_BALANCE = 10000;
 
 /** 演示账号邮箱 */
-const DEMO_EMAIL = 'boss@proclaw.demo';
+export const DEMO_EMAIL = 'boss@proclaw.demo';
+const DEMO_USER_ID = 'mock-boss-001';
 
 /** 是否为演示账号 */
 export function isDemoAccount(): boolean {
   const user = useAuthStore.getState().user;
-  return user?.email === DEMO_EMAIL;
+  if (user?.email === DEMO_EMAIL || user?.id === DEMO_USER_ID) return true;
+  try {
+    const raw = sessionStorage.getItem('proclaw-auth-session');
+    if (raw) {
+      const parsed = JSON.parse(raw) as { user?: { email?: string; id?: string } };
+      const u = parsed.user;
+      if (u?.email === DEMO_EMAIL || u?.id === DEMO_USER_ID) return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
 }
 
 /** 获取 local 存储的 token 余额 */

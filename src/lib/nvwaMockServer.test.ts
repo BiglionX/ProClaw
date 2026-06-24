@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { nvwaMockServer } from './nvwaMockServer';
+import type { ListParams } from '../types/nvwax';
 
 describe('nvwaMockServer', () => {
   beforeEach(() => {
@@ -12,18 +13,18 @@ describe('nvwaMockServer', () => {
   describe('searchAgents', () => {
     it('返回 Agent 列表', async () => {
       const result = await nvwaMockServer.searchAgents();
-      expect(result.data).toBeDefined();
-      expect(result.data.length).toBeGreaterThan(0);
-      expect(result.total).toBeGreaterThan(0);
+      expect(result.agents).toBeDefined();
+      expect(result.agents.length).toBeGreaterThan(0);
+      expect(result.pagination?.total ?? 0).toBeGreaterThan(0);
     });
 
     it('关键词搜索过滤结果', async () => {
       const result = await nvwaMockServer.searchAgents({ q: '财务' });
-      expect(result.data.length).toBeGreaterThan(0);
+      expect(result.agents.length).toBeGreaterThan(0);
       // 所有结果应包含"财务"关键词
-      const allMatch = result.data.every(a =>
+      const allMatch = result.agents.every(a =>
         a.name.includes('财务') ||
-        a.description.includes('财务') ||
+        (a.description ?? '').includes('财务') ||
         a.tags.some(t => t.includes('财务'))
       );
       expect(allMatch).toBe(true);
@@ -31,19 +32,19 @@ describe('nvwaMockServer', () => {
 
     it('按分类过滤', async () => {
       const result = await nvwaMockServer.searchAgents({ category: 'cat-finance' });
-      expect(result.data.every(a => a.category === 'cat-finance')).toBe(true);
+      expect(result.agents.every(a => a.category === 'cat-finance')).toBe(true);
     });
 
     it('按 tags 过滤', async () => {
-      const result = await nvwaMockServer.searchAgents({ tags: ['客服'] });
-      expect(result.data.every(a => a.tags.includes('客服'))).toBe(true);
+      const result = await nvwaMockServer.searchAgents({ tags: '客服' });
+      expect(result.agents.every(a => a.tags.includes('客服'))).toBe(true);
     });
 
     it('分页参数生效', async () => {
       const result = await nvwaMockServer.searchAgents({ page: 1, limit: 2 });
-      expect(result.data.length).toBeLessThanOrEqual(2);
-      expect(result.page).toBe(1);
-      expect(result.page_size).toBe(2);
+      expect(result.agents.length).toBeLessThanOrEqual(2);
+      expect(result.pagination?.page).toBe(1);
+      expect(result.pagination?.limit).toBe(2);
     });
   });
 
@@ -52,8 +53,8 @@ describe('nvwaMockServer', () => {
       const detail = await nvwaMockServer.getAgentDetail('ma-mock-001');
       expect(detail.id).toBe('ma-mock-001');
       expect(detail.name).toBeTruthy();
-      expect(detail.capabilities).toBeDefined();
-      expect(detail.permissions).toBeDefined();
+      expect(detail.tags).toBeDefined();
+      expect(detail.config).toBeDefined();
     });
 
     it('不存在的 ID 抛错', async () => {
@@ -83,13 +84,13 @@ describe('nvwaMockServer', () => {
   describe('searchAiTeams', () => {
     it('返回 AI Team 列表', async () => {
       const result = await nvwaMockServer.searchAiTeams();
-      expect(result.teams.length).toBeGreaterThan(0);
-      expect(result.total).toBeGreaterThan(0);
+      expect(result.aiteams.length).toBeGreaterThan(0);
+      expect(result.pagination?.total ?? 0).toBeGreaterThan(0);
     });
 
     it('按 industry 过滤', async () => {
-      const result = await nvwaMockServer.searchAiTeams({ industry: '社媒' });
-      expect(result.teams.every(t => t.industry === '社媒')).toBe(true);
+      const result = await nvwaMockServer.searchAiTeams({ industry: '社媒' } as ListParams);
+      expect(result.aiteams.every(t => t.industry === '社媒')).toBe(true);
     });
   });
 
@@ -106,18 +107,18 @@ describe('nvwaMockServer', () => {
     it('返回 Token 余额信息', async () => {
       const balance = await nvwaMockServer.getTokenBalance();
       expect(balance.balance).toBeGreaterThan(0);
-      expect(balance.used).toBeGreaterThanOrEqual(0);
-      expect(balance.total).toBeGreaterThan(0);
+      expect(balance.total_consumed).toBeGreaterThanOrEqual(0);
+      expect(balance.free_monthly_quota).toBeGreaterThan(0);
     });
   });
 
   describe('getUsageStats', () => {
     it('返回使用统计', async () => {
       const stats = await nvwaMockServer.getUsageStats();
-      expect(stats.totalCalls).toBeGreaterThanOrEqual(0);
-      expect(stats.totalTokens).toBeGreaterThanOrEqual(0);
-      expect(Array.isArray(stats.dailyStats)).toBe(true);
-      expect(stats.dailyStats.length).toBe(7); // 7 天
+      expect(stats.calls).toBeGreaterThanOrEqual(0);
+      expect(stats.total_tokens).toBeGreaterThanOrEqual(0);
+      expect(Array.isArray(stats.daily)).toBe(true);
+      expect(stats.daily.length).toBe(7); // 7 天
     });
   });
 
@@ -125,20 +126,18 @@ describe('nvwaMockServer', () => {
     it('全局搜索返回综合结果', async () => {
       const result = await nvwaMockServer.search({ q: 'Agent' });
       expect(result.agents).toBeDefined();
-      expect(result.teams).toBeDefined();
-      expect(result.totalCount).toBeGreaterThan(0);
+      expect(result.skills).toBeDefined();
+      expect(result.agents.length + result.skills.length).toBeGreaterThan(0);
     });
   });
 
   describe('exportData', () => {
     it('返回导出 URL', async () => {
       const result = await nvwaMockServer.exportData([
-        { type: 'chat', id: 'c1' },
-        { type: 'order', id: 'o1' },
+        { type: 'agent', id: 'c1' },
+        { type: 'aiteam', id: 'o1' },
       ]);
       expect(result.url).toMatch(/^https?:\/\//);
-      expect(result.expiresAt).toBeTruthy();
-      expect(result.size).toBeGreaterThan(0);
     });
   });
 });

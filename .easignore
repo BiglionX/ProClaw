@@ -1,69 +1,34 @@
-# EAS Build ignore file
-# 排除本地构建产物和大文件，避免上传体积超出磁盘限制
+# EAS ignore at root level
+# Exclude sibling projects that are not needed for mobile build
 
-# 桌面端安装包（不应上传到云端打包）
+# Cloud store (Next.js web app)
+cloud-store/
+
+# Desktop app (Tauri)
+src-tauri/
+
+# Marketing site
+marketing-site/
+
+# E2E tests
+e2e/
+
+# Release builds
 RELEASES/
-*.exe
-*.msi
-*.dmg
-*.dmg.zip
-*.pkg
-*.deb
-*.AppImage
 
-# 桌面端 native build 产物
-src-tauri/target/
-src-tauri/Cargo.lock
-
-# 桌面端 schema 自动生成文件
-src-tauri/gen/
-src-tauri/icons/
-
-# 本地调试产物
-dist-debug/
-dist-web*/
-dist-web/
-dist/
-
-# 测试结果与日志
-test-results/
-playwright-report/
+# Temporary files
 *.log
-*.txt
-1.log
-cargo_check*.log
-test_output.txt
-test_detail.txt
-test-list.txt
-final-test.txt
-check_output*.txt
+*.tmp
+.dist/
 
-# 截图（仅排除根目录与桌面端截图，保留 mobile/assets/）
-/*.png
-/*.jpg
-screenshot*.png
-test-*.png
-test_*.png
-homepage-*.png
-cloud-store-*.png
-test-cloud-*.png
-tauri-test-*.png
-mobile/dist-*.png
-mobile/__mocks__/*.png
-mobile/scripts/*.png
-public/**/*.png
-scripts/*.png
+# IDE cache
+.qoder/
+.codebuddy/
 
-# Python 脚本
-scripts/check_pil.py
+# Playwright cache
+playwright-report/
+test-results/
+.blob-report/
 
-# 备份
-*.bak
-icons.bak/
-
-# 临时文件
-test_*.js
-test-cloud-*.js
-
-# node_modules（自动排除）
+# Node modules at root
 node_modules/

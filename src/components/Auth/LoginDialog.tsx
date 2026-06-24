@@ -16,6 +16,7 @@ import { MOCK_PASSWORD } from '../../lib/authStore';
 export default function LoginDialog() {
   const {
     login,
+    loginWithOidc,
     isLoading,
     error,
     clearError,
@@ -25,6 +26,7 @@ export default function LoginDialog() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isOidcLoading, setIsOidcLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,6 +207,39 @@ export default function LoginDialog() {
             }}
           >
             ⚡ 一键体验 (boss)
+          </Button>
+
+          {/* OIDC 登录区域 */}
+          <div data-testid="oidc-section-check" style={{display:'none'}}>OIDC section rendered</div>
+
+          <Box sx={{ my: 2, display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ flex: 1, borderBottom: 1, borderColor: 'divider' }}></Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mx: 2 }}>
+              或
+            </Typography>
+            <Box sx={{ flex: 1, borderBottom: 1, borderColor: 'divider' }}></Box>
+          </Box>
+
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            data-testid="oidc-login-button"
+            onClick={async () => {
+              try {
+                setIsOidcLoading(true);
+                const authUrl = await loginWithOidc();
+                window.open(authUrl, '_blank');
+              } catch (err) {
+                console.error('OIDC login failed:', err);
+              } finally {
+                setIsOidcLoading(false);
+              }
+            }}
+            sx={{ mb: 2, bgcolor: '#0F62FE', '&:hover': { bgcolor: '#0D47A1' } }}
+            disabled={isOidcLoading}
+          >
+            {isOidcLoading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : '🔑 使用 ProClaw 账号登录'}
           </Button>
 
           <Box sx={{ textAlign: 'center' }}>

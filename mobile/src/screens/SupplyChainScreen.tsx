@@ -25,13 +25,6 @@ const SupplyChainScreen: React.FC = () => {
       screen: 'SalesOrder',
     },
     {
-      title: '通话记录',
-      description: '查看历史语音和视频通话',
-      icon: 'phone-log',
-      color: '#8b5cf6',
-      screen: 'CallHistory',
-    },
-    {
       title: '库存概览',
       description: '查看商品库存状态',
       icon: 'warehouse',

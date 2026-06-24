@@ -15,6 +15,8 @@ import {
   updateCloudStore,
   generateThemeWithAI,
   getStoreUrl,
+  createDemoCloudStoreStub,
+  DEMO_CLOUD_STORE_STUB_ID,
 } from '../../lib/cloudStoreService';
 import { useCloudStore, useStoreTheme, useSyncableProducts } from '../../lib/hooks/useCloudStore';
 import { PreviewProvider, usePreviewContext, previewThemeToStoreTheme } from '../../components/CloudPreview/PreviewContext';
@@ -22,6 +24,8 @@ import PhoneSimulator from '../../components/CloudPreview/PhoneSimulator';
 import H5StoreRenderer from '../../components/CloudPreview/H5StoreRenderer';
 import EditPanel from '../../components/CloudPreview/EditPanel';
 import type { PreviewProduct } from '../../components/CloudPreview/previewTypes';
+import { DEMO_EMAIL, isDemoAccount } from '../../lib/aiTeamTokenService';
+import { useAuthStore } from '../../lib/authStore';
 
 interface StorePreviewEditorProps {
   loading: boolean;
@@ -43,11 +47,21 @@ function StorePreviewEditorInner({
   setError, setSuccessMessage,
 }: StorePreviewEditorProps) {
   const ctx = usePreviewContext();
+  const authUser = useAuthStore((s) => s.user);
+  const demoMode =
+    authUser?.email === DEMO_EMAIL ||
+    authUser?.id === 'mock-boss-001' ||
+    isDemoAccount();
   const { data: storeData, isLoading: storeLoading } = useCloudStore();
-  const { data: themeData, isLoading: themeLoading } = useStoreTheme(storeData?.id, !!storeData);
-  const { data: productList = [], isLoading: productsLoading } = useSyncableProducts();
-  const initLoading = storeLoading || productsLoading || (!!storeData && themeLoading);
-  const didInit = useRef(false);
+  const effectiveStore = storeData ?? (demoMode ? createDemoCloudStoreStub() : null);
+  const isStub = effectiveStore?.id === DEMO_CLOUD_STORE_STUB_ID;
+  const { data: themeData, isLoading: themeLoading } = useStoreTheme(
+    effectiveStore?.id,
+    !!effectiveStore && !isStub,
+  );
+  const { data: productList = [], isLoading: productsLoading, refetch: refetchProducts } = useSyncableProducts();
+  const initLoading = storeLoading || productsLoading || (!!effectiveStore && !isStub && themeLoading);
+  const lastProductSig = useRef('');
 
   const isXl = useMediaQuery('(min-width: 1400px)');
   const isLg = useMediaQuery('(min-width: 1100px)');
@@ -66,7 +80,22 @@ function StorePreviewEditorInner({
   } = ctx;
 
   useEffect(() => {
-    if (initLoading || didInit.current) return;
+    const refresh = () => {
+      refetchProducts();
+    };
+    window.addEventListener('proclaw:demo-bootstrapped', refresh);
+    window.addEventListener('proclaw:products-changed', refresh);
+    return () => {
+      window.removeEventListener('proclaw:demo-bootstrapped', refresh);
+      window.removeEventListener('proclaw:products-changed', refresh);
+    };
+  }, [refetchProducts]);
+
+  useEffect(() => {
+    if (initLoading || !effectiveStore) return;
+    const productSig = `${productList.length}:${productList.map((p) => p.id).join(',')}`;
+    if (productSig === lastProductSig.current && ctx.store) return;
+    lastProductSig.current = productSig;
     try {
       const previewProducts: PreviewProduct[] = productList.map((p) => ({
         id: p.id,
@@ -78,16 +107,15 @@ function StorePreviewEditorInner({
         is_on_sale: p.is_on_sale ?? p.status === 'on_sale',
       }));
       initData({
-        store: storeData ?? null,
+        store: effectiveStore,
         theme: themeData ?? null,
         products: previewProducts,
       });
-      didInit.current = true;
     } catch (err) {
       console.error('加载预览数据失败:', err);
       setError('加载预览数据失败');
     }
-  }, [initLoading, storeData, themeData, productList, initData, setError]);
+  }, [initLoading, effectiveStore, themeData, productList, initData, setError, ctx.store]);
 
   // 保存配置
   const handleSave = useCallback(async () => {

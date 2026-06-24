@@ -11,11 +11,13 @@
  */
 
 import { isDemoAccount } from './aiTeamTokenService';
-import { safeInvoke, isTauri } from './tauri';
+import { safeInvoke, isTauri, ipcInvoke } from './tauri';
 import { createCloudStore, getCloudStore, getSyncableProducts, ensureRemoteDemoTenant, getDemoStorePublicUrl, syncAllProducts, updateCloudStore, type CloudStore, type PlanType } from './cloudStoreService';
+import { getProductsFromSimpleTable } from './productService';
 import { AgentMarketService } from './agentMarketService';
 import { markAsDemoData, clearDemoData, isDemoDataInitialized, readDemoFlag } from './demoFlag';
 import { registerForeignCounterPlugin } from './manifestRegistry';
+import { ensureDemoProductImages } from './demoProductImageSeed';
 
 // =============== 类型定义 ===============
 
@@ -46,7 +48,7 @@ export interface DemoBootstrapStep {
 // =============== 常量 ===============
 
 /** 演示数据版本号（每次结构调整时递增） */
-export const DEMO_DATA_VERSION = '1.0.1';
+export const DEMO_DATA_VERSION = '1.0.5';
 
 /** 3 个预置 AI Team 的 Skill ID（顺序：经营 → 国内 → 海外） */
 export const DEMO_TEAM_SKILL_IDS = [
@@ -112,6 +114,7 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
       // 静默修复：幂等补种商品 + 校验云商城（修复旧版 API 包装导致 subdomain 丢失等问题）
       try {
         await ensureProducts(false);
+        await ensureDemoProductImages({ force: false }).catch(() => {});
         await ensureCloudStore(false);
         const store = await getCloudStore();
         if (store?.id) {
@@ -169,6 +172,28 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
   } catch (err) {
     steps.push({
       name: 'ensure-products',
+      success: false,
+      message: String(err),
+      durationMs: 0,
+    });
+  }
+
+  // 2b) 从网上下载各型号真实产品主图
+  try {
+    const t2b = performance.now();
+    const imageCount = await ensureDemoProductImages({ force: force || flagOutdated });
+    steps.push({
+      name: 'ensure-product-images',
+      success: imageCount > 0 || productsCount === 0,
+      message:
+        imageCount > 0
+          ? `已为 ${imageCount} 个演示商品下载真实产品图`
+          : '商品主图已就绪或网络暂不可用（可稍后重试）',
+      durationMs: performance.now() - t2b,
+    });
+  } catch (err) {
+    steps.push({
+      name: 'ensure-product-images',
       success: false,
       message: String(err),
       durationMs: 0,
@@ -287,17 +312,29 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
 
 // =============== 子模块 ===============
 
-/** 注入 20 个演示产品（幂等）。返回库中实际可同步商品数 */
+/** 注入 20 个演示产品（幂等）。返回库中实际可展示商品数 */
 async function ensureProducts(force: boolean): Promise<number> {
-  // Tauri 环境：通过后端命令批量 seed
   if (isTauri()) {
-    try {
-      await safeInvoke<number>('seed_demo_products', { force });
-      const syncable = await getSyncableProducts();
-      if (syncable.length > 0) return syncable.length;
-    } catch (err) {
-      console.warn('[demoBootstrap] seed_demo_products 失败，回退到本地 mock：', err);
+    const existingSimple = await getProductsFromSimpleTable({ limit: 100 });
+    const existingSpu = await getSyncableProducts().catch(() => []);
+    const emptyDb = existingSimple.length === 0 && existingSpu.length === 0;
+    const needSeed = force || existingSimple.length < 20 || existingSpu.length < 20;
+
+    const seeded = await ipcInvoke<number>('seed_demo_products', { force: force || emptyDb });
+    if (needSeed && seeded <= 0 && emptyDb) {
+      throw new Error('seed_demo_products 未写入任何商品');
     }
+
+    const afterSpu = await getSyncableProducts().catch(() => []);
+    if (afterSpu.length > 0) return afterSpu.length;
+
+    const afterSimple = await getProductsFromSimpleTable({ limit: 100 });
+    if (afterSimple.length > 0) return afterSimple.length;
+
+    if (needSeed) {
+      throw new Error('演示商品写入后仍无法读取，请检查本地数据库');
+    }
+    return 0;
   }
 
   const { DEMO_PRODUCTS_FOR_BOOTSTRAP } = await import('./demoBootstrapData');
@@ -521,6 +558,20 @@ function writeBootstrapCache(result: DemoBootstrapResult): void {
 }
 
 // =============== 重置工具 ===============
+
+/** 演示账号：幂等修复本地 demo 云商城记录 + 远端 tenant（进入云商城页时调用） */
+export async function ensureDemoCloudStoreReady(): Promise<boolean> {
+  if (!isDemoAccount()) return false;
+  try {
+    let ok = await ensureCloudStore(false);
+    if (!ok) ok = await ensureCloudStore(true);
+    await ensureRemoteDemoTenant().catch(() => {});
+    return ok;
+  } catch (err) {
+    console.warn('[demoBootstrap] ensureDemoCloudStoreReady failed:', err);
+    return false;
+  }
+}
 
 /**
  * 重置演示数据（仅在演示账号下可用）。

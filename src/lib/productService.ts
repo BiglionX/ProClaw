@@ -342,6 +342,23 @@ export async function getPendingSyncRecords(limit?: number): Promise<any[]> {
 
 // ==================== 兼容性层 (临时方案) ====================
 
+/** 从简单商品表 products 读取（simple 模式 / SPU 视图失败时的兜底） */
+export async function getProductsFromSimpleTable(options?: {
+  limit?: number;
+  search?: string;
+  category_id?: string;
+  brand_id?: string;
+}): Promise<Product[]> {
+  if (!isTauri()) return [];
+  try {
+    const rows = await invoke<Product[]>('get_products', { options });
+    return Array.isArray(rows) ? rows : [];
+  } catch (err) {
+    console.error('getProductsFromSimpleTable error:', err);
+    return [];
+  }
+}
+
 /**
  * @deprecated 使用 getProductSPUs 代替
  * 兼容旧代码,将SPU转换为旧的Product格式
@@ -422,16 +439,31 @@ export async function getProducts(options?: {
   brand_id?: string;
 }): Promise<Product[]> {
   try {
-    const spus = await getProductSPUs({
-      limit: options?.limit,
-      search: options?.search,
-      category_id: options?.category_id,
-      brand_id: options?.brand_id,
-    });
-    return spus.map(convertSPUToProduct);
+    let spus: ProductSPU[] = [];
+    try {
+      spus = await getProductSPUs({
+        limit: options?.limit,
+        search: options?.search,
+        category_id: options?.category_id,
+        brand_id: options?.brand_id,
+      });
+    } catch (spuErr) {
+      console.warn('getProductSPUs 失败，回退 products 表：', spuErr);
+    }
+
+    if (spus.length > 0) {
+      return spus.map(convertSPUToProduct);
+    }
+
+    // 兜底：简单商品表（seed_demo_products 同时写入 products）
+    const simple = await getProductsFromSimpleTable(options);
+    if (simple.length > 0) return simple;
+
+    return [];
   } catch (error) {
     console.error('getProducts (compatibility layer) error:', error);
-    return [];
+    const fallback = await getProductsFromSimpleTable(options);
+    return fallback;
   }
 }
 

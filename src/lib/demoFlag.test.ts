@@ -20,27 +20,13 @@ import {
   type DemoFlagPayload,
 } from './demoFlag';
 
-const DEMO_USER = {
-  id: 'mock-boss',
-  email: 'boss@proclaw.demo',
-  name: '演示老板',
-  role: 'admin',
-};
+vi.mock('./aiTeamTokenService', () => ({
+  isDemoAccount: vi.fn(() => false),
+}));
 
-const REGULAR_USER = {
-  id: 'user-001',
-  email: 'alice@example.com',
-  name: 'Alice',
-  role: 'member',
-};
+import { isDemoAccount } from './aiTeamTokenService';
 
-function setCurrentUser(user: any | null) {
-  if (user) {
-    localStorage.setItem('proclaw_user', JSON.stringify(user));
-  } else {
-    localStorage.removeItem('proclaw_user');
-  }
-}
+const mockedIsDemoAccount = vi.mocked(isDemoAccount);
 
 describe('demoFlag', () => {
   beforeEach(() => {
@@ -52,28 +38,14 @@ describe('demoFlag', () => {
   });
 
   describe('isDemoAccountContext', () => {
-    it('无用户时返回 false', () => {
-      setCurrentUser(null);
+    it('非演示账号时返回 false', () => {
+      mockedIsDemoAccount.mockReturnValue(false);
       expect(isDemoAccountContext()).toBe(false);
     });
 
-    it('非演示用户邮箱时返回 false', () => {
-      setCurrentUser(REGULAR_USER);
-      expect(isDemoAccountContext()).toBe(false);
-    });
-
-    it('boss@proclaw.demo 时返回 true', () => {
-      setCurrentUser(DEMO_USER);
+    it('演示账号时返回 true', () => {
+      mockedIsDemoAccount.mockReturnValue(true);
       expect(isDemoAccountContext()).toBe(true);
-    });
-
-    it('localStorage 抛错时不崩溃', () => {
-      setCurrentUser(DEMO_USER);
-      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-        throw new Error('quota exceeded');
-      });
-      expect(isDemoAccountContext()).toBe(false);
-      spy.mockRestore();
     });
   });
 

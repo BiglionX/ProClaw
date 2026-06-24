@@ -13,14 +13,22 @@ jest.mock('../SecureConfig', () => ({
 }));
 
 // Mock axios
+let currentMockInstance: any;
 jest.mock('axios', () => ({
-  create: jest.fn(() => ({
-    interceptors: {
-      request: { use: jest.fn() },
-      response: { use: jest.fn() },
-    },
-  })),
+  create: jest.fn(() => {
+    currentMockInstance = {
+      interceptors: {
+        request: { use: jest.fn() },
+        response: { use: jest.fn() },
+      },
+      request: jest.fn(),
+      get: jest.fn(),
+      post: jest.fn(),
+    };
+    return currentMockInstance;
+  }),
   post: jest.fn(),
+  __getInstance: () => currentMockInstance,
 }));
 
 // Mock expo-secure-store
@@ -48,8 +56,6 @@ import {
   saveRoles,
   loadRoles,
   clearRoles,
-  setDemoMode,
-  isDemoMode,
 } from '../AuthService';
 
 import { secureGet, secureSet, secureDelete } from '../SecureConfig';
@@ -310,51 +316,160 @@ describe('AuthService', () => {
   });
 
   // ============================================================
-  // Demo 模式
+  // Token 刷新机制（响应拦截器）
   // ============================================================
 
-  describe('Demo 模式', () => {
-    describe('setDemoMode', () => {
-      it('应保存以 demo_ 开头的随机 token', async () => {
-        await setDemoMode();
-
-        // 验证保存的 token 以 demo_ 开头
-        const savedCall = mockSecureSet.mock.calls.find(
-          ([key]) => key === 'proclaw_auth_token'
-        );
-        expect(savedCall).toBeDefined();
-        const savedToken = savedCall![1] as string;
-        expect(savedToken.startsWith('demo_')).toBe(true);
-      });
-
-      it('应保存 https://demo.local 作为服务器地址', async () => {
-        await setDemoMode();
-
-        expect(mockSecureSet).toHaveBeenCalledWith('proclaw_server_url', 'https://demo.local');
-      });
+  describe('Token 刷新机制', () => {
+    it('401 错误时应尝试刷新 token', async () => {
+      mockSecureGet.mockResolvedValueOnce('http://192.168.1.100:8888');
+      mockSecureGet.mockResolvedValueOnce('old_token');
+      
+      await getApiClient();
+      
+      const axiosModule = jest.requireMock('axios') as any;
+      const mockInstance = axiosModule.__getInstance();
+      const responseInterceptor = mockInstance.interceptors.response.use.mock.calls[0][1];
+      
+      expect(responseInterceptor).toBeDefined();
     });
 
-    describe('isDemoMode', () => {
-      it('token 以 demo_ 开头时应返回 true', async () => {
-        mockSecureGet.mockResolvedValueOnce('demo_abc123');
-
-        const result = await isDemoMode();
-        expect(result).toBe(true);
+    it('token 刷新成功后应保存新 token', async () => {
+      mockSecureGet
+        .mockResolvedValueOnce('http://192.168.1.100:8888')
+        .mockResolvedValueOnce('old_token');
+      
+      await getApiClient();
+      
+      const axiosModule = jest.requireMock('axios') as any;
+      const mockInstance = axiosModule.__getInstance();
+      const responseInterceptor = mockInstance.interceptors.response.use.mock.calls[0][1];
+      
+      mockSecureGet.mockResolvedValueOnce('refresh_token_abc');
+      mockAxiosPost.mockResolvedValueOnce({
+        data: {
+          access_token: 'new_token',
+          refresh_token: 'new_refresh_token',
+        },
       });
+      
+      const error = {
+        response: { status: 401 },
+        config: {},
+      };
+      
+      try {
+        await responseInterceptor(error);
+      } catch (e) {
+        // apiClient 可能为 null，这是预期的边界情况
+      }
+      
+      expect(mockAxiosPost).toHaveBeenCalledWith(
+        'http://192.168.1.100:8888/api/auth/token',
+        { refresh_token: 'refresh_token_abc' }
+      );
+      expect(mockSecureSet).toHaveBeenCalledWith('proclaw_auth_token', 'new_token');
+      expect(mockSecureSet).toHaveBeenCalledWith('proclaw_refresh_token', 'new_refresh_token');
+    });
 
-      it('token 不以 demo_ 开头时应返回 false', async () => {
-        mockSecureGet.mockResolvedValueOnce('user_token_123');
+    it('token 刷新失败时应清除 tokens', async () => {
+      mockSecureGet
+        .mockResolvedValueOnce('http://192.168.1.100:8888')
+        .mockResolvedValueOnce('old_token');
+      
+      await getApiClient();
+      
+      const axiosModule = jest.requireMock('axios') as any;
+      const mockInstance = axiosModule.__getInstance();
+      const responseInterceptor = mockInstance.interceptors.response.use.mock.calls[0][1];
+      
+      mockSecureGet.mockResolvedValueOnce('refresh_token_abc');
+      mockAxiosPost.mockRejectedValueOnce(new Error('Refresh failed'));
+      
+      const error = {
+        response: { status: 401 },
+        config: {},
+      };
+      
+      await expect(responseInterceptor(error)).rejects.toMatchObject(error);
+      
+      expect(mockSecureDelete).toHaveBeenCalledWith('proclaw_auth_token');
+      expect(mockSecureDelete).toHaveBeenCalledWith('proclaw_refresh_token');
+    });
 
-        const result = await isDemoMode();
-        expect(result).toBe(false);
+    it('第二次 401 错误不应触发刷新（防止无限循环）', async () => {
+      mockSecureGet
+        .mockResolvedValueOnce('http://192.168.1.100:8888')
+        .mockResolvedValueOnce('old_token');
+      
+      await getApiClient();
+      
+      const axiosModule = jest.requireMock('axios') as any;
+      const mockInstance = axiosModule.__getInstance();
+      const responseInterceptor = mockInstance.interceptors.response.use.mock.calls[0][1];
+      
+      const error = {
+        response: { status: 401 },
+        config: { _retry: true },
+      };
+      
+      await expect(responseInterceptor(error)).rejects.toMatchObject(error);
+      
+      expect(mockAxiosPost).not.toHaveBeenCalled();
+    });
+
+    it('无 refresh token 时应直接拒绝请求', async () => {
+      mockSecureGet
+        .mockResolvedValueOnce('http://192.168.1.100:8888')
+        .mockResolvedValueOnce('old_token');
+      
+      await getApiClient();
+      
+      const axiosModule = jest.requireMock('axios') as any;
+      const mockInstance = axiosModule.__getInstance();
+      const responseInterceptor = mockInstance.interceptors.response.use.mock.calls[0][1];
+      
+      mockSecureGet.mockResolvedValueOnce(null);
+      
+      const error = {
+        response: { status: 401 },
+        config: {},
+      };
+      
+      await expect(responseInterceptor(error)).rejects.toMatchObject(error);
+      
+      expect(mockAxiosPost).not.toHaveBeenCalled();
+    });
+
+    it('apiClient 为 null 时应拒绝重试请求', async () => {
+      mockSecureGet
+        .mockResolvedValueOnce('http://192.168.1.100:8888')
+        .mockResolvedValueOnce('old_token');
+      
+      await getApiClient();
+      
+      const axiosModule = jest.requireMock('axios') as any;
+      const mockInstance = axiosModule.__getInstance();
+      const responseInterceptor = mockInstance.interceptors.response.use.mock.calls[0][1];
+      
+      mockSecureGet.mockResolvedValueOnce('refresh_token_abc');
+      mockAxiosPost.mockResolvedValueOnce({
+        data: {
+          access_token: 'new_token',
+          refresh_token: 'new_refresh_token',
+        },
       });
-
-      it('无 token 时应返回 false', async () => {
-        mockSecureGet.mockResolvedValueOnce(null);
-
-        const result = await isDemoMode();
-        expect(result).toBe(false);
-      });
+      
+      resetApiClient();
+      
+      const error = {
+        response: { status: 401 },
+        config: {},
+      };
+      
+      await expect(responseInterceptor(error)).rejects.toMatchObject(error);
+      
+      expect(mockSecureSet).toHaveBeenCalledWith('proclaw_auth_token', 'new_token');
+      expect(mockInstance.request).not.toHaveBeenCalled();
     });
   });
 });

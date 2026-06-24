@@ -4,6 +4,8 @@ import {
   StoreOrder,
   StoreStats,
   StoreTheme,
+  createDemoCloudStoreStub,
+  DEMO_CLOUD_STORE_STUB_ID,
   getCloudStore,
   getStoreOrders,
   getStoreStats,
@@ -12,30 +14,64 @@ import {
 } from '../cloudStoreService';
 import { ProductSPU } from '../productService';
 import { ProductReview, StoreCoupon, fetchStoreCoupons, fetchStoreReviews } from '../cloudStoreExtras';
+import { DEMO_EMAIL, isDemoAccount } from '../aiTeamTokenService';
+import { useAuthStore } from '../authStore';
 
 export const cloudStoreQueryKey = ['cloudStore'] as const;
 
+const CLOUD_STORE_FETCH_TIMEOUT_MS = 2500;
+
+function isDemoUser(user: { email?: string; id?: string } | null | undefined): boolean {
+  if (!user) return isDemoAccount();
+  return user.email === DEMO_EMAIL || user.id === 'mock-boss-001';
+}
+
+async function fetchCloudStoreWithTimeout(): Promise<CloudStore | null> {
+  try {
+    const result = await Promise.race([
+      getCloudStore(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), CLOUD_STORE_FETCH_TIMEOUT_MS)),
+    ]);
+    return result?.subdomain ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useCloudStore(enabled = true) {
+  const user = useAuthStore((s) => s.user);
+  const demo = isDemoUser(user);
   return useQuery<CloudStore | null>({
-    queryKey: [...cloudStoreQueryKey, 'current'],
-    queryFn: getCloudStore,
+    queryKey: [...cloudStoreQueryKey, 'current', demo ? 'demo' : 'normal'],
+    initialData: demo ? createDemoCloudStoreStub() : undefined,
+    queryFn: async () => {
+      if (demo) {
+        const store = await fetchCloudStoreWithTimeout();
+        return store ?? createDemoCloudStoreStub();
+      }
+      const store = await fetchCloudStoreWithTimeout();
+      return store?.subdomain ? store : null;
+    },
     enabled,
+    retry: demo ? 1 : 2,
   });
 }
 
 export function useStoreStats(storeId: string | undefined, enabled = true) {
+  const isStub = storeId === DEMO_CLOUD_STORE_STUB_ID;
   return useQuery<StoreStats>({
     queryKey: [...cloudStoreQueryKey, 'stats', storeId ?? ''],
     queryFn: () => getStoreStats(storeId!),
-    enabled: enabled && !!storeId,
+    enabled: enabled && !!storeId && !isStub,
   });
 }
 
 export function useStoreTheme(storeId: string | undefined, enabled = true) {
+  const isStub = storeId === DEMO_CLOUD_STORE_STUB_ID;
   return useQuery<StoreTheme>({
     queryKey: [...cloudStoreQueryKey, 'theme', storeId ?? ''],
     queryFn: () => getStoreTheme(storeId!),
-    enabled: enabled && !!storeId,
+    enabled: enabled && !!storeId && !isStub,
   });
 }
 

@@ -10,14 +10,14 @@ BEGIN TRANSACTION;
 -- ============================================
 -- 1. 确保存在 iPhone 电池相关分类
 -- ============================================
-INSERT OR IGNORE INTO product_categories (id, name, parent_id, level, sort_order, is_active, created_at, updated_at)
+INSERT OR IGNORE INTO product_categories (id, name, parent_id, sort_order, is_active, created_at, updated_at)
 VALUES 
-    ('cat_iphone15', 'iPhone 15 系列', NULL, 1, 10, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('cat_iphone14', 'iPhone 14 系列', NULL, 1, 20, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('cat_iphone13', 'iPhone 13 系列', NULL, 1, 30, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('cat_iphone12', 'iPhone 12 系列', NULL, 1, 40, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('cat_iphone11', 'iPhone 11 系列', NULL, 1, 50, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('cat_iphonese', 'iPhone SE 系列', NULL, 1, 60, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('cat_iphone15', 'iPhone 15 系列', NULL, 10, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('cat_iphone14', 'iPhone 14 系列', NULL, 20, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('cat_iphone13', 'iPhone 13 系列', NULL, 30, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('cat_iphone12', 'iPhone 12 系列', NULL, 40, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('cat_iphone11', 'iPhone 11 系列', NULL, 50, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('cat_iphonese', 'iPhone SE 系列', NULL, 60, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ============================================
 -- 2. 确保存在品牌（Apple）
@@ -115,30 +115,8 @@ VALUES
     ('sku_020', 'spu_iphonese3_bat', 'SKU-2026-020', '{"型号": "iPhone SE 2022"}', 'iPhone SE (第三代)', 25.00, 59.00, 45, 10, 999999, '6931234560200', 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'pending');
 
 -- ============================================
--- 5. 为每个 SPU 添加主图（可选）
+-- 5. 主图由演示引导程序从网上下载后写入（此处不预置占位图）
 -- ============================================
-INSERT OR IGNORE INTO product_images (id, spu_id, image_url, image_type, sort_order, is_primary, created_at, sync_status)
-VALUES
-    ('img_001', 'spu_iphone15pm_bat', 'https://example.com/images/iphone15pm_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_002', 'spu_iphone15pro_bat', 'https://example.com/images/iphone15pro_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_003', 'spu_iphone15_bat', 'https://example.com/images/iphone15_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_004', 'spu_iphone15plus_bat', 'https://example.com/images/iphone15plus_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_005', 'spu_iphone14pm_bat', 'https://example.com/images/iphone14pm_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_006', 'spu_iphone14pro_bat', 'https://example.com/images/iphone14pro_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_007', 'spu_iphone14_bat', 'https://example.com/images/iphone14_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_008', 'spu_iphone14plus_bat', 'https://example.com/images/iphone14plus_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_009', 'spu_iphone13pm_bat', 'https://example.com/images/iphone13pm_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_010', 'spu_iphone13pro_bat', 'https://example.com/images/iphone13pro_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_011', 'spu_iphone13_bat', 'https://example.com/images/iphone13_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_012', 'spu_iphone13mini_bat', 'https://example.com/images/iphone13mini_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_013', 'spu_iphone12pm_bat', 'https://example.com/images/iphone12pm_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_014', 'spu_iphone12pro_bat', 'https://example.com/images/iphone12pro_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_015', 'spu_iphone12_bat', 'https://example.com/images/iphone12_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_016', 'spu_iphone12mini_bat', 'https://example.com/images/iphone12mini_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_017', 'spu_iphone11pm_bat', 'https://example.com/images/iphone11pm_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_018', 'spu_iphone11pro_bat', 'https://example.com/images/iphone11pro_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_019', 'spu_iphone11_bat', 'https://example.com/images/iphone11_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending'),
-    ('img_020', 'spu_iphonese3_bat', 'https://example.com/images/iphonese3_bat_1.jpg', 'main', 0, 1, CURRENT_TIMESTAMP, 'pending');
 
 -- 提交事务
 COMMIT;

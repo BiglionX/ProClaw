@@ -23,6 +23,18 @@ export const OUTBOUND_ERROR_MESSAGE = '服务器有问题，请稍候再试';
 /** 默认超时（30 秒），覆盖 LLM 长上下文场景 */
 export const DEFAULT_OUTBOUND_TIMEOUT_MS = 30_000;
 
+/** Jest / older DOM typings may omit AbortSignal.reason and abort(reason). */
+type AbortSignalWithReason = AbortSignal & { reason?: unknown };
+type AbortControllerWithReason = AbortController & { abort(reason?: unknown): void };
+
+function getAbortReason(signal: AbortSignal): unknown {
+  return (signal as AbortSignalWithReason).reason;
+}
+
+function abortWithReason(controller: AbortController, reason?: unknown): void {
+  (controller as AbortControllerWithReason).abort(reason);
+}
+
 /** 长任务超时（60 秒），用于 AI 推荐 / 插件商店等较慢接口 */
 export const LONG_OUTBOUND_TIMEOUT_MS = 60_000;
 
@@ -108,9 +120,9 @@ export function withTimeout(
   // 透传用户取消信号
   if (userSignal) {
     if (userSignal.aborted) {
-      controller.abort(userSignal.reason);
+      abortWithReason(controller, getAbortReason(userSignal));
     } else {
-      userAbortHandler = () => controller.abort(userSignal.reason);
+      userAbortHandler = () => abortWithReason(controller, getAbortReason(userSignal));
       userSignal.addEventListener('abort', userAbortHandler);
     }
   }
@@ -120,7 +132,7 @@ export function withTimeout(
     timedOut = true;
     const timeoutErr = new Error('Outbound request timeout');
     timeoutErr.name = 'TimeoutError';
-    controller.abort(timeoutErr);
+    abortWithReason(controller, timeoutErr);
   }, timeoutMs);
 
   const dispose = () => {

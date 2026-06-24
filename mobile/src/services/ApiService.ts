@@ -14,6 +14,12 @@ import { logger } from '../utils/logger';
 import { getErrorMessage } from '../utils/errorUtils';
 import { showToast } from '../components/Toast';
 import { normalizeOutboundError, OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
+import {
+  incrementRetryCount,
+  hasExceededMaxRetries,
+  calculateNextRetryDelay,
+  DEFAULT_MAX_RETRIES,
+} from './SyncRetryPolicy';
 
 export interface Product {
   id: string;
@@ -408,8 +414,7 @@ const addToOfflineQueue = async (
   }
 };
 
-// 审计 R3：内存重试计数器（offline_queue 表无 retry_count 列）
-const retryAttempts = new Map<string | number, number>();
+// 离线队列同步重试由 SyncRetryPolicy 持久化到 offline_queue.retry_count
 
 /**
  * 同步离线队列到服务器
@@ -424,11 +429,13 @@ export const syncOfflineQueue = async (): Promise<void> => {
     }
 
     const db = getDatabase();
-    // 审计 E1：分批处理防止 OOM，每批最多 100 条
     const BATCH_SIZE = 100;
+    const nowSec = Math.floor(Date.now() / 1000);
     const results: any[] = await db.getAllAsync(
-      'SELECT * FROM offline_queue ORDER BY created_at ASC LIMIT ?',
-      [BATCH_SIZE]
+      `SELECT * FROM offline_queue
+       WHERE COALESCE(next_retry_at, 0) <= ?
+       ORDER BY created_at ASC LIMIT ?`,
+      [nowSec, BATCH_SIZE]
     );
 
     const client = await getApiClient();
@@ -444,24 +451,25 @@ export const syncOfflineQueue = async (): Promise<void> => {
         });
 
         await db.runAsync('DELETE FROM offline_queue WHERE id = ?', [row.id]);
-        // 审计 W2 修复：同步成功后清理内存中的重试计数器，避免内存泄漏
-        retryAttempts.delete(row.id);
         logger.log('[ApiService] Synced offline item:', row.id);
       } catch (error) {
-        // 审计 R3 修复：offline_queue 表无 retry_count 列，使用内存 Map 记录重试次数
         const itemId = row.id;
-        const currentAttempts = retryAttempts.get(itemId) || 0;
-        const newAttempts = currentAttempts + 1;
-        retryAttempts.set(itemId, newAttempts);
-        if (newAttempts >= 5) {
+        const newAttempts = await incrementRetryCount(db, itemId);
+        if (hasExceededMaxRetries(newAttempts, DEFAULT_MAX_RETRIES)) {
           logger.warn('[ApiService] Offline item exceeded max retries, removing:', itemId);
           await db.runAsync('DELETE FROM offline_queue WHERE id = ?', [itemId]);
-          retryAttempts.delete(itemId);
         } else {
-          logger.warn(`[ApiService] Failed to sync item ${itemId} (attempt ${newAttempts}):`, error);
+          const delayMs = calculateNextRetryDelay(newAttempts);
+          const nextRetryAt = nowSec + Math.ceil(delayMs / 1000);
+          await db.runAsync(
+            'UPDATE offline_queue SET next_retry_at = ? WHERE id = ?',
+            [nextRetryAt, itemId]
+          );
+          logger.warn(
+            `[ApiService] Failed to sync item ${itemId} (attempt ${newAttempts}/${DEFAULT_MAX_RETRIES}):`,
+            error
+          );
         }
-        // 审计 E5：continue 而非 break，一个临时失败不应阻塞整个队列
-        // 重试次数通过 retryAttempts Map 跟踪，超出阈值后跳过
         continue;
       }
     }

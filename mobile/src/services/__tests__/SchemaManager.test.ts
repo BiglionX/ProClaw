@@ -148,14 +148,14 @@ describe('SchemaManager', () => {
     });
 
     it('should skip schema application if already up to date', async () => {
-      // SchemaManager 当前 SCHEMA_VERSION = 3，mock 中设同样值应跳过所有迁移
-      mockDb.metadata.set('schema_version', '3');
+      // SchemaManager 当前 SCHEMA_VERSION = 4，mock 中设同样值应跳过所有迁移
+      mockDb.metadata.set('schema_version', '4');
 
       const executedBefore = mockDb.executedSql.length;
       await applySchema(mockDb as unknown as IDatabase);
       const executedAfter = mockDb.executedSql.length;
 
-      // 不应创建任何表（因为 schema 已是最新 v3）
+      // 不应创建任何表（因为 schema 已是最新 v4）
       const createTableCount = mockDb.executedSql
         .slice(executedBefore)
         .filter(sql => sql.includes('CREATE TABLE'))
@@ -175,9 +175,9 @@ describe('SchemaManager', () => {
     it('should write schema version to sync_metadata after applying', async () => {
       await applySchema(mockDb as unknown as IDatabase);
 
-      // SchemaManager 当前 SCHEMA_VERSION = 3 (升级后含 agent_profile_overrides)
+      // SchemaManager 当前 SCHEMA_VERSION = 4 (含 offline_queue 重试列)
       const versionValue = mockDb.metadata.get('schema_version');
-      expect(versionValue).toBe('3');
+      expect(versionValue).toBe('4');
     });
   });
 

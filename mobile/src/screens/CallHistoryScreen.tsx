@@ -25,6 +25,7 @@ import AuthService from '../services/AuthService';
 import { useCallStore } from '../stores/CallStore';
 import { resolveCallBackTarget } from '../utils/callBack';
 import { getErrorMessage } from '../utils/errorUtils';
+import { guardAvCall, isAvCallAvailable, startOutboundAvCall, AV_CALL_UNAVAILABLE_MSG } from '../utils/avCall';
 import type { AppNavigation } from '../types/navigation';
 
 // 临时类型定义
@@ -72,105 +73,60 @@ const formatTime = (timestamp: number): string => {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 };
 
-const DEMO_RECORDS: CallRecord[] = [
-  {
-    id: '1', session_id: 'call_001', caller_id: 'u1', callee_id: 'c1',
-    call_type: 'audio', direction: 'outgoing', status: 'ended',
-    duration_seconds: 124, started_at: Date.now() - 3600000,
-    ended_at: Date.now() - 3580000, created_at: '2024-01-01',
-    caller_name: '我', callee_name: '陈志远',
-  },
-  {
-    id: '2', session_id: 'call_002', caller_id: 'c1', callee_id: 'u1',
-    call_type: 'video', direction: 'incoming', status: 'answered',
-    duration_seconds: 305, started_at: Date.now() - 7200000,
-    ended_at: Date.now() - 6900000, created_at: '2024-01-01',
-    caller_name: '陈志远', callee_name: '我',
-  },
-  {
-    id: '3', session_id: 'call_003', caller_id: 'u1', callee_id: 'k1',
-    call_type: 'audio', direction: 'outgoing', status: 'missed',
-    duration_seconds: 0, started_at: Date.now() - 86400000,
-    ended_at: Date.now() - 86400000, created_at: '2024-01-01',
-    caller_name: '我', callee_name: '张伟',
-  },
-  {
-    id: '4', session_id: 'call_004', caller_id: 'k1', callee_id: 'u1',
-    call_type: 'video', direction: 'incoming', status: 'rejected',
-    duration_seconds: 0, started_at: Date.now() - 172800000,
-    ended_at: Date.now() - 172800000, created_at: '2024-01-01',
-    caller_name: '张伟', callee_name: '我',
-  },
-];
+const CALL_UNAVAILABLE_MSG = AV_CALL_UNAVAILABLE_MSG;
 
 const CallHistoryScreen: React.FC<{ contactId?: string }> = ({ contactId }) => {
   const navigation = useNavigation<AppNavigation>();
   const { colors } = useTheme();
+  const avAvailable = isAvCallAvailable();
   const [records, setRecords] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'audio' | 'video' | 'missed'>('all');
 
-  // P2 项 3：回拨逻辑
-  // 复用 ContactsTab.handleCall 的现有路径（startOutgoingCall + navigate('Call')），
-  // 不直接走 CallManager.startCall，避免引入 ContactsTab 未启用的 offer 流程造成两条并行路径。
-  // 对端解析委托给 resolveCallBackTarget（纯函数，已单测覆盖）。
-  const handleCallBack = useCallback((item: CallRecord) => {
+  const handleCallBack = useCallback(async (item: CallRecord) => {
+    if (!guardAvCall()) return;
     const store = useCallStore.getState();
     if (store.status !== 'idle') {
       Alert.alert('提示', '当前已在通话中');
       return;
     }
     const { userId, userName, callType } = resolveCallBackTarget(item);
-    const sessionId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    store.startOutgoingCall({
-      sessionId,
-      remoteUserId: userId,
-      remoteUserName: userName,
-      callType,
-    });
-    navigation.navigate('Call');
+    await startOutboundAvCall(navigation, userId, userName, callType);
   }, [navigation]);
 
   const loadRecords = useCallback(async () => {
     try {
-      const isDemo = await AuthService.isDemoMode();
-      if (isDemo) {
-        let filtered = DEMO_RECORDS;
-        if (filterType === 'audio') filtered = filtered.filter((r) => r.call_type === 'audio');
-        if (filterType === 'video') filtered = filtered.filter((r) => r.call_type === 'video');
-        if (filterType === 'missed') filtered = filtered.filter((r) => r.status === 'missed');
-        if (contactId) {
-          filtered = filtered.filter((r) => r.caller_id === contactId || r.callee_id === contactId);
-        }
-        setRecords(filtered);
-      } else {
-        // 通过 HTTP API 查询（由桌面端提供）
-        const token = await AuthService.loadToken();
-        const serverUrl = await AuthService.loadServerUrl();
-        const params = new URLSearchParams();
-        if (contactId) params.append('contact_id', contactId);
-        params.append('limit', '50');
+      const token = await AuthService.loadToken();
+      const serverUrl = await AuthService.loadServerUrl();
+      if (!token || !serverUrl) {
+        setRecords([]);
+        return;
+      }
+      const params = new URLSearchParams();
+      if (contactId) params.append('contact_id', contactId);
+      params.append('limit', '50');
 
-        const response = await fetch(`${serverUrl}/api/call-records?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          let result = data.data || [];
-          if (filterType !== 'all') {
-            if (filterType === 'missed') {
-              result = result.filter((r: CallRecord) => r.status === 'missed');
-            } else {
-              result = result.filter((r: CallRecord) => r.call_type === filterType);
-            }
+      const response = await fetch(`${serverUrl}/api/call-records?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        let result = data.data || [];
+        if (filterType !== 'all') {
+          if (filterType === 'missed') {
+            result = result.filter((r: CallRecord) => r.status === 'missed');
+          } else {
+            result = result.filter((r: CallRecord) => r.call_type === filterType);
           }
-          setRecords(result);
         }
+        setRecords(result);
+      } else {
+        setRecords([]);
       }
     } catch (err) {
       showToast('error', '加载失败', getErrorMessage(err));
-      setRecords(DEMO_RECORDS);
+      setRecords([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -188,7 +144,6 @@ const CallHistoryScreen: React.FC<{ contactId?: string }> = ({ contactId }) => {
 
   const renderItem = ({ item }: { item: CallRecord }) => {
     const statusInfo = STATUS_MAP[item.status] || STATUS_MAP.missed;
-    const isDemo = true; // 演示模式下使用演示数据中的 caller/callee name
     const isIncoming = item.direction === 'incoming';
     const displayName = isIncoming
       ? (item.caller_name || item.caller_id)
@@ -266,6 +221,14 @@ const CallHistoryScreen: React.FC<{ contactId?: string }> = ({ contactId }) => {
 
   return (
     <View style={styles.container}>
+      {!avAvailable && (
+      <View style={styles.unavailableBanner}>
+        <MaterialCommunityIcons name="information-outline" size={18} color="#6366f1" />
+        <Text variant="bodySmall" style={styles.unavailableBannerText}>
+          {CALL_UNAVAILABLE_MSG}
+        </Text>
+      </View>
+      )}
       {/* 筛选栏 */}
       <View style={styles.filterBar}>
         {FILTERS.map((f) => (
@@ -314,6 +277,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
+  },
+  unavailableBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#eef2ff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e7ff',
+  },
+  unavailableBannerText: {
+    flex: 1,
+    color: '#4338ca',
+    lineHeight: 18,
   },
   filterBar: {
     flexDirection: 'row',

@@ -13,20 +13,16 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { getProducts, getCustomers } from '../services/ApiService';
-import { isDemoMode, clearTokens } from '../services/AuthService';
+import { clearTokens } from '../services/AuthService';
+import callConnectionService from '../services/callConnectionService';
 import { showToast } from '../components/Toast';
 import { useChatStore } from '../stores/ChatStore';
 import { getInstalledPlugins, parseManifest, type InstalledPlugin } from '../services/PluginRegistry';
 import { getDatabase } from '../services/DatabaseFactory';
 import { useAppStore } from '../stores/AppStore';
 import type { AppNavigation, RootStackParamList } from '../types/navigation';
-
-const DEMO_PRODUCT_COUNT = 20;
-const DEMO_CONTACT_COUNT = 10;
-const DEMO_ORDER_COUNT = 9;
 
 // ============ 快捷操作配置 ============
 
@@ -45,7 +41,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: 'cloudstore', label: '云商城', icon: 'store', color: '#6366f1', glow: 'rgba(99,102,241,0.2)', navigateTo: 'CloudStore' },
   { id: 'sales', label: '创建销售单', icon: 'clipboard-text', color: '#00f5d4', glow: 'rgba(0,245,212,0.2)', navigateTo: 'SalesOrder' },
   { id: 'supply', label: '采购入库', icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.2)', navigateTo: 'SupplyChain' },
-  { id: 'calls', label: '通话记录', icon: 'phone-classic', color: '#7b2ff7', glow: 'rgba(123,47,247,0.2)', navigateTo: 'CallHistory' },
+  { id: 'calls', label: '通话记录', icon: 'phone-log', color: '#a78bfa', glow: 'rgba(167,139,250,0.2)', navigateTo: 'CallHistory' },
   { id: 'lansync', label: '局域网同步', icon: 'wifi', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'LanSync' },
 ];
 
@@ -62,7 +58,6 @@ export default function ProfileTab() {
   const [customerCount, setCustomerCount] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [demo, setDemo] = useState(false);
 
   // 当前身份
   const currentProfile = useAppStore((s) => s.currentProfile);
@@ -74,16 +69,6 @@ export default function ProfileTab() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const demoMode = await isDemoMode();
-      setDemo(demoMode);
-      if (demoMode) {
-        setConnectionStatus('checking');
-        setProductCount(DEMO_PRODUCT_COUNT);
-        setCustomerCount(DEMO_CONTACT_COUNT);
-        setOrderCount(DEMO_ORDER_COUNT);
-        setLoading(false);
-        return;
-      }
       const [connStatus] = await Promise.all([
         checkConnection(),
         getProducts({ limit: 1 }).catch(() => []),
@@ -117,23 +102,19 @@ export default function ProfileTab() {
 
   useFocusEffect(useCallback(() => { loadPlugins(); }, []));
 
-  const handleLogout = async () => {
-    Alert.alert('退出登录', '确定退出当前账号？', [
+  const handleUnpairDesktop = async () => {
+    Alert.alert('取消桌面配对', '将断开与桌面端的连接，本地数据不受影响。', [
       { text: '取消', style: 'cancel' },
       {
-        text: '退出', style: 'destructive',
+        text: '确定', style: 'destructive',
         onPress: async () => {
           try {
             await clearTokens();
-            // 清除身份状态，防止重启后自动进入主界面
-            AsyncStorage.removeItem('@proclaw_current_profile');
-            // 重置会话 store
-            useChatStore.getState().reset();
-            // 重置导航栈到根路由
-            navigation.reset({ index: 0, routes: [{ name: 'Connection' as never }] });
-            showToast('success', '已退出');
+            callConnectionService.disconnect();
+            setConnectionStatus('offline');
+            showToast('success', '已取消桌面配对');
           } catch {
-            showToast('error', '退出失败');
+            showToast('error', '操作失败');
           }
         },
       },
@@ -141,7 +122,6 @@ export default function ProfileTab() {
   };
 
   const getStatusCfg = (): { label: string; color: string; icon: string } => {
-    if (demo) return { label: '演示', color: '#8b5cf6', icon: 'play-circle' };
     switch (connectionStatus) {
       case 'direct': return { label: '直连', color: '#10b981', icon: 'lan-connect' };
       case 'cloud_relay': return { label: '云中继', color: '#f59e0b', icon: 'cloud-sync' };
@@ -303,10 +283,10 @@ export default function ProfileTab() {
         </>
       )}
 
-      {/* ============ 退出登录 ============ */}
-      <TouchableOpacity style={styles.glassLogoutBtn} onPress={handleLogout} activeOpacity={0.7}>
-        <MaterialCommunityIcons name="logout" size={20} color="#ff6b9d" />
-        <Text style={styles.logoutText}>退出登录</Text>
+      {/* ============ 取消桌面配对 ============ */}
+      <TouchableOpacity style={styles.glassLogoutBtn} onPress={handleUnpairDesktop} activeOpacity={0.7}>
+        <MaterialCommunityIcons name="link-off" size={20} color="#ff6b9d" />
+        <Text style={styles.logoutText}>取消桌面配对</Text>
       </TouchableOpacity>
 
       {/* ============ 底部版本 ============ */}

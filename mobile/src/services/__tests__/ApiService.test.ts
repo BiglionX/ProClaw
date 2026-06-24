@@ -40,6 +40,13 @@ jest.mock('../DatabaseFactory', () => ({
   getDatabase: jest.fn(),
 }));
 
+jest.mock('../SyncRetryPolicy', () => ({
+  incrementRetryCount: jest.fn(async () => 1),
+  hasExceededMaxRetries: jest.fn((count: number, max = 5) => count >= max),
+  calculateNextRetryDelay: jest.fn(() => 30000),
+  DEFAULT_MAX_RETRIES: 5,
+}));
+
 // Toast 通过 jest moduleNameMapper 映射到 __mocks__/Toast.ts
 const ToastModule = require('../components/Toast');
 const mockShowToast = ToastModule.showToast as jest.Mock;
@@ -333,7 +340,7 @@ describe('ApiService', () => {
 
       expect(mockDb.getAllAsync).toHaveBeenCalledWith(
         expect.stringContaining('LIMIT ?'),
-        [100]
+        expect.arrayContaining([expect.any(Number), 100])
       );
     });
   });

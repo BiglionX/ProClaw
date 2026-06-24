@@ -203,19 +203,6 @@ export const clearRoles = async (): Promise<void> => {
   await secureDelete('proclaw_roles');
 };
 
-/** 演示模式：使用随机 token 跳过真实配对（审计 S8：不再使用可预测 token） */
-export const setDemoMode = async (): Promise<void> => {
-  const randomToken = 'demo_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12);
-  await saveToken(randomToken);
-  await saveServerUrl('https://demo.local'); // 审计 S9：使用 HTTPS
-  logger.log('Demo mode activated');
-};
-
-export const isDemoMode = async (): Promise<boolean> => {
-  const token = await loadToken();
-  return token !== null && token.startsWith('demo_');
-};
-
 export const loginWithOidc = async (): Promise<string> => {
   try {
     logger.log('Starting OIDC auth flow');
@@ -269,8 +256,6 @@ export default {
   saveServerUrl,
   loadServerUrl,
   pairDevice,
-  setDemoMode,
-  isDemoMode,
   loginWithOidc,
   handleOidcCallback,
 };

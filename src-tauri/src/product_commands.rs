@@ -701,41 +701,59 @@ pub fn get_product_spus(
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let spus = stmt
+    // 两阶段查询：避免在 query_map 回调中嵌套查询同一连接（SQLite 会报错）
+    let rows: Vec<(String, String, String, Option<String>, Option<String>, Option<String>, String, bool, String, Option<String>, i32, i32, f64, f64, String, String)> = stmt
         .query_map(params_refs.as_slice(), |row| {
-            let id: String = row.get(0)?;
-
-            // 查询该SPU的SKU列表
-            let skus = get_skus_by_spu_id(conn, &id).unwrap_or_default();
-
-            // 查询该SPU的图片列表
-            let images = get_images_by_spu_id(conn, &id).unwrap_or_default();
-
-            Ok(ProductSPU {
-                id,
-                spu_code: row.get(1)?,
-                name: row.get(2)?,
-                description: row.get(3)?,
-                category_id: row.get(4)?,
-                brand_id: row.get(5)?,
-                unit: row.get(6)?,
-                is_on_sale: row.get(7)?,
-                status: row.get(8)?,
-                metadata: row.get(9)?,
-                skus: skus.clone(),
-                images: images.clone(),
-                sku_count: row.get(10)?,
-                total_stock: row.get(11)?,
-                min_price: row.get(12)?,
-                max_price: row.get(13)?,
-                created_at: row.get(14)?,
-                updated_at: row.get(15)?,
-            })
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+                row.get(8)?,
+                row.get(9)?,
+                row.get(10)?,
+                row.get(11)?,
+                row.get(12)?,
+                row.get(13)?,
+                row.get(14)?,
+                row.get(15)?,
+            ))
         })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
-    spus.collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())
+    let mut spus = Vec::with_capacity(rows.len());
+    for (id, spu_code, name, description, category_id, brand_id, unit, is_on_sale, status, metadata, sku_count, total_stock, min_price, max_price, created_at, updated_at) in rows {
+        let skus = get_skus_by_spu_id(conn, &id).unwrap_or_default();
+        let images = get_images_by_spu_id(conn, &id).unwrap_or_default();
+        spus.push(ProductSPU {
+            id,
+            spu_code,
+            name,
+            description,
+            category_id,
+            brand_id,
+            unit,
+            is_on_sale,
+            status,
+            metadata,
+            skus,
+            images,
+            sku_count,
+            total_stock,
+            min_price,
+            max_price,
+            created_at,
+            updated_at,
+        });
+    }
+
+    Ok(spus)
 }
 
 /// 根据ID获取SPU详情
@@ -1423,6 +1441,22 @@ pub fn seed_demo_products(
     let force = force.unwrap_or(false);
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    // 外键约束：先确保分类与品牌存在（与 seed_iphone_batteries.sql 对齐）
+    tx.execute_batch(
+        "INSERT OR IGNORE INTO product_categories (id, name, parent_id, sort_order, is_active, created_at, updated_at)
+         VALUES
+           ('cat_iphone15', 'iPhone 15 系列', NULL, 10, 1, datetime('now'), datetime('now')),
+           ('cat_iphone14', 'iPhone 14 系列', NULL, 20, 1, datetime('now'), datetime('now')),
+           ('cat_iphone13', 'iPhone 13 系列', NULL, 30, 1, datetime('now'), datetime('now')),
+           ('cat_iphone12', 'iPhone 12 系列', NULL, 40, 1, datetime('now'), datetime('now')),
+           ('cat_iphone11', 'iPhone 11 系列', NULL, 50, 1, datetime('now'), datetime('now')),
+           ('cat_iphonese', 'iPhone SE 系列', NULL, 60, 1, datetime('now'), datetime('now'));
+         INSERT OR IGNORE INTO brands (id, name, is_active, created_at, updated_at)
+         VALUES ('brand_apple', 'Apple', 1, datetime('now'), datetime('now'));",
+    )
+    .map_err(|e| format!("seed 分类/品牌失败: {}", e))?;
+
     let mut inserted = 0i32;
 
     for item in DEMO_SEED_ITEMS {
@@ -1469,7 +1503,7 @@ pub fn seed_demo_products(
                     item.min_stock,
                     item.max_stock,
                     item.current_stock,
-                    Option::<String>::None,                                     // image_url
+                    Option::<String>::None,                                     // image_url（由 fetch_demo 从网上下载后写入）
                     item.barcode,
                     Some(format!("{{\"demo_seed\":true,\"spu_code\":\"{}\"}}", item.spu_code)), // metadata
                     item.created_at,
@@ -1481,11 +1515,10 @@ pub fn seed_demo_products(
         if force || !exists_spu {
             tx.execute(
                 "INSERT OR REPLACE INTO product_spus (id, spu_code, name, description, category_id, brand_id, unit,
-                 is_on_sale, status, metadata, sync_status, created_at, updated_at, sort_order)
+                 is_on_sale, status, metadata, sync_status, created_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'on_sale', ?8, 'synced',
                          COALESCE(NULLIF(?9, ''), datetime('now')),
-                         COALESCE(NULLIF(?9, ''), datetime('now')),
-                         ?10)",
+                         COALESCE(NULLIF(?9, ''), datetime('now')))",
                 params![
                     item.id,
                     item.spu_code,
@@ -1496,7 +1529,6 @@ pub fn seed_demo_products(
                     item.unit,
                     Some(format!("{{\"demo_seed\":true}}")),
                     item.created_at,
-                    item.sort_order,
                 ],
             ).map_err(|e| format!("seed product_spus 失败 ({}): {}", item.spu_code, e))?;
 
@@ -1529,6 +1561,39 @@ pub fn seed_demo_products(
 
     tx.commit().map_err(|e| e.to_string())?;
     Ok(inserted)
+}
+
+/// 设置 SPU 主图（演示自动配图 / AI 找图结果写入）
+#[tauri::command]
+pub fn set_spu_main_image(
+    db: tauri::State<Mutex<Database>>,
+    spu_id: String,
+    image_id: String,
+    image_url: String,
+) -> Result<(), String> {
+    if image_url.trim().is_empty() {
+        return Err("image_url 不能为空".to_string());
+    }
+
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "INSERT OR REPLACE INTO product_images (id, spu_id, image_url, image_type, sort_order, is_primary, sync_status)
+         VALUES (?1, ?2, ?3, 'main', 0, 1, 'synced')",
+        params![image_id, spu_id, image_url],
+    )
+    .map_err(|e| format!("写入 product_images 失败: {}", e))?;
+
+    tx.execute(
+        "UPDATE products SET image_url = ?1, updated_at = datetime('now'), sync_status = 'synced' WHERE id = ?2",
+        params![image_url, spu_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// 标记云商城为「演示数据」（仅后端记录，不影响 UI）

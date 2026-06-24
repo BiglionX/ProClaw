@@ -1,7 +1,7 @@
 // 桌面端通话页面
 // v4.1: 音视频通话界面
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Typography,
@@ -38,27 +38,38 @@ const CallPage: React.FC = () => {
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const [, forceStreamUpdate] = useState(0);
 
   const isVideo = callType === 'video';
   const isRinging = status === 'ringing';
   const isConnected = status === 'connected';
   const userName = remoteUserName || '未知用户';
 
-  // 绑定视频流
-  useEffect(() => {
-    // 使用 desktopCallManager 的本地流和远程流
-    // 注意: 由于 desktopCallManager 是模块级单例，需要通过 ref 访问
-    if (isConnected && isVideo) {
-      // 本地流和远程流绑定到 video 元素
-      const localStream = (desktopCallManager as any).localStream as MediaStream | null;
-      const remoteStream = (desktopCallManager as any).remoteStream as MediaStream | null;
+  const bindStreams = () => {
+    const localStream = desktopCallManager.localStream;
+    const remoteStream = desktopCallManager.remoteStream;
 
-      if (localVideoRef.current && localStream) {
-        localVideoRef.current.srcObject = localStream;
-      }
-      if (remoteVideoRef.current && remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  };
+
+  useEffect(() => {
+    desktopCallManager.onStreamChange = () => {
+      bindStreams();
+      forceStreamUpdate((n) => n + 1);
+    };
+    return () => {
+      desktopCallManager.onStreamChange = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isConnected && isVideo) {
+      bindStreams();
     }
   }, [isConnected, isVideo]);
 

@@ -752,7 +752,8 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
               width: 56,
               height: 56,
               bgcolor: 'transparent',
-              boxShadow: '0 0 12px rgba(255,59,48,0.6), 0 0 24px rgba(255,59,48,0.35), 0 0 48px rgba(255,59,48,0.15)',
+              boxShadow: 'none',
+              overflow: 'visible',
               '&:hover': {
                 bgcolor: 'transparent',
               },
@@ -764,7 +765,11 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
             }}>
               <Avatar
                 src={AVATAR_PRESETS.find(p => p.key === secretaryAvatar)?.src}
-                sx={{ width: 56, height: 56 }}
+                sx={{
+                  width: 56,
+                  height: 56,
+                  boxShadow: '0 0 0 2px rgba(255,59,48,0.35), 0 4px 16px rgba(255,59,48,0.25)',
+                }}
               >
                 <BotIcon sx={{ fontSize: 28 }} />
               </Avatar>

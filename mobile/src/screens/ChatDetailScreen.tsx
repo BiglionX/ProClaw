@@ -4,7 +4,7 @@
  *
  * 玻璃拟态美学 — 毛玻璃气泡、深色渐变底、磨砂输入栏
  */
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,6 +23,7 @@ import { chatWithAgentStream } from '../services/AIService';
 import { useChatStore } from '../stores/ChatStore';
 import { getAgentGreeting } from '../data/agentGreetings';
 import { logger } from '../utils/logger';
+import { startOutboundAvCall } from '../utils/avCall';
 import type { AppNavigation, RootStackParamList } from '../types/navigation';
 
 
@@ -50,10 +51,32 @@ export default function ChatDetailScreen() {
     messagesRef.current = messages;
   }, [messages]);
 
-  // 设置标题
-  useEffect(() => {
-    navigation.setOptions({ title: targetName || '聊天' });
-  }, [targetName, navigation]);
+  // 设置标题与通话入口（个人会话）
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: targetName || '聊天',
+      headerRight: targetType === 'personal'
+        ? () => (
+            <View style={styles.headerCallActions}>
+              <TouchableOpacity
+                onPress={() => startOutboundAvCall(navigation, targetId, targetName, 'audio')}
+                accessibilityRole="button"
+                accessibilityLabel="语音通话"
+              >
+                <MaterialCommunityIcons name="phone" size={22} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => startOutboundAvCall(navigation, targetId, targetName, 'video')}
+                accessibilityRole="button"
+                accessibilityLabel="视频通话"
+              >
+                <MaterialCommunityIcons name="video" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )
+        : undefined,
+    });
+  }, [navigation, targetName, targetType, targetId]);
 
   // 初始化会话 + 加载消息
   useEffect(() => {
@@ -482,5 +505,11 @@ const styles = StyleSheet.create({
   glassSendBtnDisabled: {
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderColor: 'rgba(255,255,255,0.08)',
+  },
+  headerCallActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginRight: 12,
   },
 });

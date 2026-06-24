@@ -135,10 +135,9 @@ export class ConflictResolver {
     const manualFields: string[] = [];
 
     // 收集所有字段
-    const allKeys = new Set([
-      ...Object.keys(localData),
-      ...Object.keys(remoteData),
-    ]);
+    const allKeys = Array.from(
+      new Set([...Object.keys(localData), ...Object.keys(remoteData)])
+    );
 
     for (const key of allKeys) {
       const localVal = localData[key];

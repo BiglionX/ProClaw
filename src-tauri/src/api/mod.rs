@@ -52,6 +52,7 @@ pub mod files;
 pub mod finance;
 pub mod inventory;
 pub mod invitations;
+pub mod livekit;
 pub mod messages;
 pub mod products;
 pub mod purchase_orders;
@@ -377,6 +378,10 @@ pub fn create_router(state: AppState) -> axum::Router {
         .route(
             "/api/users/:user_id/online",
             axum::routing::get(call::check_user_online),
+        )
+        .route(
+            "/api/livekit/token",
+            axum::routing::post(livekit::issue_livekit_token),
         )
         // 添加认证+权限中间件
         .layer(middleware::from_fn(rbac_middleware));

@@ -41,11 +41,9 @@ import {
   deleteManagedUser,
   updateManagedUser,
   type ManagedUser,
-  type ManagedRole,
 } from '../lib/userManagementService';
 
 type User = ManagedUser;
-type Role = ManagedRole;
 
 const UserManagementPage: React.FC = () => {
   const { data, isLoading: loading, refetch } = useUsersAndRoles();

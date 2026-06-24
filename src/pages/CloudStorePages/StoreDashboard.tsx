@@ -27,12 +27,13 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCloudStore, useInvalidateCloudStore, useStoreStats } from '../../lib/hooks/useCloudStore';
-import { getStoreUrl, getTenantLoginUrl } from '../../lib/cloudStoreService';
+import { getStoreUrl, getTenantLoginUrl, DEMO_CLOUD_STORE_SUBDOMAIN, createDemoCloudStoreStub } from '../../lib/cloudStoreService';
 import { safeNumber, safeFixed } from '../../lib/format';
 import CloudStoreSetupWizard from './StoreSetupWizard';
-import { isDemoAccount } from '../../lib/aiTeamTokenService';
-import { readDemoFlag, isDemoResource } from '../../lib/demoFlag';
-import { resetDemoData } from '../../lib/demoBootstrap';
+import { DEMO_EMAIL, isDemoAccount } from '../../lib/aiTeamTokenService';
+import { useAuthStore } from '../../lib/authStore';
+import { isDemoResource } from '../../lib/demoFlag';
+import { ensureDemoCloudStoreReady, resetDemoData } from '../../lib/demoBootstrap';
 import StoreMobilePreviewDialog from '../../components/CloudPreview/StoreMobilePreviewDialog';
 
 interface StoreDashboardProps {
@@ -47,17 +48,35 @@ export default function StoreDashboard({
   loading: _parentLoading, setLoading, setError, setSuccessMessage,
 }: StoreDashboardProps) {
   const navigate = useNavigate();
+  const authUser = useAuthStore((s) => s.user);
+  const demoMode =
+    authUser?.email === DEMO_EMAIL ||
+    authUser?.id === 'mock-boss-001' ||
+    isDemoAccount();
   const { data: store, isLoading: storeLoading, refetch: refetchStore } = useCloudStore();
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useStoreStats(store?.id, !!store);
+  const effectiveStore = store ?? (demoMode ? createDemoCloudStoreStub() : null);
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useStoreStats(
+    effectiveStore?.id,
+    !!effectiveStore,
+  );
   const invalidateCloudStore = useInvalidateCloudStore();
-  const loading = storeLoading || statsLoading;
+  const [storeFetchTimedOut, setStoreFetchTimedOut] = useState(false);
+  const loading = demoMode ? false : (storeLoading && !storeFetchTimedOut) || statsLoading;
   const [openWizard, setOpenWizard] = useState(false);
   const [wizardSubdomain, setWizardSubdomain] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [isDemo, setIsDemo] = useState(false);
   // 手机预览 Dialog
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (demoMode || !storeLoading) {
+      setStoreFetchTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setStoreFetchTimedOut(true), 3000);
+    return () => window.clearTimeout(timer);
+  }, [demoMode, storeLoading]);
 
   const loadData = () => {
     invalidateCloudStore();
@@ -69,9 +88,22 @@ export default function StoreDashboard({
     setLoading(loading);
   }, [loading, setLoading]);
 
+  // 演示账号：后台修复本地 demo 商城（延迟执行，避免与首次 get_cloud_store 抢锁）
   useEffect(() => {
-    setIsDemo(isDemoAccount() && !!readDemoFlag());
-  }, []);
+    if (!demoMode) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      await ensureDemoCloudStoreReady();
+      if (!cancelled) {
+        invalidateCloudStore();
+        refetchStore();
+      }
+    }, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [demoMode, invalidateCloudStore, refetchStore]);
 
   useEffect(() => {
     const refresh = () => {
@@ -104,10 +136,13 @@ export default function StoreDashboard({
 
   // 处理开通商城
   const handleOpenSetupWizard = (subdomainValue: string) => {
+    if (isDemoAccount()) {
+      setMobilePreviewOpen(true);
+      return;
+    }
     console.log('[StoreDashboard] handleOpenSetupWizard called, subdomain:', subdomainValue);
     setWizardSubdomain(subdomainValue);
     setOpenWizard(true);
-    console.log('[StoreDashboard] openWizard set to true');
   };
 
   // 向导完成回调
@@ -124,16 +159,21 @@ export default function StoreDashboard({
   };
 
   const handlePreviewStore = async () => {
-    if (!store) {
-      setError('请先开通云商城');
+    if (demoMode || effectiveStore) {
+      setMobilePreviewOpen(true);
       return;
     }
-    // 弹出手机模拟器预览 Dialog（使用 getStoreUrl：proclaw.cc/shop/{subdomain}）
-    setMobilePreviewOpen(true);
+    setError('请先开通云商城');
   };
 
-  // 未开通状态 - 显示开通引导
-  if (!store) {
+  const demoStoreActive =
+    demoMode &&
+    !!effectiveStore &&
+    (effectiveStore.subdomain === DEMO_CLOUD_STORE_SUBDOMAIN ||
+      isDemoResource('cloudStore', effectiveStore.subdomain ?? ''));
+
+  // 未开通（非演示账号）
+  if (!effectiveStore && !demoMode) {
     return (
       <Box>
         <Alert severity="info" sx={{ mb: 3 }}>
@@ -201,14 +241,35 @@ export default function StoreDashboard({
     );
   }
 
-  // 已开通状态 - 显示概览
-  // 使用 getStoreUrl：标准路径 proclaw.cc/shop/{subdomain}
-  const storeUrl = getStoreUrl(store);
+  // 已开通 / 演示账号
+  const activeStore = effectiveStore!;
+  const storeUrl = getStoreUrl(activeStore);
 
   return (
     <Box>
+      {demoMode && (
+        <Alert
+          severity="info"
+          icon={<DemoIcon />}
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              size="small"
+              variant="contained"
+              color="secondary"
+              startIcon={<PhonePreviewIcon />}
+              onClick={() => setMobilePreviewOpen(true)}
+            >
+              预览演示商城
+            </Button>
+          }
+        >
+          演示账号已预置 <strong>proclaw.cc/shop/demo</strong>，无需「立即开通」，点击右侧按钮直接预览。
+        </Alert>
+      )}
+
       {/* 演示数据提示（仅演示账号下显示） */}
-      {isDemo && store && isDemoResource('cloudStore', store.subdomain) && (
+      {demoStoreActive && (
         <Alert
           severity="warning"
           icon={<DemoIcon />}
@@ -224,22 +285,22 @@ export default function StoreDashboard({
             </Button>
           }
         >
-          当前为 <strong>演示账号</strong>，云商城（{storeUrl.replace('https://', '')}）已预置开通，可点击「预览商城」查看效果。
+          当前为 <strong>演示账号</strong>，已预置演示商城（{getStoreUrl(activeStore).replace('https://', '')}），点击「手机预览」即可查看，无需手动开通。
         </Alert>
       )}
 
       {/* 状态栏 */}
-      <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: store.status === 'active' ? 'success.50' : 'warning.50' }}>
+      <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: activeStore.status === 'active' ? 'success.50' : 'warning.50' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <Box>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
               <Typography variant="h6">商城状态：</Typography>
               <Chip
-                label={store.status === 'active' ? '已开通' : store.status === 'expired' ? '已过期' : '已停用'}
-                color={store.status === 'active' ? 'success' : 'error'}
+                label={activeStore.status === 'active' ? '已开通' : activeStore.status === 'expired' ? '已过期' : '已停用'}
+                color={activeStore.status === 'active' ? 'success' : 'error'}
               />
               <Chip label="Token 计费" variant="outlined" color="warning" />
-              {isDemo && isDemoResource('cloudStore', store.subdomain) && (
+              {demoStoreActive && (
                 <Chip
                   label="🧪 演示数据"
                   color="warning"
@@ -252,7 +313,7 @@ export default function StoreDashboard({
               <Typography variant="body1" color="primary.main" sx={{ fontWeight: 600 }}>{storeUrl}</Typography>
               <Button size="small" onClick={() => navigator.clipboard.writeText(storeUrl)}>复制</Button>
               <Button size="small" endIcon={<LaunchIcon />} onClick={() => window.open(storeUrl, '_blank')}>访问</Button>
-              {isDemo && isDemoResource('cloudStore', store.subdomain) && (
+              {demoStoreActive && (
                 <Button
                   size="small"
                   variant="outlined"
@@ -344,13 +405,11 @@ export default function StoreDashboard({
       </Dialog>
 
       {/* 手机模拟器预览 Dialog（proclaw.cc/shop/{subdomain}） */}
-      {store && (
-        <StoreMobilePreviewDialog
-          open={mobilePreviewOpen}
-          onClose={() => setMobilePreviewOpen(false)}
-          subdomain={store.subdomain}
-        />
-      )}
+      <StoreMobilePreviewDialog
+        open={mobilePreviewOpen}
+        onClose={() => setMobilePreviewOpen(false)}
+        subdomain={effectiveStore?.subdomain ?? DEMO_CLOUD_STORE_SUBDOMAIN}
+      />
 
     </Box>
   );

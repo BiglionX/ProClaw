@@ -16,12 +16,20 @@
 | react-native-reanimated | ~4.3.1 |
 | typescript | ~6.0.3 |
 
-**当前质量门禁**（2026-06-10 P4-P6 完成后实测）
+**当前质量门禁**（2026-06-23 更新）
 
 - `tsc --noEmit`：0 错误
-- `jest --ci`：38/38 套件、617/617 用例
+- `jest --ci`：40/40 套件（含 LiveKitService + Schema v4）
+- `npm run lint:no-stale-js`：`src/` 无 stale `.js` 双份产物
 - `expo export (web)`：1441 模块、4 bundle 通过
 - `npm audit`：critical 0 / **high 0** / moderate 10 / low 0
+
+**v1.x 功能路线**
+
+| 项 | 文档 | 状态 |
+| --- | --- | --- |
+| 音视频通话 LiveKit 接入 | [MOBILE_LIVEKIT_INTEGRATION_PLAN.md](./MOBILE_LIVEKIT_INTEGRATION_PLAN.md) | **Phase 1–4 ✅**；独立版默认可用；桌面配对**可选**（设置内）；无演示账号/数据 |
+| stale `.js` 产物清理 | `mobile/scripts/lint-no-stale-js.js` + `.gitignore` | **✅ 完成 2026-06-23** |
 
 **路线图跟踪 7 项**
 

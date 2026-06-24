@@ -2,7 +2,7 @@
   "name": "proclaw-mobile",
   "version": "1.0.0",
   "description": "ProClaw Mobile App - 商务通移动端",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -12,11 +12,18 @@
     "test": "jest --forceExit --detectOpenHandles",
     "typecheck": "tsc --noEmit",
     "lint:no-console": "node scripts/lint-no-console.js",
-    "lint:check": "npm run typecheck && npm run lint:no-console",
+    "lint:no-stale-js": "node scripts/lint-no-stale-js.js --strict",
+    "clean:stale-js": "node scripts/clean-stale-js.js",
+    "lint:check": "npm run typecheck && npm run lint:no-console && npm run lint:no-stale-js",
+    "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1",
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "^15.0.1",
     "@expo/metro-runtime": "~56.0.15",
+    "@livekit/react-native": "^2.11.1",
+    "@livekit/react-native-expo-plugin": "^1.0.2",
+    "@livekit/react-native-webrtc": "^144.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",
@@ -25,6 +32,7 @@
     "crypto-js": "^4.2.0",
     "expo": "~56.0.11",
     "expo-camera": "~56.0.8",
+    "expo-dev-client": "~56.0.20",
     "expo-file-system": "~56.0.8",
     "expo-image-picker": "~56.0.17",
     "expo-network": "~56.0.5",
@@ -33,6 +41,7 @@
     "expo-status-bar": "~56.0.4",
     "expo-system-ui": "~56.0.5",
     "jszip": "^3.10.0",
+    "livekit-client": "^2.19.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
@@ -76,6 +85,14 @@
       "**/__tests__/**/*.test.ts",
       "**/__tests__/**/*.test.tsx"
     ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
     "moduleNameMapper": {
       "^@react-native-async-storage/async-storage$": "<rootDir>/node_modules/@react-native-async-storage/async-storage",
       "^react-native$": "<rootDir>/__mocks__/react-native.ts",
@@ -83,7 +100,7 @@
       "../lib/fetchWithTimeout$": "<rootDir>/src/lib/fetchWithTimeout.ts"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(react-native|@react-native|expo|@expo)/)"
+      "node_modules/(?!(react-native|@react-native|expo|@expo|@livekit|livekit-client)/)"
     ],
     "testEnvironment": "node"
   },

@@ -213,6 +213,9 @@ pub fn required_permission_for_route(method: &str, path: &str) -> Option<&'stati
             _ => Some(perm::VIEW_SALES),
         },
 
+        // LiveKit token — any authenticated user may join their own call room
+        (_, p) if p == "/api/livekit/token" && method == "POST" => Some(perm::VIEW_SALES),
+
         // AI / 文件 / 消息 / 设备 / 中继 — 内部用户均可
         _ => None,
     }

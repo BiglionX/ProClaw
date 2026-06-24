@@ -5,11 +5,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useNavigation } from '@react-navigation/native';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { getProducts, getCustomers } from '../services/ApiService';
-import { isDemoMode } from '../services/AuthService';
 import type { AppNavigation } from '../types/navigation';
-
-const DEMO_PRODUCT_COUNT = 20;
-const DEMO_CONTACT_COUNT = 10;
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<AppNavigation>();
@@ -21,23 +17,9 @@ const HomeScreen: React.FC = () => {
   const [customerCount, setCustomerCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [demo, setDemo] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const demoMode = await isDemoMode();
-      setDemo(demoMode);
-
-      if (demoMode) {
-        // 演示模式：直接用模拟数据
-        setConnectionStatus('checking');
-        setProductCount(DEMO_PRODUCT_COUNT);
-        setCustomerCount(DEMO_CONTACT_COUNT);
-        setLoading(false);
-        return;
-      }
-
-      // 审计 R2-B5：移除 Promise.all 中无用的 limit:1 调用，直接全量查询并计数
       const [connStatus, allProductsResult, allCustomersResult] = await Promise.allSettled([
         checkConnection(),
         getProducts(),
@@ -89,7 +71,6 @@ const HomeScreen: React.FC = () => {
   };
 
   const getStatusConfig = (): { label: string; color: string; icon: string } => {
-    if (demo) return { label: '演示', color: '#8b5cf6', icon: 'play-circle' };
     switch (connectionStatus) {
       case 'direct': return { label: '直连', color: '#10b981', icon: 'lan-connect' };
       case 'cloud_relay': return { label: '云中继', color: '#f59e0b', icon: 'cloud-sync' };
@@ -134,7 +115,7 @@ const HomeScreen: React.FC = () => {
 
       {/* 统计卡片 */}
       <View style={styles.statsGrid}>
-        <Card style={styles.statCard} onPress={() => (navigation.navigate as any)('ProductsTab')}>
+        <Card style={styles.statCard} onPress={() => navigation.navigate('Products')}>
           <Card.Content style={styles.statContent}>
             <View style={[styles.statIcon, { backgroundColor: '#e0e7ff' }]}>
               <MaterialCommunityIcons name="package-variant" size={24} color={colors.primary} />
@@ -144,7 +125,7 @@ const HomeScreen: React.FC = () => {
           </Card.Content>
         </Card>
 
-        <Card style={styles.statCard} onPress={() => (navigation.navigate as any)('SupplyChainTab', { screen: 'Contacts' })}>
+        <Card style={styles.statCard} onPress={() => navigation.navigate('Contacts')}>
           <Card.Content style={styles.statContent}>
             <View style={[styles.statIcon, { backgroundColor: '#d1fae5' }]}>
               <MaterialCommunityIcons name="account-group" size={24} color="#10b981" />
@@ -160,7 +141,7 @@ const HomeScreen: React.FC = () => {
       <View style={styles.actionsGrid}>
         <Card
           style={styles.actionCard}
-          onPress={() => (navigation.navigate as any)('SupplyChainTab', { screen: 'SalesOrder' })}
+          onPress={() => navigation.navigate('SalesOrder')}
         >
           <Card.Content style={styles.actionContent}>
             <MaterialCommunityIcons name="clipboard-text" size={28} color="#10b981" />
@@ -170,7 +151,7 @@ const HomeScreen: React.FC = () => {
 
         <Card
           style={styles.actionCard}
-          onPress={() => (navigation.navigate as any)('ProductsTab')}
+          onPress={() => navigation.navigate('Products')}
         >
           <Card.Content style={styles.actionContent}>
             <MaterialCommunityIcons name="package-variant-closed" size={28} color={colors.primary} />
@@ -180,7 +161,7 @@ const HomeScreen: React.FC = () => {
 
         <Card
           style={styles.actionCard}
-          onPress={() => (navigation.navigate as any)('SupplyChainTab', { screen: 'Contacts' })}
+          onPress={() => navigation.navigate('Contacts')}
         >
           <Card.Content style={styles.actionContent}>
             <MaterialCommunityIcons name="account-group" size={28} color="#f59e0b" />
@@ -190,7 +171,7 @@ const HomeScreen: React.FC = () => {
 
         <Card
           style={styles.actionCard}
-          onPress={() => (navigation.navigate as any)('ProfileTab')}
+          onPress={() => navigation.navigate('Settings')}
         >
           <Card.Content style={styles.actionContent}>
             <MaterialCommunityIcons name="cog" size={28} color="#8b5cf6" />
@@ -301,4 +282,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+export default HomeScreen;

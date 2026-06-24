@@ -56,7 +56,7 @@ export const FRONTEND_COMMANDS: string[] = [
   'set_product_gallery',
   'create_product_spu', 'get_product_spus', 'get_product_spu_by_id', 'update_product_spu', 'delete_product_spu',
   'get_library_mode', 'migrate_to_ecommerce_mode', 'downgrade_to_simple_mode',
-  'seed_demo_products', 'mark_store_as_demo',
+  'seed_demo_products', 'set_spu_main_image', 'mark_store_as_demo',
   'create_brand', 'get_brands', 'create_category', 'get_categories',
 
   // 库存与校准
@@ -87,7 +87,7 @@ export const FRONTEND_COMMANDS: string[] = [
 
   // 用户 / 团队 / 审批
   'create_user_cmd', 'get_users_cmd', 'get_user_by_id_cmd', 'update_user_cmd', 'delete_user_cmd',
-  'assign_user_role_cmd', 'change_user_password_cmd', 'get_roles_cmd', 'get_current_user_cmd',
+  'assign_user_role_cmd', 'change_user_password_cmd', 'get_roles_cmd', 'get_current_user_cmd', 'get_ws_session_cmd',
   'create_approval_cmd', 'get_approvals_cmd', 'approve_request_cmd', 'reject_request_cmd',
   'create_team', 'get_teams', 'get_team_by_id', 'update_team', 'delete_team', 'import_team',
 

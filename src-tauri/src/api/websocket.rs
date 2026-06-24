@@ -691,6 +691,8 @@ async fn handle_call_signaling(state: &AppState, from_user: &str, msg_type: &str
                     "callerId": from_user,
                     "calleeId": to_user,
                     "callType": call_type,
+                    "roomName": req.payload.as_ref().and_then(|p| p.get("roomName").or_else(|| p.get("room_name"))),
+                    "livekitUrl": req.payload.as_ref().and_then(|p| p.get("livekitUrl").or_else(|| p.get("livekit_url"))),
                     "offer": req.payload.as_ref().and_then(|p| p.get("offer")),
                     "timestamp": now,
                 }

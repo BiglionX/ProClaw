@@ -448,4 +448,99 @@ describe('AIService', () => {
       expect(mockFetch).toHaveBeenCalled();
     });
   });
+
+  describe('多供应商回退链', () => {
+    it('第一个供应商失败时应尝试第二个供应商', async () => {
+      const { getAvailableProviders } = require('../../config/ai');
+      getAvailableProviders.mockReturnValueOnce([
+        { id: 'deepseek', name: 'DeepSeek', apiBase: 'https://api.deepseek.com', model: 'deepseek-chat', apiKey: 'test-key', enabled: true },
+        { id: 'openai', name: 'OpenAI', apiBase: 'https://api.openai.com/v1', model: 'gpt-4o-mini', apiKey: 'openai-key', enabled: true },
+      ]);
+
+      let callCount = 0;
+      mockFetch.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            text: () => Promise.resolve('Server error'),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            choices: [{ message: { content: 'OpenAI 回复' } }],
+          }),
+        });
+      });
+
+      const result = await chatWithAgent({
+        agentId: 'secretary',
+        userMessage: '测试',
+      });
+
+      expect(result.reply).toBe('OpenAI 回复');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('所有供应商失败时应抛出包含最后错误的异常', async () => {
+      const { getAvailableProviders } = require('../../config/ai');
+      getAvailableProviders.mockReturnValueOnce([
+        { id: 'deepseek', name: 'DeepSeek', apiBase: 'https://api.deepseek.com', model: 'deepseek-chat', apiKey: 'test-key', enabled: true },
+        { id: 'openai', name: 'OpenAI', apiBase: 'https://api.openai.com/v1', model: 'gpt-4o-mini', apiKey: 'openai-key', enabled: true },
+      ]);
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('Server error'),
+      });
+
+      await expect(chatWithAgent({
+        agentId: 'secretary',
+        userMessage: '测试',
+      })).rejects.toThrow('所有 AI 供应商均不可用');
+    });
+
+    it('Ollama 本地模型不应添加 Authorization 头', async () => {
+      const { getAvailableProviders } = require('../../config/ai');
+      getAvailableProviders.mockReturnValueOnce([
+        { id: 'ollama', name: 'Ollama', apiBase: 'http://localhost:11434/v1', model: 'llama3', apiKey: 'ollama-local', enabled: true },
+      ]);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: 'Ollama 回复' } }],
+        }),
+      });
+
+      await chatWithAgent({
+        agentId: 'secretary',
+        userMessage: '测试',
+      });
+
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[1].headers.Authorization).toBeUndefined();
+    });
+
+    it('非 Ollama 供应商应添加 Authorization 头', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '回复' } }],
+        }),
+      });
+
+      await chatWithAgent({
+        agentId: 'secretary',
+        userMessage: '测试',
+      });
+
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[1].headers.Authorization).toBeDefined();
+      expect(callArgs[1].headers.Authorization).toContain('Bearer');
+    });
+  });
 });

@@ -28,10 +28,19 @@ export interface CallState {
     callerId: string;
     callerName: string;
     callType: CallType;
+    roomName?: string;
+    livekitUrl?: string;
   } | null;
 
   // 动作
-  setIncomingCall: (data: { sessionId: string; callerId: string; callerName: string; callType: CallType } | null) => void;
+  setIncomingCall: (data: {
+    sessionId: string;
+    callerId: string;
+    callerName: string;
+    callType: CallType;
+    roomName?: string;
+    livekitUrl?: string;
+  } | null) => void;
   startOutgoingCall: (data: { sessionId: string; remoteUserId: string; remoteUserName: string; callType: CallType }) => void;
   callConnected: (sessionId: string) => void;
   endCall: (reason?: string) => void;

@@ -2,8 +2,9 @@
  * 云商城开通引导向导 - 简化版
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createCloudStore } from '../../lib/cloudStoreService';
+import { isDemoAccount } from '../../lib/aiTeamTokenService';
 
 interface CloudStoreSetupWizardProps {
   open: boolean;
@@ -26,8 +27,16 @@ export default function CloudStoreSetupWizard({
   const [error, setError] = useState<string | null>(null);
   
   console.log('[StoreSetupWizard] Rendering, open:', open);
+
+  useEffect(() => {
+    if (open && isDemoAccount()) {
+      onCancel();
+    }
+  }, [open, onCancel]);
   
   if (!open) return null;
+
+  if (isDemoAccount()) return null;
 
   const handleCreate = async () => {
     setIsCreating(true);

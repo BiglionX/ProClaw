@@ -1,4 +1,5 @@
 import './src/webPatch'; // Web 平台补丁：必须在 App 之前加载
+import './src/livekit/bootstrap'; // LiveKit globals (native only via .native.ts)
 import { registerRootComponent } from 'expo';
 
 import App from './App';

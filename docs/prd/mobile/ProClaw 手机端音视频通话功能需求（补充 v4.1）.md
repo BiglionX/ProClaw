@@ -12,7 +12,16 @@
 | **数据库依赖** | N/A（通话记录未来可存储于 `chat_sessions`） |
 | **测试覆盖** | 暂无专用 E2E |
 | **差异与遗留** | 桌面端与移动端间实时音视频通话尚未落地；野火 IM SDK 依赖与体积问题需重新评估；`mobile-audit-report-v14.md` 中 react-native-webrtc 存在兼容性警告 |
-| **后续动作** | 进入 v1.x 路线图；需决策选型（野火 IM / LiveKit / 自建 WebSocket+WebRTC） |
+| **后续动作** | 见 [MOBILE_LIVEKIT_INTEGRATION_PLAN.md](../../MOBILE_LIVEKIT_INTEGRATION_PLAN.md)；LiveKit 替代野火 IM / react-native-webrtc |
+
+### LiveKit 实施补充（2026-06-23）
+
+| 项 | 要求 |
+|---|---|
+| 媒体 | LiveKit SFU；信令走 ProClaw WebSocket（`roomName`，不传 SDP/ICE） |
+| 手机认证 | 独立使用无需配对；**可选**在设置中 `POST /api/auth/pair` 连接桌面；**禁止**演示账号/演示数据 |
+| 桌面认证 | Tauri 本地 `get_ws_session_cmd` 签发 JWT；**禁止**用 Supabase mock / boss 演示登录接通话 |
+| 互通前提 | **需先完成可选桌面配对**、同一 `:8888` 后端、双方 WS 在线、联系人 id 为后端 `users.id`、配置 `LIVEKIT_*` |
 
 ### 状态变更日志
 

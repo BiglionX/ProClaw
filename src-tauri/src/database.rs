@@ -1355,4 +1355,44 @@ mod tests {
         std::fs::remove_file(&db_path).ok();
         std::fs::remove_dir(&temp_dir).ok();
     }
+
+    #[test]
+    fn test_demo_iphone_battery_seed_loads_20_spus() {
+        let temp_dir = env::temp_dir().join("proclaw_test_demo_seed");
+        let db_path = temp_dir.join("test_demo_seed.db");
+
+        let db = Database::new(db_path.clone()).unwrap();
+        db.initialize().unwrap();
+
+        let spu_count: i64 = db
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM product_spus WHERE deleted_at IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert!(
+            spu_count >= 20,
+            "expected >= 20 SPUs after seed, got {}",
+            spu_count
+        );
+        let image_count: i64 = db
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM product_images WHERE spu_id LIKE 'spu_iphone%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            image_count >= 20,
+            "expected >= 20 demo images after seed, got {}",
+            image_count
+        );
+
+        std::fs::remove_file(&db_path).ok();
+        std::fs::remove_dir(&temp_dir).ok();
+    }
 }

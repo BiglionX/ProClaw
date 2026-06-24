@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput, Button, Card, useTheme, HelperText, ActivityIndicator } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { pairDevice, setDemoMode } from '../services/AuthService';
+import { pairDevice } from '../services/AuthService';
+import callConnectionService from '../services/callConnectionService';
 import { getLocalIPAddress, isLanSyncAvailable, parseQRCodeData } from '../services/ConnectionManager';
 import { showToast } from '../components/Toast';
 import { createProfile, setCurrentProfile } from '../services/ProfileManager';
@@ -20,7 +21,6 @@ const ConnectionScreen: React.FC<AppScreenProps<'Connection'>> = ({ navigation }
   const [serverUrl, setServerUrl] = useState('http://localhost:8888');
   const [pairingCode, setPairingCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [localIP, setLocalIP] = useState('');
   // P2 项 1：扫码状态
@@ -51,6 +51,7 @@ const ConnectionScreen: React.FC<AppScreenProps<'Connection'>> = ({ navigation }
     setLoading(true);
     try {
       await pairDevice(serverUrl, pairingCode);
+      await callConnectionService.connectIfPaired();
 
       // 配对成功后自动创建默认身份（如果没有身份）
       const { listProfiles } = await import('../services/ProfileManager');
@@ -71,34 +72,6 @@ const ConnectionScreen: React.FC<AppScreenProps<'Connection'>> = ({ navigation }
       setErrorMsg(getErrorMessage(err, '配对失败，请检查地址和配对码'));
     } finally {
       setLoading(false);
-    }
-  };
-
-  /** 跳过配对，进入演示模式 */
-  const handleDemoMode = async () => {
-    setDemoLoading(true);
-    try {
-      await setDemoMode();
-
-      // 演示模式自动创建演示身份
-      const { listProfiles } = await import('../services/ProfileManager');
-      const profiles = await listProfiles();
-      if (profiles.length === 0) {
-        const profile = await createProfile('演示身份');
-        await openDatabase(profile.id);
-        await setCurrentProfile(profile.id);
-        await applySchema(await (await import('../services/DatabaseFactory')).getDatabase());
-        useAppStore.getState().setProfiles([profile]);
-        useAppStore.getState().setPhase('ready');
-        logger.log('[Connection] Created demo profile:', profile.id);
-      }
-
-      showToast('success', '已进入演示模式', '可以浏览所有功能界面');
-      navigation.replace('Main');
-    } catch {
-      showToast('error', '进入失败');
-    } finally {
-      setDemoLoading(false);
     }
   };
 
@@ -150,7 +123,7 @@ const ConnectionScreen: React.FC<AppScreenProps<'Connection'>> = ({ navigation }
           <MaterialCommunityIcons name="connection" size={48} color={colors.primary} />
         </View>
         <Text variant="headlineSmall" style={styles.title}>
-          连接 ProClaw 桌面端
+          配对 ProClaw 桌面端（可选）
         </Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
           扫描二维码或手动输入连接信息
@@ -241,19 +214,6 @@ const ConnectionScreen: React.FC<AppScreenProps<'Connection'>> = ({ navigation }
           >
             局域网同步
           </Button>
-
-          <Button
-            mode="elevated"
-            icon="play-circle"
-            onPress={handleDemoMode}
-            loading={demoLoading}
-            disabled={demoLoading}
-            style={styles.demoBtn}
-            contentStyle={{ paddingVertical: 6 }}
-            labelStyle={{ color: '#8b5cf6' }}
-          >
-            {demoLoading ? '进入中...' : '跳过登录，体验演示'}
-          </Button>
         </Card.Content>
       </Card>
 
@@ -294,11 +254,11 @@ const ConnectionScreen: React.FC<AppScreenProps<'Connection'>> = ({ navigation }
           </View>
           <View style={styles.helpStep}>
             <MaterialCommunityIcons name="numeric-3-circle" size={20} color={colors.primary} style={styles.helpStepIcon} />
-            <Text variant="bodyMedium" style={styles.helpText}>输入配对码 888888 完成配对</Text>
+            <Text variant="bodyMedium" style={styles.helpText}>输入桌面端显示的 6 位配对码完成配对</Text>
           </View>
           <View style={styles.helpStep}>
             <MaterialCommunityIcons name="numeric-4-circle" size={20} color={colors.primary} style={styles.helpStepIcon} />
-            <Text variant="bodyMedium" style={styles.helpText}>配对成功后自动跳转至主界面</Text>
+            <Text variant="bodyMedium" style={styles.helpText}>配对为可选项，不配对也可独立使用 App</Text>
           </View>
         </Card.Content>
       </Card>

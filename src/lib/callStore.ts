@@ -12,7 +12,8 @@ interface IncomingCall {
   callerId: string;
   callerName: string;
   callType: CallType;
-  offer?: { sdp: string; type: string };
+  roomName?: string;
+  livekitUrl?: string;
 }
 
 interface CallStore {

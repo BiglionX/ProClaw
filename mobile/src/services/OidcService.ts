@@ -6,6 +6,10 @@ const ISSUER = 'https://account.proclaw.cc';
 const CLIENT_ID = 'proclaw_mobile';
 const REDIRECT_URI = 'proclaw://oauth/callback';
 
+function formUrlEncodedBody(params: Record<string, string>): string {
+  return new URLSearchParams(params).toString();
+}
+
 export interface TokenResponse {
   access_token: string;
   id_token: string;
@@ -94,7 +98,7 @@ export async function exchangeCodeForToken(code: string, receivedState: string):
   const response = await fetch(ISSUER + '/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
+    body: formUrlEncodedBody({
       grant_type: 'authorization_code',
       code,
       redirect_uri: REDIRECT_URI,
@@ -119,7 +123,7 @@ export async function refreshToken(refreshToken: string): Promise<TokenResponse>
   const response = await fetch(ISSUER + '/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
+    body: formUrlEncodedBody({
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
       client_id: CLIENT_ID,
@@ -150,7 +154,7 @@ export async function logout(refreshToken: string): Promise<void> {
   await fetch(ISSUER + '/oauth/logout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ refresh_token: refreshToken }),
+    body: formUrlEncodedBody({ refresh_token: refreshToken }),
   });
 }
 

@@ -17,7 +17,7 @@ import { getErrorMessage } from '../utils/errorUtils';
 // Schema 版本管理
 // ============================================
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 /**
@@ -83,6 +83,15 @@ export const applySchema = async (db: IDatabase): Promise<void> => {
     } catch (migrationError) {
       logger.error('[SchemaManager] V3 migration failed:', migrationError);
       throw new Error('V3 migration failed: ' + (migrationError instanceof Error ? migrationError.message : String(migrationError)));
+    }
+  }
+
+  if (currentVersion < 4) {
+    try {
+      await migrateToV4(db);
+    } catch (migrationError) {
+      logger.error('[SchemaManager] V4 migration failed:', migrationError);
+      throw new Error('V4 migration failed: ' + (migrationError instanceof Error ? migrationError.message : String(migrationError)));
     }
   }
 
@@ -155,13 +164,16 @@ const createSystemTables = async (db: IDatabase): Promise<void> => {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_conflict_pending ON conflict_records(resolution)`,
 
-    // 6. offline_queue - 离线请求队列（兼容旧版）
+    // 6. offline_queue - 离线请求队列（P5: 持久化重试计数）
     `CREATE TABLE IF NOT EXISTS offline_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       endpoint TEXT NOT NULL,
       method TEXT NOT NULL,
       payload TEXT NOT NULL,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      last_retry_at INTEGER,
+      next_retry_at INTEGER DEFAULT 0
     )`,
   ];
 
@@ -551,6 +563,33 @@ const migrateToV3 = async (db: IDatabase): Promise<void> => {
     await db.execAsync(query);
   }
   logger.log('[SchemaManager] V3 migration complete');
+};
+
+// ============================================
+// V4 迁移 — offline_queue 持久化重试计数（P5 SyncRetryPolicy）
+// ============================================
+
+const migrateToV4 = async (db: IDatabase): Promise<void> => {
+  logger.log('[SchemaManager] Migrating to V4: offline_queue retry columns');
+
+  const columns = await db.getAllAsync(`PRAGMA table_info(offline_queue)`);
+  const columnNames = new Set(columns.map((col) => String((col as { name: string }).name)));
+
+  if (!columnNames.has('retry_count')) {
+    await db.execAsync(
+      `ALTER TABLE offline_queue ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0`
+    );
+  }
+  if (!columnNames.has('last_retry_at')) {
+    await db.execAsync(`ALTER TABLE offline_queue ADD COLUMN last_retry_at INTEGER`);
+  }
+  if (!columnNames.has('next_retry_at')) {
+    await db.execAsync(
+      `ALTER TABLE offline_queue ADD COLUMN next_retry_at INTEGER DEFAULT 0`
+    );
+  }
+
+  logger.log('[SchemaManager] V4 migration complete');
 };
 
 /**

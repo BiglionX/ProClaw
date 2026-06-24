@@ -3559,7 +3559,7 @@ dependencies = [
 
 [[package]]
 name = "proclaw-desktop"
-version = "1.0.0"
+version = "1.0.7"
 dependencies = [
  "aes-gcm",
  "argon2",

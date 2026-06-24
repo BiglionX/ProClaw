@@ -1,13 +1,10 @@
 /**
- * CloudStoreScreen - 云商城页面
- * 演示模式下展示演示云商城预览，非演示模式下引导开通云商城
+ * CloudStoreScreen - 云商城页面（需桌面端开通后通过 API 同步）
  */
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
-import { Text, ActivityIndicator, Button } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { Text, ActivityIndicator } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { isDemoMode } from '../services/AuthService';
-import { showToast } from '../components/Toast';
 
 interface StoreStats {
   products: number;
@@ -15,41 +12,15 @@ interface StoreStats {
   views: number;
 }
 
-const DEMO_STORE_URL = 'https://proclaw.cc/shop/demo';
-const DEMO_STORE_SUBDOMAIN = 'demo';
-
 export default function CloudStoreScreen() {
   const [loading, setLoading] = useState(true);
-  const [demo, setDemo] = useState(false);
-  const [stats, setStats] = useState<StoreStats>({ products: 20, orders: 9, views: 128 });
+  const [stats] = useState<StoreStats>({ products: 0, orders: 0, views: 0 });
 
   useEffect(() => {
-    checkDemoMode();
+    setLoading(false);
   }, []);
 
-  const checkDemoMode = async () => {
-    try {
-      const isDemo = await isDemoMode();
-      setDemo(isDemo);
-      if (isDemo) {
-        // 演示模式下使用预设统计数据
-        setStats({ products: 20, orders: 9, views: 128 });
-      }
-    } catch (e) {
-      console.error('[CloudStore] checkDemoMode error:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePreviewStore = () => {
-    Linking.openURL(DEMO_STORE_URL).catch(() => {
-      showToast('error', '无法打开商城链接');
-    });
-  };
-
   const handleOpenDashboard = () => {
-    // 引导用户使用桌面端管理云商城
     Alert.alert(
       '云商城管理',
       '云商城完整管理功能请在桌面端使用 ProClaw Plus/Light 操作。',
@@ -68,22 +39,18 @@ export default function CloudStoreScreen() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 云商城状态卡片 */}
         <View style={styles.statusCard}>
           <View style={styles.statusIconWrap}>
             <MaterialCommunityIcons name="store" size={40} color="#6366f1" />
           </View>
           <Text variant="headlineSmall" style={styles.storeName}>
-            {demo ? `proclaw.cc/shop/demo` : '未开通云商城'}
+            未开通云商城
           </Text>
-          <View style={[styles.statusBadge, { backgroundColor: demo ? '#10b981' : '#f59e0b' }]}>
-            <Text style={styles.statusBadgeText}>
-              {demo ? '已开通' : '未开通'}
-            </Text>
+          <View style={[styles.statusBadge, { backgroundColor: '#f59e0b' }]}>
+            <Text style={styles.statusBadgeText}>未开通</Text>
           </View>
         </View>
 
-        {/* 统计数据 */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text variant="headlineMedium" style={styles.statValue}>{stats.products}</Text>
@@ -99,48 +66,18 @@ export default function CloudStoreScreen() {
           </View>
         </View>
 
-        {/* 操作按钮 */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={handlePreviewStore}>
-            <MaterialCommunityIcons name="eye" size={22} color="#fff" />
-            <Text style={styles.primaryBtnText}>预览商城</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.secondaryBtn} onPress={handleOpenDashboard}>
             <MaterialCommunityIcons name="cog" size={22} color="#6366f1" />
             <Text style={styles.secondaryBtnText}>管理商城</Text>
           </TouchableOpacity>
         </View>
 
-        {/* 提示信息 */}
         <View style={styles.tipCard}>
           <MaterialCommunityIcons name="information" size={20} color="#6366f1" />
           <Text style={styles.tipText}>
-            {demo
-              ? '演示云商城已预置 20 个 iPhone 电池商品，可点击「预览商城」查看效果。完整管理功能请在桌面端操作。'
-              : '开通云商城后，您可以通过子域名或自定义域名访问您的在线商城。支持商品管理、订单处理等完整电商功能。'}
+            开通云商城后，您可以通过子域名或自定义域名访问您的在线商城。请在桌面端完成开通与配置。
           </Text>
-        </View>
-
-        {/* 功能介绍 */}
-        <View style={styles.features}>
-          <Text variant="titleMedium" style={styles.featuresTitle}>云商城功能</Text>
-          <View style={styles.featureItem}>
-            <MaterialCommunityIcons name="package-variant-closed" size={20} color="#10b981" />
-            <Text style={styles.featureText}>商品管理 - 上架、编辑、分类商品</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <MaterialCommunityIcons name="receipt" size={20} color="#10b981" />
-            <Text style={styles.featureText}>订单处理 - 接收、管理订单</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <MaterialCommunityIcons name="chart-line" size={20} color="#10b981" />
-            <Text style={styles.featureText}>数据统计 - 销售分析、流量监控</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <MaterialCommunityIcons name="palette" size={20} color="#10b981" />
-            <Text style={styles.featureText}>主题定制 - 自定义商城外观</Text>
-          </View>
         </View>
       </ScrollView>
     </View>
@@ -228,21 +165,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 12,
   },
-  primaryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    padding: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  primaryBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
   secondaryBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -274,30 +196,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 20,
-  },
-  features: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  featuresTitle: {
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
-  featureText: {
-    fontSize: 14,
-    color: '#555',
   },
 });

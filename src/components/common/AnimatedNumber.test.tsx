@@ -92,7 +92,7 @@ describe('AnimatedNumber', () => {
 
   it('应用 color', () => {
     const { container } = render(
-      <AnimatedNumber value={100} color="#FF3B30" enabled={false} />
+      <AnimatedNumber value={100} color="error" enabled={false} />
     );
     const span = container.querySelector('span');
     expect(span?.style.color).toBeTruthy();

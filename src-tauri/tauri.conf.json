@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ProClaw",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "identifier": "com.proclaw.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -28,7 +28,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com https://api.openai.com https://ai.proclaw.cc https://nvwa.proclaw.cc https://dashscope.aliyuncs.com https://open.bigmodel.cn https://api.pexels.com https://pixabay.com https://releases.proclaw.cc http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' blob:; frame-src 'self' https://*.proclaw.cc",
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.deepseek.com https://api.openai.com https://ai.proclaw.cc https://nvwa.proclaw.cc https://dashscope.aliyuncs.com https://open.bigmodel.cn https://api.pexels.com https://api.openverse.org https://pixabay.com https://releases.proclaw.cc http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' blob:; frame-src 'self' https://*.proclaw.cc",
       "dangerousDisableAssetCspModification": true
     }
   },
@@ -63,7 +63,10 @@
     "longDescription": "ProClaw is an AI-powered business operating system for small merchants. It features local-first data storage, AI order recognition, inventory management, and optional cloud backup.",
     "windows": {
       "nsis": {
-        "languages": ["English", "SimpChinese"],
+        "languages": [
+          "English",
+          "SimpChinese"
+        ],
         "installMode": "currentUser",
         "installerIcon": "icons/icon.ico"
       }

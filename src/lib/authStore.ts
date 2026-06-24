@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Session, supabase, User, isSupabaseConfigured } from '../lib/supabase';
 import { startOidcAuth, exchangeCodeForToken, getUserInfo, logout as oidcLogout } from './oidc-client';
 
-export const MOCK_PASSWORD = import.meta.env.VITE_MOCK_PASSWORD || `mock-${Date.now()}`;
+export const MOCK_PASSWORD = import.meta.env.VITE_MOCK_PASSWORD || 'IamBigBoss';
 
 const AUTH_STORAGE_KEY = 'proclaw-auth-session';
 

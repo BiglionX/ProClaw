@@ -352,6 +352,42 @@ pub fn get_current_user_cmd(
     Ok(user.unwrap_or(serde_json::json!({"error": "No active user found"})))
 }
 
+/// 为桌面端 UI 签发 WebSocket / LiveKit 用的 JWT（本地 Tauri 进程可信）
+#[tauri::command]
+pub fn get_ws_session_cmd(db: tauri::State<Mutex<Database>>) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+
+    let user_id: String = conn
+        .query_row(
+            "SELECT u.id FROM users u WHERE u.is_active = 1 AND u.user_type = 'internal' LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|_| "No active internal user found".to_string())?;
+
+    let (role, permissions) = crate::api::auth::get_user_role_and_permissions(&conn, &user_id);
+
+    let secret = crate::api::JWT_SECRET
+        .get()
+        .ok_or_else(|| "JWT_SECRET not initialized".to_string())?;
+
+    let access_token = crate::api::auth::generate_token(
+        &user_id,
+        "desktop",
+        &role,
+        &permissions,
+        secret,
+        3600,
+    )
+    .map_err(|e| format!("Failed to generate token: {}", e))?;
+
+    Ok(serde_json::json!({
+        "user_id": user_id,
+        "access_token": access_token,
+    }))
+}
+
 /// 内部分配角色函数
 fn assign_user_role(
     conn: &rusqlite::Connection,

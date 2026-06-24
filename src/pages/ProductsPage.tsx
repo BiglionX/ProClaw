@@ -35,6 +35,7 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { isDemoAccount } from '../lib/aiTeamTokenService';
 import { Brand, getBrands } from '../lib/brandService';
 import { Category, getCategories } from '../lib/categoryService';
 import { uploadImage } from '../lib/imageService';
@@ -59,8 +60,6 @@ import {
   DowngradeConfirmDialog,
   LibraryModeToggle,
 } from '../components/Products';
-// 任务 #2：骨架屏全面铺开
-import TableSkeleton from '../components/common/TableSkeleton';
 
 export default function ProductsPage() {
   // ==================== 商品库模式状态 ====================
@@ -150,6 +149,25 @@ export default function ProductsPage() {
       window.removeEventListener('proclaw:products-changed', refreshOnBootstrap);
     };
   }, []);
+
+  // 演示账号商品库为空时自动补种
+  useEffect(() => {
+    if (loading || products.length > 0 || !isDemoAccount()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { bootstrapDemoData } = await import('../lib/demoBootstrap');
+        await bootstrapDemoData({ silent: true });
+        if (!cancelled) {
+          await refetchProducts();
+          window.dispatchEvent(new CustomEvent('proclaw:products-changed'));
+        }
+      } catch (err) {
+        console.warn('[ProductsPage] 演示商品补种失败：', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [loading, products.length, refetchProducts]);
 
   // 筛选条件变化时 React Query 自动 refetch（queryKey 已包含筛选字段）
 

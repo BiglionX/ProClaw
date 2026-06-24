@@ -13,6 +13,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { logger } from './src/utils/logger';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useCallStore } from './src/stores/CallStore';
+import callManager from './src/services/CallManager';
+import callConnectionService from './src/services/callConnectionService';
 // 懒加载 IncomingCallModal（避免在 App 启动时同步加载 react-native-webrtc）
 const IncomingCallModal = React.lazy(() => import('./src/components/IncomingCallModal'));
 
@@ -28,7 +30,6 @@ import { theme } from './src/components/Theme';
 import { toastConfig } from './src/components/Toast';
 import type { RootStackParamList } from './src/types/navigation';
 import ConnectionScreen from './src/screens/ConnectionScreen';
-import HomeScreen from './src/screens/HomeScreen';
 import ProductsScreen from './src/screens/ProductsScreen';
 import SupplyChainScreen from './src/screens/SupplyChainScreen';
 import InventoryScreen from './src/screens/InventoryScreen';
@@ -181,6 +182,17 @@ export default function App() {
   }, []);
 
   // 初始化：加载身份和认证状态
+  useEffect(() => {
+    callManager.init();
+    callConnectionService.connectIfPaired().catch((e) => {
+      logger.warn('[App] Call WS connect skipped or failed:', e);
+    });
+    return () => {
+      callConnectionService.disconnect();
+      callManager.destroy();
+    };
+  }, []);
+
   useEffect(() => {
     initializeApp();
   }, []);
@@ -393,11 +405,6 @@ export default function App() {
                 name="Agents"
                 component={AgentsScreen}
                 options={{ title: 'Agent' }}
-              />
-              <Stack.Screen
-                name="Home"
-                component={HomeScreen}
-                options={{ title: '数据看板' }}
               />
               <Stack.Screen
                 name="Profile"

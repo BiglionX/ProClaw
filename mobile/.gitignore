@@ -37,6 +37,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Stale tsc emit artifacts — source of truth is .ts/.tsx (see scripts/lint-no-stale-js.js)
+src/**/*.js
+App.js
+__mocks__/**/*.js
+
 # generated native folders
 /ios
 /android

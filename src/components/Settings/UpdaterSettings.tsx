@@ -23,14 +23,12 @@ import {
   List,
   ListItem,
   ListItemText,
-  IconButton,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
   Download as DownloadIcon,
   Update as UpdateIcon,
   CheckCircle as CheckIcon,
-  Error as ErrorIcon,
 } from '@mui/icons-material';
 import { safeInvoke, isTauri } from '../../lib/tauri';
 

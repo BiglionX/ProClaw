@@ -33,7 +33,8 @@ import {
   Smartphone as PhoneIcon,
 } from '@mui/icons-material';
 import PhoneSimulator from './PhoneSimulator';
-import { getStoreUrl, type CloudStore } from '../../lib/cloudStoreService';
+import { getStoreUrl, DEMO_CLOUD_STORE_SUBDOMAIN, type CloudStore } from '../../lib/cloudStoreService';
+import LocalMobilePreviewContent from './LocalMobilePreviewContent';
 
 interface StoreMobilePreviewDialogProps {
   open: boolean;
@@ -60,6 +61,7 @@ export default function StoreMobilePreviewDialog({
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const useLocalPreview = subdomain === DEMO_CLOUD_STORE_SUBDOMAIN;
 
   // 每次打开对话框时重置状态
   useEffect(() => {
@@ -166,6 +168,10 @@ export default function StoreMobilePreviewDialog({
               重试
             </Button>
           </Box>
+        ) : useLocalPreview ? (
+          <PhoneSimulator url={storeUrl} scale={0.85}>
+            <LocalMobilePreviewContent />
+          </PhoneSimulator>
         ) : (
           <PhoneSimulator url={storeUrl} scale={0.85}>
             <Box sx={{ position: 'relative', width: '100%', height: '100%', bgcolor: 'white' }}>
@@ -211,7 +217,9 @@ export default function StoreMobilePreviewDialog({
 
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-          模拟 H5 商城在手机端访问的效果。如需编辑主题/商品，请使用「本地编辑器」标签。
+          {useLocalPreview
+            ? '演示账号使用本地 20 个商品渲染预览；线上地址可在浏览器中打开。'
+            : '模拟 H5 商城在手机端访问的效果。如需编辑主题/商品，请使用「预览编辑」标签。'}
         </Typography>
         <Button onClick={onClose}>关闭</Button>
       </DialogActions>

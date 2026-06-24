@@ -6,6 +6,9 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+// LiveKit: avoid dual-instance resolution under Metro package exports
+config.resolver.unstable_conditionNames = ['react-native', 'require'];
+
 // Resolve react-native-webview to a web mock
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (platform === 'web' && moduleName === 'react-native-webview') {

@@ -13,7 +13,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
 import { MOCK_PASSWORD } from '../lib/authStore';
-import { open } from '@tauri-apps/plugin-shell';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -180,6 +179,9 @@ export default function LoginPage() {
               ⚡ 一键体验 (boss)
             </Button>
 
+            {/* OIDC 登录区域 */}
+            <div data-testid="oidc-section-check" style={{display:'none'}}>OIDC section rendered</div>
+
             <Box sx={{ my: 2, display: 'flex', alignItems: 'center' }}>
               <Box sx={{ flex: 1, borderBottom: 1, borderColor: 'divider' }}></Box>
               <Typography variant="body2" color="text.secondary" sx={{ mx: 2 }}>
@@ -192,11 +194,12 @@ export default function LoginPage() {
               fullWidth
               variant="contained"
               size="large"
+              data-testid="oidc-login-button"
               onClick={async () => {
                 try {
                   setIsOidcLoading(true);
                   const authUrl = await loginWithOidc();
-                  await open(authUrl);
+                  window.open(authUrl, '_blank');
                 } catch (err) {
                   console.error('OIDC login failed:', err);
                 } finally {

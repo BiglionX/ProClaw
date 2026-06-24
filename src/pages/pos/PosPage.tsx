@@ -38,12 +38,6 @@ interface PosTable {
   status: 'vacant' | 'occupied' | 'reserved' | 'cleaning';
 }
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-}
-
 // ============ 模拟数据 ============
 const CATEGORY_LABELS: Record<string, string> = {
   cat_hotpot: '火锅',

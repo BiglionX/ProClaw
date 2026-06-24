@@ -6,11 +6,11 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getCustomers, Customer, ContactType, CONTACT_TYPE_LABELS } from '../services/ApiService';
-import { isDemoMode } from '../services/AuthService';
 import { showToast } from '../components/Toast';
-import { useCallStore } from '../stores/CallStore';
 import type { AppNavigation } from '../types/navigation';
 import { getErrorMessage } from '../utils/errorUtils';
+import { startOutboundAvCall, canCallContact } from '../utils/avCall';
+import type { CallType } from '../stores/CallStore';
 
 const TYPE_CONFIG: Record<ContactType, { icon: string; color: string; glow: string }> = {
   colleague:   { icon: 'account-tie',   color: '#00d2ff', glow: 'rgba(0,210,255,0.25)' },
@@ -18,22 +18,6 @@ const TYPE_CONFIG: Record<ContactType, { icon: string; color: string; glow: stri
   supplier:    { icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.25)' },
   friend:      { icon: 'account-heart',  color: '#f472b6', glow: 'rgba(244,114,182,0.25)' },
 };
-
-const DEMO_CONTACTS: Customer[] = [
-  // 同事
-  { id: 'c1', name: '陈志远', phone: '138****1001', email: 'chenzy@proclaw.com', contact_type: 'colleague', department: '技术部', position: '高级工程师' },
-  { id: 'c2', name: '刘芳',   phone: '138****1002', email: 'liufang@proclaw.com', contact_type: 'colleague', department: '销售部', position: '销售经理' },
-  { id: 'c3', name: '赵明辉', phone: '138****1003', email: 'zhaomh@proclaw.com', contact_type: 'colleague', department: '财务部', position: '财务主管' },
-  // 客户
-  { id: 'k1', name: '张伟',   phone: '139****2111', email: 'zhangwei@example.com',  contact_type: 'customer', company: '恒达商贸有限公司', position: '采购经理' },
-  { id: 'k2', name: '李娜',   phone: '139****2222', email: 'lina@example.com',      contact_type: 'customer', company: '星辰科技股份',     position: '总经理' },
-  { id: 'k3', name: '王磊',   phone: '139****2333', email: 'wanglei@example.com',   contact_type: 'customer', company: '金茂实业集团',     position: '运营总监' },
-  { id: 'k4', name: '孙晓梅', phone: '139****2444', email: 'sunxm@example.com',     contact_type: 'customer', company: '绿源环保科技',     position: '采购主管' },
-  // 供应商
-  { id: 's1', name: '周建国', phone: '137****3111', email: 'zhoujg@supply.com',     contact_type: 'supplier', company: '鼎丰电子材料有限公司', position: '销售总监' },
-  { id: 's2', name: '吴丽华', phone: '137****3222', email: 'wulh@supply.com',       contact_type: 'supplier', company: '华远工业原料供应', position: '大客户经理' },
-  { id: 's3', name: '郑海龙', phone: '137****3333', email: 'zhenghl@supply.com',    contact_type: 'supplier', company: '鑫达包装制品厂',     position: '法人代表' },
-];
 
 type FilterType = 'all' | ContactType;
 
@@ -48,28 +32,11 @@ const ContactsScreen: React.FC = () => {
 
   const loadContacts = useCallback(async () => {
     try {
-      if (await isDemoMode()) {
-        let filtered = DEMO_CONTACTS;
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          filtered = filtered.filter((c) =>
-            c.name.toLowerCase().includes(q) ||
-            (c.phone || '').includes(searchQuery) ||
-            (c.company || '').toLowerCase().includes(q) ||
-            (c.department || '').toLowerCase().includes(q)
-          );
-        }
-        if (filterType !== 'all') {
-          filtered = filtered.filter((c) => c.contact_type === filterType);
-        }
-        setContacts(filtered);
-      } else {
-        const data = await getCustomers({ search: searchQuery || undefined });
-        let result = filterType !== 'all'
-          ? data.filter((c) => c.contact_type === filterType)
-          : data;
-        setContacts(result);
-      }
+      const data = await getCustomers({ search: searchQuery || undefined });
+      const result = filterType !== 'all'
+        ? data.filter((c) => c.contact_type === filterType)
+        : data;
+      setContacts(result);
     } catch (err) {
       showToast('error', '加载失败', getErrorMessage(err));
     } finally {
@@ -122,8 +89,18 @@ const ContactsScreen: React.FC = () => {
 
   const renderRightActions = (item: Customer) => {
     const action = getSwipeAction(item);
+    const callable = canCallContact(item as Customer & { source?: string });
     return (
       <View style={styles.swipeActions}>
+        {callable && (
+          <TouchableOpacity
+            style={[styles.swipeAction, { backgroundColor: 'rgba(0,245,212,0.85)' }]}
+            onPress={() => handleCall(item, 'audio')}
+          >
+            <MaterialCommunityIcons name="phone" size={20} color="#fff" />
+            <Text style={styles.swipeActionText}>通话</Text>
+          </TouchableOpacity>
+        )}
         <View style={[styles.swipeAction, { backgroundColor: action.color }]}>
           <MaterialCommunityIcons name={action.icon} size={20} color="#fff" />
           <Text style={styles.swipeActionText}>{action.label}</Text>
@@ -155,28 +132,22 @@ const ContactsScreen: React.FC = () => {
     }
   };
 
-  /** 发起语音/视频通话 */
-  const handleCall = (item: Customer, callType: 'audio' | 'video') => {
-    const store = useCallStore.getState();
-    if (store.status !== 'idle') {
-      Alert.alert('提示', '当前已在通话中');
-      return;
-    }
-    // 生成会话ID并导航到通话界面
-    const sessionId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    store.startOutgoingCall({
-      sessionId,
-      remoteUserId: item.id,
-      remoteUserName: item.name,
-      callType,
-    });
-    navigation.navigate('Call' as never);
-  };
-
   /** 打开邀请页面 */
   const handleInvite = () => {
     navigation.navigate('InvitePartner' as never);
   };
+
+  const handleCall = useCallback(
+    async (contact: Customer, callType: CallType) => {
+      const ext = contact as Customer & { source?: string };
+      if (!canCallContact(ext)) {
+        showToast('info', '提示', '仅支持与已开通 ProClaw 账号的联系人通话');
+        return;
+      }
+      await startOutboundAvCall(navigation, contact.id, contact.name, callType);
+    },
+    [navigation],
+  );
 
   const renderContact = ({ item }: { item: Customer }) => {
     const typeCfg = item.contact_type ? TYPE_CONFIG[item.contact_type] : null;
@@ -231,24 +202,28 @@ const ContactsScreen: React.FC = () => {
                 )}
               </View>
             </View>
-            {/* 通话按钮 */}
-            <View style={styles.callActions}>
-              <TouchableOpacity
-                style={[styles.glassCallBtn, { borderColor: `${avatarColor}55` }]}
-                onPress={(e) => { e.stopPropagation?.(); handleCall(item, 'audio'); }}
-                activeOpacity={0.6}
-              >
-                <MaterialCommunityIcons name="phone" size={18} color={avatarColor} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.glassCallBtn, { borderColor: 'rgba(0,245,212,0.35)' }]}
-                onPress={(e) => { e.stopPropagation?.(); handleCall(item, 'video'); }}
-                activeOpacity={0.6}
-              >
-                <MaterialCommunityIcons name="video" size={18} color="#00f5d4" />
-              </TouchableOpacity>
+            {canCallContact(item as Customer & { source?: string }) ? (
+              <View style={styles.callActions}>
+                <TouchableOpacity
+                  style={[styles.glassCallBtn, { borderColor: 'rgba(0,245,212,0.35)' }]}
+                  onPress={() => handleCall(item, 'audio')}
+                  accessibilityRole="button"
+                  accessibilityLabel="语音通话"
+                >
+                  <MaterialCommunityIcons name="phone" size={18} color="#00f5d4" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.glassCallBtn, { borderColor: 'rgba(0,210,255,0.35)' }]}
+                  onPress={() => handleCall(item, 'video')}
+                  accessibilityRole="button"
+                  accessibilityLabel="视频通话"
+                >
+                  <MaterialCommunityIcons name="video" size={18} color="#00d2ff" />
+                </TouchableOpacity>
+              </View>
+            ) : (
               <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.2)" />
-            </View>
+            )}
           </View>
         </TouchableOpacity>
       </Swipeable>

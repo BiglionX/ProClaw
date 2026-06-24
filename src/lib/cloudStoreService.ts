@@ -5,6 +5,7 @@
 
 import { safeInvoke, isTauri } from './tauri';
 import { ProductSPU } from './productService';
+import { isDemoAccount } from './aiTeamTokenService';
 
 /** 云商城公网根地址（与 marketing-site 反向代理对齐，默认 proclaw.cc） */
 export function getCloudStorePublicOrigin(): string {
@@ -15,6 +16,24 @@ export function getCloudStorePublicOrigin(): string {
 /** 演示商城路径 URL */
 export function getDemoStorePublicUrl(): string {
   return `${getCloudStorePublicOrigin()}/shop/demo`;
+}
+
+/** 演示账号固定子域（与 bootstrap / 云端 tenant_demo 对齐） */
+export const DEMO_CLOUD_STORE_SUBDOMAIN = 'demo';
+
+/** 演示账号 UI 占位：本地库尚未写入 cloud_stores 时仍可预览 proclaw.cc/shop/demo */
+export const DEMO_CLOUD_STORE_STUB_ID = 'demo-cloud-store-stub';
+
+export function createDemoCloudStoreStub(): CloudStore {
+  return {
+    id: DEMO_CLOUD_STORE_STUB_ID,
+    user_id: 'demo',
+    subdomain: DEMO_CLOUD_STORE_SUBDOMAIN,
+    api_key: 'demo',
+    status: 'active',
+    plan_type: 'free',
+    created_at: new Date().toISOString(),
+  };
 }
 
 /** 商户后台登录（演示账号可 auto=demo 直通） */
@@ -55,6 +74,7 @@ export interface CloudStore {
   plan_type: PlanType;
   created_at: string;
   expires_at?: string;
+  updated_at?: string;
 }
 
 export interface StoreTheme {
@@ -219,7 +239,9 @@ async function callBackend<T>(command: string, args?: Record<string, unknown>): 
 
       switch (command) {
         case 'get_cloud_store':
-          return (mockStore ? { ...mockStore } : null) as T;
+          if (mockStore) return { ...mockStore } as T;
+          if (isDemoAccount()) return createDemoCloudStoreStub() as T;
+          return null as T;
         case 'create_cloud_store':
           mockStore = generateMockStore(
             (args?.planType as PlanType) || 'basic',

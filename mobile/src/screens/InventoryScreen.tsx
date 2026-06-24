@@ -20,7 +20,6 @@ import {
   Searchbar,
 } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { isDemoMode } from '../services/AuthService';
 import {
   getInventoryOverview,
   getInventoryStats,
@@ -80,26 +79,6 @@ const STATUS_META: Record<StockStatus, { label: string; color: string; bg: strin
   over:   { label: '接近满仓', color: '#1e40af', bg: '#dbeafe' },
 };
 
-// Demo 数据：覆盖 4 个状态，供演示模式使用
-const DEMO_STATS: InventoryStats = {
-  totalSkus: 8,
-  outOfStockCount: 1,
-  lowStockCount: 2,
-  recentTransactions: 12,
-  totalStockValue: 234567.89,
-};
-
-const DEMO_ITEMS: InventoryItem[] = [
-  { skuId: 's1', spuId: 'p1', skuCode: 'IP15P-256-BLK', specText: '256G 黑色', productName: 'iPhone 15 Pro', spuCode: 'IP15P', currentStock: 0,   minStock: 20, maxStock: 200, sellPrice: 8999,   status: 'out' },
-  { skuId: 's2', spuId: 'p2', skuCode: 'MBA-M3-13',    specText: '13 寸 M3',  productName: 'MacBook Air',    spuCode: 'MBA',  currentStock: 8,   minStock: 10, maxStock: 100, sellPrice: 10499,  status: 'low' },
-  { skuId: 's3', spuId: 'p3', skuCode: 'APP2-USBC',    specText: 'USB-C',     productName: 'AirPods Pro 2',  spuCode: 'APP2', currentStock: 35,  minStock: 30, maxStock: 200, sellPrice: 1999,   status: 'normal' },
-  { skuId: 's4', spuId: 'p4', skuCode: 'IPADA-11-256', specText: '256G',      productName: 'iPad Air',       spuCode: 'IPADA',currentStock: 12,  minStock: 15, maxStock: 80,  sellPrice: 4799,   status: 'low' },
-  { skuId: 's5', spuId: 'p5', skuCode: 'AWS9-45-SLV',  specText: '45mm 银',   productName: 'Apple Watch S9', spuCode: 'AWS9', currentStock: 150, minStock: 50, maxStock: 180, sellPrice: 3199,   status: 'over' },
-  { skuId: 's6', spuId: 'p6', skuCode: 'MXK-USB',      specText: 'USB 键鼠套装',productName: 'Magic Keyboard',spuCode:'MXK',  currentStock: 60,  minStock: 20, maxStock: 100, sellPrice: 999,    status: 'normal' },
-  { skuId: 's7', spuId: 'p7', skuCode: 'PENCIL2',      specText: '二代',       productName: 'Apple Pencil',   spuCode: 'AP2',  currentStock: 75,  minStock: 20, maxStock: 120, sellPrice: 999,    status: 'normal' },
-  { skuId: 's8', spuId: 'p8', skuCode: 'HOMEPOD-MIN',  specText: 'mini',       productName: 'HomePod mini',   spuCode: 'HPM',  currentStock: 42,  minStock: 15, maxStock: 100, sellPrice: 749,    status: 'normal' },
-];
-
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all',    label: '全部' },
   { key: 'out',    label: '缺货' },
@@ -122,23 +101,20 @@ const InventoryScreen: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const demo = await isDemoMode();
-      if (demo) {
-        setItems(DEMO_ITEMS);
-        setStats(DEMO_STATS);
-      } else {
-        const db = getDatabase();
-        const [list, st] = await Promise.all([
-          getInventoryOverview(db),
-          getInventoryStats(db),
-        ]);
-        setItems(list);
-        setStats(st);
-      }
+      const db = getDatabase();
+      const [list, st] = await Promise.all([
+        getInventoryOverview(db),
+        getInventoryStats(db),
+      ]);
+      setItems(list);
+      setStats(st);
     } catch (err) {
       showToast('error', '加载库存失败', getErrorMessage(err));
-      setItems(DEMO_ITEMS);
-      setStats(DEMO_STATS);
+      setItems([]);
+      setStats({
+        totalSkus: 0, outOfStockCount: 0, lowStockCount: 0,
+        recentTransactions: 0, totalStockValue: 0,
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);

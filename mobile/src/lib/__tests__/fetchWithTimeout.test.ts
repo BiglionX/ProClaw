@@ -180,7 +180,7 @@ describe('fetchWithTimeout', () => {
       await new Promise((r) => setTimeout(r, 60));
       // signal.reason 应为 TimeoutError
       expect(signal.aborted).toBe(true);
-      const reason = signal.reason as Error;
+      const reason = (signal as AbortSignal & { reason?: unknown }).reason as Error;
       expect(reason).toBeInstanceOf(Error);
       expect(reason.name).toBe('TimeoutError');
       dispose();

@@ -5,6 +5,7 @@
  * 列出已预置的产品 / 云商城 / AI Team / 插件清单。
  */
 import { useEffect, useState } from 'react';
+import { APP_VERSION } from '../../lib/appVersion';
 import {
   Box,
   Button,
@@ -136,7 +137,7 @@ export default function WelcomeTour() {
           <RocketLaunchIcon sx={{ color: '#FF3B30', fontSize: 28 }} />
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              欢迎使用 ProClaw 1.0.0
+              {`欢迎使用 ProClaw ${APP_VERSION}`}
             </Typography>
             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
               当前账号为演示账号，已预置以下数据包

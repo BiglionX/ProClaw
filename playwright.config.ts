@@ -10,19 +10,21 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    headless: false,
   },
   projects: [
     {
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
+        executablePath: 'F:\\chrome-win64\\chrome.exe',
       },
     },
   ],
   webServer: {
     command: 'set VITE_BUILD_MODE=light&& npx vite --port 3000',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 30000,
   },
 });

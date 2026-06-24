@@ -37,8 +37,6 @@ import { useAppModeStore } from '../config/appMode';
 import { isDemoAccountContext, readDemoFlag, recordDemoReset } from '../lib/demoFlag';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
-// 补全 5：自动更新 Tab（任务 #10）
-import UpdaterSettings from '../components/Settings/UpdaterSettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;

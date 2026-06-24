@@ -46,7 +46,7 @@ import { ProductSPU } from '../../lib/productService';
 import { isTauri } from '../../lib/tauri';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCloudStore, useInvalidateCloudStore, useSyncableProducts, cloudStoreQueryKey } from '../../lib/hooks/useCloudStore';
-import { syncAllProducts, syncIncremental, toggleProductVisible, SyncStatus } from '../../lib/cloudStoreService';
+import { syncAllProducts, syncIncremental, toggleProductVisible, SyncStatus, DEMO_CLOUD_STORE_STUB_ID } from '../../lib/cloudStoreService';
 import {
   searchProductImages,
   searchBatchProductImages,
@@ -361,6 +361,10 @@ export default function StoreProducts({
       setError('请先开通云商城');
       return;
     }
+    if (store.id === DEMO_CLOUD_STORE_STUB_ID) {
+      setError('演示商城正在初始化，请稍候几秒后重试');
+      return;
+    }
     try {
       setSyncing(true);
       setSuccessMessage('正在全量同步商品到云端...');
@@ -376,6 +380,10 @@ export default function StoreProducts({
   const handleSyncIncremental = async () => {
     if (!store) {
       setError('请先开通云商城');
+      return;
+    }
+    if (store.id === DEMO_CLOUD_STORE_STUB_ID) {
+      setError('演示商城正在初始化，请稍候几秒后重试');
       return;
     }
     try {

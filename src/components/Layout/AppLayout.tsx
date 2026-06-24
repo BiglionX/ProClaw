@@ -11,6 +11,7 @@ import WelcomeTour from '../Demo/WelcomeTour';
 import { useAppModeStore } from '../../config/appMode';
 import { useAuthStore } from '../../lib/authStore';
 import { isDemoAccount } from '../../lib/aiTeamTokenService';
+import callConnectionService from '../../services/callConnectionService';
 
 const TOPBAR_HEIGHT = 64;
 
@@ -82,6 +83,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     })();
     return () => { cancelled = true; };
   }, [user?.id, user?.email]);
+
+  // Phase 4: WebSocket + CallManager (Tauri local JWT — not Supabase mock)
+  useEffect(() => {
+    callConnectionService.connect().catch((err) => {
+      console.warn('[AppLayout] Call connection setup failed:', err);
+    });
+    return () => {
+      callConnectionService.disconnect();
+    };
+  }, []);
 
   return (
     <Box

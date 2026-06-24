@@ -15,11 +15,13 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { clearTokens } from '../services/AuthService';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
+import callConnectionService from '../services/callConnectionService';
 import { showToast } from '../components/Toast';
 import { hasBackupConfig } from '../services/BackupConfigStore';
 import type { AppNavigation } from '../types/navigation';
 
-export default function SettingsScreen() {  const navigation = useNavigation<AppNavigation>();
+export default function SettingsScreen() {
+  const navigation = useNavigation<AppNavigation>();
   // theme removed for glassmorphism
 
   const [autoSync, setAutoSync] = useState(true);
@@ -73,13 +75,14 @@ export default function SettingsScreen() {  const navigation = useNavigation<Ap
     }
   };
 
-  const handleLogout = async () => {
+  const handleUnpairDesktop = async () => {
     try {
       await clearTokens();
-      navigation.navigate('Connection');
-      showToast('success', '已退出');
+      callConnectionService.disconnect();
+      setConnectionMode('offline');
+      showToast('success', '已取消桌面配对');
     } catch {
-      showToast('error', '退出失败');
+      showToast('error', '操作失败');
     }
   };
 
@@ -111,6 +114,17 @@ export default function SettingsScreen() {  const navigation = useNavigation<Ap
           </View>
           <Switch value={autoSync} onValueChange={setAutoSync} color="#00d2ff" />
         </View>
+        <View style={styles.glassDivider} />
+        <TouchableOpacity style={styles.glassItem} onPress={() => navigation.navigate('Connection')} activeOpacity={0.7}>
+          <View style={styles.glassItemIcon}>
+            <MaterialCommunityIcons name="desktop-classic" size={20} color="#a78bfa" />
+          </View>
+          <View style={styles.glassItemContent}>
+            <Text style={styles.glassItemTitle}>配对桌面端</Text>
+            <Text style={styles.glassItemDesc}>可选：同步数据、音视频通话、拉取桌面业务数据</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.3)" />
+        </TouchableOpacity>
         <View style={styles.glassDivider} />
         <TouchableOpacity style={styles.glassItem} onPress={() => navigation.navigate('LanSync')} activeOpacity={0.7}>
           <View style={styles.glassItemIcon}>
@@ -206,11 +220,11 @@ export default function SettingsScreen() {  const navigation = useNavigation<Ap
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.glassLogoutBtn}
-          onPress={handleLogout}
+          onPress={handleUnpairDesktop}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="logout" size={20} color="#ff6b9d" style={{marginRight:8}} />
-          <Text style={styles.glassLogoutText}>退出登录</Text>
+          <MaterialCommunityIcons name="link-off" size={20} color="#ff6b9d" style={{marginRight:8}} />
+          <Text style={styles.glassLogoutText}>取消桌面配对</Text>
         </TouchableOpacity>
         <Text style={styles.versionText}>ProClaw Mobile v1.0.0</Text>
       </View>

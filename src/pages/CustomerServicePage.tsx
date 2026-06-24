@@ -64,7 +64,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   type TransferItem,
-  type ChatLogItem,
   type KBItem,
   type CSSettings,
   DEFAULT_CS_SETTINGS,

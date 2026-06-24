@@ -83,6 +83,7 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
             downgrade_to_simple_mode,
             // 演示数据 Seed（ProClaw 1.0.0）
             seed_demo_products,
+            set_spu_main_image,
             mark_store_as_demo,
             // 品牌管理
             create_brand,
@@ -206,6 +207,7 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
             change_user_password_cmd,
             get_roles_cmd,
             get_current_user_cmd,
+            get_ws_session_cmd,
             // 审批工作流 (Phase 6)
             create_approval_cmd,
             get_approvals_cmd,

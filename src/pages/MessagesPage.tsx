@@ -28,7 +28,7 @@ export default function MessagesPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('all');
 
-  const { data: contacts = [], isLoading: loading, refetch } = useRecentContacts('self');
+  const { data: contacts = [], isLoading: loading } = useRecentContacts('self');
 
   const filtered = contacts.filter(c => {
     if (filter === 'unread') return (c.unread_count || 0) > 0;

@@ -1,25 +1,40 @@
-// 桌面端通话管理器
-// v4.1: 音视频通话管理器（WebRTC + WebSocket 信令）
+// Desktop call manager — LiveKit SFU + WebSocket signaling (PRD v4.1 Phase 4)
 
+import { ConnectionState } from 'livekit-client';
 import { useCallStore, CallType } from '../lib/callStore';
 import desktopWsService from './WebSocketService';
+import {
+  buildRoomName,
+  isLiveKitAvailable,
+  liveKitService,
+} from './LiveKitService';
 
 class DesktopCallManager {
-  private rtcPeer: RTCPeerConnection | null = null;
-  private localStream: MediaStream | null = null;
   private callTimeout: ReturnType<typeof setTimeout> | null = null;
   private durationTimer: ReturnType<typeof setInterval> | null = null;
   private unsubscribers: (() => void)[] = [];
-  private pendingOffer: any = null;
+  private activeRoomName: string | null = null;
 
+  localStream: MediaStream | null = null;
   remoteStream: MediaStream | null = null;
+  onStreamChange: (() => void) | null = null;
 
   init(): void {
+    liveKitService.setStreamCallbacks({
+      onLocalStream: (stream) => {
+        this.localStream = stream;
+        this.onStreamChange?.();
+      },
+      onRemoteStream: (stream) => {
+        this.remoteStream = stream;
+        this.onStreamChange?.();
+      },
+    });
+
     this.unsubscribers.push(
       desktopWsService.on('call_offer', this.handleIncomingOffer.bind(this)),
       desktopWsService.on('call_offer_sent', this.handleOfferSent.bind(this)),
       desktopWsService.on('call_answer', this.handleAnswer.bind(this)),
-      desktopWsService.on('call_ice_candidate', this.handleIceCandidate.bind(this)),
       desktopWsService.on('call_hangup', this.handleRemoteHangup.bind(this)),
       desktopWsService.on('call_reject', this.handleReject.bind(this)),
       desktopWsService.on('call_busy', this.handleBusy.bind(this)),
@@ -33,11 +48,12 @@ class DesktopCallManager {
     this.cleanup();
   }
 
-  // ============================================================
-  // 发起通话
-  // ============================================================
-
   async startCall(targetUserId: string, targetUserName: string, callType: CallType): Promise<boolean> {
+    if (!isLiveKitAvailable()) {
+      alert('当前环境不支持音视频通话');
+      return false;
+    }
+
     const store = useCallStore.getState();
     if (store.status !== 'idle') {
       alert('当前已在通话中，请先结束当前通话');
@@ -46,58 +62,63 @@ class DesktopCallManager {
 
     const sessionId = this.generateSessionId();
     const userId = desktopWsService.currentUserId;
-
-    try {
-      await this.createPeerConnection(sessionId, callType, true);
-    } catch (e) {
-      console.error('[Call] Failed to create peer:', e);
-      alert('无法初始化通话设备');
+    if (!userId) {
+      alert('未连接到通话服务，请重新登录');
       return false;
     }
 
-    store.startOutgoingCall({ sessionId, remoteUserId: targetUserId, remoteUserName: targetUserName, callType });
+    const roomName = buildRoomName(sessionId);
+    this.activeRoomName = roomName;
 
-    const offer = await this.rtcPeer!.createOffer();
-    await this.rtcPeer!.setLocalDescription(offer);
+    store.startOutgoingCall({
+      sessionId,
+      remoteUserId: targetUserId,
+      remoteUserName: targetUserName,
+      callType,
+    });
 
     desktopWsService.send('call_offer', {
-      sessionId, callType,
+      sessionId,
+      callType,
       callerId: userId,
       calleeId: targetUserId,
-      offer: { sdp: offer.sdp, type: offer.type },
+      roomName,
     }, targetUserId);
 
     this.callTimeout = setTimeout(() => this.handleCallTimeout(), 30000);
     return true;
   }
 
-  // ============================================================
-  // 接听/拒绝
-  // ============================================================
-
   async acceptIncoming(): Promise<void> {
     const store = useCallStore.getState();
     const call = store.incomingCall;
     if (!call) return;
 
-    try {
-      await this.createPeerConnection(call.sessionId, call.callType, false);
-    } catch (e) {
-      desktopWsService.send('call_reject', { sessionId: call.sessionId }, call.callerId);
-      useCallStore.getState().setIncomingCall(null);
+    const roomName = call.roomName ?? buildRoomName(call.sessionId);
+    this.activeRoomName = roomName;
+    const identity = desktopWsService.currentUserId;
+    if (!identity) {
+      this.rejectIncoming();
       return;
     }
 
-    const answer = await this.rtcPeer!.createAnswer();
-    await this.rtcPeer!.setLocalDescription(answer);
+    const joined = await liveKitService.joinCallRoom({
+      roomName,
+      participantIdentity: identity,
+      callType: call.callType,
+    });
 
-    desktopWsService.send('call_answer', {
-      sessionId: call.sessionId,
-      answer: { sdp: answer.sdp, type: answer.type },
-    }, call.callerId);
+    if (!joined) {
+      alert('无法加入通话房间');
+      desktopWsService.send('call_reject', { sessionId: call.sessionId }, call.callerId);
+      store.setIncomingCall(null);
+      return;
+    }
 
+    desktopWsService.send('call_answer', { sessionId: call.sessionId, joined: true }, call.callerId);
     store.callConnected(call.sessionId);
     store.setIncomingCall(null);
+    this.clearCallTimeout();
     this.startDurationTimer();
   }
 
@@ -120,42 +141,32 @@ class DesktopCallManager {
     setTimeout(() => useCallStore.getState().reset(), 500);
   }
 
-  // ============================================================
-  // 媒体控制
-  // ============================================================
-
   toggleMute(): void {
     const store = useCallStore.getState();
-    if (this.localStream) {
-      const track = this.localStream.getAudioTracks()[0];
-      if (track) track.enabled = store.isMuted;
-    }
-    store.setMuted(!store.isMuted);
+    const willBeMuted = !store.isMuted;
+    liveKitService.setMicrophoneEnabled(!willBeMuted).catch(() => {});
+    store.setMuted(willBeMuted);
   }
 
   toggleCamera(): void {
     const store = useCallStore.getState();
-    if (this.localStream) {
-      const track = this.localStream.getVideoTracks()[0];
-      if (track) track.enabled = store.isCameraOff;
-    }
-    store.setCameraOff(!store.isCameraOff);
+    const willBeCameraOff = !store.isCameraOff;
+    liveKitService.setCameraEnabled(!willBeCameraOff).catch(() => {});
+    store.setCameraOff(willBeCameraOff);
   }
 
   toggleSpeaker(): void {
     useCallStore.getState().setSpeakerOn(!useCallStore.getState().isSpeakerOn);
   }
 
-  // ============================================================
-  // 信令处理
-  // ============================================================
-
   private async handleIncomingOffer(_type: string, data: any): Promise<void> {
     const payload = data.payload || {};
-    const { sessionId, callerId, callType, callerName } = payload;
+    const { sessionId, callerId, callType, roomName, livekitUrl } = payload;
     if (!sessionId) return;
 
+    const callerName = payload.callerName || callerId || '未知用户';
     const store = useCallStore.getState();
+
     if (store.status !== 'idle') {
       desktopWsService.send('call_busy', { sessionId }, callerId);
       return;
@@ -164,15 +175,17 @@ class DesktopCallManager {
     store.setIncomingCall({
       sessionId,
       callerId: callerId || '',
-      callerName: callerName || callerId || '未知用户',
+      callerName,
       callType: callType || 'audio',
-      offer: payload.offer,
+      roomName: roomName || buildRoomName(sessionId),
+      livekitUrl,
     });
 
-    this.pendingOffer = payload.offer || null;
-
     this.callTimeout = setTimeout(() => {
-      if (useCallStore.getState().status === 'ringing') this.rejectIncoming();
+      const s = useCallStore.getState();
+      if (s.status === 'ringing' && s.incomingCall) {
+        this.rejectIncoming();
+      }
     }, 30000);
   }
 
@@ -181,26 +194,35 @@ class DesktopCallManager {
   }
 
   private async handleAnswer(_type: string, data: any): Promise<void> {
-    const { sessionId, answer } = data.payload || {};
-    if (!sessionId || !answer || !this.rtcPeer) return;
-    try {
-      await this.rtcPeer.setRemoteDescription(new RTCSessionDescription(answer));
-      useCallStore.getState().callConnected(sessionId);
-      this.clearTimeout();
-      this.startDurationTimer();
-    } catch (e) {
-      console.error('[Call] setRemoteDescription failed:', e);
-    }
-  }
+    const payload = data.payload || {};
+    const { sessionId } = payload;
+    if (!sessionId) return;
 
-  private async handleIceCandidate(_type: string, data: any): Promise<void> {
-    const { sessionId, candidate } = data.payload || {};
-    if (!sessionId || !candidate || !this.rtcPeer) return;
-    try {
-      await this.rtcPeer.addIceCandidate(new RTCIceCandidate(candidate));
-    } catch (e) {
-      console.error('[Call] addIceCandidate failed:', e);
+    const store = useCallStore.getState();
+    if (store.sessionId !== sessionId) return;
+
+    const identity = desktopWsService.currentUserId;
+    const roomName = this.activeRoomName ?? buildRoomName(sessionId);
+    if (!identity) return;
+
+    if (liveKitService.connectionState !== ConnectionState.Connected) {
+      const joined = await liveKitService.joinCallRoom({
+        roomName,
+        participantIdentity: identity,
+        callType: store.callType,
+      });
+      if (!joined) {
+        alert('无法加入通话房间');
+        this.cleanup();
+        store.endCall();
+        setTimeout(() => store.reset(), 500);
+        return;
+      }
     }
+
+    store.callConnected(sessionId);
+    this.clearCallTimeout();
+    this.startDurationTimer();
   }
 
   private handleRemoteHangup(_type: string, data: any): void {
@@ -243,46 +265,8 @@ class DesktopCallManager {
     setTimeout(() => store.reset(), 500);
   }
 
-  // ============================================================
-  // WebRTC
-  // ============================================================
-
-  private async createPeerConnection(sessionId: string, callType: CallType, isCaller: boolean): Promise<void> {
-    this.rtcPeer = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ],
-    });
-
-    this.rtcPeer.onicecandidate = (event) => {
-      if (event.candidate) {
-        desktopWsService.send('call_ice_candidate', { sessionId, candidate: event.candidate });
-      }
-    };
-
-    this.rtcPeer.ontrack = (event) => {
-      this.remoteStream = event.streams[0];
-    };
-
-    // 获取本地媒体
-    this.localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: callType === 'video',
-    });
-
-    this.localStream.getTracks().forEach((track) => {
-      this.rtcPeer!.addTrack(track, this.localStream!);
-    });
-
-    if (!isCaller && this.pendingOffer) {
-      await this.rtcPeer.setRemoteDescription(new RTCSessionDescription(this.pendingOffer));
-      this.pendingOffer = null;
-    }
-  }
-
   private generateSessionId(): string {
-    return `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `call_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private handleCallTimeout(): void {
@@ -298,17 +282,23 @@ class DesktopCallManager {
     this.durationTimer = setInterval(() => useCallStore.getState().tickDuration(), 1000);
   }
 
-  private clearTimeout(): void {
-    if (this.callTimeout) { clearTimeout(this.callTimeout); this.callTimeout = null; }
+  private clearCallTimeout(): void {
+    if (this.callTimeout) {
+      clearTimeout(this.callTimeout);
+      this.callTimeout = null;
+    }
   }
 
   private cleanup(): void {
-    this.clearTimeout();
-    if (this.durationTimer) { clearInterval(this.durationTimer); this.durationTimer = null; }
-    if (this.localStream) { this.localStream.getTracks().forEach((t) => t.stop()); this.localStream = null; }
-    if (this.rtcPeer) { this.rtcPeer.close(); this.rtcPeer = null; }
+    this.clearCallTimeout();
+    if (this.durationTimer) {
+      clearInterval(this.durationTimer);
+      this.durationTimer = null;
+    }
+    liveKitService.disconnect().catch(() => {});
+    this.localStream = null;
     this.remoteStream = null;
-    this.pendingOffer = null;
+    this.activeRoomName = null;
   }
 }
 

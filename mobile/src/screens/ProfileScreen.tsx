@@ -14,14 +14,10 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { checkConnection, ConnectionMode } from '../services/ConnectionManager';
 import { getProducts, getCustomers } from '../services/ApiService';
-import { isDemoMode } from '../services/AuthService';
 import { getInstalledPlugins, parseManifest, type InstalledPlugin } from '../services/PluginRegistry';
 import { getDatabase } from '../services/DatabaseFactory';
 import { useAppStore } from '../stores/AppStore';
 import type { AppNavigation, RootStackParamList } from '../types/navigation';
-
-const DEMO_PRODUCT_COUNT = 20;
-const DEMO_CONTACT_COUNT = 10;
 
 // ============ 快捷操作配置 ============
 
@@ -39,7 +35,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: 'products', label: '商品目录', icon: 'package-variant-closed', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'Products' },
   { id: 'sales', label: '创建销售单', icon: 'clipboard-text', color: '#00f5d4', glow: 'rgba(0,245,212,0.2)', navigateTo: 'SalesOrder' },
   { id: 'supply', label: '采购入库', icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.2)', navigateTo: 'SupplyChain' },
-  { id: 'calls', label: '通话记录', icon: 'phone-classic', color: '#7b2ff7', glow: 'rgba(123,47,247,0.2)', navigateTo: 'CallHistory' },
+  { id: 'calls', label: '通话记录', icon: 'phone-log', color: '#a78bfa', glow: 'rgba(167,139,250,0.2)', navigateTo: 'CallHistory' },
   { id: 'lansync', label: '局域网同步', icon: 'wifi', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'LanSync' },
   { id: 'backup', label: '云备份', icon: 'cloud-upload', color: '#7b2ff7', glow: 'rgba(123,47,247,0.2)', navigateTo: 'BackupWallet' },
 ];
@@ -56,7 +52,6 @@ export default function ProfileScreen() {
   const [productCount, setProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [demo, setDemo] = useState(false);
 
   // 当前身份
   const currentProfile = useAppStore((s) => s.currentProfile);
@@ -68,15 +63,6 @@ export default function ProfileScreen() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const demoMode = await isDemoMode();
-      setDemo(demoMode);
-      if (demoMode) {
-        setConnectionStatus('checking');
-        setProductCount(DEMO_PRODUCT_COUNT);
-        setCustomerCount(DEMO_CONTACT_COUNT);
-        setLoading(false);
-        return;
-      }
       const [connStatus] = await Promise.all([
         checkConnection(),
         getProducts({ limit: 1 }).catch(() => []),
@@ -105,7 +91,6 @@ export default function ProfileScreen() {
   useFocusEffect(useCallback(() => { loadPlugins(); }, []));
 
   const getStatusCfg = (): { label: string; color: string; icon: string } => {
-    if (demo) return { label: '演示', color: '#8b5cf6', icon: 'play-circle' };
     switch (connectionStatus) {
       case 'direct': return { label: '直连', color: '#10b981', icon: 'lan-connect' };
       case 'cloud_relay': return { label: '云中继', color: '#f59e0b', icon: 'cloud-sync' };

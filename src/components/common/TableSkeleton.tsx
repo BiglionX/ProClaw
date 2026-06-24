@@ -47,7 +47,6 @@ export function TableSkeleton({
   columnWidths,
   hasHeader = true,
 }: TableSkeletonProps) {
-  const totalColumns = columns + (hasCheckbox ? 1 : 0) + (hasAction ? 1 : 0);
   const widths = columnWidths || Array(columns).fill(1);
 
   return (

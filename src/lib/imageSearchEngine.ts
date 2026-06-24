@@ -20,7 +20,7 @@ export interface ImageSearchResult {
   /** 拍摄者（用于署名） */
   photographer: string;
   /** 图片来源 */
-  source: 'pexels' | 'pixabay' | 'fallback';
+  source: 'pexels' | 'pixabay' | 'openverse' | 'fallback';
 }
 
 export interface BatchSearchProgress {
@@ -62,6 +62,33 @@ function cleanQuery(name: string, description?: string): string {
     query += ' product photo';
   }
   return query.trim();
+}
+
+// ========== Openverse API（免费、无需 Key）==========
+
+async function searchOpenverse(query: string, count: number): Promise<ImageSearchResult[]> {
+  try {
+    const resp = await fetch(
+      `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=${Math.min(count, 20)}&license_type=commercial,modification`,
+    );
+    if (!resp.ok) return [];
+
+    const data = await resp.json();
+    return (data.results || [])
+      .filter((r: { url?: string }) => r.url)
+      .map((r: { id: string; url: string; thumbnail?: string; title?: string; creator?: string }) => ({
+        id: `openverse-${r.id}`,
+        thumbnail: r.thumbnail || r.url,
+        medium: r.url,
+        large: r.url,
+        alt: r.title || query,
+        photographer: r.creator || 'Openverse',
+        source: 'openverse' as const,
+      }));
+  } catch (err) {
+    console.error('[ImageSearch] Openverse error:', err);
+    return [];
+  }
 }
 
 // ========== Pexels API ==========
@@ -190,10 +217,15 @@ export async function searchProductImages(
   const query = cleanQuery(productName, productDesc);
   console.log(`[ImageSearch] 搜索关键词: "${query}"`);
 
-  // 优先使用 Pexels
-  let results = await searchPexels(query, count);
+  // 优先 Openverse（免 Key，适合演示自动配图）
+  let results = await searchOpenverse(query, count);
 
-  // 备用 Pixabay
+  // Pexels
+  if (results.length === 0) {
+    results = await searchPexels(query, count);
+  }
+
+  // Pixabay
   if (results.length === 0) {
     results = await searchPixabay(query, count);
   }

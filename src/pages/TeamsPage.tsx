@@ -809,7 +809,7 @@ export default function TeamsPage() {
       {/* ============ 编辑对话框 ============ */}
       {editTeam && (
         <EditTeamDialog team={editTeam} onClose={() => setEditTeam(null)}
-          onSaved={(updated) => { void invalidateTeams(); setEditTeam(null); setSnackbar('团队已更新'); }} />
+          onSaved={(_updated) => { void invalidateTeams(); setEditTeam(null); setSnackbar('团队已更新'); }} />
       )}
 
       {/* ============ 删除确认 ============ */}

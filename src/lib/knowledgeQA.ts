@@ -9,9 +9,8 @@
  */
 
 import { getLLMForTask } from './llmProvider';
-import { extractInsights, generatePrompt, formatBusinessData, estimateTokens } from './aiTools';
+import { estimateTokens } from './aiTools';
 import type { KnowledgeDocument } from './knowledgeBaseService';
-import { isTauri } from './tauri';
 
 // ==================== 类型定义 ====================
 
@@ -372,7 +371,7 @@ function tryParseJsonResponse(content: string): {
   }
 }
 
-function formatFallbackAnswer(question: string, matches: RetrievalMatch[]): string {
+function formatFallbackAnswer(_question: string, matches: RetrievalMatch[]): string {
   const lines = [
     `AI 服务暂时不可用，但知识库中找到了以下相关文档：`,
     '',

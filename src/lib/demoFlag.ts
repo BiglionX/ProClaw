@@ -4,6 +4,8 @@
  * 便于后续「重置为演示数据」功能。
  */
 
+import { isDemoAccount } from './aiTeamTokenService';
+
 const DEMO_FLAG_KEY = 'proclaw_demo_flag_v1';
 
 export interface DemoFlagPayload {
@@ -25,14 +27,9 @@ export interface DemoFlagPayload {
   resetCount?: number;
 }
 
-/** 当前是否为演示账号 */
+/** 当前是否为演示账号（与 aiTeamTokenService.isDemoAccount 对齐） */
 export function isDemoAccountContext(): boolean {
-  try {
-    const user = JSON.parse(localStorage.getItem('proclaw_user') || 'null');
-    return user?.email === 'boss@proclaw.demo';
-  } catch {
-    return false;
-  }
+  return isDemoAccount();
 }
 
 /** 是否已初始化过演示数据（是否存在 flag） */

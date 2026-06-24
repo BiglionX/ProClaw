@@ -67,6 +67,29 @@ jest.mock('../../stores/CallStore', () => ({
   CallType: { audio: 'audio', video: 'video' },
 }));
 
+jest.mock('../LiveKitService', () => ({
+  buildRoomName: (id: string) => `proclaw-call-${id}`,
+  isLiveKitNativeAvailable: () => false,
+  liveKitService: {
+    setStreamCallbacks: jest.fn(),
+    setMicrophoneEnabled: jest.fn().mockResolvedValue(undefined),
+    setCameraEnabled: jest.fn().mockResolvedValue(undefined),
+    disconnect: jest.fn().mockResolvedValue(undefined),
+    joinCallRoom: jest.fn().mockResolvedValue(false),
+    connectionState: 'disconnected',
+    activeRoom: null,
+  },
+}));
+
+jest.mock('../WebSocketService', () => ({
+  __esModule: true,
+  default: {
+    on: jest.fn(() => () => {}),
+    send: jest.fn(),
+    currentUserId: 'test-user',
+  },
+}));
+
 // 直接导入 CallManager 并测试其方法
 import { callManager } from '../CallManager';
 
@@ -153,15 +176,19 @@ describe('CallManager', () => {
       mockCallStore.sessionId = null;
       mockCallStore.getState.mockReturnValue(mockCallStore);
 
-      // 这会调用 wsService.send，但 mock 不存在会报错
-      // 我们跳过这个测试，因为需要 mock WebSocketService
+      callManager.hangup();
+
+      expect(mockCallStore.endCall).not.toHaveBeenCalled();
     });
 
-    it('挂断后应调用 endCall 和 reset', () => {
+    it('挂断后应调用 endCall', () => {
       mockCallStore.sessionId = 'session_123';
+      mockCallStore.remoteUserId = 'user456';
       mockCallStore.getState.mockReturnValue(mockCallStore);
 
-      // 由于 wsService.send 未 mock，跳过
+      callManager.hangup();
+
+      expect(mockCallStore.endCall).toHaveBeenCalled();
     });
   });
 
@@ -176,7 +203,6 @@ describe('CallManager', () => {
 
       callManager.rejectIncoming();
 
-      // 无来电时不发送任何消息
       expect(mockCallStore.reset).not.toHaveBeenCalled();
     });
 
@@ -204,8 +230,99 @@ describe('CallManager', () => {
       };
       mockCallStore.getState.mockReturnValue(mockCallStore);
 
-      // 由于 wsService.send 未 mock，跳过断言
-      expect(() => callManager.rejectIncoming('busy')).not.toThrow();
+      callManager.rejectIncoming('busy');
+
+      expect(mockCallStore.setIncomingCall).toHaveBeenCalledWith(null);
+      expect(mockCallStore.reset).toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================
+  // 通话生命周期
+  // ============================================================
+
+  describe('通话生命周期', () => {
+    it('init 应注册事件监听器', () => {
+      const wsService = require('../WebSocketService').default;
+
+      callManager.init();
+
+      expect(wsService.on).toHaveBeenCalledWith('call_offer', expect.any(Function));
+      expect(wsService.on).toHaveBeenCalledWith('call_answer', expect.any(Function));
+      expect(wsService.on).toHaveBeenCalledWith('call_hangup', expect.any(Function));
+      expect(wsService.on).toHaveBeenCalledWith('call_reject', expect.any(Function));
+      expect(wsService.on).toHaveBeenCalledWith('call_busy', expect.any(Function));
+    });
+
+    it('destroy 应清理资源', () => {
+      callManager.init();
+      callManager.destroy();
+
+      expect(callManager.localStream).toBeNull();
+      expect(callManager.remoteStream).toBeNull();
+    });
+
+    it('startCall 应生成唯一 sessionId', () => {
+      const sessionId1 = (callManager as any).generateSessionId();
+      const sessionId2 = (callManager as any).generateSessionId();
+
+      expect(sessionId1).toMatch(/call_\d+_.+/);
+      expect(sessionId2).toMatch(/call_\d+_.+/);
+      expect(sessionId1).not.toBe(sessionId2);
+    });
+
+    it('已有通话时 startCall 应返回 false', async () => {
+      mockCallStore.status = 'connected';
+      mockCallStore.getState.mockReturnValue(mockCallStore);
+
+      const result = await callManager.startCall('user456', '测试用户', 'audio');
+      expect(result).toBe(false);
+    });
+  });
+
+  // ============================================================
+  // 来电处理
+  // ============================================================
+
+  describe('来电处理', () => {
+    it('handleIncomingOffer 应设置来电状态', () => {
+      callManager.init();
+      mockCallStore.status = 'idle';
+      mockCallStore.getState.mockReturnValue(mockCallStore);
+
+      const wsService = require('../WebSocketService').default;
+      const handleOffer = wsService.on.mock.calls.find((call: any) => call[0] === 'call_offer')[1];
+
+      handleOffer('call_offer', {
+        payload: {
+          sessionId: 'session_123',
+          callerId: 'user456',
+          callerName: '测试用户',
+          callType: 'audio',
+        },
+      });
+
+      expect(mockCallStore.setIncomingCall).toHaveBeenCalled();
+      callManager.destroy();
+    });
+
+    it('通话中收到来电应发送 call_busy', () => {
+      callManager.init();
+      mockCallStore.status = 'connected';
+      mockCallStore.getState.mockReturnValue(mockCallStore);
+
+      const wsService = require('../WebSocketService').default;
+      const handleOffer = wsService.on.mock.calls.find((call: any) => call[0] === 'call_offer')[1];
+
+      handleOffer('call_offer', {
+        payload: {
+          sessionId: 'session_123',
+          callerId: 'user456',
+        },
+      });
+
+      expect(wsService.send).toHaveBeenCalledWith('call_busy', expect.any(Object), 'user456');
+      callManager.destroy();
     });
   });
 });

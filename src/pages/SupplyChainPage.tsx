@@ -75,12 +75,9 @@ import {
   CreateTransactionInput,
   createInventoryTransaction,
 } from '../lib/inventoryService';
-import { ProductSPU } from '../lib/productService';
 import {
   CreateSupplierInput,
-  PurchaseOrder,
   PurchaseOrderDetail,
-  Supplier,
   createSupplier,
   createPurchaseOrder,
   getPurchaseOrderDetail,
@@ -92,8 +89,6 @@ import {
 } from '../lib/purchaseService';
 import {
   CreateCustomerInput,
-  Customer,
-  SalesOrder,
   SalesOrderDetail,
   createCustomer,
   createSalesOrder,
@@ -106,7 +101,6 @@ import {
   markSalesDelivered,
 } from '../lib/salesService';
 import {
-  PurchaseReturn,
   PurchaseReturnDetail,
   createPurchaseReturn,
   getPurchaseReturnDetail,
@@ -114,7 +108,6 @@ import {
   cancelPurchaseReturn,
 } from '../lib/purchaseReturnService';
 import {
-  SalesReturn,
   SalesReturnDetail,
   createSalesReturn,
   getSalesReturnDetail,
