@@ -466,7 +466,11 @@ pub fn submit_sales_order_cmd(
             }
         } else {
             // 销售后库存依然 >= 0，清除 negative_since
-            tx.execute("UPDATE products SET negative_since = NULL WHERE id = ?1 AND current_stock >= 0", params![pid]).map_err(|e| e.to_string())?;
+            tx.execute(
+                "UPDATE products SET negative_since = NULL WHERE id = ?1 AND current_stock >= 0",
+                params![pid],
+            )
+            .map_err(|e| e.to_string())?;
         }
     }
 

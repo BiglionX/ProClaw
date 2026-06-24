@@ -158,12 +158,26 @@ pub fn beauty_create_employee(
 
 fn seed_beauty_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let emp_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM beauty_employees", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM beauty_employees", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     if emp_count == 0 {
         let employees = [
-            ("e1", "发型师小王", "1380002001", r#"["剪发","染发","烫发"]"#, 0.3),
-            ("e2", "美容师小刘", "1380002002", r#"["面部护理","SPA套餐"]"#, 0.35),
+            (
+                "e1",
+                "发型师小王",
+                "1380002001",
+                r#"["剪发","染发","烫发"]"#,
+                0.3,
+            ),
+            (
+                "e2",
+                "美容师小刘",
+                "1380002002",
+                r#"["面部护理","SPA套餐"]"#,
+                0.35,
+            ),
             ("e3", "美甲师小李", "1380002003", r#"["美甲"]"#, 0.4),
         ];
         for (id, name, phone, services, rate) in employees {
@@ -177,7 +191,9 @@ fn seed_beauty_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> 
     }
 
     let appt_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM beauty_appointments", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM beauty_appointments", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     if appt_count > 0 {
         return Ok(());
@@ -186,10 +202,42 @@ fn seed_beauty_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> 
     let today = Utc::now().format("%Y-%m-%d").to_string();
     let now = Utc::now().to_rfc3339();
     let appointments = [
-        ("a1", "张女士", r#"["剪发","染发"]"#, "e1", "09:00", 120i64, "checked_in"),
-        ("a2", "李女士", r#"["面部护理"]"#, "e2", "10:30", 60i64, "in_progress"),
-        ("a3", "王小姐", r#"["洗吹"]"#, "e1", "11:00", 30i64, "pending"),
-        ("a4", "赵女士", r#"["SPA套餐"]"#, "e2", "14:00", 90i64, "pending"),
+        (
+            "a1",
+            "张女士",
+            r#"["剪发","染发"]"#,
+            "e1",
+            "09:00",
+            120i64,
+            "checked_in",
+        ),
+        (
+            "a2",
+            "李女士",
+            r#"["面部护理"]"#,
+            "e2",
+            "10:30",
+            60i64,
+            "in_progress",
+        ),
+        (
+            "a3",
+            "王小姐",
+            r#"["洗吹"]"#,
+            "e1",
+            "11:00",
+            30i64,
+            "pending",
+        ),
+        (
+            "a4",
+            "赵女士",
+            r#"["SPA套餐"]"#,
+            "e2",
+            "14:00",
+            90i64,
+            "pending",
+        ),
     ];
     for (id, customer, services, emp, time, duration, status) in appointments {
         let start_at = format!("{}T{}", today, time);
@@ -205,9 +253,7 @@ fn seed_beauty_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> 
 
 /// 获取服务分类
 #[tauri::command]
-pub fn beauty_get_service_categories(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn beauty_get_service_categories(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     seed_beauty_services_if_empty(&conn)?;
@@ -301,7 +347,15 @@ pub fn beauty_update_service(
         .execute(
             "UPDATE beauty_services SET category_id = ?1, name = ?2, duration = ?3, price = ?4,
              member_price = ?5, is_active = ?6 WHERE id = ?7",
-            params![category_id, name, duration, price, member_price, is_active, id],
+            params![
+                category_id,
+                name,
+                duration,
+                price,
+                member_price,
+                is_active,
+                id
+            ],
         )
         .map_err(|e| e.to_string())?;
     if updated == 0 {
@@ -338,7 +392,11 @@ fn map_beauty_service_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
 
 fn seed_beauty_services_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM beauty_service_categories", [], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM beauty_service_categories",
+            [],
+            |row| row.get(0),
+        )
         .unwrap_or(0);
     if count > 0 {
         return Ok(());

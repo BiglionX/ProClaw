@@ -229,9 +229,7 @@ pub fn reset_store_api_key(
 /// 返回结构与 get_product_spus 一致（ProductSPU[]），这样前端 cloudStoreService.getSyncableProducts
 /// 能直接当作完整商品对象使用（含 skus / images）。
 #[tauri::command]
-pub fn get_syncable_products(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Vec<Value>, String> {
+pub fn get_syncable_products(db: tauri::State<Mutex<Database>>) -> Result<Vec<Value>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
@@ -250,16 +248,16 @@ pub fn get_syncable_products(
     let rows = stmt
         .query_map([], |row: &rusqlite::Row| {
             Ok((
-                row.get::<_, String>(0)?,  // id
-                row.get::<_, String>(1)?,  // spu_code
-                row.get::<_, String>(2)?,  // name
-                row.get::<_, Option<String>>(3).ok().flatten(),  // description
-                row.get::<_, Option<String>>(4).ok().flatten(),  // category_id
-                row.get::<_, Option<String>>(5).ok().flatten(),  // brand_id
-                row.get::<_, Option<String>>(6).ok().flatten(),  // unit
+                row.get::<_, String>(0)?,                       // id
+                row.get::<_, String>(1)?,                       // spu_code
+                row.get::<_, String>(2)?,                       // name
+                row.get::<_, Option<String>>(3).ok().flatten(), // description
+                row.get::<_, Option<String>>(4).ok().flatten(), // category_id
+                row.get::<_, Option<String>>(5).ok().flatten(), // brand_id
+                row.get::<_, Option<String>>(6).ok().flatten(), // unit
                 row.get::<_, i32>(7).unwrap_or(1) != 0,         // is_on_sale
                 row.get::<_, String>(8)?,                       // status
-                row.get::<_, Option<String>>(9).ok().flatten(),  // metadata
+                row.get::<_, Option<String>>(9).ok().flatten(), // metadata
                 row.get::<_, String>(10)?,                      // created_at
                 row.get::<_, String>(11)?,                      // updated_at
             ))
@@ -267,8 +265,20 @@ pub fn get_syncable_products(
         .map_err(|e| e.to_string())?;
 
     for row in rows {
-        let (id, spu_code, name, description, category_id, brand_id, unit, is_on_sale, status, metadata, created_at, updated_at) =
-            row.map_err(|e| e.to_string())?;
+        let (
+            id,
+            spu_code,
+            name,
+            description,
+            category_id,
+            brand_id,
+            unit,
+            is_on_sale,
+            status,
+            metadata,
+            created_at,
+            updated_at,
+        ) = row.map_err(|e| e.to_string())?;
 
         // 查询该 SPU 的 SKU 列表
         let mut sku_stmt = conn

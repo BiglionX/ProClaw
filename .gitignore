@@ -91,3 +91,22 @@ playwright/.cache/
 
 # Vitest
 vitest.config.ts.timestamp-*
+
+# Release installers
+*.exe
+*.msi
+RELEASES/
+
+# Temporary diff/log files
+.build-log.txt
+.diff_*.txt
+.review_diff.txt
+.tauri-build-skip-fe.json
+final-test.txt
+test-list.txt
+
+# EAS temp
+.eas-tmp/
+
+# Playwright browsers
+playwright-browsers/

@@ -7,7 +7,9 @@ use uuid::Uuid;
 
 fn seed_pa_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let model_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM pa_device_models", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM pa_device_models", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     let now = chrono::Utc::now().to_rfc3339();
     if model_count == 0 {

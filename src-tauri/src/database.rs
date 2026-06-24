@@ -72,7 +72,10 @@ impl Database {
             let test_path = db_path.with_extension("write_test.txt");
             match std::fs::write(&test_path, b"main_proc_can_write") {
                 Ok(_) => eprintln!("✓ [DIAG] Main 进程能写文件: {:?}", test_path),
-                Err(e) => eprintln!("✗ [DIAG] Main 进程写文件失败: {} (path: {:?})", e, test_path),
+                Err(e) => eprintln!(
+                    "✗ [DIAG] Main 进程写文件失败: {} (path: {:?})",
+                    e, test_path
+                ),
             }
         }
 
@@ -198,9 +201,18 @@ impl Database {
         // v1.0.0+tray+db+contacts+msgs+safety+view: 拆成独立 try/catch
         //                                          避免一条失败影响其他表的迁移
         let deleted_at_tables = [
-            "users", "customers", "products", "purchase_orders", "sales_orders",
-            "suppliers", "messages", "brands", "product_categories", "product_skus",
-            "purchase_returns", "sales_returns",
+            "users",
+            "customers",
+            "products",
+            "purchase_orders",
+            "sales_orders",
+            "suppliers",
+            "messages",
+            "brands",
+            "product_categories",
+            "product_skus",
+            "purchase_returns",
+            "sales_returns",
         ];
         for table in deleted_at_tables.iter() {
             let sql = format!("ALTER TABLE {} ADD COLUMN deleted_at TIMESTAMP;", table);
@@ -212,7 +224,10 @@ impl Database {
                     if msg.contains("duplicate column") {
                         eprintln!("[DB Migration INFO] {}.deleted_at 已存在，跳过", table);
                     } else {
-                        eprintln!("[DB Migration WARNING] ALTER TABLE {} ADD deleted_at: {}", table, msg);
+                        eprintln!(
+                            "[DB Migration WARNING] ALTER TABLE {} ADD deleted_at: {}",
+                            table, msg
+                        );
                     }
                 }
             }
@@ -267,7 +282,10 @@ impl Database {
             }
             Err(e) => {
                 // 部分失败是允许的（例如某条 INSERT 违反约束），记录警告
-                eprintln!("[DB Migration WARNING] seed_iphone_batteries (部分插入可忽略): {}", e);
+                eprintln!(
+                    "[DB Migration WARNING] seed_iphone_batteries (部分插入可忽略): {}",
+                    e
+                );
                 migration_errors.push(format!("seed_iphone_batteries: {}", e));
             }
         }

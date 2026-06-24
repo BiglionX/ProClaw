@@ -360,7 +360,9 @@ pub fn list_customs_declarations(
             }))
         })
         .map_err(|e| e.to_string())?;
-    Ok(serde_json::Value::Array(rows.filter_map(|r| r.ok()).collect()))
+    Ok(serde_json::Value::Array(
+        rows.filter_map(|r| r.ok()).collect(),
+    ))
 }
 
 #[tauri::command]
@@ -389,7 +391,9 @@ pub fn search_hs_code(
             }))
         })
         .map_err(|e| e.to_string())?;
-    Ok(serde_json::Value::Array(rows.filter_map(|r| r.ok()).collect()))
+    Ok(serde_json::Value::Array(
+        rows.filter_map(|r| r.ok()).collect(),
+    ))
 }
 
 #[tauri::command]
@@ -501,7 +505,10 @@ pub fn get_pairing_code_cmd(
     .map_err(|e| e.to_string())?;
 
     let local_ips = get_local_ip_addresses();
-    let ip = local_ips.first().cloned().unwrap_or_else(|| "127.0.0.1".to_string());
+    let ip = local_ips
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "127.0.0.1".to_string());
     let port = 8888;
     let qr_content = format!("proclaw://pair?host={}&port={}&code={}", ip, port, code);
 
@@ -593,7 +600,9 @@ pub fn get_operations_overview_cmd(
         .query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))
         .unwrap_or(0);
     let enabled_agents: i64 = conn
-        .query_row("SELECT COUNT(*) FROM agents WHERE enabled = 1", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM agents WHERE enabled = 1", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     let pending_content: i64 = conn
         .query_row(

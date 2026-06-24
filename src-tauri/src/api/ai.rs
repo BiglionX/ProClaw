@@ -188,8 +188,10 @@ pub async fn recognize_order(
             .filter(|k| !k.is_empty())
             .or_else(|| {
                 if payload.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
-                    eprintln!("[Security] WARNING: AI API key provided via HTTP request body. \
-                              This is insecure - configure DEEPSEEK_API_KEY env var instead.");
+                    eprintln!(
+                        "[Security] WARNING: AI API key provided via HTTP request body. \
+                              This is insecure - configure DEEPSEEK_API_KEY env var instead."
+                    );
                 }
                 payload.api_key.clone().filter(|k| !k.is_empty())
             })

@@ -21,11 +21,11 @@ pub mod store_commands;
 #[cfg(feature = "inventory")]
 pub mod finance_commands;
 #[cfg(feature = "inventory")]
+pub mod inventory_aging_commands; // PRD v12.0 灵活库存老化
+#[cfg(feature = "inventory")]
+pub mod inventory_calibration_commands; // PRD v12.0 灵活库存微盘点/置信度
+#[cfg(feature = "inventory")]
 pub mod inventory_commands;
-#[cfg(feature = "inventory")]
-pub mod inventory_aging_commands;        // PRD v12.0 灵活库存老化
-#[cfg(feature = "inventory")]
-pub mod inventory_calibration_commands;   // PRD v12.0 灵活库存微盘点/置信度
 #[cfg(feature = "inventory")]
 pub mod payment_commands;
 #[cfg(feature = "inventory")]
@@ -54,9 +54,9 @@ pub mod tray_commands;
 pub mod user_commands;
 
 // 云备份模块（Cloud 版）
+pub mod agent_profile_commands;
 pub mod cloud_backup_commands;
 pub mod secretary_commands;
-pub mod agent_profile_commands;
 
 // 行业插件命令（Phase 4）
 pub mod beauty_commands;
@@ -132,7 +132,11 @@ fn diag_log(msg: &str) {
     eprintln!("[PROCLAW_DIAG] {}", msg);
     if let Ok(temp) = std::env::var("TEMP") {
         let log_path = std::path::PathBuf::from(&temp).join("proclaw-diag.log");
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&log_path) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+        {
             let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
             let _ = writeln!(f, "[{}] {}", ts, msg);
         }
@@ -162,10 +166,8 @@ async fn main() {
         Err(e) => {
             eprintln!("⚠️ 数据库初始化失败: {}. 尝试自动恢复...", e);
             backup_and_remove_corrupted_db_files(&db_path);
-            let db = Database::new(db_path.clone())
-                .expect("启动失败: 无法重建数据库。");
-            db.initialize()
-                .expect("启动失败: 数据库初始化失败。");
+            let db = Database::new(db_path.clone()).expect("启动失败: 无法重建数据库。");
+            db.initialize().expect("启动失败: 数据库初始化失败。");
             db
         }
     };

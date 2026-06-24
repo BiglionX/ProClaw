@@ -1,10 +1,6 @@
 // LiveKit token API (PRD v4.1 Phase 1)
 
-use axum::{
-    extract::Extension,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::Extension, http::StatusCode, Json};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 
@@ -62,7 +58,9 @@ fn livekit_config() -> Result<(String, String, String), (StatusCode, Json<serde_
     let api_key = std::env::var("LIVEKIT_API_KEY").map_err(|_| {
         (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({"error": "LiveKit is not configured (LIVEKIT_API_KEY missing)"})),
+            Json(
+                serde_json::json!({"error": "LiveKit is not configured (LIVEKIT_API_KEY missing)"}),
+            ),
         )
     })?;
     let api_secret = std::env::var("LIVEKIT_API_SECRET").map_err(|_| {

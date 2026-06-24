@@ -54,7 +54,6 @@ process.on('unhandledRejection', (reason) => {
     return; // 静默忽略 jsdom 内部已知误报
   }
   // 其他 unhandled rejection 仍然抛给默认处理器
-  // eslint-disable-next-line no-console
   console.warn('[unhandledRejection]', reason);
 });
 

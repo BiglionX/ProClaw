@@ -1,8 +1,8 @@
 // WebSocket 聊天模块处理器
 // Phase 3: 实现实时消息通信、消息路由、持久化、离线消息推送
 
-use crate::api::AppState;
 use crate::api::auth::Claims;
+use crate::api::AppState;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -218,11 +218,7 @@ pub async fn websocket_handler(
 }
 
 /// 核心 WebSocket 连接处理
-async fn handle_websocket(
-    socket: WebSocket,
-    state: AppState,
-    pre_auth_user_id: Option<String>,
-) {
+async fn handle_websocket(socket: WebSocket, state: AppState, pre_auth_user_id: Option<String>) {
     use futures_util::{SinkExt, StreamExt};
 
     let (ws_sender, mut ws_receiver) = socket.split();
@@ -246,7 +242,9 @@ async fn handle_websocket(
     if authenticated {
         let uid = user_id.as_ref().unwrap();
         println!("[WS] User '{}' connected (pre-auth JWT)", uid);
-        state.ws_manager.add_connection(uid, &conn_id, outgoing_tx.clone());
+        state
+            .ws_manager
+            .add_connection(uid, &conn_id, outgoing_tx.clone());
         on_ws_authenticated(&state, uid, &self_tx);
     } else {
         println!("[WS] Awaiting auth message");
@@ -289,7 +287,8 @@ async fn handle_websocket(
                         serde_json::json!({
                             "type": "error",
                             "error": "Rate limit exceeded: max 10 messages per second"
-                        }).to_string()
+                        })
+                        .to_string(),
                     );
                     continue;
                 }
@@ -307,12 +306,17 @@ async fn handle_websocket(
                                     Ok(uid) => {
                                         user_id = Some(uid.clone());
                                         authenticated = true;
-                                        state.ws_manager.add_connection(&uid, &conn_id, outgoing_tx.clone());
+                                        state.ws_manager.add_connection(
+                                            &uid,
+                                            &conn_id,
+                                            outgoing_tx.clone(),
+                                        );
                                         on_ws_authenticated(&state, &uid, &self_tx);
                                     }
                                     Err(err) => {
                                         let _ = self_tx.send(
-                                            serde_json::json!({"type": "auth_error", "error": err}).to_string(),
+                                            serde_json::json!({"type": "auth_error", "error": err})
+                                                .to_string(),
                                         );
                                         break;
                                     }
@@ -322,7 +326,8 @@ async fn handle_websocket(
                                     serde_json::json!({
                                         "type": "auth_error",
                                         "error": "Authentication required before sending messages"
-                                    }).to_string(),
+                                    })
+                                    .to_string(),
                                 );
                             }
                             continue;
@@ -332,7 +337,8 @@ async fn handle_websocket(
                         match req.msg_type.as_str() {
                             "auth" => {
                                 let _ = self_tx.send(
-                                    serde_json::json!({"type": "auth_ok", "user_id": uid}).to_string(),
+                                    serde_json::json!({"type": "auth_ok", "user_id": uid})
+                                        .to_string(),
                                 );
                             }
                             "message" | "chat" => {
@@ -349,11 +355,13 @@ async fn handle_websocket(
                                     to_user,
                                     req.content.as_deref().unwrap_or(""),
                                     req.content_type.as_deref().unwrap_or("text"),
-                                ).await;
+                                )
+                                .await;
                             }
                             "heartbeat" => {
                                 let _ = self_tx.send(
-                                    serde_json::json!({"type": "heartbeat", "status": "ok"}).to_string()
+                                    serde_json::json!({"type": "heartbeat", "status": "ok"})
+                                        .to_string(),
                                 );
                             }
                             "typing" => {
@@ -367,7 +375,8 @@ async fn handle_websocket(
                                     state.ws_manager.send_to_user(to, &typing_msg.to_string());
                                 }
                             }
-                            "call_offer" | "call_answer" | "call_ice_candidate" | "call_hangup" | "call_reject" | "call_busy" => {
+                            "call_offer" | "call_answer" | "call_ice_candidate" | "call_hangup"
+                            | "call_reject" | "call_busy" => {
                                 handle_call_signaling(&state, uid, &req.msg_type, &req).await;
                             }
                             _ => {
@@ -418,9 +427,11 @@ fn complete_ws_auth(
     req: &WsRequest,
     _self_tx: &mpsc::UnboundedSender<String>,
 ) -> Result<String, String> {
-    let token = req.token.as_deref().filter(|t| !t.is_empty()).ok_or_else(|| {
-        "Missing token in auth message".to_string()
-    })?;
+    let token = req
+        .token
+        .as_deref()
+        .filter(|t| !t.is_empty())
+        .ok_or_else(|| "Missing token in auth message".to_string())?;
     let claimed_user_id = req
         .user_id
         .as_deref()
@@ -931,10 +942,7 @@ mod ws_auth_tests {
         let (tx, _rx) = mpsc::unbounded_channel();
         let state = dummy_state(secret);
         let req = auth_request("user-abc", Some(&token));
-        assert_eq!(
-            complete_ws_auth(&state, &req, &tx).unwrap(),
-            "user-abc"
-        );
+        assert_eq!(complete_ws_auth(&state, &req, &tx).unwrap(), "user-abc");
     }
 
     #[test]

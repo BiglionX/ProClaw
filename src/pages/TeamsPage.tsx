@@ -276,7 +276,7 @@ export default function TeamsPage() {
       console.error('Failed to load teams:', err);
       setSnackbar('加载团队列表失败: ' + String(err));
     }
-  }, [invalidateTeams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [invalidateTeams]);
 
   useEffect(() => {
     loadTeams();

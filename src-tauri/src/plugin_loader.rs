@@ -131,16 +131,14 @@ impl PluginLoader {
 
         // 加载动态库
         // 审计修复 SEC-P1-02: 加载前验证动态库文件完整性（SHA-256 哈希）
-        let hash_file = library_path.with_extension(
-            format!("{}.sha256", ext)
-        );
+        let hash_file = library_path.with_extension(format!("{}.sha256", ext));
         if hash_file.exists() {
             let expected_hash = std::fs::read_to_string(&hash_file)
                 .map_err(|e| format!("读取哈希文件失败: {}", e))?
                 .trim()
                 .to_lowercase();
-            let file_bytes = std::fs::read(library_path)
-                .map_err(|e| format!("读取动态库文件失败: {}", e))?;
+            let file_bytes =
+                std::fs::read(library_path).map_err(|e| format!("读取动态库文件失败: {}", e))?;
             let actual_hash = hex::encode(sha2::Sha256::digest(&file_bytes));
             if actual_hash != expected_hash {
                 return Err(format!(

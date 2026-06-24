@@ -15,8 +15,24 @@ fn seed_dm_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     }
     let now = Utc::now().to_rfc3339();
     let projects = [
-        ("dm1", "阳光花园 3-1202", "dm_c1", "阳光花园3栋1202", "active", 85000.0, "2026-04-01"),
-        ("dm2", "写字楼前台改造", "dm_c2", "科技路88号", "active", 42000.0, "2026-05-10"),
+        (
+            "dm1",
+            "阳光花园 3-1202",
+            "dm_c1",
+            "阳光花园3栋1202",
+            "active",
+            85000.0,
+            "2026-04-01",
+        ),
+        (
+            "dm2",
+            "写字楼前台改造",
+            "dm_c2",
+            "科技路88号",
+            "active",
+            42000.0,
+            "2026-05-10",
+        ),
     ];
     for (id, name, cust, addr, status, budget, start) in projects {
         conn.execute(

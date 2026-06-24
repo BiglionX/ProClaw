@@ -372,15 +372,9 @@ pub fn get_ws_session_cmd(db: tauri::State<Mutex<Database>>) -> Result<serde_jso
         .get()
         .ok_or_else(|| "JWT_SECRET not initialized".to_string())?;
 
-    let access_token = crate::api::auth::generate_token(
-        &user_id,
-        "desktop",
-        &role,
-        &permissions,
-        secret,
-        3600,
-    )
-    .map_err(|e| format!("Failed to generate token: {}", e))?;
+    let access_token =
+        crate::api::auth::generate_token(&user_id, "desktop", &role, &permissions, secret, 3600)
+            .map_err(|e| format!("Failed to generate token: {}", e))?;
 
     Ok(serde_json::json!({
         "user_id": user_id,

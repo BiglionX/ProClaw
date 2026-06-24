@@ -86,8 +86,10 @@ pub fn create_router(state: AppState) -> axum::Router {
 
     // 局域网同步 WebSocket（无需 JWT，使用配对码鉴权）
     // PRD v11.0 第4节：局域网直连同步
-    let sync_ws_route = axum::Router::new()
-        .route("/proclaw/sync", axum::routing::get(sync_ws::sync_websocket_handler));
+    let sync_ws_route = axum::Router::new().route(
+        "/proclaw/sync",
+        axum::routing::get(sync_ws::sync_websocket_handler),
+    );
 
     // 需要认证的端点
     let protected_routes = axum::Router::new()
@@ -393,13 +395,15 @@ pub fn create_router(state: AppState) -> axum::Router {
 
     // 审计修复 SEC-P0-02: CORS 限制为 localhost 来源，防止任意外部域名访问
     let cors = CorsLayer::new()
-        .allow_origin(tower_http::cors::AllowOrigin::predicate(|origin, _parts| {
-            let origin_str = origin.to_str().unwrap_or("");
-            origin_str == "tauri://localhost"
-                || origin_str == "https://tauri.localhost"
-                || origin_str.starts_with("http://localhost:")
-                || origin_str.starts_with("http://127.0.0.1:")
-        }))
+        .allow_origin(tower_http::cors::AllowOrigin::predicate(
+            |origin, _parts| {
+                let origin_str = origin.to_str().unwrap_or("");
+                origin_str == "tauri://localhost"
+                    || origin_str == "https://tauri.localhost"
+                    || origin_str.starts_with("http://localhost:")
+                    || origin_str.starts_with("http://127.0.0.1:")
+            },
+        ))
         .allow_methods(Any)
         .allow_headers(Any);
 

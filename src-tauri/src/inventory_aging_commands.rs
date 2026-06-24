@@ -108,9 +108,7 @@ pub fn get_pending_aging_tasks(
 ///   2. 长期未校准低置信度（low_confidence，> 15 天无校准）
 ///   3. 高销量低置信度（top_sales_aging，近 7 天销量前 10% 但置信度为低）
 #[tauri::command]
-pub fn compute_reminders(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<serde_json::Value, String> {
+pub fn compute_reminders(db: tauri::State<Mutex<Database>>) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 

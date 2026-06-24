@@ -146,7 +146,10 @@ pub fn calibrate_stock(
             abs_delta,
             calib_id,
             performed_by,
-            format!("微盘点校准：账面 {} → 实际 {}（差 {}）", book_stock, actual_stock, delta),
+            format!(
+                "微盘点校准：账面 {} → 实际 {}（差 {}）",
+                book_stock, actual_stock, delta
+            ),
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -570,7 +573,10 @@ pub fn supplement_inbound(
             supplement_qty,
             calib_id,
             performed_by,
-            format!("补录入库 {} 件：处理负库存老化（{} → {}）", supplement_qty, pre_stock, new_stock),
+            format!(
+                "补录入库 {} 件：处理负库存老化（{} → {}）",
+                supplement_qty, pre_stock, new_stock
+            ),
         ],
     )
     .map_err(|e| e.to_string())?;

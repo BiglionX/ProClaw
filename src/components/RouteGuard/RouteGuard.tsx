@@ -130,7 +130,7 @@ export function RouteGuard({
   fallbackPath = '/',
 }: RouteGuardProps) {
   const location = useLocation();
-  const mode = useAppModeStore((state) => state.mode); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const mode = useAppModeStore((state) => state.mode);
   void mode; // 保留以供将来使用
   
   // 获取功能 ID

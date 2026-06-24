@@ -3,7 +3,6 @@ import axios from 'axios';
 import apiClient from '../lib/apiClient';
 
 vi.mock('axios', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockAxios: any = {
     create: vi.fn(),
     interceptors: {

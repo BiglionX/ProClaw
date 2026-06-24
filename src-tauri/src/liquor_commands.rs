@@ -294,7 +294,9 @@ pub fn lw_set_price_tier(
 
 fn seed_lw_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM lw_credit_accounts", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM lw_credit_accounts", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     if count > 0 {
         return Ok(());
@@ -327,8 +329,24 @@ fn seed_lw_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     }
     let batches = [
-        ("lb1", "B2026-001", "prod_demo_1", "2026-01-10", "2028-01-10", 500, 320),
-        ("lb2", "B2026-002", "prod_demo_2", "2026-03-01", "2027-03-01", 200, 180),
+        (
+            "lb1",
+            "B2026-001",
+            "prod_demo_1",
+            "2026-01-10",
+            "2028-01-10",
+            500,
+            320,
+        ),
+        (
+            "lb2",
+            "B2026-002",
+            "prod_demo_2",
+            "2026-03-01",
+            "2027-03-01",
+            200,
+            180,
+        ),
     ];
     for (id, batch_no, product_id, prod_date, exp_date, purchase, remain) in batches {
         conn.execute(

@@ -144,10 +144,58 @@ fn seed_pet_profiles_if_empty(conn: &rusqlite::Connection) -> Result<(), String>
     }
     let now = Utc::now().to_rfc3339();
     let pets = [
-        ("p1", "owner_zhang", "小黄", "dog", "金毛", "male", "2023-06-15", 28.5, "金色", "CN985632147", 1),
-        ("p2", "owner_li", "咪咪", "cat", "布偶", "female", "2024-01-20", 4.2, "白色", "", 0),
-        ("p3", "owner_wang", "小黑", "dog", "泰迪", "male", "2022-11-08", 6.0, "黑色", "CN123456789", 1),
-        ("p5", "owner_zhao", "豆豆", "dog", "柯基", "female", "2023-09-12", 12.0, "黄白", "", 1),
+        (
+            "p1",
+            "owner_zhang",
+            "小黄",
+            "dog",
+            "金毛",
+            "male",
+            "2023-06-15",
+            28.5,
+            "金色",
+            "CN985632147",
+            1,
+        ),
+        (
+            "p2",
+            "owner_li",
+            "咪咪",
+            "cat",
+            "布偶",
+            "female",
+            "2024-01-20",
+            4.2,
+            "白色",
+            "",
+            0,
+        ),
+        (
+            "p3",
+            "owner_wang",
+            "小黑",
+            "dog",
+            "泰迪",
+            "male",
+            "2022-11-08",
+            6.0,
+            "黑色",
+            "CN123456789",
+            1,
+        ),
+        (
+            "p5",
+            "owner_zhao",
+            "豆豆",
+            "dog",
+            "柯基",
+            "female",
+            "2023-09-12",
+            12.0,
+            "黄白",
+            "",
+            1,
+        ),
     ];
     for (id, owner, name, species, breed, gender, birth, weight, color, chip, neutered) in pets {
         conn.execute(
@@ -287,9 +335,7 @@ pub fn pet_check_out_boarding(
 
 /// 查询寄养房间
 #[tauri::command]
-pub fn pet_get_boarding_rooms(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn pet_get_boarding_rooms(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     seed_pet_boarding_rooms_if_empty(&conn)?;
@@ -316,9 +362,7 @@ pub fn pet_get_boarding_rooms(
 
 /// 查询洗护记录
 #[tauri::command]
-pub fn pet_get_grooming_records(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn pet_get_grooming_records(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     seed_pet_grooming_if_empty(&conn)?;
@@ -407,7 +451,9 @@ pub fn pet_update_grooming_status(
 
 fn seed_pet_boarding_rooms_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM pet_boarding_rooms", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM pet_boarding_rooms", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     if count > 0 {
         return Ok(());
@@ -436,17 +482,55 @@ fn seed_pet_boarding_rooms_if_empty(conn: &rusqlite::Connection) -> Result<(), S
 
 fn seed_pet_grooming_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM pet_grooming_records", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM pet_grooming_records", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     if count > 0 {
         return Ok(());
     }
     let now = Utc::now().to_rfc3339();
     let records = [
-        ("g1", "p1", "基础洗护+剪毛造型", "美容师小李", "2026-05-30 10:00", 128.0, "scheduled", ""),
-        ("g2", "p2", "精洗+SPA护理", "美容师小李", "2026-05-30 14:00", 188.0, "scheduled", "猫咪胆小需注意"),
-        ("g3", "p3", "基础洗护", "美容师小张", "2026-05-29 09:00", 68.0, "completed", ""),
-        ("g4", "p5", "精洗+修甲", "美容师小李", "2026-05-29 15:00", 98.0, "completed", ""),
+        (
+            "g1",
+            "p1",
+            "基础洗护+剪毛造型",
+            "美容师小李",
+            "2026-05-30 10:00",
+            128.0,
+            "scheduled",
+            "",
+        ),
+        (
+            "g2",
+            "p2",
+            "精洗+SPA护理",
+            "美容师小李",
+            "2026-05-30 14:00",
+            188.0,
+            "scheduled",
+            "猫咪胆小需注意",
+        ),
+        (
+            "g3",
+            "p3",
+            "基础洗护",
+            "美容师小张",
+            "2026-05-29 09:00",
+            68.0,
+            "completed",
+            "",
+        ),
+        (
+            "g4",
+            "p5",
+            "精洗+修甲",
+            "美容师小李",
+            "2026-05-29 15:00",
+            98.0,
+            "completed",
+            "",
+        ),
     ];
     for (id, pet_id, items, emp, scheduled, amount, status, notes) in records {
         let completed = if status == "completed" {

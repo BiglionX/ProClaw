@@ -198,7 +198,13 @@ pub fn upload_custom_avatar(input: UploadAvatarInput) -> Result<UploadAvatarResu
     let safe_id: String = input
         .agent_id
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let file_name = format!("{}.{}", safe_id, ext);
     let dir = avatar_dir()?;
@@ -219,9 +225,7 @@ pub fn read_custom_avatar(relative_path: String) -> Result<String, String> {
     // 相对路径（相对 app_data_dir）
     let proj_dirs = directories::ProjectDirs::from("com", "proclaw", "desktop")
         .ok_or_else(|| "无法获取项目目录".to_string())?;
-    let path = proj_dirs
-        .data_local_dir()
-        .join(&relative_path);
+    let path = proj_dirs.data_local_dir().join(&relative_path);
 
     if !path.exists() {
         return Err(format!("头像文件不存在: {}", relative_path));

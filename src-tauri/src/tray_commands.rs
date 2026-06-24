@@ -27,12 +27,7 @@ pub fn send_desktop_notification(
     title: String,
     body: String,
 ) -> Result<(), String> {
-    let result = app
-        .notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show();
+    let result = app.notification().builder().title(title).body(body).show();
 
     if let Err(e) = result {
         eprintln!("[Tray] send_desktop_notification failed: {}", e);
@@ -50,10 +45,7 @@ pub fn send_desktop_notification(
 /// # 返回
 /// 成功返回 `Ok(())`，失败返回错误信息
 #[tauri::command]
-pub fn update_tray_tooltip(
-    app: AppHandle,
-    text: String,
-) -> Result<(), String> {
+pub fn update_tray_tooltip(app: AppHandle, text: String) -> Result<(), String> {
     // 通过固定 ID 查找托盘图标
     let tray = match app.tray_by_id("main-tray") {
         Some(t) => t,
@@ -62,7 +54,11 @@ pub fn update_tray_tooltip(
         }
     };
 
-    let tooltip = if text.is_empty() { None } else { Some(text.as_str()) };
+    let tooltip = if text.is_empty() {
+        None
+    } else {
+        Some(text.as_str())
+    };
     if let Err(e) = tray.set_tooltip(tooltip) {
         eprintln!("[Tray] set_tooltip failed: {}", e);
         return Err(format!("更新 tooltip 失败: {}", e));

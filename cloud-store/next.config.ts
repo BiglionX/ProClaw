@@ -6,8 +6,8 @@ const nextConfig: NextConfig = {
     root: import.meta.dirname || process.cwd(),
   },
 
-  // Docker 独立部署支持
-  output: 'standalone',
+  // Docker 独立部署支持（Vercel 部署时自动忽略）
+  output: process.env.NEXT_OUTPUT_MODE === 'standalone' ? 'standalone' : undefined,
 
   // 图片远程域名白名单 (Supabase Storage)
   images: {

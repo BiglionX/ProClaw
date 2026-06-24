@@ -420,8 +420,8 @@ fn extract_table_names(sql: &str) -> Vec<String> {
                 if next == "IF" {
                     // CREATE TABLE IF NOT EXISTS table_name
                     if i + 4 < tokens.len() {
-                        let table_name = tokens[i + 4]
-                            .trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                        let table_name =
+                            tokens[i + 4].trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
                         if !table_name.is_empty() {
                             // 从原始 SQL 中提取对应位置的表名（保持大小写）
                             tables.push(find_original_table_name(sql, table_name));
@@ -567,7 +567,10 @@ pub fn agent_db_execute(
     // 审计修复 SEC-P1-05: 移除 DROP 和 ALTER，仅允许 INSERT/UPDATE/DELETE/CREATE TABLE IF NOT EXISTS
     let allowed_keywords = ["INSERT", "UPDATE", "DELETE", "CREATE TABLE IF NOT EXISTS"];
     if !allowed_keywords.iter().any(|kw| upper.starts_with(kw)) {
-        return Err("Only INSERT/UPDATE/DELETE/CREATE TABLE IF NOT EXISTS statements are allowed".to_string());
+        return Err(
+            "Only INSERT/UPDATE/DELETE/CREATE TABLE IF NOT EXISTS statements are allowed"
+                .to_string(),
+        );
     }
 
     // 禁止多语句注入

@@ -205,9 +205,7 @@ pub fn catering_mark_kds_item_done(
 
 /// 获取 POS 菜品列表
 #[tauri::command]
-pub fn catering_get_menu_items(
-    db: tauri::State<Mutex<Database>>,
-) -> Result<Value, String> {
+pub fn catering_get_menu_items(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     seed_catering_menu_if_empty(&conn)?;

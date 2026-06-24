@@ -127,7 +127,9 @@ pub fn hw_add_unit_conversion(
 
 fn seed_hw_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM hw_credit_accounts", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM hw_credit_accounts", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     if count > 0 {
         return Ok(());
@@ -158,9 +160,27 @@ fn seed_hw_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     }
     let specs = [
-        ("hs1", "hw_spu_demo", "diameter", "[\"M6\",\"M8\",\"M10\",\"M12\"]", 1),
-        ("hs2", "hw_spu_demo", "length", "[\"20mm\",\"30mm\",\"50mm\",\"80mm\"]", 2),
-        ("hs3", "hw_spu_demo", "material", "[\"304不锈钢\",\"镀锌\",\"黄铜\"]", 3),
+        (
+            "hs1",
+            "hw_spu_demo",
+            "diameter",
+            "[\"M6\",\"M8\",\"M10\",\"M12\"]",
+            1,
+        ),
+        (
+            "hs2",
+            "hw_spu_demo",
+            "length",
+            "[\"20mm\",\"30mm\",\"50mm\",\"80mm\"]",
+            2,
+        ),
+        (
+            "hs3",
+            "hw_spu_demo",
+            "material",
+            "[\"304不锈钢\",\"镀锌\",\"黄铜\"]",
+            3,
+        ),
     ];
     for (id, spu, spec_type, values, sort) in specs {
         conn.execute(
@@ -191,8 +211,20 @@ fn seed_hw_spec_if_empty(conn: &rusqlite::Connection, product_spu_id: &str) -> R
         return Ok(());
     }
     let specs = [
-        ("hs1", "hw_spu_demo", "diameter", "[\"M6\",\"M8\",\"M10\",\"M12\"]", 1),
-        ("hs2", "hw_spu_demo", "length", "[\"20mm\",\"30mm\",\"50mm\",\"80mm\"]", 2),
+        (
+            "hs1",
+            "hw_spu_demo",
+            "diameter",
+            "[\"M6\",\"M8\",\"M10\",\"M12\"]",
+            1,
+        ),
+        (
+            "hs2",
+            "hw_spu_demo",
+            "length",
+            "[\"20mm\",\"30mm\",\"50mm\",\"80mm\"]",
+            2,
+        ),
     ];
     for (id, spu, spec_type, values, sort) in specs {
         conn.execute(
@@ -205,7 +237,10 @@ fn seed_hw_spec_if_empty(conn: &rusqlite::Connection, product_spu_id: &str) -> R
     Ok(())
 }
 
-fn seed_hw_unit_conversions_if_empty(conn: &rusqlite::Connection, product_id: &str) -> Result<(), String> {
+fn seed_hw_unit_conversions_if_empty(
+    conn: &rusqlite::Connection,
+    product_id: &str,
+) -> Result<(), String> {
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM hw_unit_conversions WHERE product_id = ?1",

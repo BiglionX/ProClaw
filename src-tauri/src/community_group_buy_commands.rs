@@ -15,8 +15,22 @@ fn seed_gb_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     }
     let now = Utc::now().to_rfc3339();
     let groups = [
-        ("gb1", "周末生鲜团", "2026-06-20 08:00", "2026-06-22 20:00", 10, "open"),
-        ("gb2", "端午粽子预售", "2026-06-01 10:00", "2026-06-08 18:00", 20, "closed"),
+        (
+            "gb1",
+            "周末生鲜团",
+            "2026-06-20 08:00",
+            "2026-06-22 20:00",
+            10,
+            "open",
+        ),
+        (
+            "gb2",
+            "端午粽子预售",
+            "2026-06-01 10:00",
+            "2026-06-08 18:00",
+            20,
+            "closed",
+        ),
     ];
     for (id, name, start, end, min_p, status) in groups {
         conn.execute(

@@ -205,11 +205,7 @@ pub async fn sync_websocket_handler(
 }
 
 /// 处理同步 WebSocket 连接
-async fn handle_sync_connection(
-    mut socket: WebSocket,
-    addr: SocketAddr,
-    state: AppState,
-) {
+async fn handle_sync_connection(mut socket: WebSocket, addr: SocketAddr, state: AppState) {
     println!("[SyncWS] Connected: {:?}", addr);
 
     // 确保 change_log 表存在
@@ -231,11 +227,9 @@ async fn handle_sync_connection(
     let desktop_profile_id = {
         let db = state.db.lock().unwrap();
         let conn = db.connection();
-        conn.query_row(
-            "SELECT id FROM users LIMIT 1",
-            [],
-            |row| row.get::<_, String>(0),
-        )
+        conn.query_row("SELECT id FROM users LIMIT 1", [], |row| {
+            row.get::<_, String>(0)
+        })
         .unwrap_or_default()
     };
 
@@ -267,12 +261,10 @@ async fn handle_sync_connection(
 
         let text = match msg {
             Message::Text(t) => t.to_string(),
-            Message::Binary(b) => {
-                match String::from_utf8(b) {
-                    Ok(s) => s,
-                    Err(_) => continue,
-                }
-            }
+            Message::Binary(b) => match String::from_utf8(b) {
+                Ok(s) => s,
+                Err(_) => continue,
+            },
             Message::Ping(_) | Message::Pong(_) => continue,
             Message::Close(_) => {
                 println!("[SyncWS] Close frame received: {:?}", addr);
@@ -457,7 +449,10 @@ async fn handle_sync_connection(
                 // 标记已发送的变更为 synced
                 mark_changes_synced(&state, &paired_device_id);
 
-                println!("[SyncWS] Sent pending changes to device {}", paired_device_id);
+                println!(
+                    "[SyncWS] Sent pending changes to device {}",
+                    paired_device_id
+                );
             }
 
             other => {

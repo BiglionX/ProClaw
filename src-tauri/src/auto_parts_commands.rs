@@ -7,7 +7,9 @@ use uuid::Uuid;
 
 fn seed_ap_demo_if_empty(conn: &rusqlite::Connection) -> Result<(), String> {
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM ap_vehicle_models", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM ap_vehicle_models", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
     if count > 0 {
         return Ok(());
