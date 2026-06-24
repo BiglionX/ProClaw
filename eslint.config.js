@@ -1,4 +1,3 @@
-import globals from "globals";
 import parserTs from "@typescript-eslint/parser";
 
 export default [
@@ -6,7 +5,6 @@ export default [
   {
     languageOptions: {
       globals: {
-        ...globals.browser,
         React: "readonly",
         process: "readonly",
         __dirname: "readonly",
