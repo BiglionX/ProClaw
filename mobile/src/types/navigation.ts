@@ -75,6 +75,15 @@ export type RootStackParamList = {
   AgentProfile: { agentId: string };
   // 云商城页面
   CloudStore: undefined;
+  ProClipsHome: undefined;
+  ProClipsTemplateList: undefined;
+  ProClipsTemplateDetail: { templateId: string; title: string };
+  ProClipsWorkflow: { templateId: string; title: string };
+  ProClipsSceneUpload: { templateId: string; title: string };
+  ProClipsProductInfo: { templateId: string; title: string };
+  ProClipsScriptReview: { templateId: string; title: string };
+  ProClipsVoiceSample: undefined;
+  ProClipsMixStatus: undefined;
 };
 
 /** 通用 Navigation 快捷类型 */

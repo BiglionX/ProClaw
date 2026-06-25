@@ -1,0 +1,255 @@
+openapi: 3.0.1
+info:
+  title: ProClips Skill API
+  version: '1.0.0'
+  description: OpenAPI specification for the 15 ProClips Skill endpoints (request/response schemas)
+servers:
+  - url: http://localhost:4000
+paths:
+  /api/proclips/templates:
+    get:
+      summary: Get templates
+      responses:
+        '200':
+          description: Template list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplatesResponse'
+
+  /api/proclips/select-template:
+    post:
+      summary: Select a template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectTemplateRequest'
+      responses:
+        '200':
+          description: OK
+
+  /api/proclips/generate-upload-url:
+    post:
+      summary: Generate presigned upload URL
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateUploadUrlRequest'
+      responses:
+        '200':
+          description: Upload URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateUploadUrlResponse'
+
+  /api/proclips/confirm-scene-upload:
+    post:
+      summary: Confirm a scene upload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmSceneUploadRequest'
+      responses:
+        '200':
+          description: confirmed
+
+  /api/proclips/generate-script:
+    post:
+      summary: Generate script from LLM
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateScriptRequest'
+      responses:
+        '200':
+          description: scripts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateScriptResponse'
+
+  /api/proclips/record-voice:
+    post:
+      summary: Upload voice sample (multipart)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordVoiceResponse'
+
+  /api/proclips/mix/submit:
+    post:
+      summary: Submit mix task
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitMixRequest'
+      responses:
+        '200':
+          description: submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitMixResponse'
+
+  /api/proclips/mix/status/{taskId}:
+    get:
+      summary: Get mix task status
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MixStatusResponse'
+
+components:
+  schemas:
+    TemplatesResponse:
+      type: object
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        scenes:
+          type: array
+          items:
+            type: string
+
+    SelectTemplateRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+
+    GenerateUploadUrlRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+        scene_index:
+          type: integer
+
+    GenerateUploadUrlResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+        key:
+          type: string
+
+    ConfirmSceneUploadRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+        scene_index:
+          type: integer
+        file_key:
+          type: string
+
+    GenerateScriptRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+        product_name:
+          type: string
+        product_features:
+          type: string
+        product_price:
+          type: string
+
+    GenerateScriptResponse:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            type: string
+
+    RecordVoiceResponse:
+      type: object
+      properties:
+        remoteUrl:
+          type: string
+
+    SubmitMixRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+        product_name:
+          type: string
+        product_features:
+          type: string
+        product_price:
+          type: string
+        script:
+          type: string
+        voice_sample_uri:
+          type: string
+        scene_uploads:
+          type: array
+          items:
+            type: object
+            properties:
+              sceneIndex:
+                type: integer
+              remoteUrl:
+                type: string
+
+    SubmitMixResponse:
+      type: object
+      properties:
+        taskId:
+          type: string
+        status:
+          type: string
+
+    MixStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        progress:
+          type: number
+        resultVideoUrl:
+          type: string
+        errorMessage:
+          type: string

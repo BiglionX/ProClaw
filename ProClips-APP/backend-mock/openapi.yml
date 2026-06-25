@@ -1,0 +1,69 @@
+openapi: 3.0.1
+info:
+  title: ProClips Skill API (Mock)
+  version: '1.0'
+servers:
+  - url: http://localhost:4000
+paths:
+  /api/proclips/templates:
+    get:
+      summary: Get templates
+      responses:
+        '200':
+          description: list
+  /api/proclips/upload-scene:
+    post:
+      summary: Upload scene clip (multipart)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                template_id:
+                  type: string
+                scene_index:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: uploaded
+  /api/proclips/record-voice:
+    post:
+      summary: Upload voice sample
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: uploaded
+  /api/proclips/mix/submit:
+    post:
+      summary: Submit mix task
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: submitted
+  /api/proclips/mix/status/{taskId}:
+    get:
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: status

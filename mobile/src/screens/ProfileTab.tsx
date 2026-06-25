@@ -38,6 +38,7 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'products', label: '商品目录', icon: 'package-variant-closed', color: '#00d2ff', glow: 'rgba(0,210,255,0.2)', navigateTo: 'Products' },
+  { id: 'cliplus', label: 'ProClips', icon: 'video-plus', color: '#5b21b6', glow: 'rgba(99,102,241,0.2)', navigateTo: 'ProClipsHome' },
   { id: 'cloudstore', label: '云商城', icon: 'store', color: '#6366f1', glow: 'rgba(99,102,241,0.2)', navigateTo: 'CloudStore' },
   { id: 'sales', label: '创建销售单', icon: 'clipboard-text', color: '#00f5d4', glow: 'rgba(0,245,212,0.2)', navigateTo: 'SalesOrder' },
   { id: 'supply', label: '采购入库', icon: 'truck-delivery', color: '#ff6b9d', glow: 'rgba(255,107,157,0.2)', navigateTo: 'SupplyChain' },

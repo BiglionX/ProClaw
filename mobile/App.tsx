@@ -58,6 +58,15 @@ import OnboardingWizard from './src/screens/OnboardingWizard';
 import SettingsScreen from './src/screens/SettingsScreen';
 import FloatingSecretaryButton from './src/components/FloatingSecretaryButton';
 import AgentProfileScreen from './src/screens/AgentProfileScreen';
+import ProClipsHomeScreen from './src/screens/ProClipsHomeScreen';
+import ProClipsTemplateListScreen from './src/screens/ProClipsTemplateListScreen';
+import ProClipsTemplateDetailScreen from './src/screens/ProClipsTemplateDetailScreen';
+import ProClipsWorkflowScreen from './src/screens/ProClipsWorkflowScreen';
+import ProClipsSceneUploadScreen from './src/screens/ProClipsSceneUploadScreen';
+import ProClipsProductInfoScreen from './src/screens/ProClipsProductInfoScreen';
+import ProClipsScriptReviewScreen from './src/screens/ProClipsScriptReviewScreen';
+import ProClipsVoiceSampleScreen from './src/screens/ProClipsVoiceSampleScreen';
+import ProClipsMixStatusScreen from './src/screens/ProClipsMixStatusScreen';
 
 type MainTabParamList = {
   ContactsTab: undefined;
@@ -448,6 +457,51 @@ export default function App() {
                 name="CloudStore"
                 component={CloudStoreScreen}
                 options={{ title: '云商城' }}
+              />
+              <Stack.Screen
+                name="ProClipsHome"
+                component={ProClipsHomeScreen}
+                options={{ title: 'ProClips · 拍可丽' }}
+              />
+              <Stack.Screen
+                name="ProClipsTemplateList"
+                component={ProClipsTemplateListScreen}
+                options={{ title: '模板列表' }}
+              />
+              <Stack.Screen
+                name="ProClipsTemplateDetail"
+                component={ProClipsTemplateDetailScreen}
+                options={({ route }: any) => ({ title: route.params?.title || '模板详情' })}
+              />
+              <Stack.Screen
+                name="ProClipsWorkflow"
+                component={ProClipsWorkflowScreen}
+                options={{ title: '制作流程' }}
+              />
+              <Stack.Screen
+                name="ProClipsSceneUpload"
+                component={ProClipsSceneUploadScreen}
+                options={{ title: '上传素材' }}
+              />
+              <Stack.Screen
+                name="ProClipsProductInfo"
+                component={ProClipsProductInfoScreen}
+                options={{ title: '商品信息' }}
+              />
+              <Stack.Screen
+                name="ProClipsScriptReview"
+                component={ProClipsScriptReviewScreen}
+                options={{ title: '文案确认' }}
+              />
+              <Stack.Screen
+                name="ProClipsVoiceSample"
+                component={ProClipsVoiceSampleScreen}
+                options={{ title: '录制音色' }}
+              />
+              <Stack.Screen
+                name="ProClipsMixStatus"
+                component={ProClipsMixStatusScreen}
+                options={{ title: '混剪状态' }}
               />
             </Stack.Navigator>
           </NavigationContainer>
