@@ -4,6 +4,7 @@ import {
   Assignment as OrderIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -37,6 +38,7 @@ import {
   usePurchaseOrders,
   useSuppliers,
 } from '../lib/hooks/usePurchase';
+import { ImportWizard } from '../components/DataImport/ImportWizard';
 
 export default function PurchasePage() {
   const [tabValue, setTabValue] = useState(0);
@@ -75,6 +77,9 @@ export default function PurchasePage() {
     tax_number: '',
     notes: '',
   });
+
+  // v1.2 P1：导入向导开关
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   const loadSuppliers = () => setSearchQuery(searchTerm);
   const loadOrders = () => setOrderSearchQuery(orderSearchTerm);
@@ -194,6 +199,16 @@ export default function PurchasePage() {
               disabled={loading}
             >
               刷新
+            </Button>
+
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<UploadIcon />}
+              onClick={() => setImportWizardOpen(true)}
+              data-testid="open-import-wizard"
+            >
+              导入
             </Button>
           </Paper>
 
@@ -559,6 +574,18 @@ export default function PurchasePage() {
           {successMessage}
         </Alert>
       </Snackbar>
+
+      {/* v1.2 P1：导入向导 */}
+      <ImportWizard
+        open={importWizardOpen}
+        onClose={() => setImportWizardOpen(false)}
+        initialTarget="purchases"
+        onSuccess={() => {
+          invalidatePurchase();
+          setSuccessMessage('采购订单导入成功');
+          setTimeout(() => setSuccessMessage(null), 3000);
+        }}
+      />
     </Box>
   );
 }

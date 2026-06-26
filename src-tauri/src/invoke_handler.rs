@@ -20,6 +20,7 @@ use crate::finance_agent_commands::*;
 use crate::finance_commands::*;
 use crate::fresh_food_commands::*;
 use crate::hardware_commands::*;
+use crate::import::commands::*;
 #[cfg(feature = "inventory")]
 use crate::inventory_aging_commands::*;
 #[cfg(feature = "inventory")]
@@ -77,6 +78,27 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         get_product_spu_by_id,
         update_product_spu,
         delete_product_spu,
+        // 商品数据导入（DATA_IMPORT_PRD_v1.0 MVP）
+        import_create_batch,
+        import_update_mapping,
+        import_validate,
+        import_execute,
+        import_get_batch,
+        import_list_batches,
+        import_rollback,
+        // v1.3：图片 zip 包解析
+        import_extract_images,
+        // v1.3：Import Center 任务管理（暂停/继续/取消/重试）
+        import_pause,
+        import_resume,
+        import_cancel,
+        import_retry,
+        // v1.3 C1：导入模板下载
+        import_list_templates,
+        import_get_template_bytes,
+        import_get_examples_zip,
+        // v1.3 C2：首次启动拷贝模板到 AppData
+        import_setup_templates,
         // 商品库模式迁移
         get_library_mode,
         migrate_to_ecommerce_mode,

@@ -43,6 +43,8 @@ pub mod approval_commands;
 pub mod call_commands;
 pub mod ceo_commands;
 pub mod common_commands;
+// 商品数据导入（DATA_IMPORT_PRD_v1.0 MVP）
+pub mod import;
 pub mod invitation_commands;
 pub mod message_commands;
 pub mod plugin_loader;
@@ -402,6 +404,13 @@ async fn main() {
         })
         .setup(|app| {
             use tauri::Manager;
+
+            // ========== v1.3 C2：首次启动拷贝模板到 AppData ==========
+            // 在托盘/窗口初始化之前完成，确保 ImportWizard 打开时模板就绪
+            match crate::import::commands::import_setup_templates() {
+                Ok(n) => diag_log(&format!("[v1.3 C2] import_setup_templates copied {} files", n)),
+                Err(e) => diag_log(&format!("[v1.3 C2] import_setup_templates error: {}", e)),
+            }
 
             // ========== 系统托盘 ==========
             // 构建托盘右键菜单

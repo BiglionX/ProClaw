@@ -192,6 +192,28 @@ impl Database {
             eprintln!("✓ [DB Migration] 051_product_gallery 多图支持已加载");
         }
 
+        // 运行迁移：商品数据导入批次审计表（PRD DATA_IMPORT_PRD_v1.0 MVP）
+        let import_batches_migration =
+            include_str!("../../database/migrations/060_import_batches.sql");
+        if let Err(e) = self.conn.execute_batch(import_batches_migration) {
+            eprintln!("[DB Migration WARNING] 060_import_batches: {}", e);
+            migration_errors.push(format!("060: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] 060_import_batches 导入审计表已加载");
+        }
+
+        // 运行迁移：v1.3 Import Center 扩展 - 状态机新增 paused/retrying + 心跳/进度/暂停原因列
+        // SQLite 无法 ALTER CHECK 约束，所以是 DROP+RECREATE 重建表（保留所有历史批次）。
+        // 详情见 database/migrations/061_import_batches_pause.sql
+        let import_pause_migration =
+            include_str!("../../database/migrations/061_import_batches_pause.sql");
+        if let Err(e) = self.conn.execute_batch(import_pause_migration) {
+            eprintln!("[DB Migration WARNING] 061_import_batches_pause: {}", e);
+            migration_errors.push(format!("061: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] 061_import_batches_pause 状态机扩展已加载");
+        }
+
         // 运行迁移：给缺 deleted_at 列的表补充软删除列（v1.0.0+tray 补丁）
         // 原因：销售/采购/联系人代码使用 WHERE deleted_at IS NULL，但 src/db/schema.sql
         // 原始定义里没建这个列。SQLite 不支持 ADD COLUMN IF NOT EXISTS，
@@ -1409,6 +1431,112 @@ mod tests {
             "expected >= 20 demo images after seed, got {}",
             image_count
         );
+
+        std::fs::remove_file(&db_path).ok();
+        std::fs::remove_dir(&temp_dir).ok();
+    }
+
+    // v1.3 P1：迁移 061 扩展 import_batches 状态机（新增 paused/retrying + 心跳/进度/暂停原因列）
+    #[test]
+    fn test_migration_061_extends_import_batches_state_machine() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        // 用唯一路径避免上次崩溃时残留文件导致 UNIQUE 冲突
+        let temp_dir = env::temp_dir().join(format!("proclaw_test_migration_061_{}", nanos));
+        let db_path = temp_dir.join("test_061.db");
+
+        let db = Database::new(db_path.clone()).unwrap();
+
+        // 应用 060 迁移（init 内部会做）
+        let m060 = include_str!("../../database/migrations/060_import_batches.sql");
+        db.connection().execute_batch(m060).unwrap();
+
+        // 插入 1 条样本数据用于校验数据迁移
+        db.connection()
+            .execute(
+                "INSERT INTO import_batches (id, file_name, file_type, target_type, status, total_rows, success_rows)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                rusqlite::params!["batch-061-test", "products.xlsx", "xlsx", "products", "success", 100, 100],
+            )
+            .unwrap();
+
+        // 应用 061 迁移
+        let m061 = include_str!("../../database/migrations/061_import_batches_pause.sql");
+        db.connection().execute_batch(m061).unwrap();
+
+        // 1) 校验新列存在
+        let new_columns: Vec<String> = db
+            .connection()
+            .prepare("PRAGMA table_info(import_batches)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect();
+        for col in ["last_heartbeat_at", "processed_rows", "paused_reason"] {
+            assert!(
+                new_columns.iter().any(|c| c == col),
+                "061 migration should add column '{}', got {:?}",
+                col,
+                new_columns
+            );
+        }
+
+        // 2) 校验历史数据迁移成功
+        let preserved: (String, i64, i64) = db
+            .connection()
+            .query_row(
+                "SELECT status, total_rows, success_rows FROM import_batches WHERE id = ?",
+                ["batch-061-test"],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(preserved.0, "success");
+        assert_eq!(preserved.1, 100);
+        assert_eq!(preserved.2, 100);
+
+        // 3) 校验新状态枚举（paused / retrying）可写入
+        db.connection()
+            .execute(
+                "INSERT INTO import_batches (id, file_name, file_type, target_type, status) VALUES (?, ?, ?, ?, ?)",
+                rusqlite::params!["batch-paused", "p.xlsx", "xlsx", "products", "paused"],
+            )
+            .unwrap();
+        db.connection()
+            .execute(
+                "INSERT INTO import_batches (id, file_name, file_type, target_type, status) VALUES (?, ?, ?, ?, ?)",
+                rusqlite::params!["batch-retry", "r.xlsx", "xlsx", "products", "retrying"],
+            )
+            .unwrap();
+
+        // 4) 校验非法状态被 CHECK 拒绝
+        let bad = db
+            .connection()
+            .execute(
+                "INSERT INTO import_batches (id, file_name, file_type, target_type, status) VALUES (?, ?, ?, ?, ?)",
+                rusqlite::params!["batch-bad", "b.xlsx", "xlsx", "products", "bogus"],
+            );
+        assert!(bad.is_err(), "invalid status should be rejected by CHECK");
+
+        // 5) 校验新列可写入（processed_rows / paused_reason）
+        db.connection()
+            .execute(
+                "UPDATE import_batches SET processed_rows = ?, paused_reason = ?, last_heartbeat_at = CURRENT_TIMESTAMP WHERE id = ?",
+                rusqlite::params![42i64, "用户主动暂停", "batch-paused"],
+            )
+            .unwrap();
+        let heartbeat: String = db
+            .connection()
+            .query_row(
+                "SELECT paused_reason FROM import_batches WHERE id = ?",
+                ["batch-paused"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(heartbeat, "用户主动暂停");
 
         std::fs::remove_file(&db_path).ok();
         std::fs::remove_dir(&temp_dir).ok();

@@ -8,6 +8,7 @@ import {
   Refresh as RefreshIcon,
   Search as SearchIcon,
   SmartToy as SmartToyIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -60,6 +61,8 @@ import {
   DowngradeConfirmDialog,
   LibraryModeToggle,
 } from '../components/Products';
+// 新增：导入向导
+import { ImportWizard } from '../components/DataImport/ImportWizard';
 
 export default function ProductsPage() {
   // ==================== 商品库模式状态 ====================
@@ -105,6 +108,8 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
+  // 导入向导开关
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   const loadProducts = async () => {
     await refetchProducts();
@@ -606,6 +611,15 @@ export default function ProductsPage() {
         >
           导出 CSV
         </Button>
+        <Button
+          variant="contained"
+          color="secondary"
+          startIcon={<UploadIcon />}
+          onClick={() => setImportWizardOpen(true)}
+          data-testid="open-import-wizard"
+        >
+          导入
+        </Button>
       </Paper>
 
       {/* 产品列表 */}
@@ -1022,6 +1036,19 @@ export default function ProductsPage() {
           （耗时 {migrationResult.duration_ms}ms）
         </Alert>
       )}
+
+      {/* 导入向导 */}
+      <ImportWizard
+        open={importWizardOpen}
+        onClose={() => setImportWizardOpen(false)}
+        initialTarget="products"
+        onSuccess={() => {
+          loadProducts();
+          loadFilters();
+          setSuccessMessage('商品导入成功');
+          setTimeout(() => setSuccessMessage(null), 3000);
+        }}
+      />
     </Box>
   );
 }

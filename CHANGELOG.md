@@ -5,6 +5,114 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/),
 版本遵循 [Semantic Versioning](https://semver.org/)。
 
+## [v1.3] - 2026-06-26
+
+### Added
+- **业务导入增强（4 大模块）**（PRD DATA_IMPORT_PRD_v1.0 §3.1.3/3.6/3.7/3.8）:
+  - **A. 图片 zip 包批量上传**（§3.1.3）:
+    - `import_extract_images` Tauri 命令：接收 zip 字节 → SHA-256 → 写入 `<app_data>/import_images/<hash>.zip` 并解压到 `<hash>/` 子目录（白名单：`png/jpg/jpeg/webp`）
+    - 文件名约定解析：`SPU编码_任意命名.png` 或 `SKU编码_x.png`，回填 SPU/SKU
+    - `executor.rs` 集成 `image_filename` 字段：写入 SPU 前查找 zip 命中，复制到 `<app_data>/product_images/<spu_id>/`，写入 `local://<spu_id>/<filename>` URL 与 `sync_status='local'`
+    - 前端 `Step1FileSelect` 扩展 `accept` 为 `.xlsx,.xls,.csv,.json,.zip`；dropzone 文案改为「支持 Excel / CSV / JSON / 图片 zip 包」
+  - **B. Import Center 任务管理**（§3.6 P1）:
+    - 数据库迁移 `061_import_batches_pause.sql` 扩展状态枚举为 `pending/parsing/mapping/importing/paused/cancelled/retrying/success/failed`，新增 `last_heartbeat_at` / `processed_rows` / `paused_reason` 列
+    - 4 个新 Tauri commands：`import_pause` / `import_resume` / `import_cancel` / `import_retry`
+    - `executor.rs` 检查点：每 100 行持久化 `processed_rows` 与 `last_heartbeat`；循环开头检查 `status='paused'` 即退出（不丢数据）
+    - 新增路由 `/import-center`（`ImportCenterPage`）：MUI Table 列出批次 + 状态/目标类型/日期范围多选过滤 + 右侧详情 Drawer
+    - 新增嵌套路由 `/import-center/:batchId`（`ImportBatchDetailPage`）：状态卡片 + 暂停/继续/取消/重试/回滚/下载错误报告按钮 + 映射快照折叠面板 + 行级错误表（虚拟滚动）
+  - **C. 5 套 xlsx 模板 + 示例数据**（§3.7 P1）:
+    - 新增 `import_list_templates` Tauri 命令（`PROCLAW_TEMPLATE_DIR` 环境变量可覆盖；纯函数 `list_templates_at` / `read_template_bytes_at` / `read_examples_zip_at` 可单测）
+    - 新增 `import_setup_templates` setup hook：首次启动从 `exe_dir/resources/templates` / `public/templates` 拷贝到 AppData
+    - 构建脚本 `scripts/build-import-templates.mjs` 生成 6 个文件：
+      - `products-template.xlsx`（28 列，含 `image_filename` 关联 zip 命名约定）
+      - `inventory-transactions-template.xlsx`（9 列）
+      - `purchase-orders-template.xlsx`（8 列）
+      - `sales-orders-template.xlsx`（8 列）
+      - `suppliers-customers-template.xlsx`（双 sheet）
+      - `examples.zip`（含 5 套模板 + 10 张示例 PNG + README）
+    - 新增 `TemplateDownloadPanel.tsx`：Accordion 折叠面板，列出 5 套模板元数据（target_type/file_name/size_bytes/sha256）+ 单独下载 / 整套 `examples.zip` 下载入口
+    - `package.json` 新增 `build:templates` + `prebuild` 钩子
+  - **D. AI 智能引导联动**（§3.8 P1）:
+    - `aiGuide.ts` 新增 `generateImportGuidance(targetType, errorList, fieldHeaders): ImportGuidance[]`，内置 **8 类规则**：missing_required / mapping_conflict / duplicate_row / reference_missing / value_out_of_range / date_format / encoding_unknown / image_missing
+    - 每条 guidance 返回 `affectedRows`（去重）+ `category` + `aiHint`（AI 别名猜测 `ALIAS_HINTS`） + `actionLabel` / `actionPath`
+    - `ImportWizard` Step3 缺字段 AI 气泡：未映射必填字段时显示 `<Alert severity="info">` + 一键「AI 推荐映射」按钮（自动填充 confidence > 0.8 的高置信度映射）
+    - `ImportWizard` Step7 失败 AI 排查面板：`result.failed_rows > 0` 时新增折叠面板「AI 帮你排查」+ top 5 引导建议 + 「查看完整错误报告」跳转
+- **测试覆盖**:
+  - Rust: 51 → **75+** 单元测试（+24 = 图片 zip 5 + Import Center 状态机 9 + 模板 4 + 重试 6）
+  - 前端 Vitest: 60+ → **100+** 测试（新增 `TemplateDownloadPanel` 10 + `aiGuide.importGuidance` 45）
+  - Playwright E2E: 4 → **8** spec 文件（新增 `import-products-images.spec.ts` / `import-center.spec.ts` / `import-templates.spec.ts` / `import-ai-guide.spec.ts`）
+
+### Changed
+- `import_execute` 后端命令支持 `image_archive` 字段（zip 在 AppData 内的相对路径），未提供时沿用 v1.2 P1 的 URL 模式
+- `ImportWizard` 接收 `initialTarget` 已可从任何业务页跳转，Step7 新增 `result/targetType/headers` props 驱动 AI 排查面板
+- `importService` 暴露 `listTemplates` / `getTemplateBytes` / `getExamplesZip` 三个 invoke 接口
+
+### Known Limitations
+- **Import Center 暂不支持并发导入**：当前为串行队列（一个批次执行中无法同时启动另一个）；v1.4 计划按优先级与 worker pool 并发
+- **AI 引导置信度阈值 0.8**：低于 0.6 时不推荐自动填充；强误判可由用户手工覆盖
+- **图片 zip 白名单仅 png/jpg/jpeg/webp**：其他格式（gif/avif/heic）需先转码
+
+## [1.0.8] - 2026-06-26
+
+### Added
+- **业务对象批量导入扩展（v1.2 P1）**（PRD DATA_IMPORT_PRD_v1.0 §3.2-3.5）:
+  - **库存交易导入**（PRD §3.2 P0）: 按 `(sku_code + transaction_date + transaction_type)` 幂等去重；4 种类型（inbound / outbound / adjustment / transfer）支持；冲突策略 3 态（skip / overwrite / duplicate）
+  - **采购订单导入**（PRD §3.3 P0）: 按 `po_number` 唯一去重；自动按 `supplier_name` 创建供应商（`ensure_supplier` 辅助函数）；每行 = 1 个 PO + 1 个 item
+  - **销售订单导入**（PRD §3.4 P0）: 按 `so_number` 唯一去重；自动按 `customer_name` 创建客户（`ensure_customer` 辅助函数）；金额计算自动
+  - **供应商 / 客户主数据导入**（PRD §3.5 P1）: 独立主数据批量导入，支持 `name` / `phone` / `email` / `address` / `level` / `tax_id` / `notes` 等字段
+- **后端（Rust）新增 5 个核心函数**:
+  - `process_inventory_txn` / `process_purchase_order` / `process_sales_order`
+  - `ensure_supplier` / `ensure_customer`（按名称查重，自动建主数据）
+  - 路由分发：`commands.rs::import_execute` 按 `target_type` 路由到对应 process_* 函数
+- **前端（React + TS）扩展**:
+  - `ImportTarget` 类型扩展为 6 种（`products` / `inventory` / `purchases` / `sales` / `suppliers` / `customers`）
+  - `REQUIRED_FIELDS_BY_TARGET` 按 target 动态判断必填字段
+  - `Step2TargetSelect` 激活 6 张目标卡片（商品库/库存交易/采购/销售/供应商/客户）
+  - `ImportWizard` 新增 `initialTarget` prop：业务页可直接传入 target 跳过 Step2
+  - `fieldMatcher` 别名词典新增 50+ 中英文别名（库存/采购/销售/供应商/客户字段）
+  - 3 个业务页（`InventoryPage` / `PurchasePage` / `SalesPage`）工具栏新增 "导入" 按钮
+- **测试覆盖**:
+  - Rust: 24 → **51** 单元测试（+27 = validator 24 / mapper 5 / executor 22）
+  - 前端 Vitest: 41 → **60+** 测试（新增业务字段匹配 19+）
+  - Playwright E2E: 1 → **4** spec 文件（新增 `import-inventory.spec.ts` / `import-purchases.spec.ts` / `import-sales.spec.ts`）
+
+### Changed
+- `ProductsPage` `target` prop 重命名为 `initialTarget`，保持向后兼容语义
+- `importService.createBatch` 新增 `targetType` 参数；后端 `import_create_batch` 接受 `target_type` 路由参数
+- 7 步向导的 Step 2（选目标）解锁 target 锁定：支持切换 target 而不重启向导
+
+### Known Limitations
+- 仅支持 **URL 模式** 图片；本地图片 zip 包批量上传留待 v1.3
+- 未实现 **Import Center**（历史批次管理页）；通过 Setup Wizard + 各业务页"导入"按钮触发
+- 批量上限 10MB（更大文件分批进度推送留待 v1.3）
+- 业务对象导入的测试用例覆盖了小批量（5-100 行）；100,000 行性能验证留待 v1.3
+
+## [1.0.7] - 2026-06-26
+
+### Added
+- **商品库数据导入 MVP**（PRD DATA_IMPORT_PRD_v1.0 §3.1 P0）:
+  - 支持 **Excel (.xlsx/.xls)** / **CSV** / **JSON** 三种格式批量导入商品
+  - 7 步向导：选文件 → 选目标 → 字段映射（自动别名词典 + string-similarity 模糊匹配）→ 数据预览 → 冲突策略（skip / overwrite / duplicate）→ 摘要确认 → 执行进度
+  - 三级校验：L1 格式（必填/类型/范围，阻断）、L2 业务（价格/库存/条形码，警告）、L3 引用（自动建分类/品牌）
+  - 冲突策略：按 `spu_code` 命中即按策略处理；`duplicate` 策略自动追加 `_copy2/_copy3` 后缀
+  - 事务包裹：批次级失败自动回滚；`import_batches` 审计表（迁移 060）
+  - 后端 7 个 Tauri commands（`import_create_batch` / `import_update_mapping` / `import_validate` / `import_execute` / `import_get_batch` / `import_list_batches` / `import_rollback`）
+  - 错误报告下载：`errors.xlsx` 含错误明细 + 错误类型统计两个 Sheet
+  - 入口：`商品库` 页面工具栏 "导入" 按钮 + `SetupWizard.DataImportStep` "已有数据，导入 Excel" 按钮
+- 新增依赖：`xlsx@^0.18.5`、`papaparse@^5.4.1`、`jszip@^3.10.1`、`file-saver@^2.0.5`、`string-similarity@^4.0.4` + 类型定义
+- 新增 Rust 模块 `src-tauri/src/import/`（6 文件）+ 数据库迁移 `database/migrations/060_import_batches.sql`
+- 测试：Rust 24 单元测试（validator 14 / mapper 5 / executor 5） + 前端 41 Vitest（fieldMatcher 21 / jsonImporter 9 / excelImporter 7 / ImportWizard 4） + Playwright E2E `e2e/import-products.spec.ts`
+
+### Changed
+- `ProductsPage` 工具栏新增 "导入" 按钮（与 "导出 CSV" 紧邻），完成后自动刷新列表
+- `SetupWizard/DataImportStep` "已有数据" 按钮从仅设置状态改为直接打开 `ImportWizard`
+
+### Known Limitations
+- 仅支持 **URL 模式** 图片；本地图片 zip 包批量上传留待 v1.1
+- 仅支持 **商品库** 导入；库存交易、采购/销售导入留待 v1.2
+- 未实现 **Import Center**（历史批次管理页）；MVP 通过 Setup Wizard + Products 页面入口触发
+- 批量上限 10MB（更大文件分批进度推送留待 v1.1）
+
 ## [1.0.0] - 2026-06-08
 
 ### Added

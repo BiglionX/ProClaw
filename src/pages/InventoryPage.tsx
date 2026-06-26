@@ -5,6 +5,7 @@ import {
   ArrowUpward as OutboundIcon,
   Refresh as RefreshIcon,
   SmartToy as SmartToyIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -60,6 +61,7 @@ import {
   getCustomers,
   generateCustomerCode, // 新增：自动生成客户编码
 } from '../lib/salesService';
+import { ImportWizard } from '../components/DataImport/ImportWizard';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -164,6 +166,9 @@ export default function InventoryPage() {
       reason: '',
       notes: '',
     });
+
+  // v1.2 P1：导入向导开关
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   // 同步 React Query 库存仪表盘数据到本地 state（兼容现有渲染逻辑）
   useEffect(() => {
@@ -666,6 +671,15 @@ export default function InventoryPage() {
             disabled={loading}
           >
             刷新
+          </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<UploadIcon />}
+            onClick={() => setImportWizardOpen(true)}
+            data-testid="open-import-wizard"
+          >
+            导入
           </Button>
         </Paper>
 
@@ -1429,6 +1443,18 @@ export default function InventoryPage() {
           {successMessage}
         </Alert>
       </Snackbar>
+
+      {/* v1.2 P1：导入向导 */}
+      <ImportWizard
+        open={importWizardOpen}
+        onClose={() => setImportWizardOpen(false)}
+        initialTarget="inventory"
+        onSuccess={() => {
+          loadInventoryData();
+          setSuccessMessage('库存交易导入成功');
+          setTimeout(() => setSuccessMessage(null), 3000);
+        }}
+      />
     </Box>
   );
 }

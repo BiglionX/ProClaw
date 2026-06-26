@@ -5,6 +5,7 @@ import {
   Refresh as RefreshIcon,
   Search as SearchIcon,
   SmartToy as SmartToyIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -38,6 +39,7 @@ import {
   useInvalidateSales,
   useSalesOrders,
 } from '../lib/hooks/useSales';
+import { ImportWizard } from '../components/DataImport/ImportWizard';
 import { useAppModeStore } from '../config/appMode';
 
 export default function SalesPage() {
@@ -86,6 +88,9 @@ export default function SalesPage() {
     credit_limit: 0,
     notes: '',
   });
+
+  // v1.2 P1：导入向导开关
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   const loadCustomers = () => setCustomerSearchQuery(customerSearch);
   const loadOrders = () => {
@@ -222,6 +227,15 @@ export default function SalesPage() {
               disabled={loading}
             >
               刷新
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<UploadIcon />}
+              onClick={() => setImportWizardOpen(true)}
+              data-testid="open-import-wizard"
+            >
+              导入
             </Button>
           </Paper>
 
@@ -618,6 +632,18 @@ export default function SalesPage() {
           {successMessage}
         </Alert>
       </Snackbar>
+
+      {/* v1.2 P1：导入向导 */}
+      <ImportWizard
+        open={importWizardOpen}
+        onClose={() => setImportWizardOpen(false)}
+        initialTarget="sales"
+        onSuccess={() => {
+          invalidateSales();
+          setSuccessMessage('销售订单导入成功');
+          setTimeout(() => setSuccessMessage(null), 3000);
+        }}
+      />
     </Box>
   );
 }

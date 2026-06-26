@@ -7,6 +7,44 @@ Object.defineProperty(globalThis, 'importMeta', {
   writable: true,
 });
 
+// jsdom 中 Blob/File 的 text() / arrayBuffer() 在某些版本下未实现或对 File 退化为 "[object File]"。
+// 改为在测试中用纯字符串/字节缓冲直接覆盖，并提供一个简单 polyfill 作 fallback。
+function polyfillBlobText(): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const BlobProto = (globalThis as any).Blob?.prototype as Record<string, unknown> | undefined;
+  if (!BlobProto) return;
+  if (typeof BlobProto.text !== 'function') {
+    // eslint-disable-next-line no-extend-native
+    BlobProto.text = function text(this: Blob): Promise<string> {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (): void => resolve(String(reader.result ?? ''));
+        reader.onerror = (): void => reject(reader.error ?? new Error('FileReader failed'));
+        reader.readAsText(this);
+      });
+    };
+  }
+  if (typeof BlobProto.arrayBuffer !== 'function') {
+    // eslint-disable-next-line no-extend-native
+    BlobProto.arrayBuffer = function arrayBuffer(this: Blob): Promise<ArrayBuffer> {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (): void => {
+          const result = reader.result;
+          if (result instanceof ArrayBuffer) {
+            resolve(result);
+            return;
+          }
+          resolve(new TextEncoder().encode(String(result ?? '')).buffer as ArrayBuffer);
+        };
+        reader.onerror = (): void => reject(reader.error ?? new Error('FileReader failed'));
+        reader.readAsArrayBuffer(this);
+      });
+    };
+  }
+}
+polyfillBlobText();
+
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),

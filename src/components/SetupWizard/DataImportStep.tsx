@@ -1,11 +1,15 @@
 import { Box, Button, Typography } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import { useState } from 'react';
+
+import { ImportWizard } from '../DataImport/ImportWizard';
 
 interface DataImportStepProps {
   onImportSelected: (hasData: boolean) => void;
 }
 
 export function DataImportStep({ onImportSelected }: DataImportStepProps) {
+  const [wizardOpen, setWizardOpen] = useState(false);
   return (
     <Box
       sx={{
@@ -30,7 +34,10 @@ export function DataImportStep({ onImportSelected }: DataImportStepProps) {
         variant="contained"
         size="large"
         startIcon={<CloudUploadIcon />}
-        onClick={() => onImportSelected(true)}
+        onClick={() => {
+          // 打开导入向导；用户完成后再标记为"已有数据"
+          setWizardOpen(true);
+        }}
         sx={{
           bgcolor: '#ff3b30',
           '&:hover': { bgcolor: '#d32f2f' },
@@ -61,6 +68,13 @@ export function DataImportStep({ onImportSelected }: DataImportStepProps) {
       >
         从空白开始，稍后手动添加
       </Button>
+
+      <ImportWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        initialTarget="products"
+        onSuccess={() => onImportSelected(true)}
+      />
     </Box>
   );
 }

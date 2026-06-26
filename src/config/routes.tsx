@@ -129,6 +129,9 @@ export const PROTECTED_ROUTES: Array<{ path: string; loader: RouteLoader }> = [
   { path: '/group-buy', loader: () => import('../pages/groupbuy/GroupBuyPage') },
   { path: '/pickup-verify', loader: () => import('../pages/groupbuy/PickupVerifyPage') },
   { path: '/test', loader: () => import('../pages/TestPage') },
+  // v1.3：Import Center 列表页 + 详情页
+  { path: '/import-center', loader: () => import('../pages/ImportCenterPage') },
+  { path: '/import-center/:batchId', loader: () => import('../pages/ImportCenterPage') },
 ];
 
 export function renderAppRoutes() {

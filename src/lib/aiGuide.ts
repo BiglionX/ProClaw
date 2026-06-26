@@ -706,3 +706,349 @@ ProClaw 支持多种部署方式：
     response: '',
   };
 }
+
+// ==================== v1.3 D1：导入错误 AI 引导 ====================
+
+import type { ImportError, ImportTarget } from './importers/types';
+
+/**
+ * AI 引导建议（前端展示用）
+ */
+export interface ImportGuidance {
+  /** 引导分类（用于去重 + UI badge） */
+  category:
+    | 'missing_required'
+    | 'mapping_conflict'
+    | 'duplicate_row'
+    | 'reference_missing'
+    | 'value_out_of_range'
+    | 'date_format'
+    | 'encoding_unknown'
+    | 'image_missing';
+  /** 标题（如"缺商品名称列"） */
+  title: string;
+  /** 详细建议（HTML / Markdown 都可） */
+  suggestion: string;
+  /** 触发操作按钮的标签（可选） */
+  actionLabel?: string;
+  /** 跳转路径（可选） */
+  actionPath?: string;
+  /** AI 提示（如"检测到第 3 列疑似别名"） */
+  aiHint?: string;
+  /** 受影响行数（用于排序） */
+  affectedRows: number;
+  /** 受影响的字段（缺失必填 / 冲突列等） */
+  fields: string[];
+}
+
+/**
+ * v1.3 D1：根据导入错误列表生成 AI 引导建议
+ *
+ * 内置 8 类引导规则：
+ *  1. 缺必填字段（missing_required）
+ *  2. 字段映射冲突（mapping_conflict）
+ *  3. 重复行（duplicate_row）
+ *  4. 参考表不存在（reference_missing）— 如 SKU / 供应商名引用了不存在的对象
+ *  5. 数值越界（value_out_of_range）
+ *  6. 日期格式（date_format）
+ *  7. 编码未识别（encoding_unknown）
+ *  8. 图片缺失（image_missing）— image_filename 在 zip 内找不到
+ *
+ * 设计原则：
+ *  - 同类别聚合：返回数组中每条唯一对应一个 category
+ *  - 不做 LLM 调用：纯规则匹配 + 模板字符串（避免依赖网络）
+ *  - 按受影响行数降序：UI 可直接展示无需排序
+ */
+export function generateImportGuidance(
+  targetType: ImportTarget,
+  errorList: ImportError[],
+  fieldHeaders: string[],
+): ImportGuidance[] {
+  const out: ImportGuidance[] = [];
+  // 复用累加器：每类一个聚合结果
+  const buckets: Record<ImportGuidance['category'], { rows: Set<number>; fields: Set<string> }> = {
+    missing_required: { rows: new Set(), fields: new Set() },
+    mapping_conflict: { rows: new Set(), fields: new Set() },
+    duplicate_row: { rows: new Set(), fields: new Set() },
+    reference_missing: { rows: new Set(), fields: new Set() },
+    value_out_of_range: { rows: new Set(), fields: new Set() },
+    date_format: { rows: new Set(), fields: new Set() },
+    encoding_unknown: { rows: new Set(), fields: new Set() },
+    image_missing: { rows: new Set(), fields: new Set() },
+  };
+
+  for (const e of errorList) {
+    const cat = classifyError(e);
+    if (!cat) continue;
+    buckets[cat].rows.add(e.rowIndex);
+    if (e.field) buckets[cat].fields.add(e.field);
+  }
+
+  // 逐类生成引导
+  const missing = buildMissingRequiredGuidance(targetType, buckets.missing_required, fieldHeaders);
+  if (missing) out.push(missing);
+
+  const conflict = buildMappingConflictGuidance(buckets.mapping_conflict, fieldHeaders);
+  if (conflict) out.push(conflict);
+
+  const dup = buildDuplicateRowGuidance(buckets.duplicate_row, targetType);
+  if (dup) out.push(dup);
+
+  const ref = buildReferenceMissingGuidance(buckets.reference_missing, targetType);
+  if (ref) out.push(ref);
+
+  const range = buildValueOutOfRangeGuidance(buckets.value_out_of_range);
+  if (range) out.push(range);
+
+  const date = buildDateFormatGuidance(buckets.date_format);
+  if (date) out.push(date);
+
+  const enc = buildEncodingUnknownGuidance(buckets.encoding_unknown);
+  if (enc) out.push(enc);
+
+  const img = buildImageMissingGuidance(buckets.image_missing, targetType);
+  if (img) out.push(img);
+
+  // 按受影响行数降序
+  out.sort((a, b) => b.affectedRows - a.affectedRows);
+  return out;
+}
+
+/** 把单条 ImportError 分类到 8 类之一（未知返回 null） */
+function classifyError(e: ImportError): ImportGuidance['category'] | null {
+  const code = (e.code || '').toUpperCase();
+  if (code.startsWith('MISSING_REQUIRED') || code === 'REQUIRED_FIELD_EMPTY' || code === 'REQUIRED_EMPTY') {
+    return 'missing_required';
+  }
+  if (code.startsWith('MAPPING') || code === 'AMBIGUOUS_MAPPING' || code === 'CONFLICT_MAPPING') {
+    return 'mapping_conflict';
+  }
+  if (code.startsWith('DUPLICATE') || code === 'ROW_DUPLICATE') {
+    return 'duplicate_row';
+  }
+  if (
+    code.startsWith('REFERENCE') ||
+    code === 'SKU_NOT_FOUND' ||
+    code === 'SUPPLIER_NOT_FOUND' ||
+    code === 'CUSTOMER_NOT_FOUND'
+  ) {
+    return 'reference_missing';
+  }
+  if (code.startsWith('OUT_OF_RANGE') || code === 'VALUE_OUT_OF_RANGE' || code === 'NEGATIVE_QTY') {
+    return 'value_out_of_range';
+  }
+  if (code.startsWith('DATE') || code === 'INVALID_DATE' || code === 'DATE_FORMAT_INVALID') {
+    return 'date_format';
+  }
+  if (code.startsWith('ENCODING') || code === 'INVALID_ENCODING' || code === 'BOM_MISSING') {
+    return 'encoding_unknown';
+  }
+  if (code.startsWith('IMAGE') || code === 'IMAGE_NOT_FOUND' || code === 'IMAGE_MISSING') {
+    return 'image_missing';
+  }
+  return null;
+}
+
+// ---------- 8 类引导的具体实现 ----------
+
+const TARGET_LABEL: Record<ImportTarget, string> = {
+  products: '商品库',
+  inventory: '库存交易',
+  purchases: '采购订单',
+  sales: '销售订单',
+  suppliers: '供应商主数据',
+  customers: '客户主数据',
+};
+
+const TEMPLATE_PATH: Record<ImportTarget, string> = {
+  products: '/products?downloadTemplate=products',
+  inventory: '/products?downloadTemplate=inventory',
+  purchases: '/products?downloadTemplate=purchases',
+  sales: '/products?downloadTemplate=sales',
+  suppliers: '/products?downloadTemplate=suppliers-customers',
+  customers: '/products?downloadTemplate=suppliers-customers',
+};
+
+function finalize(
+  category: ImportGuidance['category'],
+  title: string,
+  suggestion: string,
+  bucket: { rows: Set<number>; fields: Set<string> },
+  extras: Partial<ImportGuidance> = {},
+): ImportGuidance | null {
+  if (bucket.rows.size === 0 && bucket.fields.size === 0) return null;
+  return {
+    category,
+    title,
+    suggestion,
+    affectedRows: bucket.rows.size,
+    fields: Array.from(bucket.fields),
+    ...extras,
+  };
+}
+
+function buildMissingRequiredGuidance(
+  targetType: ImportTarget,
+  bucket: { rows: Set<number>; fields: Set<string> },
+  headers: string[],
+): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  const fields = Array.from(bucket.fields);
+  const fieldsList = fields.length > 0 ? fields.join('、') : '必填字段';
+  // AI hint: 在 headers 中找可疑别名
+  const aliasHint = guessAliasHint(fields, headers);
+  return finalize(
+    'missing_required',
+    `缺${TARGET_LABEL[targetType]}必填字段（${fieldsList}）`,
+    `系统检测到 ${bucket.rows.size} 行缺少必填字段：${fieldsList}。请补全对应列后重新上传，或下载模板参考命名约定。`,
+    bucket,
+    {
+      actionLabel: `下载${TARGET_LABEL[targetType]}模板`,
+      actionPath: TEMPLATE_PATH[targetType],
+      aiHint: aliasHint ?? undefined,
+    },
+  );
+}
+
+function buildMappingConflictGuidance(
+  bucket: { rows: Set<number>; fields: Set<string> },
+  headers: string[],
+): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  const fields = Array.from(bucket.fields);
+  const fieldsText = fields.length > 0 ? fields.join('、') : '目标字段';
+  return finalize(
+    'mapping_conflict',
+    `字段映射冲突（${fieldsText}）`,
+    `检测到 ${bucket.rows.size} 行的字段映射存在歧义（如多个源列匹配到同一目标字段）。请在 Step 3 手动指定唯一映射。`,
+    bucket,
+    {
+      aiHint: guessAliasHint(fields, headers) ?? `尝试在映射面板中点击"AI 推荐映射"自动填充。`,
+    },
+  );
+}
+
+function buildDuplicateRowGuidance(
+  bucket: { rows: Set<number>; fields: Set<string> },
+  targetType: ImportTarget,
+): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  return finalize(
+    'duplicate_row',
+    `检测到重复行（${TARGET_LABEL[targetType]}）`,
+    `表中有 ${bucket.rows.size} 行与已有数据完全重复。请在 Step 5 调整冲突策略为"覆盖"或"复制为新"。`,
+    bucket,
+    {
+      suggestion: `表中有 ${bucket.rows.size} 行与已有数据完全重复。请在 Step 5 调整冲突策略为"覆盖"或"复制为新"。`,
+    },
+  );
+}
+
+function buildReferenceMissingGuidance(
+  bucket: { rows: Set<number>; fields: Set<string> },
+  targetType: ImportTarget,
+): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  const field = Array.from(bucket.fields)[0] ?? '外键字段';
+  const refName =
+    targetType === 'purchases'
+      ? 'SKU / 供应商'
+      : targetType === 'sales'
+        ? 'SKU / 客户'
+        : targetType === 'inventory'
+          ? 'SKU / 库位'
+          : '关联对象';
+  return finalize(
+    'reference_missing',
+    `${refName}不存在`,
+    `检测到 ${bucket.rows.size} 行的 ${field} 在系统中找不到对应记录。请先导入 ${refName} 主数据，再上传本批次。`,
+    bucket,
+    {
+      actionLabel: '查看导入主数据',
+      actionPath: '/products?downloadTemplate=suppliers-customers',
+    },
+  );
+}
+
+function buildValueOutOfRangeGuidance(
+  bucket: { rows: Set<number>; fields: Set<string> },
+): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  const fields = Array.from(bucket.fields);
+  return finalize(
+    'value_out_of_range',
+    `数值越界（${fields.join('、') || '相关字段'}）`,
+    `检测到 ${bucket.rows.size} 行的字段值超出允许范围（如负库存、百分比 > 100）。请检查源数据。`,
+    bucket,
+  );
+}
+
+function buildDateFormatGuidance(bucket: { rows: Set<number>; fields: Set<string> }): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  const fields = Array.from(bucket.fields);
+  return finalize(
+    'date_format',
+    `日期格式不规范（${fields.join('、') || '相关字段'}）`,
+    `检测到 ${bucket.rows.size} 行的日期字段无法识别。推荐使用 ISO 8601 (YYYY-MM-DD) 或 Excel 日期序列号。`,
+    bucket,
+  );
+}
+
+function buildEncodingUnknownGuidance(bucket: { rows: Set<number>; fields: Set<string> }): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  return finalize(
+    'encoding_unknown',
+    '文件编码无法识别',
+    `检测到 ${bucket.rows.size} 行包含乱码字符。请用 UTF-8（无 BOM）或 GB18030 重新导出 CSV。`,
+    bucket,
+  );
+}
+
+function buildImageMissingGuidance(
+  bucket: { rows: Set<number>; fields: Set<string> },
+  targetType: ImportTarget,
+): ImportGuidance | null {
+  if (bucket.rows.size === 0) return null;
+  return finalize(
+    'image_missing',
+    '图片在 zip 包内找不到',
+    `检测到 ${bucket.rows.size} 行的 image_filename 字段在上传的图片 zip 内找不到对应文件。请检查文件名是否一致（区分大小写）。`,
+    bucket,
+    {
+      actionLabel: '下载商品图片示例',
+      actionPath: TEMPLATE_PATH[targetType],
+    },
+  );
+}
+
+// ---------- 辅助：在 headers 中找疑似别名 ----------
+const ALIAS_HINTS: Record<string, string[]> = {
+  name: ['商品名称', '品名', '产品名称', '名称', 'name', 'product_name', 'title'],
+  spu_code: ['SPU编码', 'SPU', '商品编码', 'spu_code', 'spu'],
+  sku_code: ['SKU编码', 'SKU', '规格编码', 'sku_code', 'sku'],
+  category: ['分类', '类目', '类别', 'category', 'cat'],
+  quantity: ['数量', 'qty', 'quantity', '件数'],
+  unit_price: ['单价', '价格', 'price', 'unit_price'],
+  transaction_date: ['日期', '业务日期', 'date', 'transaction_date'],
+  order_date: ['订单日期', '下单日期', 'order_date'],
+  po_number: ['采购单号', 'PO号', '采购编号', 'po_number'],
+  so_number: ['销售单号', 'SO号', '销售编号', 'so_number'],
+  supplier_name: ['供应商', '供应商名称', 'supplier_name'],
+  customer_name: ['客户', '客户名称', 'customer_name'],
+};
+
+/** 在用户 headers 中找疑似字段的别名，给出 AI hint */
+function guessAliasHint(fields: string[], headers: string[]): string | null {
+  if (fields.length === 0 || headers.length === 0) return null;
+  const out: string[] = [];
+  for (const f of fields) {
+    const aliases = ALIAS_HINTS[f];
+    if (!aliases) continue;
+    const matches = headers.filter((h) => aliases.some((a) => a.toLowerCase() === String(h).toLowerCase()));
+    if (matches.length > 0) {
+      out.push(`${f} ← ${matches.join(' / ')}`);
+    }
+  }
+  if (out.length === 0) return null;
+  return `检测到疑似别名：${out.join('；')}`;
+}
