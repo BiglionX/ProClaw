@@ -234,13 +234,15 @@ pub fn get_syncable_products(db: tauri::State<Mutex<Database>>) -> Result<Vec<Va
     let conn = db.connection();
 
     // 从 product_spus 查所有 SPU（默认 is_cloud_visible = 1，云商城可同步）
+    // 修复：product_spus 表 schema 中没有 sort_order 列（仅 product_skus / product_images / brands / categories 有），
+    // 按 created_at DESC 排序，保持稳定顺序
     let mut stmt = conn
         .prepare(
             "SELECT id, spu_code, name, description, category_id, brand_id, unit,
                     is_on_sale, status, metadata, created_at, updated_at
              FROM product_spus
              WHERE deleted_at IS NULL
-             ORDER BY sort_order ASC, created_at DESC",
+             ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
 

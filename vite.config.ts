@@ -21,6 +21,18 @@ export default defineConfig({
   base: './',
   server: {
     port: 3000,
+    watch: {
+      // 忽略 Rust 构建产物，避免 Vite 在 Windows 上因目标 exe 文件锁 (EBUSY) 崩溃
+      ignored: [
+        '**/src-tauri/target/**',
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/coverage/**',
+        '**/test-results/**',
+        '**/playwright-report/**',
+        '**/playwright-browsers/**',
+      ],
+    },
   },
   resolve: {
     alias: {

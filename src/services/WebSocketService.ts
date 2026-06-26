@@ -28,18 +28,23 @@ class DesktopWebSocketService {
   private doConnect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    this.ws = new WebSocket(this.url);
+    // 使用局部变量捕获本次连接的 ws 实例。
+    // 修复：React StrictMode 下 useEffect 会执行两次（挂载→卸载→再挂载），
+    // 旧 ws 的 onopen 闭包若使用 this.ws!，可能指向被新连接替换且仍处于 CONNECTING 状态的实例，
+    // 导致 ws.send 抛 InvalidStateError: Still in CONNECTING state。
+    const ws = new WebSocket(this.url);
+    this.ws = ws;
 
-    this.ws.onopen = () => {
+    ws.onopen = () => {
       this.isAuthenticated = false;
-      this.ws!.send(JSON.stringify({
+      ws.send(JSON.stringify({
         type: 'auth',
         user_id: this.userId,
         token: this.token,
       }));
     };
 
-    this.ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
         const type = msg.type || 'unknown';
@@ -53,7 +58,7 @@ class DesktopWebSocketService {
           }
         } else if (type === 'auth_error') {
           console.error('[WS] Auth failed:', msg.error);
-          this.ws?.close();
+          ws.close();
           return;
         }
 
@@ -65,15 +70,19 @@ class DesktopWebSocketService {
       }
     };
 
-    this.ws.onclose = () => {
+    ws.onclose = () => {
       this.isConnected = false;
       this.isAuthenticated = false;
       this.stopHeartbeat();
       this.onStatusChange?.(false);
+      // 仅当当前活动连接仍是本实例时，才清空 this.ws，避免覆盖更新后的连接
+      if (this.ws === ws) {
+        this.ws = null;
+      }
       this.scheduleReconnect();
     };
 
-    this.ws.onerror = (err) => {
+    ws.onerror = (err) => {
       console.error('[WS] Error:', err);
     };
   }
