@@ -1,0 +1,13 @@
+openapi: 3.0.1
+info:
+  title: ProClips Skill API (cloud-store mock)
+  version: '1.0'
+servers:
+  - url: http://localhost:4001
+paths:
+  /api/proclips/templates:
+    get:
+      summary: Get templates
+      responses:
+        '200':
+          description: list
