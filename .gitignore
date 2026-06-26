@@ -104,9 +104,14 @@ RELEASES/
 .tauri-build-skip-fe.json
 final-test.txt
 test-list.txt
+executor_*.txt
 
 # EAS temp
 .eas-tmp/
+
+# Vercel temp
+.vercel-tmp/
+marketing-site/.vercel-tmp/
 
 # Playwright browsers
 playwright-browsers/
