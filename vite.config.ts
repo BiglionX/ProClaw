@@ -22,7 +22,7 @@ export default defineConfig({
   server: {
     port: 3000,
     watch: {
-      // 忽略 Rust 构建产物，避免 Vite 在 Windows 上因目标 exe 文件锁 (EBUSY) 崩溃
+      // 忽略 Rust 构建产物与发布产物，避免 Vite 在 Windows 上因文件锁 (EBUSY) 崩溃
       ignored: [
         '**/src-tauri/target/**',
         '**/node_modules/**',
@@ -31,6 +31,8 @@ export default defineConfig({
         '**/test-results/**',
         '**/playwright-report/**',
         '**/playwright-browsers/**',
+        // 打包后 RELEASES/v*/ 下的 .exe / .msi 同样会被文件锁，不应纳入 watch
+        '**/RELEASES/**',
       ],
     },
   },
