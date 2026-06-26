@@ -565,7 +565,7 @@ const DownloadPage: React.FC = () => {
                 <tbody>
                   <tr className="border-b border-gray-100">
                     <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (桌面端 v1.0.7)</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">bb6a85e774f1a4174e9576e50336de8effc3b7b499272e6092c2c87739d4c959</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">849efda24083df691d9249a127857b5403d79cb91906aa6a2d617b485d40af30</td>
                   </tr>
                   <tr className="border-b border-gray-100">
                     <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (移动端 Android APK v1.0.3)</td>
