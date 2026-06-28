@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+data/
+*.log
+*.sqlite
+*.sqlite-journal
+coverage/
+
+# 构建 / 测试运行残留（运行时生成的退出码或状态文件）
+*_exit.txt

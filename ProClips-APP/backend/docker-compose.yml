@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  proclips-backend:
+    build: .
+    container_name: proclips-backend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    volumes:
+      - ./data:/data
+    environment:
+      - PORT=${PORT:-4000}
+      - HOST=0.0.0.0
+      - NODE_ENV=${NODE_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ISSUER=${JWT_ISSUER:-proclips-backend}
+      - DB_PATH=/data/db.sqlite
+      - UPLOAD_DIR=/data/uploads
+      - RESULT_DIR=/data/results
+      - LOG_DIR=/data/logs
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:4000}
+      - MIX_WORKER_INTERVAL_MS=${MIX_WORKER_INTERVAL_MS:-2000}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
