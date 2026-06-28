@@ -19,24 +19,17 @@ export function LazyPage({ loader }: { loader: () => Promise<{ default: React.Co
 }
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, checkAuth, openLoginDialog } = useAuthStore();
+  const { user, checkAuth } = useAuthStore();
 
+  // PRD v13.0 §3 P1：离线 = 一等公民
+  // 首次启动不弹登录框；checkAuth 仍异步执行，演示账号 / 已登录用户会自然恢复 user
   React.useEffect(() => {
     if (user?.id?.startsWith('mock-')) return;
     checkAuth();
   }, [checkAuth, user]);
 
-  React.useEffect(() => {
-    if (!user) {
-      const timer = setTimeout(() => openLoginDialog(), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [user, openLoginDialog]);
-
-  if (!user) {
-    return <Box sx={{ minHeight: '100vh', bgcolor: '#1a1a1a' }} />;
-  }
-
+  // 不再自动 openLoginDialog()：登录入口已收缩到侧边栏底部账号区 + 设置中心账号 Tab
+  // 保留 AppLayout 渲染以维持顶栏/侧边栏等全局 UI
   return <AppLayout>{children}</AppLayout>;
 }
 

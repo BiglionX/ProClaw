@@ -76,6 +76,12 @@ lettre = { version = "0.11", default-features = false, features = ["builder", "s
 # 密码哈希 (argon2)
 argon2 = "0.5.3"
 
+# OS Keyring（v13.1 本地密码升级：Tauri 桌面端用 OS 原生密码管理器存密码哈希）
+# - macOS: Keychain
+# - Windows: Credential Manager
+# - Linux: Secret Service (GNOME Keyring / KWallet)
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "vendored"] }
+
 # HMAC-SHA256 签名（邀请码防伪）
 hmac = "0.12"
 

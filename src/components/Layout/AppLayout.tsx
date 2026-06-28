@@ -8,6 +8,7 @@ import TopBar from './TopBar';
 import RecruitButton from '../AgentMarket/RecruitButton';
 import MarketDialog from '../AgentMarket/MarketDialog';
 import WelcomeTour from '../Demo/WelcomeTour';
+import { GlobalRequireUpgradeDialog } from '../Auth/RequireUpgrade';
 import { useAppModeStore } from '../../config/appMode';
 import { useAuthStore } from '../../lib/authStore';
 import { isDemoAccount } from '../../lib/aiTeamTokenService';
@@ -140,6 +141,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       {/* 演示账号首次登录欢迎提示 */}
       <WelcomeTour />
+
+      {/* PRD v13.0 §9：全局增值能力拦截对话框 */}
+      <GlobalRequireUpgradeDialog />
     </Box>
   );
 }

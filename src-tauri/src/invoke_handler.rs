@@ -52,6 +52,7 @@ use crate::sales_commands::*;
 use crate::sales_return_commands::*;
 use crate::secretary_commands::*;
 use crate::services::nvwax_commands::*;
+use crate::password_storage_commands::*;
 use crate::setup_commands::*;
 #[cfg(any(feature = "light", feature = "inventory"))]
 use crate::store_commands::*;
@@ -640,5 +641,9 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         // 系统托盘与桌面通知 (v1.1.0)
         send_desktop_notification,
         update_tray_tooltip,
+        // 本地密码 OS Keyring 存储（v13.1）
+        password_keyring_get,
+        password_keyring_set,
+        password_keyring_delete,
     ])
 }

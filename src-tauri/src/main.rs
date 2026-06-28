@@ -55,6 +55,9 @@ pub mod team_commands;
 pub mod tray_commands;
 pub mod user_commands;
 
+// 本地密码 OS Keyring 存储（v13.1）
+pub mod password_storage_commands;
+
 // 云备份模块（Cloud 版）
 pub mod agent_profile_commands;
 pub mod cloud_backup_commands;

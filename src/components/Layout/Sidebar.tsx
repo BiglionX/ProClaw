@@ -45,6 +45,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppModeStore, PluginNavItem } from '../../config/appMode';
+import AccountArea from './AccountArea';
 // 注：用户信息已上移至 TopBar 右上角展示，Sidebar 不再直接消费 useAuthStore
 
 const DRAWER_WIDTH = 240;
@@ -362,9 +363,12 @@ export default function Sidebar() {
           );
         })}
 
-      {/* ---- 底部：折叠按钮（用户信息已上移至 TopBar 右上角，避免视觉重叠） ---- */}
+      {/* ---- 底部：账号区 + 折叠按钮（PRD v13.0 §5.1） ---- */}
       <Box sx={{ mt: 'auto' }}>
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+
+        {/* PRD v13.0：账号区（点击离线态直接跳设置中心账号 Tab） */}
+        <AccountArea collapsed={collapsed} />
 
         {/* 折叠按钮 */}
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>

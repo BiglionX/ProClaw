@@ -86,14 +86,21 @@ import { NvwaXService } from '../lib/nvwaxClient';
 import BapSettingsPanel from '../components/Agent/BapSettingsPanel';
 import PreferenceSettings from '../components/CEO/PreferenceSettings';
 import AiPluginPanel from '../components/Teams/AiPluginPanel';
+import { SoftBanner } from '../components/Auth/RequireUpgrade';
 
 export default function TeamsPage() {
   const navigate = useNavigate();
   const invalidateTeams = useInvalidateTeams();
   const { data: teams = [], isLoading: loading } = useTeams();
+  // PRD v13.0 §6.2：离线访客进入 AI 团队页面，触发 UpgradeDialog（增值能力拦截）
+  const { identityState } = useAuthStore();
   const existingTeamNames = useMemo(() => teams.map((t) => t.name), [teams]);
   const [snackbar, setSnackbar] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // PRD v13.0 §6：离线访客可用 AI Team 本地回退，仅云端能力需登录
+  // 用页面级 state 控制顶部软提示，避免 useEffect 循环
+  const [showOfflineBanner, setShowOfflineBanner] = useState(identityState === 'offline');
 
   // 对话框状态
   const [createOpen, setCreateOpen] = useState(false);
@@ -455,6 +462,11 @@ export default function TeamsPage() {
 
   return (
     <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
+      {/* PRD v13.0 §6：离线访客软提示条（页面顶部，本地能力仍可使用） */}
+      {showOfflineBanner && identityState === 'offline' && (
+        <SoftBanner feature="ai-team" onClose={() => setShowOfflineBanner(false)} />
+      )}
+
       {/* 第一行：标题 + 创建团队按钮（始终显示） */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
         <Typography variant="h5" fontWeight={700}>AI 团队</Typography>

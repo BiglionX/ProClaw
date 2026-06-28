@@ -31,18 +31,35 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { useAppModeStore } from '../config/appMode';
 import { isDemoAccountContext, readDemoFlag, recordDemoReset } from '../lib/demoFlag';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
+import AccountSettings from '../components/Settings/AccountSettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
 }
+
+// PRD v13.0 §5.2：账号 Tab 索引（追加在末尾）
+// 注意：在 light 模式下 数据库设置/指令分析/邀请管理 Tab 不渲染，
+//       所以需要根据 mode/isDemo 动态计算索引。
+//       demo 模式下会多一个「数据管理」Tab。
+const computeAccountTabIndex = (isLight: boolean, isDemo: boolean): number => {
+  let idx = 0;
+  idx++; // 0: AI 模型设置
+  if (!isLight) idx++; // 1: 数据库设置
+  if (!isLight) idx++; // 2: 指令分析
+  idx++; // 系统信息
+  if (!isLight) idx++; // 邀请管理
+  if (isDemo) idx++; // 数据管理
+  idx++; // 自动更新
+  return idx; // 账号
+};
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
@@ -85,6 +102,18 @@ export default function SettingsPage() {
 
   const isDemo = isDemoAccountContext();
   const demoFlag = isDemo ? readDemoFlag() : null;
+  // PRD v13.0 §5.2：账号 Tab 索引随 mode/isDemo 动态计算
+  const accountTabIndex = computeAccountTabIndex(mode === 'light', isDemo);
+
+  // PRD v13.0 §5.2：支持 ?tab=account 参数（侧边栏点击触发）
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'account') {
+      setTabValue(accountTabIndex);
+      // 不删除参数，允许子组件读取 scrollTo
+    }
+  }, [searchParams, accountTabIndex]);
 
   // 监听演示数据引导完成事件，自动刷新本地标记
   useEffect(() => {
@@ -179,6 +208,8 @@ export default function SettingsPage() {
           {isDemo && <Tab label="🧪 数据管理" {...a11yProps(5)} />}
           {/* 补全 5：自动更新 Tab */}
           <Tab label="🔄 自动更新" {...a11yProps(6)} />
+          {/* PRD v13.0 §5.2：账号 Tab（追加末尾，永远可见，索引动态计算） */}
+          <Tab label="👤 账号" {...a11yProps(accountTabIndex)} />
         </Tabs>
       </Paper>
 
@@ -526,6 +557,11 @@ export default function SettingsPage() {
           </Dialog>
         </TabPanel>
       )}
+
+      {/* Tab {accountTabIndex}: 账号（PRD v13.0 §5.2） */}
+      <TabPanel value={tabValue} index={accountTabIndex}>
+        <AccountSettings />
+      </TabPanel>
     </Box>
   );
 }

@@ -1,0 +1,109 @@
+{
+  "name": "proclips-mobile",
+  "version": "1.0.0",
+  "description": "ProClips App - AI 视频营销助手移动端",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "eject": "expo eject",
+    "test": "jest --forceExit --detectOpenHandles",
+    "typecheck": "tsc --noEmit",
+    "lint:no-console": "node scripts/lint-no-console.js",
+    "lint:no-stale-js": "node scripts/lint-no-stale-js.js --strict",
+    "clean:stale-js": "node scripts/clean-stale-js.js",
+    "lint:check": "npm run typecheck && npm run lint:no-console && npm run lint:no-stale-js",
+    "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1",
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "@config-plugins/react-native-webrtc": "^15.0.1",
+    "@expo/metro-runtime": "~56.0.15",
+    "@livekit/react-native": "^2.11.1",
+    "@livekit/react-native-expo-plugin": "^1.0.2",
+    "@livekit/react-native-webrtc": "^144.1.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^6.5.11",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/stack": "^6.3.20",
+    "axios": "^1.7.0",
+    "crypto-js": "^4.2.0",
+    "expo": "~56.0.11",
+    "expo-av": "^16.0.8",
+    "expo-camera": "~56.0.8",
+    "expo-dev-client": "~56.0.20",
+    "expo-file-system": "~56.0.8",
+    "expo-image-picker": "~56.0.17",
+    "expo-network": "~56.0.5",
+    "expo-secure-store": "~56.0.4",
+    "expo-sqlite": "~56.0.5",
+    "expo-status-bar": "~56.0.4",
+    "expo-system-ui": "~56.0.5",
+    "jszip": "^3.10.0",
+    "livekit-client": "^2.19.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-gesture-handler": "~2.31.1",
+    "react-native-incall-manager": "^4.2.1",
+    "react-native-linear-gradient": "^2.8.3",
+    "react-native-paper": "^5.12.0",
+    "react-native-qrcode-svg": "^6.3.0",
+    "react-native-reanimated": "~4.3.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "4.25.2",
+    "react-native-svg": "15.15.4",
+    "react-native-toast-message": "^2.2.0",
+    "react-native-vector-icons": "^10.0.0",
+    "react-native-web": "^0.21.2",
+    "react-native-webview": "^13.16.1",
+    "react-native-worklets": "0.8.3",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/crypto-js": "^4.2.2",
+    "@types/jest": "29.5.14",
+    "@types/react": "~19.2.14",
+    "@types/react-native-vector-icons": "^6.4.18",
+    "jest": "^29.7.0",
+    "patch-package": "^8.0.0",
+    "ts-jest": "^29.4.11",
+    "typescript": "~6.0.3"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.json"
+        }
+      ]
+    },
+    "testMatch": [
+      "**/__tests__/**/*.test.ts",
+      "**/__tests__/**/*.test.tsx"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
+    "moduleNameMapper": {
+      "^@react-native-async-storage/async-storage$": "<rootDir>/node_modules/@react-native-async-storage/async-storage",
+      "^react-native$": "<rootDir>/__mocks__/react-native.ts",
+      "^(.*[/\\\\])components/Toast$": "<rootDir>/__mocks__/Toast.ts",
+      "../lib/fetchWithTimeout$": "<rootDir>/src/lib/fetchWithTimeout.ts"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(react-native|@react-native|expo|@expo|@livekit|livekit-client)/)"
+    ],
+    "testEnvironment": "node"
+  },
+  "private": true
+}

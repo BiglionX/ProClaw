@@ -46,6 +46,7 @@ import {
   type Plan,
 } from '../../lib/subscriptionService';
 import { useAuthStore } from '../../lib/authStore';
+import { useOfflineGuard } from '../../lib/hooks/useOfflineGuard';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -79,6 +80,8 @@ function generateTrendData(days: number): { date: string; used: number }[] {
 export default function TokenBillingPage() {
   const user = useAuthStore((s) => s.user);
   const userId = user?.id || '';
+  // PRD v13.0 §4.5：Token 计费必须登录，离线访客弹 UpgradeDialog
+  useOfflineGuard('token');
 
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);

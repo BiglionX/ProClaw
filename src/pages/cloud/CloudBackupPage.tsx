@@ -50,6 +50,7 @@ import {
   type BackupStatus,
 } from '../../lib/cloudBackupService';
 import { useAuthStore } from '../../lib/authStore';
+import { useOfflineGuard } from '../../lib/hooks/useOfflineGuard';
 
 /** 格式化字节数 */
 function formatBytes(bytes: number | null): string {
@@ -72,6 +73,8 @@ function formatDate(dateStr: string | null): string {
 export default function CloudBackupPage() {
   const user = useAuthStore((s) => s.user);
   const userId = user?.id || '';
+  // PRD v13.0 §4.5：云备份必须登录，离线访客弹 UpgradeDialog
+  useOfflineGuard('cloud-backup');
 
   const [loading, setLoading] = useState(true);
   const [backingUp, setBackingUp] = useState(false);

@@ -5,8 +5,11 @@
  */
 import { Box, Typography } from '@mui/material';
 import AiPluginPanel from '../components/Teams/AiPluginPanel';
+import { useOfflineGuard } from '../lib/hooks/useOfflineGuard';
 
 export default function PluginStorePage() {
+  // PRD v13.0 §4.7：插件商店必须登录，离线访客弹 UpgradeDialog
+  useOfflineGuard('plugin-store');
   return (
     <Box>
       {/* 页面标题 */}

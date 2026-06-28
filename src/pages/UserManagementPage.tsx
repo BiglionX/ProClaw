@@ -35,6 +35,7 @@ import {
 } from '@mui/icons-material';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useUsersAndRoles, useInvalidateUsers } from '../lib/hooks/useUsers';
+import { useOfflineGuard } from '../lib/hooks/useOfflineGuard';
 import {
   createEmployeeInvitation,
   createManagedUser,
@@ -46,6 +47,8 @@ import {
 type User = ManagedUser;
 
 const UserManagementPage: React.FC = () => {
+  // PRD v13.0 §4.6：5 角色权限矩阵必须登录，离线访客弹 UpgradeDialog
+  useOfflineGuard('invitation');
   const { data, isLoading: loading, refetch } = useUsersAndRoles();
   const invalidateUsers = useInvalidateUsers();
   const users = data?.users ?? [];
