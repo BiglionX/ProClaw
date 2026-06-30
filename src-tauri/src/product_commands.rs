@@ -1879,7 +1879,7 @@ pub fn seed_demo_products(
                 "INSERT OR REPLACE INTO product_skus (id, spu_id, sku_code, specifications, spec_text,
                  cost_price, sell_price, current_stock, min_stock, max_stock, barcode,
                  is_default, sort_order, is_active, sync_status)
-                 VALUES (?1, ?2, ?3, ?4, '标准版', ?5, ?6, ?7, ?8, ?9, ?10, 1, 0, 1, 'synced')",
+                 VALUES (?1, ?2, ?3, ?4, '标准版', ?5, ?6, ?7, ?8, ?9, ?10, 1, ?11, 1, 'synced')",
                 params![
                     sku_id,
                     item.id,
@@ -1891,6 +1891,7 @@ pub fn seed_demo_products(
                     item.min_stock,
                     item.max_stock,
                     item.barcode,
+                    item.sort_order,
                 ],
             ).map_err(|e| format!("seed product_skus 失败 ({}): {}", item.spu_code, e))?;
         }

@@ -144,7 +144,9 @@ pub struct OrderNotification {
 }
 
 /// WebSocket 请求结构（客户端发送）
+/// `id` 字段保留用于客户端请求/响应关联（暂未在服务端读取，避免 dead_code 警告）
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct WsRequest {
     #[serde(rename = "type")]
     msg_type: String,

@@ -110,6 +110,25 @@ lazy_static::lazy_static! {
     pub static ref COMMAND_STATS: CommandStatsCollector = CommandStatsCollector::new();
 }
 
+/// 修复 v1.0.7 闪退 #2: 启动期致命错误处理
+/// 作用: 写明详细日志到 %TEMP%\proclaw-diag.log 后再退出（不 panic）
+/// 原因: 原代码用 .expect(...)? 直接 panic，stdout/stderr 被 windows_subsystem="windows" 吞掉
+///       用户报告"闪退"时无任何信息可查
+/// 提示: 用户侧排查时引导查看 diag 日志
+fn fatal_exit(context: &str, err: impl std::fmt::Display) -> ! {
+    let msg = format!("FATAL [{}]: {}", context, err);
+    eprintln!("{}", msg);
+    diag_log(&msg);
+    diag_log("─────────────────────────────────────────────────");
+    diag_log("应用启动失败，即将退出。请按以下顺序排查：");
+    diag_log("  1. 检查 C:\\Users\\<User>\\AppData\\Local\\com.proclaw.desktop\\ 目录是否可写");
+    diag_log("  2. 检查磁盘空间（AppData 所在盘至少保留 1GB）");
+    diag_log("  3. 暂时关闭杀软/防火墙后重试");
+    diag_log("  4. 查看完整日志: %TEMP%\\proclaw-diag.log");
+    diag_log("─────────────────────────────────────────────────");
+    std::process::exit(1);
+}
+
 /// 备份并删除损坏的数据库文件（主db + WAL -shm + -wal）
 /// 用于 main 启动时检测到 readonly/corrupted 后的自动恢复
 fn backup_and_remove_corrupted_db_files(db_path: &Path) {
@@ -149,26 +168,39 @@ async fn main() {
     let db_path = get_database_path();
     println!("Database path: {:?}", db_path);
 
-    // 审计修复 #11+白屏修复: 优雅处理 db 初始化失败
+    // 审计修复 #11+白屏修复+闪退修复 #2: 优雅处理 db 初始化失败
     // - 第一次失败：自动备份损坏文件 + 删除 -shm/-wal + 重建 db
-    // - 第二次还失败：返回错误 db（is_installed 永远 false），setup-wizard 会引导用户
+    // - 第二次还失败：fatal_exit 写详细日志后退出（替代原 .expect 直接 panic）
+    // - 退出后用户可从 %TEMP%\proclaw-diag.log 看到原因，不再出现"无声闪退"
     let db = match Database::new(db_path.clone()) {
         Ok(db) => db,
         Err(e) => {
             eprintln!("⚠️ 数据库打开失败: {}. 尝试自动恢复（备份+重建）...", e);
+            diag_log(&format!("WARN: 第一次 Database::new 失败: {}，尝试恢复...", e));
             backup_and_remove_corrupted_db_files(&db_path);
-            Database::new(db_path.clone())
-                .expect("启动失败: 无法创建数据库。请检查磁盘空间和数据目录权限。")
+            match Database::new(db_path.clone()) {
+                Ok(db) => db,
+                Err(e2) => fatal_exit("Database::new 二次失败", format!("{} (首次: {})", e2, e)),
+            }
         }
     };
     let db = match db.initialize() {
         Ok(()) => db,
         Err(e) => {
             eprintln!("⚠️ 数据库初始化失败: {}. 尝试自动恢复...", e);
+            diag_log(&format!("WARN: db.initialize 失败: {}，尝试恢复...", e));
             backup_and_remove_corrupted_db_files(&db_path);
-            let db = Database::new(db_path.clone()).expect("启动失败: 无法重建数据库。");
-            db.initialize().expect("启动失败: 数据库初始化失败。");
-            db
+            let db = match Database::new(db_path.clone()) {
+                Ok(db) => db,
+                Err(e2) => fatal_exit("重建 Database::new 失败", e2),
+            };
+            match db.initialize() {
+                Ok(()) => db,
+                Err(e2) => fatal_exit(
+                    "db.initialize 二次失败",
+                    format!("{} (首次: {})", e2, e),
+                ),
+            }
         }
     };
     println!("Database initialized successfully");
@@ -206,17 +238,24 @@ async fn main() {
     // 创建同步引擎（使用独立的数据库实例）
     // 审计修复 #11: 5个独立连接共享WAL无重试机制。WAL模式支持多读单写，
     // 当前设计为迁移过渡方案，后续应用连接池统一管理。
-    let sync_engine = SyncEngine::new(
-        Database::new(db_path.clone()).expect("启动失败: 同步引擎数据库创建失败。请检查磁盘空间。"),
-    );
+    // 闪退修复 #2: Database::new 改 fatal_exit，不再静默 panic
+    let sync_engine = SyncEngine::new(match Database::new(db_path.clone()) {
+        Ok(db) => db,
+        Err(e) => fatal_exit("同步引擎数据库创建", e),
+    });
     // 审计修复 #10: 多个独立 DB 实例竞争同一 WAL 文件是已知过渡设计，
     // SQLite WAL 模式支持多读单写，但缺少 SQLITE_BUSY 重试。
 
     // 审计修复 #2: 从 KeyManager 派生云备份独立密钥，不再使用全零密钥
+    // 闪退修复 #2: Database::new 改 fatal_exit
     let backup_encryption_key =
         KeyManager::derive_from_key(&key_manager, b"proclaw-cloud-backup-key-v1");
+    let cloud_backup_db = match Database::new(db_path.clone()) {
+        Ok(db) => db,
+        Err(e) => fatal_exit("云备份数据库创建", e),
+    };
     let cloud_backup_service = Arc::new(CloudBackupService::new(
-        Database::new(db_path.clone()).expect("启动失败: 云备份数据库创建失败。请检查磁盘空间。"),
+        cloud_backup_db,
         &backup_encryption_key,
     ));
 
@@ -233,10 +272,11 @@ async fn main() {
             eprintln!("[Security] WARNING: NVWAX_CIPHER_PASSWORD env var not set, using default. Set this in production!");
             "proclaw-nvwax-default-cipher-key".to_string()
         });
-    let nvwax_cipher = Arc::new(
-        Aes256GcmCipher::from_password(&nvwax_password, nvwax_key_salt)
-            .expect("Failed to create NvwaX cipher"),
-    );
+    // 闪退修复 #2: NvwaX cipher 创建改 fatal_exit
+    let nvwax_cipher = Arc::new(match Aes256GcmCipher::from_password(&nvwax_password, nvwax_key_salt) {
+        Ok(c) => c,
+        Err(e) => fatal_exit("NvwaX cipher 创建", e),
+    });
 
     // 优先使用环境变量 NVWAX_API_KEY，其次尝试从数据库加载已保存的 Key
     // 审计修复 #15: 解密/加载失败时打印警告，不再静默回退为空字符串
@@ -275,21 +315,25 @@ async fn main() {
     // Tauri State 使用 Mutex<Database>（不包 Arc），HTTP 服务器使用 Arc<Mutex<Database>>
     let db = Mutex::new(db);
 
-    let nvwax_billing_db = Arc::new(Mutex::new(
-        Database::new(db_path.clone()).expect("Failed to create billing DB"),
-    ));
+    // 闪退修复 #2: billing db 改 fatal_exit
+    let nvwax_billing_db = match Database::new(db_path.clone()) {
+        Ok(db) => Arc::new(Mutex::new(db)),
+        Err(e) => fatal_exit("billing 数据库创建", e),
+    };
     let nvwax_billing = Arc::new(NvwaXBilling::new(nvwax_billing_db));
 
     // 审计修复 #1/#22: 从 KeyManager 派生 HTTP API 独立加密密钥（与云备份密钥分离）
+    // 闪退修复 #2: cipher / http db 改 fatal_exit
     let api_encryption_key = KeyManager::derive_from_key(&key_manager, b"proclaw-http-api-key-v1");
-    let cipher = Arc::new(
-        Aes256GcmCipher::new(&api_encryption_key)
-            .expect("Failed to create HTTP API cipher from derived key"),
-    );
+    let cipher = Arc::new(match Aes256GcmCipher::new(&api_encryption_key) {
+        Ok(c) => c,
+        Err(e) => fatal_exit("HTTP API cipher 创建", e),
+    });
     // 创建 axum 应用状态（使用独立数据库连接，SQLite WAL 支持多连接）
-    let http_db = Arc::new(Mutex::new(
-        Database::new(db_path.clone()).expect("Failed to create HTTP DB"),
-    ));
+    let http_db = match Database::new(db_path.clone()) {
+        Ok(db) => Arc::new(Mutex::new(db)),
+        Err(e) => fatal_exit("HTTP 数据库创建", e),
+    };
     let ws_manager = Arc::new(WebSocketManager::new());
     let app_state = AppState {
         db: http_db,
@@ -333,7 +377,8 @@ async fn main() {
     };
 
     // 启动 Tauri 应用
-    invoke_handler::apply(tauri::Builder::default()
+    // 闪退修复 #2: Tauri run 绑定到 _run_result，异常时调用 fatal_exit 写日志再退出
+    let _run_result = invoke_handler::apply(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
@@ -412,9 +457,24 @@ async fn main() {
             let tray_menu = tauri::menu::Menu::with_items(app, &[&show_item, &quit_item])
                 .map_err(|e| format!("Menu build failed: {}", e))?;
 
+            // 修复 v1.0.7 闪退 #1: 托盘图标三级回退，避免 panic
+            // 优先级: 1) app.default_window_icon()（tauri 2.11 从 bundle.icon[0] 回退）
+            //         2) Image::new_owned 创建透明 32x32 占位
+            //         3) 无图标托盘（允许）
+            // 原因: 原 .ok_or(...)? 在 tauri 2.11 打包后 default_window_icon() 可能返回 None
+            //       （虽然 tauri 2.11 应该从 bundle.icon 回退，但出于防御性仍提供多重回退）
+            //       → 进程 panic 闪退
+            let tray_icon = app.default_window_icon().cloned().or_else(|| {
+                diag_log("WARN: default_window_icon() returned None, creating 32x32 transparent fallback");
+                Some(tauri::image::Image::new_owned(vec![0u8; 32 * 32 * 4], 32, 32))
+            });
+            diag_log(&format!(
+                "✓ Tray icon resolved: {}",
+                if tray_icon.is_some() { "OK" } else { "none" }
+            ));
+
             // 构建托盘图标
-            let _tray = tauri::tray::TrayIconBuilder::with_id("main-tray")
-                .icon(app.default_window_icon().cloned().ok_or("no default window icon")?)
+            let mut tray_builder = tauri::tray::TrayIconBuilder::with_id("main-tray")
                 .tooltip("ProClaw Desktop")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)
@@ -445,7 +505,11 @@ async fn main() {
                         app.exit(0);
                     }
                     _ => {}
-                })
+                });
+            if let Some(ic) = tray_icon {
+                tray_builder = tray_builder.icon(ic);
+            }
+            let _tray = tray_builder
                 .build(app)
                 .map_err(|e| format!("Tray build failed: {}", e))?;
             diag_log("System tray icon created");
@@ -538,7 +602,9 @@ async fn main() {
 
             Ok(())
         })
-    )
-        .run(tauri::generate_context!())
-        .expect("启动失败: Tauri 应用运行时出错。请检查系统资源是否充足。");
+        .run(tauri::generate_context!());
+    // 闪退修复 #2: Tauri run 异常不要 panic，写详细日志后再退出
+    if let Err(e) = _run_result {
+        fatal_exit("Tauri 应用运行时", e);
+    }
 }

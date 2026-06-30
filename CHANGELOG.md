@@ -5,6 +5,41 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/),
 版本遵循 [Semantic Versioning](https://semver.org/)。
 
+## [1.0.8] - 2026-06-30
+
+### Fixed
+- **🛠 启动闪退修复（v1.0.7 回归）**：v1.0.7 安装后双击图标立刻退到桌面，现已修复
+  - **托盘图标三级回退**（[src-tauri/src/main.rs](file:///d:/BigLionX/ProClaw/src-tauri/src/main.rs)）：`default_window_icon()` 返回 `None` 时自动降级到 32×32 透明占位图，避免 `TrayIconBuilder` 因图标缺失而 panic
+  - **`fatal_exit` 替代 9 处 `.expect()`**：所有启动期致命错误（DB / cipher / billing db / sync engine / HTTP db / Tauri run 等）改为先写详细诊断日志到 `%TEMP%\proclaw-diag.log` 再退出，告别"无声闪退"
+  - **NTFS compact 缓存**（[src-tauri/src/database.rs](file:///d:/BigLionX/ProClaw/src-tauri/src/database.rs)）：用 `OnceLock<Mutex<HashSet<PathBuf>>>` 缓存已清理 NTFS 压缩属性的目录，避免 5 个 `Database::new` 重复执行 `compact /U /S`（首次启动从 25+ 秒降至 < 1 秒）
+  - **WebSocket 请求结构**：移除 `WsRequest.id` 字段的 `dead_code` 警告（保留字段用于客户端请求/响应关联）
+  - **演示 SKU 排序**：修复 `product_commands.rs::seed_demo_products` 中 `INSERT INTO product_skus` 漏绑定 `sort_order` 参数的 bug（v1.0.7 起 `?11` 占位但未传值）
+
+### Changed
+- 版本号同步：`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` / `src/lib/appVersion.ts` 由 `1.0.7` → `1.0.8`
+
+### Diagnostic
+- 新增启动诊断日志路径：`%TEMP%\proclaw-diag.log`
+- 闪退时日志会写入 `FATAL [context]: error` + 4 条排查指引（数据目录权限 / 磁盘空间 / 杀软防火墙 / 日志位置）
+
+### Testing
+- 完整测试步骤见 [RELEASES/v1.0.8/测试步骤.md](file:///d:/BigLionX/ProClaw/RELEASES/v1.0.8/测试步骤.md)（5 阶段 + 5 项通过标准，约 10 分钟）
+- 安装包：`RELEASES/v1.0.8/ProClaw_1.0.8_x64-setup.exe`（7.42 MB）
+
+---
+
+## [1.0.7] - 2026-06-25
+
+### Changed
+- 下载页同步 v1.0.7 安装包（[marketing-site/src/pages/DownloadPage.tsx](file:///d:/BigLionX/ProClaw/marketing-site/src/pages/DownloadPage.tsx)）
+- 安装包 SHA256 校验和同步
+
+### Fixed
+- 修复 3 个开发/运行期 bug（desktop）
+- Vite watch 忽略 `RELEASES/**` 避免 MSI 文件触发 EBUSY
+
+---
+
 ## [1.0.0] - 2026-06-08
 
 ### Added

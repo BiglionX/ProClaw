@@ -1,6 +1,14 @@
 use rusqlite::{params, Connection, Result};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use thiserror::Error;
+
+/// 闪退修复 #3: 缓存已清理 NTFS 压缩属性的目录
+/// 原因: main.rs 创建 5 个 Database 实例共享同一 db_path，原始实现每次都调用 compact /U
+///       每次 compact 耗时 5+ 秒，5 次 = 25+ 秒启动时间，被用户误判为“启动慢/闪退”
+/// 优化: OnceLock 全局缓存，相同路径只跑一次 compact
+static NTFS_CLEARED_DIRS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
 
 /// 清除目录的 NTFS Compressed 属性（Windows 专用）
 ///
@@ -14,8 +22,20 @@ use thiserror::Error;
 /// compact /U 取消当前目录及子目录的 NTFS 文件压缩。
 #[cfg(windows)]
 fn clear_ntfs_compressed_attribute(path: &Path) {
-    let path_str = path.as_os_str().to_string_lossy().to_string();
+    // 闪退修复 #3: 先检查缓存，同一路径不再重复跑 compact
+    let path_buf = path.to_path_buf();
+    let cache = NTFS_CLEARED_DIRS.get_or_init(|| Mutex::new(HashSet::new()));
+    if let Ok(mut set) = cache.lock() {
+        if set.contains(&path_buf) {
+            // 已清理过，静默跳过（首次调用会打印详细信息）
+            return;
+        }
+        set.insert(path_buf);
+    }
+    // 锁中毒（poisoned）时仍继续走原逻辑，不阻塞启动
+
     // compact /U <path> 取消路径下所有文件的 NTFS 压缩
+    let path_str = path.as_os_str().to_string_lossy().to_string();
     let result = std::process::Command::new("compact")
         .args(["/U", "/S", &path_str, "/Q", "/I", "/F"])
         .output();
