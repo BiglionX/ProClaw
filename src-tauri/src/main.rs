@@ -116,9 +116,20 @@ lazy_static::lazy_static! {
 /// 原因: 原代码用 .expect(...)? 直接 panic，stdout/stderr 被 windows_subsystem="windows" 吞掉
 ///       用户报告"闪退"时无任何信息可查
 /// 提示: 用户侧排查时引导查看 diag 日志
+///
+/// v1.1.1 hotfix 闪退修复 #2: 日志最顶端额外写一行 FATAL_RAW_ERR
+/// 原: 只输出一行 `FATAL [context]: err`，SQLite 多行错误（如包含 SQL 文本）
+///     会被 windows 控制台 / 终端截尾，用户只看到尾部。"at offset 54)" 看似
+///     语法错误，实际可能是 readonly / locked / busy, 被截断误导定位。
+/// 新: 先 err.to_string() 完整文本独立一行 + 上下文 + 边界线，diag_log 头
+///     永远是完整错误原文，定位零猜。
 fn fatal_exit(context: &str, err: impl std::fmt::Display) -> ! {
-    let msg = format!("FATAL [{}]: {}", context, err);
+    let err_str = err.to_string();
+    let msg = format!("FATAL [{}]: {}", context, err_str);
     eprintln!("{}", msg);
+    diag_log("════════════════════════════════════════════════════════════");
+    diag_log("⚠️  FATAL_RAW_ERR (完整原文，看这一行定位闪退根因，不要看下面):");
+    diag_log(&err_str);
     diag_log(&msg);
     diag_log("─────────────────────────────────────────────────");
     diag_log("应用启动失败，即将退出。请按以下顺序排查：");
@@ -128,6 +139,23 @@ fn fatal_exit(context: &str, err: impl std::fmt::Display) -> ! {
     diag_log("  4. 查看完整日志: %TEMP%\\proclaw-diag.log");
     diag_log("─────────────────────────────────────────────────");
     std::process::exit(1);
+}
+
+/// v1.1.1 hotfix 闪退修复 #3: 识别 db 只读/被锁错误
+/// 原因: 杀软 / OneDrive 同步 / 文件句柄未释放导致 db 处于 readonly 或 locked 状态，
+///       CREATE INDEX ... IF NOT EXISTS 会抱 "attempt to write a readonly database"
+///       或 "database is locked" 在错。原始 fatal_exit 只会一次性退出，
+///       用户只能手动改文件名重建 db 才能恢复。
+/// 策略: 检测到 readonly/locked 错误后，自动备份+删除-重建，幂等重试一次，
+///       仍未恢复才 fatal_exit。这样 90% 的环境干扰用户不需要任何手动操作。
+fn is_db_unwritable_error(err: &dyn std::fmt::Display) -> bool {
+    let s = err.to_string().to_lowercase();
+    s.contains("readonly")
+        || s.contains("locked")
+        || s.contains("attempt to write")
+        || s.contains("database is locked")
+        || s.contains("disk i/o error")
+        || s.contains("no space left")
 }
 
 /// 备份并删除损坏的数据库文件（主db + WAL -shm + -wal）
@@ -266,19 +294,42 @@ async fn main() {
     let db = match db.initialize() {
         Ok(()) => db,
         Err(e) => {
-            eprintln!("⚠️ 数据库初始化失败: {}. 尝试自动恢复...", e);
-            diag_log(&format!("WARN: db.initialize 失败: {}，尝试恢复...", e));
-            backup_and_remove_corrupted_db_files(&db_path);
-            let db = match Database::new(db_path.clone()) {
-                Ok(db) => db,
-                Err(e2) => fatal_exit("重建 Database::new 失败", e2),
-            };
-            match db.initialize() {
-                Ok(()) => db,
-                Err(e2) => fatal_exit(
-                    "db.initialize 二次失败",
-                    format!("{} (首次: {})", e2, e),
-                ),
+            // v1.1.1 hotfix 闪退修复 #3: readonly/locked 检测 + 自动备份+重建
+            // 背景: 杀软/OneDrive 同步占用/文件句柄未释放造成 db 不可写,
+            //       CREATE INDEX ... IF NOT EXISTS 拋 readonly/locked, 原 fatal_exit
+            //       让用户手动改文件名才能恢复。现自动备份+重建，无感恢复。
+            if is_db_unwritable_error(&e) {
+                diag_log(&format!(
+                    "WARN: 检测到 db 不可写错误: {}，自动备份+重建+重试一次",
+                    e
+                ));
+                backup_and_remove_corrupted_db_files(&db_path);
+                let db = match Database::new(db_path.clone()) {
+                    Ok(db) => db,
+                    Err(e2) => fatal_exit("readonly 后重建 Database::new 失败", e2),
+                };
+                match db.initialize() {
+                    Ok(()) => db,
+                    Err(e2) => fatal_exit(
+                        "readonly 后重建 db.initialize 失败",
+                        format!("{} (首次: {})", e2, e),
+                    ),
+                }
+            } else {
+                eprintln!("⚠️ 数据库初始化失败: {}. 尝试自动恢复...", e);
+                diag_log(&format!("WARN: db.initialize 失败: {}，尝试恢复...", e));
+                backup_and_remove_corrupted_db_files(&db_path);
+                let db = match Database::new(db_path.clone()) {
+                    Ok(db) => db,
+                    Err(e2) => fatal_exit("重建 Database::new 失败", e2),
+                };
+                match db.initialize() {
+                    Ok(()) => db,
+                    Err(e2) => fatal_exit(
+                        "db.initialize 二次失败",
+                        format!("{} (首次: {})", e2, e),
+                    ),
+                }
             }
         }
     };

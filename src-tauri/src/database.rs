@@ -1263,6 +1263,125 @@ impl Database {
             }
         }
 
+        // ============================================================
+        // v1.1.1 hotfix 闪退修复 #1: schema 兜底段（安全幂等）
+        // ============================================================
+        // 背景:
+        //   1) src/db/schema.sql 在当前 main 分支已移除 agents + agent_permissions
+        //      两表定义（被某次拆分后未保留），但 src-tauri/src/agent_commands.rs:153
+        //      仍 INSERT INTO agent_permissions —— 老 db 残留出现 "no such table" 警告，
+        //      新装 db 完全不会出现这两表，运行期 INSERT 时静默失败。
+        //   2) 060_import_batches.sql（v1.1.0 P1 批量导入中心 schema）从未被
+        //      database.rs:initialize() include_str —— 新装 db 找不到 import_batches，
+        //      用户首次进入批量导入中心会因 "no such table: import_batches" 报错。
+        //   3) 用户升级 v1.1.0 → v1.1.1 期间，schema 漂移可能让 CREATE INDEX ... IF NOT EXISTS
+        //      在执行时挂错（at offset N），整个 db.initialize() 失败 → fatal_exit 闪退。
+        // 目的:
+        //   任意历史版本（v1.0.x / v1.1.0）db 残留或新装 db 都经过本段补齐缺失结构
+        //   IF NOT EXISTS 幂等，对存量数据无破坏，与已发布 schema 并存不冲突。
+        // 用户可见行为:
+        //   从 v1.1.0 升级的桌面端不会再因 schema 漂移闪退；新装自动获得完整结构
+        if let Err(e) = self.conn.execute_batch(
+            "\
+            -- Agent 注册表 + Agent 权限声明表（v6.0 Agent 化架构；schema.sql 已移除，兜底段补回）
+            CREATE TABLE IF NOT EXISTS agents (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                version TEXT NOT NULL,
+                manifest TEXT NOT NULL,
+                enabled BOOLEAN DEFAULT 1,
+                is_builtin BOOLEAN DEFAULT 0,
+                installed_at INTEGER,
+                last_updated INTEGER,
+                data_dir TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_agents_enabled ON agents(enabled);
+            CREATE INDEX IF NOT EXISTS idx_agents_builtin ON agents(is_builtin);
+
+            CREATE TABLE IF NOT EXISTS agent_permissions (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+                permission TEXT NOT NULL,
+                granted_by TEXT REFERENCES users(id),
+                granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(agent_id, permission)
+            );
+            CREATE INDEX IF NOT EXISTS idx_agent_permissions_agent ON agent_permissions(agent_id);
+            CREATE INDEX IF NOT EXISTS idx_agent_permissions_name ON agent_permissions(permission);
+
+            -- 批量导入中心 v1.1.0 P1 schema 兜底（database.rs 漏加载 060，兜底段补回）
+            -- 包含: import_batches (主表) + import_batch_errors (行级错误明细) +
+            --       import_field_mapping_templates (用户映射模板持久化)
+            CREATE TABLE IF NOT EXISTS import_batches (
+                id TEXT PRIMARY KEY,
+                target_type TEXT NOT NULL CHECK(target_type IN (
+                    'products', 'inventory', 'purchases',
+                    'sales', 'suppliers', 'customers'
+                )),
+                source_filename TEXT NOT NULL,
+                source_format TEXT NOT NULL CHECK(source_format IN ('csv', 'xlsx', 'json')),
+                source_size INTEGER,
+                source_path TEXT,
+                row_count INTEGER,
+                column_mapping TEXT,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN (
+                        'pending', 'parsing', 'mapping', 'validating',
+                        'importing', 'paused', 'retrying',
+                        'success', 'partial', 'failed', 'cancelled'
+                    )),
+                processed_rows INTEGER DEFAULT 0,
+                success_rows INTEGER DEFAULT 0,
+                failed_rows INTEGER DEFAULT 0,
+                skipped_rows INTEGER DEFAULT 0,
+                error_summary TEXT,
+                dedup_key TEXT,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                finished_at TIMESTAMP,
+                performed_by TEXT,
+                notes TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_import_batches_target_type ON import_batches(target_type);
+            CREATE INDEX IF NOT EXISTS idx_import_batches_status ON import_batches(status);
+            CREATE INDEX IF NOT EXISTS idx_import_batches_started ON import_batches(started_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_import_batches_target_status ON import_batches(target_type, status);
+
+            CREATE TABLE IF NOT EXISTS import_batch_errors (
+                id TEXT PRIMARY KEY,
+                batch_id TEXT NOT NULL REFERENCES import_batches(id) ON DELETE CASCADE,
+                row_index INTEGER NOT NULL,
+                field_name TEXT,
+                error_code TEXT NOT NULL,
+                error_message TEXT NOT NULL,
+                raw_value TEXT,
+                phase TEXT NOT NULL CHECK(phase IN ('parsing', 'mapping', 'validating', 'importing')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_import_batch_errors_batch ON import_batch_errors(batch_id);
+            CREATE INDEX IF NOT EXISTS idx_import_batch_errors_row ON import_batch_errors(batch_id, row_index);
+
+            CREATE TABLE IF NOT EXISTS import_field_mapping_templates (
+                id TEXT PRIMARY KEY,
+                target_type TEXT NOT NULL,
+                template_name TEXT NOT NULL,
+                mapping_json TEXT NOT NULL,
+                config_json TEXT,
+                use_count INTEGER DEFAULT 1,
+                last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(target_type, template_name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_mapping_templates_target_used ON import_field_mapping_templates(target_type, last_used_at DESC);
+            ",
+        ) {
+            eprintln!("[DB Migration WARNING] v1.1.1 hotfix 兜底段: {}", e);
+            migration_errors.push(format!("v1.1.1_hotfix_holders: {}", e));
+        } else {
+            eprintln!(
+                "✓ [DB Migration] v1.1.1 hotfix 兜底段已应用（agents + agent_permissions + import_batches）"
+            );
+        }
+
         // 审计修复 #14: 汇总迁移警告
         if !migration_errors.is_empty() {
             eprintln!(

@@ -1,6 +1,6 @@
 [package]
 name = "proclaw-desktop"
-version = "1.1.0"
+version = "1.1.1"
 description = "ProClaw Desktop Application - AI-Powered Business Operating System"
 authors = ["You"]
 license = "MIT"

@@ -28,7 +28,7 @@ const productCards = [
       '离线完全可用',
     ],
     cta: '免费下载',
-    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/v1.1.0/ProClaw_1.1.0_x64-setup.exe',
+    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/v1.1.1/ProClaw_1.1.1_x64-setup.exe',
     platforms: 'Windows · macOS · Linux',
     highlighted: true,
     color: 'black',
@@ -52,7 +52,7 @@ const productCards = [
       '离线完全可用',
     ],
     cta: '免费下载',
-    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/v1.1.0/ProClaw_1.1.0_x64-setup.exe',
+    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/v1.1.1/ProClaw_1.1.1_x64-setup.exe',
     platforms: 'Windows · macOS · Linux',
     highlighted: false,
     color: 'gray',
@@ -219,7 +219,7 @@ const DownloadPage: React.FC = () => {
       <PageHeader
         title="下载 ProClaw"
         description="ProClaw Plus / Light 桌面端 · Cloud 云商城 · 手机端 App"
-        subtitle="Plus 版 v1.1.0 | Light 版 v1.1.0 | 发布日期：2026-06-24"
+        subtitle="Plus 版 v1.1.1 | Light 版 v1.1.1 | 发布日期：2026-07-01（v1.1.0 启动闪退 hotfix）"
       />
 
       {/* 四产品并列卡片 */}
@@ -564,8 +564,12 @@ const DownloadPage: React.FC = () => {
                 </thead>
                 <tbody>
                   <tr className="border-b border-gray-100">
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (桌面端 v1.1.0)</td>
-                    <td className="py-3 text-sm text-gray-500 font-mono break-all">63ad556913963a735263919c8f9088fe277e769780c30a34b3af1a6cde2b23fe</td>
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (桌面端 v1.1.1 hotfix)</td>
+                    <td className="py-3 text-sm text-gray-500 font-mono break-all">fc48a6217532fd414cd6d294b901e01c901a88bc69cf6ce7539a9ae113d3fff1</td>
+                  </tr>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-3 pr-4 text-sm text-gray-500">ProClaw (桌面端 v1.1.0 历史版本)</td>
+                    <td className="py-3 text-xs text-gray-400 font-mono break-all">63ad556913963a735263919c8f9088fe277e769780c30a34b3af1a6cde2b23fe</td>
                   </tr>
                   <tr className="border-b border-gray-100">
                     <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (移动端 Android APK v1.0.3)</td>
