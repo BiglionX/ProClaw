@@ -24,6 +24,7 @@ import {
   Paper,
   Select,
   Snackbar,
+  Stack,
   Tab,
   Table,
   TableBody,
@@ -46,6 +47,8 @@ import {
 import { ProductSPU } from '../lib/productService';
 import { StockConfidenceInfo } from '../lib/inventoryCalibrationService';
 import StockCalibrationDialog from '../components/Inventory/StockCalibrationDialog';
+// v1.2 P1: 批量导入按钮
+import ImportButton from '../components/ImportCenter/ImportButton';
 import {
   CreateSupplierInput,
   Supplier,
@@ -411,26 +414,30 @@ export default function InventoryPage() {
             库存管理、供应商管理和客户管理
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<SmartToyIcon />}
-          size="small"
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent('proclaw:open-ai-chat', {
-              detail: { message: '分析库存状况，给出优化建议' },
-            }));
-          }}
-          sx={{
-            borderColor: 'rgba(99,102,241,0.3)',
-            color: '#6366F1',
-            '&:hover': {
-              borderColor: '#6366F1',
-              backgroundColor: 'rgba(99,102,241,0.06)',
-            },
-          }}
-        >
-          🤖 AI 助手
-        </Button>
+        <Stack direction="row" spacing={1}>
+          {/* v1.2 P1: 批量导入入口 */}
+          <ImportButton target="inventory" />
+          <Button
+            variant="outlined"
+            startIcon={<SmartToyIcon />}
+            size="small"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('proclaw:open-ai-chat', {
+                detail: { message: '分析库存状况，给出优化建议' },
+              }));
+            }}
+            sx={{
+              borderColor: 'rgba(99,102,241,0.3)',
+              color: '#6366F1',
+              '&:hover': {
+                borderColor: '#6366F1',
+                backgroundColor: 'rgba(99,102,241,0.06)',
+              },
+            }}
+          >
+            🤖 AI 助手
+          </Button>
+        </Stack>
       </Box>
 
       {/* Tab 导航 */}

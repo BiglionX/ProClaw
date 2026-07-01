@@ -60,6 +60,8 @@ import {
   DowngradeConfirmDialog,
   LibraryModeToggle,
 } from '../components/Products';
+// v1.2 P1: 批量导入按钮
+import ImportButton from '../components/ImportCenter/ImportButton';
 
 export default function ProductsPage() {
   // ==================== 商品库模式状态 ====================
@@ -462,6 +464,8 @@ export default function ProductsPage() {
         </Box>
         
         <Box sx={{ display: 'flex', gap: 1.5 }}>
+          {/* v1.2 P1: 批量导入入口 */}
+          <ImportButton target="products" />
           {/* 模式切换按钮 */}
           <LibraryModeToggle
             currentMode={libraryMode}

@@ -1345,10 +1345,41 @@ impl Database {
 
 /// 获取数据库文件路径
 pub fn get_database_path() -> PathBuf {
-    let proj_dirs = directories::ProjectDirs::from("com", "proclaw", "desktop")
-        .expect("Failed to get project directories");
-
-    proj_dirs.data_local_dir().join("proclaw.db")
+    // 修复 v1.0.8 闪退: 不再用 .expect() 直接 panic
+    // 原代码在 AppData 不可访问时（容器/受限制 token 环境）会无声闪退
+    // 现在三级 fallback（不丢覆盖安装用户数据）：
+    //   1. ProjectDirs 标准路径（99% 场景）
+    //   2. 直接读 %LOCALAPPDATA% 环境变量 + 手动拼接（ProjectDirs 异常但环境变量正常）
+    //   3. 最后才 fallback 到 temp（带 PID 区分避免冲突）
+    //
+    // 关键: fallback 路径用进程 ID 区分，避免覆盖其他实例的数据
+    if let Some(proj_dirs) = directories::ProjectDirs::from("com", "proclaw", "desktop") {
+        let path = proj_dirs.data_local_dir().join("proclaw.db");
+        // 确保目录存在
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        return path;
+    }
+    // fallback 2: 直接读 LOCALAPPDATA 环境变量
+    if let Ok(local_appdata) = std::env::var("LOCALAPPDATA") {
+        let dir = std::path::PathBuf::from(&local_appdata).join("com.proclaw.desktop");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("proclaw.db");
+        eprintln!(
+            "WARN: ProjectDirs::from returned None, falling back to LOCALAPPDATA: {:?}",
+            path
+        );
+        return path;
+    }
+    // fallback 3: temp + PID（最后手段）
+    let path = std::env::temp_dir()
+        .join(format!("proclaw-fallback-{}.db", std::process::id()));
+    eprintln!(
+        "WARN: ProjectDirs + LOCALAPPDATA 都失败，fallback 到 temp: {:?}",
+        path
+    );
+    path
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@
 mod api;
 mod auth;
 mod database;
+mod import; // v1.2 P1: 批量导入中心
 mod services;
 mod sync_engine;
 mod utils;
@@ -162,8 +163,86 @@ fn diag_log(msg: &str) {
     }
 }
 
+/// 修复 v1.0.8 闪退: 全局 panic hook
+/// 作用: 任何闭包（on_page_load / on_window_event / setup / tray）panic 时
+///       都把 panic 信息和 backtrace 写到 %TEMP%\proclaw-diag.log 再退出
+/// 原因: main 函数里的 fatal_exit 只覆盖 Result 错误路径，
+///       Tauri 事件回调（on_page_load 等）内 panic 不会被 fatal_exit 捕获，
+///       而 Tauri 默认 panic hook 不写文件，用户报告"闪退"时无日志可查
+/// 防护:
+///   - 所有 hook 内部操作都用 catch_unwind 包住，避免二次 panic = abort
+///   - 用 std::io::stderr().write_all() 直接写，避免 eprintln! 宏内部 panic
+///   - 设计为幂等可重入：setup 闭包内可重复调用以防御 Tauri 覆盖
+/// 用法:
+///   - 在 main() 第一行调用 setup_panic_hook()
+///   - 在 setup() 闭包开头再调用一次（防御 Tauri generate_context! 覆盖）
+fn install_panic_hook() {
+    use std::io::Write;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    // 每次调用都拿最新的 default_hook（可能已被 Tauri 覆盖）
+    let default_hook = std::panic::take_hook();
+
+    std::panic::set_hook(Box::new(move |panic_info| {
+        // ========== 阶段 1：必走的 stderr 输出（用 write_all 避免宏 panic）==========
+        // 即使后面所有步骤 panic，stderr 至少能保留部分信息
+        let location = panic_info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "unknown".to_string());
+        let payload = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "<non-string panic payload>".to_string()
+        };
+        let _ = writeln!(
+            std::io::stderr(),
+            "[PROCLAW_PANIC] ⚠️ PANIC at {}: {}",
+            location, payload
+        );
+
+        // ========== 阶段 2：backtrace 抓取（用 catch_unwind 防护）==========
+        let bt_text = match catch_unwind(AssertUnwindSafe(|| {
+            std::backtrace::Backtrace::force_capture().to_string()
+        })) {
+            Ok(s) => s,
+            Err(_) => "<backtrace capture panicked>".to_string(),
+        };
+        let _ = writeln!(std::io::stderr(), "[PROCLAW_PANIC_BACKTRACE]\n{}", bt_text);
+
+        // ========== 阶段 3：写 diag_log（catch_unwind 防护避免文件 I/O panic 二次触发 abort）==========
+        let _ = catch_unwind(AssertUnwindSafe(|| {
+            diag_log(&format!("⚠️ PANIC at {}: {}", location, payload));
+            diag_log(&format!("⚠️ BACKTRACE:\n{}", bt_text));
+            diag_log("─────────────────────────────────────────────────");
+            diag_log("应用因未捕获 panic 而退出。请按以下顺序排查：");
+            diag_log("  1. 查看上述 PANIC location 定位源码行");
+            diag_log("  2. 如果是 on_page_load 内的 webview.eval() —— webview 未就绪");
+            diag_log("  3. 如果是 setup 闭包内 —— 查看上方 diag_log 上下文");
+            diag_log("  4. 完整日志: %TEMP%\\proclaw-diag.log");
+            diag_log("─────────────────────────────────────────────────");
+        }));
+
+        // ========== 阶段 4：调用 Tauri 默认 hook（catch_unwind 防护 GUI 错误对话框 panic）==========
+        let _ = catch_unwind(AssertUnwindSafe(|| {
+            default_hook(panic_info);
+        }));
+    }));
+}
+
+fn setup_panic_hook() {
+    install_panic_hook();
+}
+
 #[tokio::main]
 async fn main() {
+    // 修复 v1.0.8 闪退: 必须最先注册 panic hook，
+    // 否则后续任何 panic（包括 on_page_load 闭包内）都不会写文件日志
+    setup_panic_hook();
+    diag_log("========== ProClaw Desktop 启动 ==========");
+
     // 初始化数据库
     let db_path = get_database_path();
     println!("Database path: {:?}", db_path);
@@ -334,6 +413,16 @@ async fn main() {
         Ok(db) => Arc::new(Mutex::new(db)),
         Err(e) => fatal_exit("HTTP 数据库创建", e),
     };
+
+    // v1.2 P1: 启动时拷贝 6 套导入模板到 APPDATA
+    // 失败不中断启动（用户在导入中心能手动点击补拷）
+    let templates_dir = crate::import::templates::default_templates_dir();
+    if let Err(e) = crate::import::templates::ensure_templates(&templates_dir) {
+        diag_log(&format!("WARN: ensure_templates 失败: {} (dir: {:?})", e, templates_dir));
+    } else {
+        diag_log(&format!("导入模板就绪: {:?}", templates_dir));
+    }
+
     let ws_manager = Arc::new(WebSocketManager::new());
     let app_state = AppState {
         db: http_db,
@@ -402,22 +491,33 @@ async fn main() {
         .manage(nvwax_billing.clone())
         .manage(nvwax_cipher.clone())
         // v7: on_page_load 回调 - 在页面加载完成时注入 JS 诊断（修复 v6 eval() 时序 bug）
+        // 修复 v1.0.8 闪退: 用 catch_unwind 包住 webview.eval()，
+        // Tauri 2.11 的 Webview::eval 在 webview 未就绪/已销毁时会 panic 而非返回 Err，
+        // 一旦闭包 panic → 整个进程闪退且没有 diag_log
         .on_page_load(|webview, payload| {
+            use std::panic::{catch_unwind, AssertUnwindSafe};
             let label = webview.label().to_string();
             match payload.event() {
                 tauri::webview::PageLoadEvent::Started => {
                     diag_log(&format!("PAGE_STARTED: label={}", label));
                     // v8: 非破坏性诊断 - 仅修改 document.title，不替换 body.innerHTML
                     // 修复: body.innerHTML 替换会销毁 <div id="root">，导致 React createRoot 失败 (#299)
-                    let _ = webview.eval(
-                        "document.title = '[Loading] ProClaw...';"
-                    );
+                    let eval_result = catch_unwind(AssertUnwindSafe(|| {
+                        webview.eval("document.title = '[Loading] ProClaw...';")
+                    }));
+                    if let Err(panic_payload) = eval_result {
+                        diag_log(&format!(
+                            "WARN: eval PANIC at PAGE_STARTED for {}: {:?}",
+                            label, panic_payload
+                        ));
+                    }
                 }
                 tauri::webview::PageLoadEvent::Finished => {
                     let url = payload.url().to_string();
                     diag_log(&format!("PAGE_FINISHED: label={}, url={}", label, url));
                     // v7: 注入 JS 错误捕获（在页面真正加载完成后）
-                    if let Err(e) = webview.eval(r#"(function(){
+                    let eval_result = catch_unwind(AssertUnwindSafe(|| {
+                        webview.eval(r#"(function(){
                         window.__proclaw_diag__ = window.__proclaw_diag__ || {log:[], errors:[]};
                         window.__proclaw_diag__.errors.push('[PAGE_LOAD] ' + location.href);
                         if (!window.__proclaw_err_installed__) {
@@ -439,14 +539,30 @@ async fn main() {
                             });
                         }
                         console.log('[PROCLAW_DIAG] error capture installed, url=' + location.href);
-                    })();"#) {
-                        diag_log(&format!("eval FAILED for {}: {}", label, e));
+                    })();"#)
+                    }));
+                    match eval_result {
+                        Ok(Ok(())) => {}
+                        Ok(Err(e)) => diag_log(&format!("eval FAILED for {}: {}", label, e)),
+                        Err(panic_payload) => {
+                            diag_log(&format!(
+                                "WARN: eval PANIC at PAGE_FINISHED for {}: {:?}",
+                                label, panic_payload
+                            ));
+                        }
                     }
                 }
             }
         })
         .setup(|app| {
             use tauri::Manager;
+
+            // 修复 v1.0.8 闪退: setup 阶段再次注册 panic hook
+            // 原因: Tauri 的 generate_context! / Builder 内部某些路径可能
+            //       覆盖 main 开头注册的 hook。这里重注册以确保任何
+            //       后续 panic 都能被我们的 hook 捕获并写文件日志。
+            install_panic_hook();
+            diag_log("setup() callback entered");
 
             // ========== 系统托盘 ==========
             // 构建托盘右键菜单

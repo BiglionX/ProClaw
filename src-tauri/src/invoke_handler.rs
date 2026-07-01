@@ -26,6 +26,7 @@ use crate::inventory_aging_commands::*;
 use crate::inventory_calibration_commands::*;
 #[cfg(feature = "inventory")]
 use crate::inventory_commands::*;
+use crate::import::commands::*; // v1.2 P1: 批量导入中心
 use crate::invitation_commands::*;
 use crate::liquor_commands::*;
 #[cfg(feature = "virtual_company")]
@@ -190,6 +191,21 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         mark_as_synced,
         start_sync,
         get_sync_status,
+        // v1.2 P1: 批量导入中心
+        import_create_batch,
+        import_parse_file,
+        import_upload_file,
+        import_validate_batch,
+        import_execute_batch,
+        import_pause_batch,
+        import_cancel_batch,
+        import_retry_batch,
+        import_get_batch,
+        import_list_batches,
+        import_get_batch_errors,
+        import_get_templates,
+        import_list_mapping_templates,
+        import_save_mapping_template,
         // AI 团队管理
         create_team,
         get_teams,

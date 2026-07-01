@@ -5,6 +5,39 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/),
 版本遵循 [Semantic Versioning](https://semver.org/)。
 
+## [1.1.0] - 2026-07-01
+
+### Added
+- **🌟 批量导入中心（v1.2 P1 交付）**——6 类业务对象一键导入
+  - 商品库 / 库存交易 / 采购订单 / 销售订单 / 供应商 / 客户
+  - 7 步导入向导：选目标与文件 → 解析预览 → 字段映射 → 校验 → 执行 → 结果 → 完成
+  - 47+ 字段 / 80+ 别名：中英文智能别名词典（精确 / 别名 / 归一化 3 级匹配）
+  - 6 套 CSV 模板首次启动自动写入 `APPDATA/proclaw/desktop/import_templates/`
+  - 幂等策略：products by sku / inventory by (sku,date,type,ref) skip / purchases by po_number / sales by so_number / suppliers+customers by code-or-name
+  - 导入中心管理页：历史批次表 + 错误详情 + 错误 CSV 下载
+  - 4 个业务页（Products / Inventory / Purchase / Sales）顶部「批量导入」按钮
+
+### Technical
+- 新增 `src-tauri/src/import/` 模块（types / parser / executor / templates / commands 共 5 个文件 / ~3500 行 Rust）
+- 13 个新 Tauri 命令：`import_create_batch` / `import_parse_file` / `import_validate_batch` / `import_execute_batch` / `import_pause_batch` / `import_cancel_batch` / `import_retry_batch` / `import_get_batch` / `import_list_batches` / `import_get_batch_errors` / `import_get_templates` / `import_list_mapping_templates` / `import_save_mapping_template`
+- 数据库迁移：`database/migrations/060_import_batches.sql`（2 张新表 `import_batches` + `import_batch_errors`）
+- 前端组件：`src/types/import.ts` / `src/lib/import/{fieldMatcher,importService}.ts` / `src/components/ImportCenter/{ImportButton,ImportCenterPage,ImportWizardPage}.tsx`
+- 路由：`/import-center` / `/import-center/new?target=xxx` / `/import-center/:batchId`
+- 编译干净：cargo check 0 errors / 0 warnings
+
+### Testing
+- 76 个 Vitest 单元测试全部通过：
+  - `src/lib/import/fieldMatcher.test.ts`（48 个）
+  - `src/lib/import/importService.test.ts`（23 个）
+  - `src/components/ImportCenter/ImportButton.test.tsx`（5 个）
+- 4 套 Playwright E2E：`e2e/import-{products,inventory,purchases,sales}.spec.ts`
+- 详细测试步骤见 `RELEASES/v1.1.0/测试步骤.md`（8 阶段 / 约 15 分钟）
+
+### Changed
+- 版本号同步：`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` / `src/lib/appVersion.ts` 由 `1.0.8` → `1.1.0`
+
+---
+
 ## [1.0.8] - 2026-06-30
 
 ### Fixed

@@ -128,6 +128,9 @@ export const PROTECTED_ROUTES: Array<{ path: string; loader: RouteLoader }> = [
   { path: '/material-bom', loader: () => import('../pages/decoration/MaterialBomPage') },
   { path: '/group-buy', loader: () => import('../pages/groupbuy/GroupBuyPage') },
   { path: '/pickup-verify', loader: () => import('../pages/groupbuy/PickupVerifyPage') },
+  { path: '/import-center', loader: () => import('../components/ImportCenter/ImportCenterPage') },
+  { path: '/import-center/new', loader: () => import('../components/ImportCenter/ImportWizardPage') },
+  { path: '/import-center/:batchId', loader: () => import('../components/ImportCenter/ImportWizardPage') },
   { path: '/test', loader: () => import('../pages/TestPage') },
 ];
 

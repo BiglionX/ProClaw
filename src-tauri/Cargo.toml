@@ -1,6 +1,6 @@
 [package]
 name = "proclaw-desktop"
-version = "1.0.8"
+version = "1.1.0"
 description = "ProClaw Desktop Application - AI-Powered Business Operating System"
 authors = ["You"]
 license = "MIT"
@@ -46,6 +46,12 @@ jsonwebtoken = "9.2.0"
 serde_bytes = "0.11.12"
 url = "2.5.0"
 mime = "0.3.17"
+
+# CSV 解析（v1.2 P1 批量导入）
+csv = "1.3"
+
+# 简易 XLSX（v1.2 P1 批量导入，轻量免依赖 calamine）
+quick-xml = "0.36"
 
 # 工具库
 chrono = { version = "0.4.31", features = ["serde", "clock"] }

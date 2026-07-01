@@ -37,6 +37,8 @@ import {
   usePurchaseOrders,
   useSuppliers,
 } from '../lib/hooks/usePurchase';
+// v1.2 P1: 批量导入按钮
+import ImportButton from '../components/ImportCenter/ImportButton';
 
 export default function PurchasePage() {
   const [tabValue, setTabValue] = useState(0);
@@ -123,13 +125,17 @@ export default function PurchasePage() {
   return (
     <Box>
       {/* 页面标题 */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          🛒 采购管理
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          供应商管理和采购订单
-        </Typography>
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <Box>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+            🛒 采购管理
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            供应商管理和采购订单
+          </Typography>
+        </Box>
+        {/* v1.2 P1: 批量导入入口 */}
+        <ImportButton target="purchases" />
       </Box>
 
       {/* 标签页 */}
