@@ -423,3 +423,99 @@ mod tests {
         assert!(!BatchStatus::Importing.is_terminal());
     }
 }
+
+// ============================================
+// v1.3 老系统数据迁移 扩展
+// ============================================
+
+/// 用户在 Step 4 编辑后的聚合规则（按主键分组）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AggregationRule {
+    /// 分组主键值（如商品编号 V1XLJ1001 / 客户编号 CNSHK0001）
+    pub group_key: String,
+    /// 操作类型：'spu' / 'merge_contact' / 'skip'
+    pub action: String,
+    /// 作 SPU/主联系人的源行索引（1-based，相对于 data_start_row）
+    pub primary_row_index: usize,
+    /// 选中的行索引列表（包含 primary_row_index）
+    pub included_row_indices: Vec<usize>,
+}
+
+/// 客户聚合结果：1 条 customer + N 条 customer_contact
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomerAggregate {
+    pub code: String,
+    pub name: String,
+    /// 基础信息字段（首行非空值）
+    pub base_fields: HashMap<String, String>,
+    /// N 条联系人
+    pub contacts: Vec<CustomerContactRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomerContactRecord {
+    pub contact_name: String,
+    pub phone: Option<String>,
+    pub landline: Option<String>,
+    pub qq_wechat: Option<String>,
+    pub address: Option<String>,
+    pub is_primary: bool,
+}
+
+/// 商品聚合结果：1 条 product + N 条 product_sku
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductAggregate {
+    pub sku: String,
+    pub name: String,
+    pub category: Option<String>,
+    pub spec: Option<String>,
+    pub tag: Option<String>,
+    /// N 条 SKU 变体
+    pub variants: Vec<ProductSkuRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductSkuRecord {
+    pub sku: String,
+    pub variant_name: String,
+    pub spec: Option<String>,
+}
+
+/// LegacyParseResult：老格式解析结果（含表头探测 + 聚合预览）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyParseResult {
+    pub format: String, // "xls" | "xlsx"
+    pub detected_format: String, // 实际探测到的格式
+    pub total_data_rows: usize,
+    pub field_names: Vec<String>,
+    pub segment_titles: Vec<HashMap<String, String>>, // [{start_col, end_col, title}]
+    pub customer_groups: Vec<CustomerAggregate>,
+    pub product_groups: Vec<ProductAggregate>,
+    /// 类别新值清单（用于审核）
+    pub categories_to_create: HashMap<String, Vec<String>>, // type -> [names]
+    /// 头部预览（row0 / row1 / row2 原文）
+    pub header_preview: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyExecuteRequest {
+    pub batch_id: String,
+    pub column_mapping: HashMap<String, String>,
+    pub default_values: Option<HashMap<String, String>>,
+    pub skip_errors: Option<bool>,
+    /// 用户编辑后的聚合规则（customer / product 用）
+    pub aggregation_rules: Option<Vec<AggregationRule>>,
+    /// 是否跳过类别自动建档
+    pub skip_category_auto_create: Option<bool>,
+}
+
+/// 类别自动建档结果摘要
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CategoryCreateSummary {
+    pub product_created: usize,
+    pub supplier_created: usize,
+    pub customer_created: usize,
+    pub product_skipped: usize,
+    pub supplier_skipped: usize,
+    pub customer_skipped: usize,
+}

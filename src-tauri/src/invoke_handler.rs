@@ -206,6 +206,10 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         import_get_templates,
         import_list_mapping_templates,
         import_save_mapping_template,
+        // v1.3: 老系统数据迁移（.xls / .xlsx + 两行表头 + 多联系人 / SPU-SKU 聚合）
+        import_preview_legacy,
+        import_execute_legacy,
+        import_rollback_batch,
         // AI 团队管理
         create_team,
         get_teams,

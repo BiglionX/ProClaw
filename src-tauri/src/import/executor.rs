@@ -13,8 +13,13 @@
 //! - `process_customer`    → `customers` 表（按 name 或 code upsert）
 
 use crate::database::Database;
+use crate::import::aggregator::{persist_customer_with_contacts, persist_product_with_skus};
+use crate::import::category_resolver::{bulk_ensure_categories, ensure_category as ensure_category_v13};
 use crate::import::parser::{parse_bytes, ParseResult};
-use crate::import::types::{required_fields_for, FieldMap, ImportTarget};
+use crate::import::types::{
+    required_fields_for, CustomerAggregate, FieldMap, ImportTarget, LegacyParseResult,
+    ProductAggregate,
+};
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
@@ -809,6 +814,76 @@ fn ensure_customer_with_code(conn: &rusqlite::Connection, name: &str, code: &str
 pub fn parse_from_path(path: &str, source_format: &str) -> Result<ParseResult, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("读取文件失败: {}", e))?;
     parse_bytes(&bytes, source_format)
+}
+
+// ============================================
+// 6. v1.3 老系统数据迁移 — 聚合执行 facade
+// ============================================
+//
+// 设计：
+// - v1.2 P1 的 process_customer / process_product 是单行处理 → 不适用聚合
+// - v1.3 老系统数据走全新命令 import_execute_legacy（不走 execute_batch）
+// - 本节的 execute_legacy_* 函数是 commands.rs::import_execute_legacy 的执行层
+//   内部委托给 aggregator.rs 的 persist_* 完成实际的聚合持久化
+//
+// 为什么单独抽 facade 而不是直接在 commands.rs 调 aggregator：
+// - 保留 executor 作为"执行层"的单一入口
+// - 未来如果要加 chunked（每 1000 行 commit）或重试，只改 executor 即可
+// ============================================
+
+/// v1.3 老格式客户聚合执行（1 customer + N contacts）
+///
+/// 与 v1.2 P1 process_customer 不同：这里按聚合组处理，一次写 N 个联系人
+/// `skip_category`: 是否跳过自动建档（如果用户在 Step 4 关掉了类别自动建档）
+pub fn execute_customer_legacy(
+    conn: &rusqlite::Connection,
+    agg: &CustomerAggregate,
+    skip_category: bool,
+    batch_id: &str,
+) -> Result<String, String> {
+    persist_customer_with_contacts(conn, agg, skip_category, batch_id)
+}
+
+/// v1.3 老格式商品聚合执行（1 product + N product_sku）
+///
+/// 与 v1.2 P1 process_product 不同：这里按聚合组处理，一次写 N 个 SKU
+#[allow(dead_code)]
+pub fn execute_product_legacy(
+    conn: &rusqlite::Connection,
+    agg: &ProductAggregate,
+    skip_category: bool,
+    batch_id: &str,
+) -> Result<String, String> {
+    persist_product_with_skus(conn, agg, skip_category, batch_id)
+}
+
+/// v1.3 老格式类别批量建档
+///
+/// 按 type 分组（product / supplier / customer），每组走 bulk_ensure_categories
+/// 返回 HashMap<type, (created_count, skipped_count)>
+pub fn execute_category_auto_create(
+    conn: &rusqlite::Connection,
+    preview: &LegacyParseResult,
+    batch_id: &str,
+) -> Result<std::collections::HashMap<String, (usize, usize)>, String> {
+    let mut out = std::collections::HashMap::new();
+    for (cat_type, cats) in &preview.categories_to_create {
+        let (created, skipped) = bulk_ensure_categories(conn, cat_type, cats, batch_id)?;
+        out.insert(cat_type.clone(), (created, skipped));
+    }
+    Ok(out)
+}
+
+/// v1.3 兼容：单条类别建档（用于 supplier 单条类别处理路径）
+#[allow(dead_code)]
+pub fn execute_ensure_category(
+    conn: &rusqlite::Connection,
+    cat_type: &str,
+    name: &str,
+) -> Result<Option<String>, String> {
+    // 注意：executor.rs 已有本地 ensure_category（仅商品，2 参数）
+    // 这里要明确走 v1.3 的统一 categories 表（3 参数）
+    ensure_category_v13(conn, cat_type, name)
 }
 
 // ============================================

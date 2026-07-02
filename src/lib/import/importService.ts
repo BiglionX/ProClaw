@@ -1,7 +1,7 @@
 /**
- * ProClaw 批量导入中心 - 服务层（v1.2 P1）
+ * ProClaw 批量导入中心 - 服务层（v1.2 P1 + v1.3 老系统迁移）
  *
- * 封装 13 个 Tauri 命令；前端组件通过本模块访问后端能力。
+ * 封装 13 + 3 = 16 个 Tauri 命令；前端组件通过本模块访问后端能力。
  */
 
 import { ipcInvoke, isTauri } from '../tauri';
@@ -11,7 +11,12 @@ import type {
   ImportCreateResponse,
   ImportTarget,
   ExecuteResponse,
+  LegacyExecuteRequest,
+  LegacyExecuteResponse,
+  LegacyParseResult,
+  LegacyPreviewRequest,
   MappingTemplate,
+  RollbackResponse,
   TemplateInfo,
   ValidateResponse,
 } from '../../types/import';
@@ -207,3 +212,60 @@ export async function saveMappingTemplate(
 export function importAvailable(): boolean {
   return isTauri();
 }
+
+// ============================================
+// 9. v1.3 老系统数据迁移 — 新增 3 个命令封装
+// ============================================
+
+/**
+ * 老格式文件预览（上传后调用，仅解析不写库）
+ *
+ * 用法：用户上传 .xls / .xlsx → 后端探测表头结构 + 聚合预览 → 前端展示给用户
+ *
+ * @param sourcePath 文件绝对路径（前端从 base64 解码写到 import_uploads/<batch_id>/）
+ * @param target 目标类型（customers / products / suppliers）
+ */
+export async function previewLegacy(
+  sourcePath: string,
+  target: ImportTarget,
+): Promise<LegacyParseResult> {
+  return ipcInvoke<LegacyParseResult>('import_preview_legacy', {
+    request: { source_path: sourcePath, target_type: target } satisfies LegacyPreviewRequest,
+  });
+}
+
+/**
+ * 老格式执行（用户在 Step 4 编辑聚合规则后调用）
+ *
+ * @param req 包含 batch_id / column_mapping / aggregation_rules / skip_category_auto_create 等
+ */
+export async function executeLegacy(
+  req: LegacyExecuteRequest,
+): Promise<LegacyExecuteResponse> {
+  return ipcInvoke<LegacyExecuteResponse>('import_execute_legacy', { request: req });
+}
+
+/**
+ * 不限时撤销（v1.3 决策 2026-07-02）
+ *
+ * 范围：
+ *  - 删除 customer_contacts / product_sku 中 source = 'import_legacy' 的行
+ *  - 删除 categories 中 source = 'import_legacy' 的行
+ *  - 不动 customers / products / suppliers 主表
+ */
+export async function rollbackBatch(batchId: string): Promise<RollbackResponse> {
+  return ipcInvoke<RollbackResponse>('import_rollback_batch', { batchId });
+}
+
+// ============================================
+// 10. 工具：检测文件是否为老格式（仅前端启发式，最终由后端判定）
+// ============================================
+
+/** 判定文件扩展名是否需要走 v1.3 老格式导入 */
+export function isLegacyFile(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return lower.endsWith('.xls') || lower.endsWith('.xlsx');
+}
+
+// 重新导出 legacyAdapter 类型（方便组件层 import）
+export { LegacyAdapter } from './legacyAdapter';

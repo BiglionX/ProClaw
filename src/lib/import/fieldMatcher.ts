@@ -1,8 +1,8 @@
 /**
- * ProClaw 批量导入中心 - 中英文字段别名词典（v1.2 P1）
+ * ProClaw 批量导入中心 - 中英文字段别名词典（v1.2 P1 + v1.3 老系统扩展）
  *
- * 通过别名匹配让用户上传的 CSV/JSON 表头自动关联到目标字段。
- * 覆盖 6 类业务对象共 47+ 字段 / 80+ 别名。
+ * 通过别名匹配让用户上传的 CSV/JSON/XLS/XLSX 表头自动关联到目标字段。
+ * 覆盖 6 类业务对象共 47+ 字段 / 100+ 别名（含 v1.3 老系统字段扩展）。
  */
 
 import type { FieldDef } from '../../types/import';
@@ -12,18 +12,20 @@ import type { FieldDef } from '../../types/import';
 // ============================================
 
 export const FIELDS_PRODUCTS: FieldDef[] = [
-  { key: 'sku', label: 'SKU 编码', aliases: ['sku', 'SKU', '商品编码', '商品代码', '货号', 'item_code', 'product_code'], required: true, field_type: 'string', example: 'SKU-001' },
-  { key: 'name', label: '商品名称', aliases: ['name', '商品名称', '名称', '品名', '产品名', 'product_name', 'item_name'], required: true, field_type: 'string', example: 'iPhone 15 电池' },
-  { key: 'category', label: '分类', aliases: ['category', '分类', '品类', '商品分类', 'cat'], required: false, field_type: 'string', example: 'iPhone 15 系列' },
+  { key: 'sku', label: 'SKU 编码', aliases: ['sku', 'SKU', '商品编码', '商品代码', '货号', 'item_code', 'product_code', '商品编号', '货品编号', '商品简码'], required: true, field_type: 'string', example: 'SKU-001' },
+  { key: 'name', label: '商品名称', aliases: ['name', '商品名称', '名称', '品名', '产品名', 'product_name', 'item_name', '商品简称'], required: true, field_type: 'string', example: 'iPhone 15 电池' },
+  { key: 'category', label: '分类', aliases: ['category', '分类', '品类', '商品分类', 'cat', '商品类别', '类别', '所属类别'], required: false, field_type: 'string', example: 'iPhone 15 系列' },
   { key: 'brand', label: '品牌', aliases: ['brand', '品牌', '牌子'], required: false, field_type: 'string', example: 'Apple' },
-  { key: 'unit', label: '单位', aliases: ['unit', '单位', '计量单位', 'uom'], required: false, field_type: 'string', example: '块' },
-  { key: 'cost_price', label: '成本价', aliases: ['cost_price', 'cost', '成本价', '进价', '进货价', 'purchase_price', 'cif'], required: false, field_type: 'number', example: '80.00' },
-  { key: 'sell_price', label: '销售价', aliases: ['sell_price', 'price', '售价', '销售价', '零售价', 'msrp', 'retail_price'], required: false, field_type: 'number', example: '199.00' },
-  { key: 'current_stock', label: '初始库存', aliases: ['current_stock', 'stock', '库存', '初始库存', '期初库存', 'qty_on_hand'], required: false, field_type: 'number', example: '50' },
-  { key: 'min_stock', label: '最低库存', aliases: ['min_stock', 'min', '最低库存', '安全库存', 'safety_stock'], required: false, field_type: 'number', example: '5' },
-  { key: 'max_stock', label: '最高库存', aliases: ['max_stock', 'max', '最高库存', '最大库存'], required: false, field_type: 'number', example: '999' },
-  { key: 'barcode', label: '条形码', aliases: ['barcode', '条形码', '条码', 'ean', 'upc'], required: false, field_type: 'string', example: '6931234560001' },
-  { key: 'description', label: '商品描述', aliases: ['description', '描述', '商品描述', '备注', 'desc', 'remark'], required: false, field_type: 'string', example: '原装电池' },
+  { key: 'unit', label: '单位', aliases: ['unit', '单位', '计量单位', 'uom', '基本单位'], required: false, field_type: 'string', example: '块' },
+  { key: 'cost_price', label: '成本价', aliases: ['cost_price', 'cost', '成本价', '进价', '进货价', 'purchase_price', 'cif', '采购价', '进货单价'], required: false, field_type: 'number', example: '80.00' },
+  { key: 'sell_price', label: '销售价', aliases: ['sell_price', 'price', '售价', '销售价', '零售价', 'msrp', 'retail_price', '批发价', '零售单价'], required: false, field_type: 'number', example: '199.00' },
+  { key: 'current_stock', label: '初始库存', aliases: ['current_stock', 'stock', '库存', '初始库存', '期初库存', 'qty_on_hand', '当前库存', '库存数量'], required: false, field_type: 'number', example: '50' },
+  { key: 'min_stock', label: '最低库存', aliases: ['min_stock', 'min', '最低库存', '安全库存', 'safety_stock', '最低库存量'], required: false, field_type: 'number', example: '5' },
+  { key: 'max_stock', label: '最高库存', aliases: ['max_stock', 'max', '最高库存', '最大库存', '最高库存量'], required: false, field_type: 'number', example: '999' },
+  { key: 'barcode', label: '条形码', aliases: ['barcode', '条形码', '条码', 'ean', 'upc', '商品条码'], required: false, field_type: 'string', example: '6931234560001' },
+  { key: 'description', label: '商品描述', aliases: ['description', '描述', '商品描述', '备注', 'desc', 'remark', '说明', '备注信息'], required: false, field_type: 'string', example: '原装电池' },
+  { key: 'spec', label: '规格', aliases: ['spec', '规格', '规格型号', '型号', '规格说明', '商品规格'], required: false, field_type: 'string', example: '3000mAh' },
+  { key: 'supplier', label: '主供应商', aliases: ['supplier', '主供应商', '默认供应商', '首选供应商'], required: false, field_type: 'string', example: '深圳电池供应商' },
 ];
 
 export const FIELDS_INVENTORY: FieldDef[] = [
@@ -60,23 +62,26 @@ export const FIELDS_SALES: FieldDef[] = [
 ];
 
 export const FIELDS_SUPPLIERS: FieldDef[] = [
-  { key: 'name', label: '供应商名称', aliases: ['name', '供应商名称', '名称', 'supplier_name', 'vendor_name'], required: true, field_type: 'string', example: '深圳电池供应商' },
-  { key: 'code', label: '供应商编码', aliases: ['code', '供应商编码', '编码', 'supplier_code', 'vendor_code'], required: false, field_type: 'string', example: 'SUP-001' },
-  { key: 'contact_person', label: '联系人', aliases: ['contact_person', 'contact', '联系人', 'contact_name'], required: false, field_type: 'string', example: '张三' },
-  { key: 'phone', label: '电话', aliases: ['phone', '电话', '联系电话', 'tel', 'mobile'], required: false, field_type: 'string', example: '13800138000' },
+  { key: 'name', label: '供应商名称', aliases: ['name', '供应商名称', '名称', 'supplier_name', 'vendor_name', '简称', '供应商简称', '拼音码'], required: true, field_type: 'string', example: '深圳电池供应商' },
+  { key: 'code', label: '供应商编码', aliases: ['code', '供应商编码', '编码', 'supplier_code', 'vendor_code', '供应商编号', '编号', '助记码'], required: false, field_type: 'string', example: 'SUP-001' },
+  { key: 'contact_person', label: '联系人', aliases: ['contact_person', 'contact', '联系人', 'contact_name', '联系人姓名', '联系人1'], required: false, field_type: 'string', example: '张三' },
+  { key: 'phone', label: '电话', aliases: ['phone', '电话', '联系电话', 'tel', 'mobile', '手机', '联系人电话', '移动电话', '手机号码'], required: false, field_type: 'string', example: '13800138000' },
   { key: 'email', label: '邮箱', aliases: ['email', '邮箱', '电子邮箱', 'mail'], required: false, field_type: 'string', example: 'supplier@example.com' },
-  { key: 'address', label: '地址', aliases: ['address', '地址', 'addr'], required: false, field_type: 'string', example: '' },
+  { key: 'address', label: '地址', aliases: ['address', '地址', 'addr', '联系地址', '供应商地址', '公司地址'], required: false, field_type: 'string', example: '' },
   { key: 'tax_number', label: '税号', aliases: ['tax_number', '税号', 'tax_id', 'unified_social_credit_code'], required: false, field_type: 'string', example: '' },
+  { key: 'category', label: '供应商类别', aliases: ['category', '供应商类别', '类别', '分类', 'supplier_type'], required: false, field_type: 'string', example: '电池' },
 ];
 
 export const FIELDS_CUSTOMERS: FieldDef[] = [
-  { key: 'name', label: '客户名称', aliases: ['name', '客户名称', '名称', 'customer_name', 'client_name'], required: true, field_type: 'string', example: '手机维修店 A' },
-  { key: 'code', label: '客户编码', aliases: ['code', '客户编码', '编码', 'customer_code', 'client_code'], required: false, field_type: 'string', example: 'CUS-001' },
-  { key: 'contact_person', label: '联系人', aliases: ['contact_person', 'contact', '联系人', 'contact_name'], required: false, field_type: 'string', example: '李四' },
-  { key: 'phone', label: '电话', aliases: ['phone', '电话', '联系电话', 'tel', 'mobile'], required: false, field_type: 'string', example: '13900139000' },
+  { key: 'name', label: '客户名称', aliases: ['name', '客户名称', '名称', 'customer_name', 'client_name', '客户简称', '简称', '拼音码'], required: true, field_type: 'string', example: '手机维修店 A' },
+  { key: 'code', label: '客户编码', aliases: ['code', '客户编码', '编码', 'customer_code', 'client_code', '客户编号', '编号', '助记码'], required: false, field_type: 'string', example: 'CUS-001' },
+  { key: 'contact_person', label: '联系人', aliases: ['contact_person', 'contact', '联系人', 'contact_name', '联系人姓名'], required: false, field_type: 'string', example: '李四' },
+  { key: 'phone', label: '电话', aliases: ['phone', '电话', '联系电话', 'tel', 'mobile', '手机', '移动电话', '手机号码'], required: false, field_type: 'string', example: '13900139000' },
   { key: 'email', label: '邮箱', aliases: ['email', '邮箱', '电子邮箱', 'mail'], required: false, field_type: 'string', example: '' },
-  { key: 'address', label: '地址', aliases: ['address', '地址', 'addr'], required: false, field_type: 'string', example: '' },
-  { key: 'customer_type', label: '客户类型', aliases: ['customer_type', '客户类型', 'type', '客户种类'], required: false, field_type: 'string', example: 'company' },
+  { key: 'address', label: '地址', aliases: ['address', '地址', 'addr', '联系地址', '客户地址', '收货地址', '送货地址'], required: false, field_type: 'string', example: '' },
+  { key: 'customer_type', label: '客户类型', aliases: ['customer_type', '客户类型', 'type', '客户种类', '客户类别', '类别'], required: false, field_type: 'string', example: 'company' },
+  { key: 'landline', label: '座机/传真', aliases: ['landline', '座机', '传真', 'fax'], required: false, field_type: 'string', example: '0755-88888888' },
+  { key: 'qq_wechat', label: 'QQ/微信', aliases: ['qq', 'wechat', 'QQ', '微信', 'QQ/微信', 'QQ微信', '即时通讯'], required: false, field_type: 'string', example: '123456' },
 ];
 
 /** 各目标 → 字段定义 */

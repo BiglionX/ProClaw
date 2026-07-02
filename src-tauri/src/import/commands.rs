@@ -96,6 +96,7 @@ pub fn import_create_batch(
             .take(3)
             .map(|r| r.fields.clone())
             .collect(),
+        source_path: Some(target_file.to_string_lossy().to_string()),
     })
 }
 
@@ -107,6 +108,9 @@ pub struct ImportCreateResponse {
     pub total_rows: i64,
     pub headers: Vec<String>,
     pub sample_rows: Vec<HashMap<String, String>>,
+    /// v1.3 源文件实际写入路径（用于老格式 preview/execute 时定位文件）
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub source_path: Option<String>,
 }
 
 // ============================================
@@ -160,6 +164,7 @@ pub fn import_parse_file(
             .take(3)
             .map(|r| r.fields.clone())
             .collect(),
+        source_path: Some(path),
     })
 }
 
@@ -784,6 +789,7 @@ mod tests {
             total_rows: 0,
             headers: vec![],
             sample_rows: vec![],
+            source_path: None,
         };
         let s = serde_json::to_string(&r).unwrap();
         assert!(s.contains("batch_id"));
@@ -793,4 +799,412 @@ mod tests {
         assert!(s.contains("headers"));
         assert!(s.contains("sample_rows"));
     }
+}
+
+// ============================================
+// v1.3 老系统数据迁移 — 新增 3 个命令
+// ============================================
+
+use crate::import::aggregator::{
+    persist_customer_with_contacts, persist_product_with_skus,
+};
+use crate::import::category_resolver::bulk_ensure_categories;
+use crate::import::parser_legacy::parse_legacy_file;
+use crate::import::types::{
+    AggregationRule, CategoryCreateSummary, CustomerAggregate, LegacyExecuteRequest,
+    LegacyParseResult, ProductAggregate,
+};
+
+/// 供应商 upsert（按 code → name 优先），私有辅助函数
+fn ensure_supplier_legacy(
+    conn: &rusqlite::Connection,
+    code: &str,
+    name: &str,
+) -> Result<String, String> {
+    use rusqlite::OptionalExtension;
+    use uuid::Uuid;
+
+    // 优先按 code 找
+    if !code.is_empty() {
+        if let Some(id) = conn
+            .query_row(
+                "SELECT id FROM suppliers WHERE code = ?1 AND deleted_at IS NULL LIMIT 1",
+                rusqlite::params![code],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+        {
+            return Ok(id);
+        }
+    }
+    // 再按 name 找
+    if !name.is_empty() {
+        if let Some(id) = conn
+            .query_row(
+                "SELECT id FROM suppliers WHERE name = ?1 AND deleted_at IS NULL LIMIT 1",
+                rusqlite::params![name],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+        {
+            return Ok(id);
+        }
+    }
+    // 新建
+    let id = Uuid::new_v4().to_string();
+    let code_opt: Option<&str> = if code.is_empty() { None } else { Some(code) };
+    conn.execute(
+        "INSERT INTO suppliers (id, name, code, is_active, created_at, updated_at, sync_status)
+         VALUES (?1, ?2, ?3, 1, datetime('now'), datetime('now'), 'pending')",
+        rusqlite::params![id, name, code_opt],
+    )
+    .map_err(|e| format!("创建供应商失败: {}", e))?;
+    Ok(id)
+}
+
+// ----------------------------------------------------------------------------
+// import_preview_legacy：上传后立刻解析 + 探测表头 + 聚合预览
+// （仅做预览，不写库，不创建批次 — 用户在 Step 4 编辑后再调 import_execute_legacy）
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct LegacyPreviewRequest {
+    /// 文件绝对路径（前端从 base64 解码后写到 import_uploads/<batch_id>/ 下）
+    pub source_path: String,
+    /// 目标类型：customers / products / suppliers
+    pub target_type: String,
+}
+
+#[tauri::command]
+pub fn import_preview_legacy(
+    request: LegacyPreviewRequest,
+) -> Result<LegacyParseResult, String> {
+    let path = std::path::Path::new(&request.source_path);
+    if !path.exists() {
+        return Err(format!("文件不存在: {}", request.source_path));
+    }
+    let (result, _rows) = parse_legacy_file(path, &request.target_type)?;
+    Ok(result)
+}
+
+// ----------------------------------------------------------------------------
+// import_execute_legacy：根据用户编辑的聚合规则执行老格式导入
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LegacyExecuteResponse {
+    pub batch_id: String,
+    pub status: String, // success / partial / failed
+    pub customers_created: i64,
+    pub customer_contacts_created: i64,
+    pub products_created: i64,
+    pub product_skus_created: i64,
+    pub suppliers_created: i64,
+    pub categories_summary: CategoryCreateSummary,
+    pub finished_at: String,
+}
+
+#[tauri::command]
+pub fn import_execute_legacy(
+    db: tauri::State<Mutex<Database>>,
+    request: LegacyExecuteRequest,
+) -> Result<LegacyExecuteResponse, String> {
+    let batch_id = request.batch_id;
+    let _skip_errors = request.skip_errors.unwrap_or(true);
+    let skip_category = request.skip_category_auto_create.unwrap_or(false);
+
+    let dbg = db.lock().map_err(|e| e.to_string())?;
+    let conn = dbg.connection();
+
+    // 1) 查 source_path + 校验状态
+    let (target_type, source_path): (String, Option<String>) = conn
+        .query_row(
+            "SELECT target_type, source_path FROM import_batches WHERE id = ?1",
+            rusqlite::params![batch_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| format!("查询批次失败: {}", e))?;
+
+    let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
+    let target = crate::import::types::ImportTarget::from_str(&target_type)
+        .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
+
+    // 2) 解析（拿到聚合预览）
+    let (preview, _rows) = parse_legacy_file(std::path::Path::new(&path), &target_type)?;
+
+    // 3) 把 status 置 importing
+    conn.execute(
+        "UPDATE import_batches SET status = 'importing', column_mapping = ?1 WHERE id = ?2",
+        rusqlite::params![
+            serde_json::to_string(&request.column_mapping).ok(),
+            batch_id,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // ===== P0-S3：每 1000 行/组一个独立事务 =====
+    // ===== P1-S2：批量预清理本批次旧数据，避免 N+1 单条 DELETE =====
+    // ===== P1-M1 + P1-M2：类别空字符串防护 + supplier 路径找不到列报错 =====
+
+    const CHUNK_SIZE: usize = 1000;
+    let mut customers_created = 0i64;
+    let mut customer_contacts_created = 0i64;
+    let mut products_created = 0i64;
+    let mut product_skus_created = 0i64;
+    let mut suppliers_created = 0i64;
+    let mut categories_summary = CategoryCreateSummary::default();
+    let mut processed_rows: i64 = 0;
+
+    match target {
+        crate::import::types::ImportTarget::Customers => {
+            // 预清理：本批次旧的联系人（精准回滚基础）
+            conn.execute(
+                "DELETE FROM customer_contacts WHERE batch_id = ?1",
+                rusqlite::params![batch_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+            // 类别批量建档
+            if !skip_category {
+                if let Some(cats) = preview.categories_to_create.get("customer") {
+                    let (created, skipped) = bulk_ensure_categories(conn, "customer", cats, &batch_id)?;
+                    categories_summary.customer_created = created;
+                    categories_summary.customer_skipped = skipped;
+                }
+            }
+            // chunked：每 1000 个聚合组一个事务
+            for chunk in preview.customer_groups.chunks(CHUNK_SIZE) {
+                let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+                for agg in chunk {
+                    let _cid = persist_customer_with_contacts(&tx, agg, skip_category, &batch_id)?;
+                    customers_created += 1;
+                    customer_contacts_created += agg.contacts.len() as i64;
+                    processed_rows += 1;
+                }
+                tx.commit().map_err(|e| format!("commit customer chunk 失败: {}", e))?;
+                conn.execute(
+                    "UPDATE import_batches SET processed_rows = ?1 WHERE id = ?2",
+                    rusqlite::params![processed_rows, batch_id],
+                )
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        crate::import::types::ImportTarget::Products => {
+            conn.execute(
+                "DELETE FROM product_sku WHERE batch_id = ?1",
+                rusqlite::params![batch_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+            if !skip_category {
+                if let Some(cats) = preview.categories_to_create.get("product") {
+                    let (created, skipped) = bulk_ensure_categories(conn, "product", cats, &batch_id)?;
+                    categories_summary.product_created = created;
+                    categories_summary.product_skipped = skipped;
+                }
+            }
+            for chunk in preview.product_groups.chunks(CHUNK_SIZE) {
+                let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+                for agg in chunk {
+                    let _pid = persist_product_with_skus(&tx, agg, skip_category, &batch_id)?;
+                    products_created += 1;
+                    product_skus_created += agg.variants.len() as i64;
+                    processed_rows += 1;
+                }
+                tx.commit().map_err(|e| format!("commit product chunk 失败: {}", e))?;
+                conn.execute(
+                    "UPDATE import_batches SET processed_rows = ?1 WHERE id = ?2",
+                    rusqlite::params![processed_rows, batch_id],
+                )
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        crate::import::types::ImportTarget::Suppliers => {
+            // 类别批量建档
+            if !skip_category {
+                if let Some(cats) = preview.categories_to_create.get("supplier") {
+                    let (created, skipped) = bulk_ensure_categories(conn, "supplier", cats, &batch_id)?;
+                    categories_summary.supplier_created = created;
+                    categories_summary.supplier_skipped = skipped;
+                }
+            }
+            // M2：找不到 '供应商编号' / '供应商名称' 列直接报错（不再 fallback）
+            let code_idx: usize = preview
+                .field_names
+                .iter()
+                .position(|f| f.contains("供应商编号"))
+                .ok_or_else(|| {
+                    "供应商文件缺少 '供应商编号' 列，请检查表头是否包含「供应商编号」".to_string()
+                })?;
+            let name_idx: usize = preview
+                .field_names
+                .iter()
+                .position(|f| f.contains("供应商名称"))
+                .ok_or_else(|| {
+                    "供应商文件缺少 '供应商名称' 列，请检查表头是否包含「供应商名称」".to_string()
+                })?;
+            let category_idx: Option<usize> = preview
+                .field_names
+                .iter()
+                .position(|f| f.contains("供应商类别"));
+
+            let total = _rows.len();
+            let mut valid_count = 0i64;
+            let mut valid_seen = 0i64;
+            // chunked：每 1000 行一个事务
+            for chunk_start in (0..total).step_by(CHUNK_SIZE) {
+                let chunk_end = (chunk_start + CHUNK_SIZE).min(total);
+                let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+                for row_idx in chunk_start..chunk_end {
+                    let row = &_rows[row_idx];
+                    valid_seen += 1;
+                    if row.len() <= code_idx {
+                        continue;
+                    }
+                    let code = row[code_idx].trim().to_string();
+                    if code.is_empty() {
+                        continue;
+                    }
+                    let name = row
+                        .get(name_idx)
+                        .map(|s| s.trim().to_string())
+                        .unwrap_or_default();
+                    let category_name = category_idx
+                        .and_then(|i| row.get(i))
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty());
+
+                    if let Some(ref cn) = category_name {
+                        crate::import::category_resolver::ensure_category(
+                            &tx, "supplier", cn,
+                        )?;
+                    }
+                    let _ = ensure_supplier_legacy(&tx, &code, &name)?;
+                    suppliers_created += 1;
+                    valid_count += 1;
+                }
+                tx.commit().map_err(|e| format!("commit supplier chunk 失败: {}", e))?;
+                processed_rows = valid_seen;
+                conn.execute(
+                    "UPDATE import_batches SET processed_rows = ?1 WHERE id = ?2",
+                    rusqlite::params![processed_rows, batch_id],
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            // 避免 unused warning
+                let _ = valid_count;
+        }
+        _ => {
+            return Err(format!(
+                "目标类型 {} 暂不支持老格式导入，请用标准 CSV/JSON 流程",
+                target_type
+            ));
+        }
+    }
+
+    // 5) 提交
+    // tx.commit() 已在每个 chunk 内完成，本函数不再包外层事务
+
+    // 6) 更新批次状态
+    let final_status = "success";
+    let finished_at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let final_processed = customers_created + products_created + suppliers_created;
+    conn.execute(
+        "UPDATE import_batches SET
+            status = ?1, processed_rows = ?2, success_rows = ?3, failed_rows = 0,
+            skipped_rows = 0, finished_at = ?4,
+            notes = COALESCE(notes, '') || ?5
+         WHERE id = ?6",
+        rusqlite::params![
+            final_status,
+            final_processed,
+            final_processed,
+            finished_at,
+            format!(
+                " | v1.3 legacy: customers={}, contacts={}, products={}, skus={}, suppliers={}",
+                customers_created, customer_contacts_created,
+                products_created, product_skus_created, suppliers_created
+            ),
+            batch_id,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(LegacyExecuteResponse {
+        batch_id,
+        status: final_status.to_string(),
+        customers_created,
+        customer_contacts_created,
+        products_created,
+        product_skus_created,
+        suppliers_created,
+        categories_summary,
+        finished_at,
+    })
+}
+
+// ----------------------------------------------------------------------------
+// import_rollback_batch：撤销已完成的导入（不限时）
+//
+// 范围（决策 2026-07-02）：
+//   - 删除 customer_contacts / product_sku 中 source = 'import_legacy' 的行
+//   - 删除 categories 中 source = 'import_legacy' 的行
+//   - 不动 customers / products / suppliers 主表（用户可能已手动改过）
+//   - 不动 import_batches / import_batch_errors（保留历史）
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RollbackResponse {
+    pub batch_id: String,
+    pub contacts_deleted: i64,
+    pub product_skus_deleted: i64,
+    pub categories_deleted: i64,
+    pub rolled_back_at: String,
+}
+
+#[tauri::command]
+pub fn import_rollback_batch(
+    db: tauri::State<Mutex<Database>>,
+    batch_id: String,
+) -> Result<RollbackResponse, String> {
+    let dbg = db.lock().map_err(|e| e.to_string())?;
+    let conn = dbg.connection();
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    // P0-S1 修复：按 batch_id 精准过滤，避免跨批次误删
+    let contacts_deleted = tx
+        .execute(
+            "DELETE FROM customer_contacts WHERE batch_id = ?1",
+            rusqlite::params![batch_id],
+        )
+        .map_err(|e| e.to_string())? as i64;
+
+    let product_skus_deleted = tx
+        .execute(
+            "DELETE FROM product_sku WHERE batch_id = ?1",
+            rusqlite::params![batch_id],
+        )
+        .map_err(|e| e.to_string())? as i64;
+
+    let categories_deleted = tx
+        .execute(
+            "DELETE FROM categories WHERE batch_id = ?1",
+            rusqlite::params![batch_id],
+        )
+        .map_err(|e| e.to_string())? as i64;
+
+    tx.commit().map_err(|e| e.to_string())?;
+
+    let rolled_back_at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    Ok(RollbackResponse {
+        batch_id,
+        contacts_deleted,
+        product_skus_deleted,
+        categories_deleted,
+        rolled_back_at,
+    })
 }

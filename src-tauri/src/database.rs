@@ -212,6 +212,16 @@ impl Database {
             eprintln!("✓ [DB Migration] 051_product_gallery 多图支持已加载");
         }
 
+        // 运行迁移：v1.3 老系统数据迁移 - 客户多联系人 / 商品 SPU-SKU / 类别统一表
+        let legacy_extras_migration =
+            include_str!("../../database/migrations/061_legacy_import_extras.sql");
+        if let Err(e) = self.conn.execute_batch(legacy_extras_migration) {
+            eprintln!("[DB Migration WARNING] 061_legacy_import_extras: {}", e);
+            migration_errors.push(format!("061: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] 061_legacy_import_extras 老系统迁移扩展表已加载");
+        }
+
         // 运行迁移：给缺 deleted_at 列的表补充软删除列（v1.0.0+tray 补丁）
         // 原因：销售/采购/联系人代码使用 WHERE deleted_at IS NULL，但 src/db/schema.sql
         // 原始定义里没建这个列。SQLite 不支持 ADD COLUMN IF NOT EXISTS，

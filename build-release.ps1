@@ -111,8 +111,8 @@ Write-Host ""
 
 Write-Host "Step 6/6: Verifying generated files..." -ForegroundColor Yellow
 
-$msiPath = "src-tauri\target\release\bundle\msi\Proclaw_0.1.0_x64_en-US.msi"
-$nsisPath = "src-tauri\target\release\bundle\nsis\Proclaw_0.1.0_x64-setup.exe"
+$msiPath = "src-tauri\target\release\bundle\msi\ProClaw_1.3.0_x64_en-US.msi"
+$nsisPath = "src-tauri\target\release\bundle\nsis\ProClaw_1.3.0_x64-setup.exe"
 
 $foundFiles = @()
 

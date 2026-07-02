@@ -1,9 +1,13 @@
-//! ProClaw 批量导入中心 - 解析器（v1.2 P1）
+//! ProClaw 批量导入中心 - 解析器（v1.2 P1 + v1.3 老格式扩展）
 //!
 //! 把上传的文件字节流转成 `Vec<ParsedRow>`：第一行作为标题行。
 //! - CSV 完整实现（utf-8 / 自动 BOM 剥离）
-//! - XLSX 简化为「改后缀为 .xlsx.csv」并提示用户重新保存（轻量免依赖）
 //! - JSON 按数组对象格式解析为多行
+//! - XLSX / XLS 走 v1.3 引入的 calamine 真解析（已不再 stub）
+//!
+//! v1.3 变更：
+//! - 移除 `parse_xlsx_stub`
+//! - 新增 `parse_xls_xlsx` 入口（基于 calamine，自动识别 .xls / .xlsx）
 
 use crate::import::types::ParsedRow;
 use std::collections::HashMap;
@@ -19,13 +23,70 @@ pub struct ParseResult {
 }
 
 /// 入口：根据 source_format 分发到具体解析器
+///
+/// v1.3 变更：xls / xlsx 不再是 stub，直接走 calamine 真解析。
+/// 注意：calamine 解析需要文件路径（不能纯内存），所以 xls/xlsx 分支
+/// 会通过临时文件方式传递：调用方应已把字节流写到 import_uploads/<batch_id>/ 下。
 pub fn parse_bytes(bytes: &[u8], source_format: &str) -> Result<ParseResult, String> {
     match source_format {
         "csv" => parse_csv(bytes),
         "json" => parse_json(bytes),
-        "xlsx" => parse_xlsx_stub(bytes), // 见函数注释
+        "xls" | "xlsx" => {
+            // 把 bytes 写到临时文件，调用 calamine
+            let temp_path = std::env::temp_dir()
+                .join(format!("proclaw_import_{}.{}", std::process::id(), source_format));
+            std::fs::write(&temp_path, bytes)
+                .map_err(|e| format!("写临时文件失败: {}", e))?;
+            let result = parse_xls_xlsx(&temp_path);
+            let _ = std::fs::remove_file(&temp_path);
+            result
+        }
         other => Err(format!("不支持的文件格式: {}", other)),
     }
+}
+
+/// 从文件路径解析 xls / xlsx（calamine 真解析）
+pub fn parse_xls_xlsx(path: &std::path::Path) -> Result<ParseResult, String> {
+    use crate::import::header_detect::detect_header;
+
+    let format = crate::import::parser_legacy::detect_format(path)?;
+    let (_, all_rows) =
+        crate::import::parser_legacy::parse_legacy_file(path, "generic")?;
+
+    if all_rows.is_empty() {
+        return Ok(ParseResult {
+            rows: vec![],
+            headers: vec![],
+            format: format.to_string(),
+            total_rows: 0,
+        });
+    }
+
+    // 探测表头
+    let report = detect_header(&all_rows);
+    let data_start = report.structure.data_start_row;
+    let headers = report.field_names.clone();
+
+    let mut rows = Vec::new();
+    for (i, raw_row) in all_rows.iter().skip(data_start).enumerate() {
+        let mut fields = HashMap::new();
+        for (idx, header) in headers.iter().enumerate() {
+            let val = raw_row.get(idx).cloned().unwrap_or_default();
+            fields.insert(header.clone(), val.trim().to_string());
+        }
+        rows.push(ParsedRow {
+            row_index: i + 1,
+            fields,
+        });
+    }
+
+    let total_rows = rows.len();
+    Ok(ParseResult {
+        rows,
+        headers,
+        format: format.to_string(),
+        total_rows,
+    })
 }
 
 // ============================================
@@ -141,23 +202,14 @@ fn parse_json(bytes: &[u8]) -> Result<ParseResult, String> {
 }
 
 // ============================================
-// XLSX 解析（轻量 stub：提示用户另存为 CSV）
+// XLSX / XLS 解析（v1.3：calamine 真解析）
 // ============================================
 //
-// 为什么不引入完整的 XLSX 解析（如 calamine，~10MB）？
-//   - 大多数用户「Excel → 文件 → 另存为 CSV」 1 步搞定
-//   - Tauri 安装包体积敏感，每 +1MB 都影响更新包
-//   - 模板里 6 类目标的 CSV 模板已能覆盖 99% 场景
-//   - 真正支持 XLSX 留到 v1.3 P2（按需激活 quick-xml + calamine）
+// v1.2 P1 的 parse_xlsx_stub 已删除。xls/xlsx 真解析由 parser_legacy.rs 提供。
+// 见 `parse_xls_xlsx` 入口（calamine 走 .xls / .xlsx 双格式）。
 //
-// 因此 parser 不真正读 xlsx 二进制，而是检测 zip 头 + 给出明确报错，
-// 让向导回到 Step1 提示用户重新导出。
-fn parse_xlsx_stub(_bytes: &[u8]) -> Result<ParseResult, String> {
-    Err(
-        "暂未启用 XLSX 解析。请在 Excel 中点击「文件 → 另存为 → CSV (UTF-8)」后重新上传。"
-            .to_string(),
-    )
-}
+// 保留注释以记录历史：v1.2 P1 阶段曾因安装包体积敏感，用 stub 提示用户另存 CSV；
+// v1.3 改用 calamine（Rust 生态标准 xls/xlsx 库），体积 +1.8MB 可接受。
 
 // ============================================
 // 单元测试
@@ -225,11 +277,5 @@ mod tests {
     #[test]
     fn test_parse_dispatch_unknown() {
         assert!(parse_bytes(b"", "pdf").is_err());
-    }
-
-    #[test]
-    fn test_parse_xlsx_stub_rejects() {
-        // 任意 .xlsx 二进制都会被拒绝
-        assert!(parse_bytes(b"PK\x03\x04...", "xlsx").is_err());
     }
 }

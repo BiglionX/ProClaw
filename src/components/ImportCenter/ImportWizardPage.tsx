@@ -1,10 +1,10 @@
 /**
- * ProClaw 批量导入中心 - 7 步向导（v1.2 P1）
+ * ProClaw 批量导入中心 - 7 步向导（v1.2 P1 + v1.3 老系统迁移）
  *
  * /import-center/new         → 新建
  * /import-center/:batchId    → 查看/继续已有批次
  *
- * 7 步：
+ * v1.2 P1 7 步：
  *  1. 选目标 + 上传文件
  *  2. 解析预览（表头 + 前 3 行）
  *  3. 字段映射（自动按中英别名匹配，可手动调整）
@@ -12,6 +12,12 @@
  *  5. 执行（事务化入库）
  *  6. 结果报告
  *  7. 完成（继续导入 / 返回中心）
+ *
+ * v1.3 老系统数据迁移（.xls / .xlsx）：
+ *  - 上传 .xls / .xlsx → 调 import_preview_legacy → 展示聚合预览
+ *  - Step 4（聚合规则确认）：用户手动编辑 aggregation_rules
+ *  - Step 5（执行）：调 import_execute_legacy（带 aggregation_rules + skip_category_auto_create）
+ *  - Step 7（结果 + 撤销）：调 import_rollback_batch（不限时）
  */
 
 import {
@@ -21,6 +27,7 @@ import {
   CloudUpload as UploadIcon,
   ErrorOutline as ErrorIcon,
   Refresh as RefreshIcon,
+  Undo as UndoIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -56,13 +63,26 @@ import {
   createBatch,
   executeBatch,
   getBatch,
+  isLegacyFile,
+  previewLegacy,
+  executeLegacy,
+  rollbackBatch,
   validateBatch,
 } from '../../lib/import/importService';
+import {
+  buildCategoryReviewList,
+  countAggregationTotals,
+  needsAggregationReview,
+} from '../../lib/import/legacyAdapter';
+import Step0LegacyPreview from './steps/Step0LegacyPreview';
 import type {
   ExecuteResponse,
   FieldMappingRow,
   ImportCreateResponse,
   ImportTarget,
+  LegacyExecuteResponse,
+  LegacyParseResult,
+  RollbackResponse,
   ValidateResponse,
 } from '../../types/import';
 import { STATUS_LABELS, TARGET_LABELS } from '../../types/import';
@@ -93,7 +113,7 @@ export default function ImportWizardPage() {
   const [searchParams] = useSearchParams();
   const queryTarget = (searchParams.get('target') as ImportTarget) || 'products';
 
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState<number>(0);
   const [target, setTarget] = useState<ImportTarget>(queryTarget);
   const [file, setFile] = useState<File | null>(null);
   const [createResp, setCreateResp] = useState<ImportCreateResponse | null>(null);
@@ -104,6 +124,28 @@ export default function ImportWizardPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ==============================
+  // v1.3 老系统数据迁移 - state
+  // ==============================
+  /** 是否在走老格式流程（.xls / .xlsx） */
+  const [legacyMode, setLegacyMode] = useState(false);
+  /** 老格式预览结果（previewLegacy 返回） */
+  const [legacyPreview, setLegacyPreview] = useState<LegacyParseResult | null>(null);
+  /** 老格式文件源路径（用于 step 5 执行） */
+  const [legacySourcePath, setLegacySourcePath] = useState<string>('');
+  /** 老格式导入批次 id（执行后） */
+  const [legacyBatchId, setLegacyBatchId] = useState<string>('');
+  /** 老格式执行结果 */
+  const [legacyExecuteResp, setLegacyExecuteResp] = useState<LegacyExecuteResponse | null>(null);
+  /** 撤销结果 */
+  const [rollbackResp, setRollbackResp] = useState<RollbackResponse | null>(null);
+  /** 是否跳过类别自动建档（用户在 Step 4 编辑） */
+  const [skipCategoryAutoCreate, setSkipCategoryAutoCreate] = useState(false);
+  /** 聚合规则编辑（v1.3 默认自动推断 + 用户可手动编辑） */
+  const [autoAggregationEnabled, setAutoAggregationEnabled] = useState(true);
+  /** 老格式向导子步骤：0=上传后预览；1=类别审核；2=执行中；3=结果 */
+  const [legacySubStep, setLegacySubStep] = useState(0);
 
   // 已有 batchId → 重新加载
   const { data: existingBatch, isLoading: loadingBatch } = useQuery({
@@ -141,6 +183,11 @@ export default function ImportWizardPage() {
     setUploading(true);
     setError(null);
     try {
+      // v1.3 老格式检测（.xls / .xlsx）走特殊流程
+      if (isLegacyFile(file.name) && (target === 'products' || target === 'customers' || target === 'suppliers')) {
+        await handleLegacyUpload(file);
+        return;
+      }
       const resp = await createBatch(target, file);
       setCreateResp(resp);
       setActiveStep(1);
@@ -148,6 +195,101 @@ export default function ImportWizardPage() {
       setMapping(autoMapColumns(resp.headers, target));
     } catch (e: unknown) {
       setError((e as Error).message || '上传失败');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ============================================
+  // v1.3 老系统数据迁移 - handler
+  // ============================================
+
+  /** v1.3 上传 .xls / .xlsx → 创建标准批次（让 import_batches 行存在）+ 调 previewLegacy */
+  const handleLegacyUpload = async (f: File) => {
+    try {
+      // 1) 先用 createBatch 创建 import_batches 行（与 v1.2 P1 保持一致）
+      const resp = await createBatch(target, f);
+      setLegacyBatchId(resp.batch_id);
+      // 2) 获取文件实际路径（在 import_uploads/<batch_id>/）
+      const filePath = `${resp.source_path ?? ''}`;
+      setLegacySourcePath(filePath);
+      setLegacyMode(true);
+      setLegacySubStep(0);
+      // 3) 调 previewLegacy（拿到聚合组 + 类别清单）
+      const preview = await previewLegacy(filePath, target);
+      setLegacyPreview(preview);
+      setActiveStep(1); // 直接跳到"解析预览"步骤展示老格式预览
+    } catch (e: unknown) {
+      setError((e as Error).message || '老格式预览失败');
+      throw e;
+    }
+  };
+
+  /** v1.3 类别审核 → 执行 */
+  const handleLegacyExecute = async () => {
+    if (!legacyBatchId) return;
+
+    // P1-C1：如果有聚合待确认，弹 confirm dialog 强制用户确认
+    if (legacyPreview && needsAggregationReview(legacyPreview)) {
+      const totals = countAggregationTotals(legacyPreview);
+      const multiCustomers = legacyPreview.customer_groups.filter(
+        (g) => g.contacts.length > 1,
+      ).length;
+      const multiProducts = legacyPreview.product_groups.filter(
+        (g) => g.variants.length > 1,
+      ).length;
+      const msg =
+        `检测到待确认的聚合规则：\n\n` +
+        `· ${multiCustomers} 个客户有多个联系人（自动选首要 + 备用）\n` +
+        `· ${multiProducts} 个商品有多个 SKU（自动按 SPU 聚合）\n` +
+        `总计：${totals.customer_groups} 个客户 / ${totals.customer_contacts} 个联系人 / ` +
+        `${totals.product_groups} 个 SPU / ${totals.product_skus} 个 SKU\n\n` +
+        `${skipCategoryAutoCreate ? '类别自动建档：关闭\n' : '类别自动建档：开启\n'}` +
+        `类别审核：${buildCategoryReviewList(legacyPreview.categories_to_create).length} 项\n\n` +
+        `确认执行导入？`;
+      if (!window.confirm(msg)) {
+        return;
+      }
+    }
+
+    setUploading(true);
+    setError(null);
+    setLegacySubStep(2); // 执行中
+    try {
+      const ex = await executeLegacy({
+        batch_id: legacyBatchId,
+        column_mapping: {}, // 老格式不依赖 v1.2 P1 的字段映射（后端按列名直接推断）
+        default_values: defaultValues,
+        skip_errors: true,
+        // v1.3 决策：默认自动推断聚合规则 + 用户可手动编辑
+        // 当前 UI 未提供编辑界面，传 None 由后端自动推断
+        aggregation_rules: undefined,
+        skip_category_auto_create: skipCategoryAutoCreate,
+      });
+      setLegacyExecuteResp(ex);
+      setLegacySubStep(3); // 结果
+      qc.invalidateQueries({ queryKey: ['import-batches'] });
+    } catch (e: unknown) {
+      setError((e as Error).message || '执行失败');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /** v1.3 不限时撤销 */
+  const handleLegacyRollback = async () => {
+    if (!legacyBatchId) return;
+    if (!window.confirm('确定要撤销本次老格式导入吗？\n\n将删除：\n- 客户联系人（customer_contacts）\n- 商品 SKU（product_sku）\n- 自动建档的类别（categories）\n\n注：不影响 customers / products / suppliers 主表。')) {
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const r = await rollbackBatch(legacyBatchId);
+      setRollbackResp(r);
+      qc.invalidateQueries({ queryKey: ['import-batches'] });
+    } catch (e: unknown) {
+      setError((e as Error).message || '撤销失败');
     } finally {
       setUploading(false);
     }
@@ -266,7 +408,7 @@ export default function ImportWizardPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.json,.xlsx"
+                accept=".csv,.json,.xls,.xlsx"
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -281,7 +423,7 @@ export default function ImportWizardPage() {
                 fullWidth
                 sx={{ py: 3 }}
               >
-                {file ? `已选：${file.name}` : '选择文件（CSV / JSON）'}
+                {file ? `已选：${file.name}` : '选择文件（CSV / JSON / XLS / XLSX）'}
               </Button>
               {file && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
@@ -310,69 +452,117 @@ export default function ImportWizardPage() {
         {/* Step 1: 解析预览 */}
         {activeStep === 1 && createResp && (
           <Stack spacing={2}>
-            <Alert severity="success" icon={<CheckIcon />}>
-              解析成功！共识别 <strong>{createResp.total_rows}</strong> 行数据，
-              <strong>{createResp.headers.length}</strong> 列。
-            </Alert>
-            <Typography variant="subtitle2">表头（前 12 列）</Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {createResp.headers.slice(0, 12).map((h) => (
-                <Chip key={h} label={h} variant="outlined" />
-              ))}
-            </Stack>
-            {createResp.sample_rows.length > 0 && (
+            {/* v1.3 老格式预览分支 */}
+            {legacyMode && legacyPreview ? (
               <>
-                <Divider sx={{ my: 1 }} />
-                <Typography variant="subtitle2">样例数据（前 3 行）</Typography>
-                <Box sx={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        {createResp.headers.map((h) => (
-                          <th
-                            key={h}
-                            style={{
-                              border: '1px solid #ddd',
-                              padding: 4,
-                              background: '#f5f5f5',
-                              textAlign: 'left',
-                            }}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {createResp.sample_rows.map((row, i) => (
-                        <tr key={i}>
-                          {createResp.headers.map((h) => (
-                            <td
-                              key={h}
-                              style={{ border: '1px solid #ddd', padding: 4, maxWidth: 200, overflow: 'hidden' }}
-                            >
-                              {row[h] || ''}
-                            </td>
+                <Alert severity="info">
+                  检测到老系统数据（.xls / .xlsx）：共 <strong>{legacyPreview.total_data_rows}</strong> 行，
+                  已自动按客户编号 / 商品编号聚合。
+                  {needsAggregationReview(legacyPreview) && '有客户多联系人 / 商品多 SKU，请确认聚合规则。'}
+                </Alert>
+                <Step0LegacyPreview preview={legacyPreview} compact />
+                {/* 类别自动建档开关（v1.3 决策：默认全开） */}
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Typography variant="body2">类别自动建档：</Typography>
+                  <Chip
+                    label={skipCategoryAutoCreate ? '已关闭' : '已开启'}
+                    color={skipCategoryAutoCreate ? 'default' : 'success'}
+                    onClick={() => setSkipCategoryAutoCreate((v) => !v)}
+                    sx={{ cursor: 'pointer' }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    关闭后，已存在的类别仍可复用，新类别不会自动创建
+                  </Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
+                  <Button
+                    onClick={() => {
+                      setLegacyMode(false);
+                      setLegacyPreview(null);
+                      setLegacyBatchId('');
+                      setActiveStep(0);
+                    }}
+                    startIcon={<ArrowBackIcon />}
+                  >
+                    返回重选
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleLegacyExecute}
+                    disabled={uploading}
+                    endIcon={<ArrowForwardIcon />}
+                  >
+                    下一步：执行导入
+                  </Button>
+                </Stack>
+              </>
+            ) : (
+              <>
+                <Alert severity="success" icon={<CheckIcon />}>
+                  解析成功！共识别 <strong>{createResp.total_rows}</strong> 行数据，
+                  <strong>{createResp.headers.length}</strong> 列。
+                </Alert>
+                <Typography variant="subtitle2">表头（前 12 列）</Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {createResp.headers.slice(0, 12).map((h) => (
+                    <Chip key={h} label={h} variant="outlined" />
+                  ))}
+                </Stack>
+                {createResp.sample_rows.length > 0 && (
+                  <>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="subtitle2">样例数据（前 3 行）</Typography>
+                    <Box sx={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr>
+                            {createResp.headers.map((h) => (
+                              <th
+                                key={h}
+                                style={{
+                                  border: '1px solid #ddd',
+                                  padding: 4,
+                                  background: '#f5f5f5',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {createResp.sample_rows.map((row, i) => (
+                            <tr key={i}>
+                              {createResp.headers.map((h) => (
+                                <td
+                                  key={h}
+                                  style={{ border: '1px solid #ddd', padding: 4, maxWidth: 200, overflow: 'hidden' }}
+                                >
+                                  {row[h] || ''}
+                                </td>
+                              ))}
+                            </tr>
                           ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </Box>
+                        </tbody>
+                      </table>
+                    </Box>
+                  </>
+                )}
+                <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
+                  <Button onClick={() => setActiveStep(0)} startIcon={<ArrowBackIcon />}>
+                    返回
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={() => setActiveStep(2)}
+                    endIcon={<ArrowForwardIcon />}
+                  >
+                    下一步：字段映射
+                  </Button>
+                </Stack>
               </>
             )}
-            <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
-              <Button onClick={() => setActiveStep(0)} startIcon={<ArrowBackIcon />}>
-                返回
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => setActiveStep(2)}
-                endIcon={<ArrowForwardIcon />}
-              >
-                下一步：字段映射
-              </Button>
-            </Stack>
           </Stack>
         )}
 
