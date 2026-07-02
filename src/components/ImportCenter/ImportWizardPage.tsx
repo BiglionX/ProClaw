@@ -27,7 +27,6 @@ import {
   CloudUpload as UploadIcon,
   ErrorOutline as ErrorIcon,
   Refresh as RefreshIcon,
-  Undo as UndoIcon,
 } from '@mui/icons-material';
 import {
   Alert,
@@ -66,7 +65,6 @@ import {
   isLegacyFile,
   previewLegacy,
   executeLegacy,
-  rollbackBatch,
   validateBatch,
 } from '../../lib/import/importService';
 import {
@@ -80,9 +78,7 @@ import type {
   FieldMappingRow,
   ImportCreateResponse,
   ImportTarget,
-  LegacyExecuteResponse,
   LegacyParseResult,
-  RollbackResponse,
   ValidateResponse,
 } from '../../types/import';
 import { STATUS_LABELS, TARGET_LABELS } from '../../types/import';
@@ -127,25 +123,18 @@ export default function ImportWizardPage() {
 
   // ==============================
   // v1.3 老系统数据迁移 - state
+  // （v1.3.0 release 后精简：移除未挂载 UI 的预留 state 与 setter，
+  //   仅保留 legacyMode / legacyPreview / legacyBatchId / skipCategoryAutoCreate
+  //   这 4 个真正影响渲染与执行的 state）
   // ==============================
   /** 是否在走老格式流程（.xls / .xlsx） */
   const [legacyMode, setLegacyMode] = useState(false);
   /** 老格式预览结果（previewLegacy 返回） */
   const [legacyPreview, setLegacyPreview] = useState<LegacyParseResult | null>(null);
-  /** 老格式文件源路径（用于 step 5 执行） */
-  const [legacySourcePath, setLegacySourcePath] = useState<string>('');
   /** 老格式导入批次 id（执行后） */
   const [legacyBatchId, setLegacyBatchId] = useState<string>('');
-  /** 老格式执行结果 */
-  const [legacyExecuteResp, setLegacyExecuteResp] = useState<LegacyExecuteResponse | null>(null);
-  /** 撤销结果 */
-  const [rollbackResp, setRollbackResp] = useState<RollbackResponse | null>(null);
   /** 是否跳过类别自动建档（用户在 Step 4 编辑） */
   const [skipCategoryAutoCreate, setSkipCategoryAutoCreate] = useState(false);
-  /** 聚合规则编辑（v1.3 默认自动推断 + 用户可手动编辑） */
-  const [autoAggregationEnabled, setAutoAggregationEnabled] = useState(true);
-  /** 老格式向导子步骤：0=上传后预览；1=类别审核；2=执行中；3=结果 */
-  const [legacySubStep, setLegacySubStep] = useState(0);
 
   // 已有 batchId → 重新加载
   const { data: existingBatch, isLoading: loadingBatch } = useQuery({
@@ -200,9 +189,14 @@ export default function ImportWizardPage() {
     }
   };
 
-  // ============================================
-  // v1.3 老系统数据迁移 - handler
-  // ============================================
+  /**
+   * v1.3 老系统数据迁移 - handler
+   *
+   * 注：原本规划在 Step 7 挂载「撤销本次导入」按钮（调 import_rollback_batch），
+   * 但 v1.3.0 release 时 Step 7 组件（Step7Result）未实现，按钮未挂载，
+   * handler 也未被任何 onClick 调用。为避免 dead code 暂时删除；
+   * 后续补 Step7Result 时再恢复。v1.3 计划文档 11.1 风险表中保留「撤销本次导入」按钮。
+   */
 
   /** v1.3 上传 .xls / .xlsx → 创建标准批次（让 import_batches 行存在）+ 调 previewLegacy */
   const handleLegacyUpload = async (f: File) => {
@@ -212,9 +206,7 @@ export default function ImportWizardPage() {
       setLegacyBatchId(resp.batch_id);
       // 2) 获取文件实际路径（在 import_uploads/<batch_id>/）
       const filePath = `${resp.source_path ?? ''}`;
-      setLegacySourcePath(filePath);
       setLegacyMode(true);
-      setLegacySubStep(0);
       // 3) 调 previewLegacy（拿到聚合组 + 类别清单）
       const preview = await previewLegacy(filePath, target);
       setLegacyPreview(preview);
@@ -254,42 +246,21 @@ export default function ImportWizardPage() {
 
     setUploading(true);
     setError(null);
-    setLegacySubStep(2); // 执行中
     try {
-      const ex = await executeLegacy({
+      // 执行结果直接丢掉（v1.3 老格式结果未挂载到 UI；后续 Step 7 显示成功统计时再保留）
+      await executeLegacy({
         batch_id: legacyBatchId,
         column_mapping: {}, // 老格式不依赖 v1.2 P1 的字段映射（后端按列名直接推断）
         default_values: defaultValues,
         skip_errors: true,
         // v1.3 决策：默认自动推断聚合规则 + 用户可手动编辑
-        // 当前 UI 未提供编辑界面，传 None 由后端自动推断
+        // 当前 UI 未提供编辑界面，传 undefined 由后端自动推断
         aggregation_rules: undefined,
         skip_category_auto_create: skipCategoryAutoCreate,
       });
-      setLegacyExecuteResp(ex);
-      setLegacySubStep(3); // 结果
       qc.invalidateQueries({ queryKey: ['import-batches'] });
     } catch (e: unknown) {
       setError((e as Error).message || '执行失败');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  /** v1.3 不限时撤销 */
-  const handleLegacyRollback = async () => {
-    if (!legacyBatchId) return;
-    if (!window.confirm('确定要撤销本次老格式导入吗？\n\n将删除：\n- 客户联系人（customer_contacts）\n- 商品 SKU（product_sku）\n- 自动建档的类别（categories）\n\n注：不影响 customers / products / suppliers 主表。')) {
-      return;
-    }
-    setUploading(true);
-    setError(null);
-    try {
-      const r = await rollbackBatch(legacyBatchId);
-      setRollbackResp(r);
-      qc.invalidateQueries({ queryKey: ['import-batches'] });
-    } catch (e: unknown) {
-      setError((e as Error).message || '撤销失败');
     } finally {
       setUploading(false);
     }

@@ -811,8 +811,7 @@ use crate::import::aggregator::{
 use crate::import::category_resolver::bulk_ensure_categories;
 use crate::import::parser_legacy::parse_legacy_file;
 use crate::import::types::{
-    AggregationRule, CategoryCreateSummary, CustomerAggregate, LegacyExecuteRequest,
-    LegacyParseResult, ProductAggregate,
+    CategoryCreateSummary, LegacyExecuteRequest, LegacyParseResult,
 };
 
 /// 供应商 upsert（按 code → name 优先），私有辅助函数

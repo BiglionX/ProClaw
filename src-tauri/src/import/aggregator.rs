@@ -12,10 +12,7 @@ use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
 use crate::import::category_resolver::ensure_category;
-use crate::import::types::{
-    AggregationRule, CustomerAggregate, CustomerContactRecord, ProductAggregate,
-    ProductSkuRecord,
-};
+use crate::import::types::{CustomerAggregate, ProductAggregate};
 
 /// 持久化单个客户聚合（1 customer + N contacts）
 ///
@@ -216,37 +213,11 @@ fn upsert_product(
     Ok(id)
 }
 
-/// 过滤聚合规则（按 action = 'skip' 排除）
-pub fn filter_active_rules(rules: &[AggregationRule]) -> Vec<&AggregationRule> {
-    rules.iter().filter(|r| r.action != "skip").collect()
-}
-
 // ============================================
 // 单元测试（仅纯函数）
 // ============================================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_filter_active_rules() {
-        let rules = vec![
-            AggregationRule {
-                group_key: "V1XLJ1001".into(),
-                action: "spu".into(),
-                primary_row_index: 1,
-                included_row_indices: vec![1, 2, 3],
-            },
-            AggregationRule {
-                group_key: "BAD001".into(),
-                action: "skip".into(),
-                primary_row_index: 0,
-                included_row_indices: vec![],
-            },
-        ];
-        let active = filter_active_rules(&rules);
-        assert_eq!(active.len(), 1);
-        assert_eq!(active[0].group_key, "V1XLJ1001");
-    }
-}
+//
+// 注：原 `filter_active_rules` 工具函数已被删除。
+// 原因：根据 v1.3 决策 #2「SPU/SKU 聚合策略 = 强制手动确认」，
+// 聚合规则完全由用户在 Step 4 编辑，后端不再做"按 action='skip' 自动过滤"的推断逻辑。
+// 后续若有新的纯聚合工具函数再加测试。
