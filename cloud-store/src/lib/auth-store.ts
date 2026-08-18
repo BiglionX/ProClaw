@@ -61,16 +61,63 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
+      // 密码验证：至少10个字符，包含字母和数字
+      if (password.length < 10) {
+        throw new Error('密码长度至少为10个字符');
+      }
+      if (!/[a-zA-Z]/.test(password)) {
+        throw new Error('密码必须包含字母');
+      }
+      if (!/[0-9]/.test(password)) {
+        throw new Error('密码必须包含数字');
+      }
+
+      // 调用 NvwaX 统一身份平台注册
+      const nvwaPortalApi = import.meta.env.NEXT_PUBLIC_NVWAX_PORTAL_API || 'https://account.proclaw.cc/api';
+      let nvwaResponse: Response;
+      try {
+        nvwaResponse = await fetch(`${nvwaPortalApi}/portal/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.toLowerCase(),
+            password,
+            locale: 'zh-CN',
+          }),
+        });
+      } catch (networkError) {
+        throw new Error('无法连接到统一身份服务，请稍后重试');
+      }
+
+      const nvwaResult = await nvwaResponse.json().catch(() => ({}));
+
+      if (!nvwaResponse.ok) {
+        if (nvwaResult.code === 'email_taken') {
+          throw new Error('该邮箱已被注册，请直接登录或使用其他邮箱');
+        }
+        if (nvwaResult.code === 'weak_password') {
+          throw new Error('密码强度不足，密码至少10个字符且必须包含字母和数字');
+        }
+        throw new Error(nvwaResult.message || '统一身份服务注册失败');
+      }
+
+      // NvwaX 注册成功后，使用 Supabase 匿名登录获取会话
+      // 用户需要在邮箱激活后通过 OIDC 登录
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.toLowerCase(),
+        password, // 仅用于临时登录，激活后使用 OIDC
       });
 
-      if (error) throw error;
+      if (error) {
+        // 注册成功但登录失败（可能需要邮箱激活）
+        set({
+          user: null,
+          session: null,
+          isLoading: false,
+        });
+        return;
+      }
 
       set({
         user: data.user,
