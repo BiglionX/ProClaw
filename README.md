@@ -1,5 +1,7 @@
-﻿[![Latest Release](https://img.shields.io/github/v/release/BiglionX/ProClaw?include_prereleases)](https://github.com/BiglionX/ProClaw/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/BiglionX/ProClaw?include_prereleases)](https://github.com/BiglionX/ProClaw/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/BiglionX/ProClaw/total)](https://github.com/BiglionX/ProClaw/releases)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/BiglionX/ProClaw/ci.yml?branch=main&label=CI)](https://github.com/BiglionX/ProClaw/actions/workflows/ci.yml)
+[![Hermes Fast Feedback](https://img.shields.io/badge/Hermes-Fast%20Feedback-blueviolet)](docs/plans/hermes_ci_setup.md)
 # 🦞 ProClaw
 
 > 开源AI驱动的商户经营操作系统 | Open-Source AI-Powered Business OS
@@ -11,7 +13,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![Stars](https://img.shields.io/github/stars/BiglionX/ProClaw?style=social)](https://github.com/BiglionX/ProClaw)
 
-> **🎉 v1.0.0 正式版已发布！生产环境验收通过，可以推广使用。**
+> **🎉 v1.5.1 已发布！跨仓库交付：NvWaX Web marketplace 详情页 + 后端字段补全（author / usageCount / relatedAgents）+ ProClaw 发布成功 toast 深链。详见 [RELEASE_NOTES_v1.5.1.md](RELEASE_NOTES_v1.5.1.md)。**
 
 ## 🎯 项目定位
 
@@ -24,7 +26,8 @@ ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应
 - 💾 **本地优先** - 数据本地存储（SQLCipher 加密），完全自主可控
 - ☁️ **云托管可�?* - 支持 Supabase 云端同步、Token 计费、债务保护
 - 🔌 **全栈生�?* - 桌面�?+ 移动�?App + 云托管商�?+ 营销站点
-- 🔑 **Token管理** - API密钥管理、用量统计、成本控制、月度账�?
+- 🔑 **Token管理** - API密钥管理、用量统计、成本控制、月度账
+- 🌐 **NvWaX 虚拟公司闭环**（v1.3.2 新增） - 与 [NvWaX](https://nvwax.proclaw.cc) 云端协同：在 NvWaX 用对话式 AI 设计虚拟公司 → 一键导出 `.nvwax-vc.json` → 在 ProClaw 桌面端本地运行整个 AI 团队。详见 [集成 NvWaX 虚拟公司](#-集成-nvwax-虚拟公司-sprint-213215)�?
 
 ## �?核心功能
 
@@ -104,6 +107,83 @@ ProClaw 是一个**开源的AI驱动商户经营操作系统**，采用桌面应
 - 简化的导航和页面布局
 - 安装向导引导式配�?
 - 适合单一门店、个体商户快速上�?
+
+## 🌐 集成 NvWaX 虚拟公司 (Sprint 2.13–2.15)
+
+> **状态**: v1.5.1 已发布 ✅（Sprint 2.18 收尾 3 项：撤销 + 真 SSE + 反向发布；v1.5.1 补 marketplace 详情页）
+> **关联 PRDs**: [`PROCLAW-NVWAX-API-INTEGRATION-REQUIREMENT`](docs/prd/architecture/PROCLAW-NVWAX-API-INTEGRATION-REQUIREMENT.md) · [`MULTI_PROJECT_INTEGRATION_SPEC`](docs/MULTI_PROJECT_INTEGRATION_SPEC.md)
+> **开发者文档**: [`docs/integration/NVWAX_INTEGRATION.md`](docs/integration/NVWAX_INTEGRATION.md) · [`docs/integration/virtual-company-package.schema.json`](docs/integration/virtual-company-package.schema.json)
+
+自 v1.3.2 起，ProClaw 与 [NvWaX](https://nvwax.proclaw.cc) 形成完整的"虚拟公司"双向闭环。
+
+### 11.1 闭环全景
+
+```
+┌─────────────────────────┐                  ┌──────────────────────────┐
+│  NvWaX Cloud (Web)        │   HTTP / JWT    │  ProClaw Desktop (Tauri)  │
+│  · 对话式创建虚拟公司      │ ◄─────────────► │  · virtual-company 插件   │
+│  · AI 自动匹配 Agent       │                  │  · 本地 SQLite 持久化     │
+│  · 一键导出 .nvwax-vc.json │                  │  · Hermes Skill 触发     │
+│  · 多设备 local_state 同步  │                  │  · 多设备 LWW 合并        │
+└─────────────────────────┘                  └──────────────────────────┘
+```
+
+### 11.2 用户体验
+
+- **CEO Agent 智能触发**：在 CEO Agent 对话中输入"帮我开一家咖啡店的虚拟公司" → 自动加载 `sk_preset_open_virtual_company_wizard` Skill → 跳转到 `虚拟公司 → 创建向导`
+- **本地 SSE 对话**：`/vc/wizard` 页面直接与 NvWaX SSE 流交互，5-10 分钟完成需求沟通
+- **一键导入**：NvWaX 完成设计后，前端 `aiteam-creator-modal` 自动下载 `.nvwax-vc.json` + 显示完整下载链接；用户在 ProClaw 粘贴即可导入
+- **本地状态回写**：在 ProClaw 启用/停用某个 Agent → 点击"☁️ 同步状态到 NvWaX" → NvWaX 记录 `aiteam_creation_sessions.local_state`
+- **多设备同步**：MacBook 上启用的 Agent，自动同步到 Windows 桌面端；last-write-wins 字段级合并避免误覆盖
+
+### 11.3 三 Sprint 里程碑
+
+| Sprint | 主题 | 关键交付 | 状态 |
+|--------|------|----------|------|
+| **2.13** | 最小闭环 | `VirtualCompanyPackage` JSON Schema v1.0.0 · `nvwax_search_vc_templates` · `nvwax_import_virtual_company_from_url` · 4 个内置 React 路由（`/vc/{templates,wizard,import,companies}`） | ✅ |
+| **2.14** | 4 项增强 | `sk_preset_open_virtual_company_wizard` · `open_virtual_company_page` Tauri 命令 · `PUT /sessions/:id/local-state` 回写 API · `nvwax_stream_session` SSE 代理 · `NVWAX_INTEGRATION.md` 220 行开发者指南 | ✅ |
+| **2.15** | 多设备同步 | `mergeAgentState` + `reconcileSync` 纯函数合并引擎（字段级 LWW）· `nvwax_fetch_local_state` + `nvwax_list_sessions_with_state` · App 启动 5 秒后台同步 · Companies 页"🔄 立即同步"按钮 + 报告卡片 | ✅ |
+| **v1.4.0 / 2.16** | **持久化 + 真实 SSE + 模板市场** | `virtual_company_agents` 表加 4 列（enabled / alias / owner_role / local_modified_at）· `nvwax_set_agent_local_state` 字段级独立 UPDATE · `nvwax_stream_session_v2` 用 `reqwest::bytes_stream()` 真 SSE · `nvwax_publish_to_marketplace` 一键发布到 NvWaX 市场 · Companies 页 "📤 发布到 NvWaX 市场" 按钮 | ✅ |
+| **v1.4.1 / 2.17** | **真实 SSE 收尾** | ProClaw `nvwax_stream_session_v2` 升级：按 `event:` 字段路由 6 种事件类型（progress / agent_message / step / status / complete / error），端到端打通 wizard 流式显示 NvWaX CEO Agent 回复；NvWaX 端 `sse-progress.service` 新增 `broadcastAgentMessage()` + `broadcastComplete()` | ✅ |
+
+### 11.4 数据交换契约
+
+所有跨端数据交换遵循单一 Schema：
+
+- **文件位置**：[`ProClaw/docs/integration/virtual-company-package.schema.json`](docs/integration/virtual-company-package.schema.json) · 镜像：[`NvwaX/packages/nvwax-server/src/schemas/virtual-company-package.schema.json`](https://github.com/BiglionX/NvwaX)
+- **当前版本**：`1.0.0`（主版本不一致即拒绝导入，跨版本升级走 ADR）
+- **必填字段**：`schemaVersion` / `packageId` / `exportedAt` / `source.platform === "nvwax"` / `team.id` / `team.name` / `agents[]`
+- **可选字段**：`checksum`（SHA-256）· `skills[]` · `metadata`
+
+### 11.5 完整 Tauri 命令清单（Sprint 2.13 + 2.14 + 2.15 + **v1.4.0 Sprint 2.16 + v1.4.1 Sprint 2.17**）
+
+| 命令 | 用途 | 引入版本 |
+|------|------|----------|
+| `nvwax_search_vc_templates` | 浏览 NvWaX 虚拟公司模板 | 2.13 |
+| `nvwax_import_virtual_company_from_url` | 拉取 `.nvwax-vc.json` 并导入本地 SQLite | 2.13 |
+| `bootstrap_virtual_company_tables` | 首次加载时建表（幂等） | 2.13 |
+| `open_virtual_company_page` | 触发前端跳转到 `/vc/{wizard,import,companies}` | 2.14 |
+| `nvwax_push_virtual_company_state` | 把本地状态变更回写到 NvWaX | 2.14 |
+| `nvwax_stream_session` | 通过 SSE 流与 NvWaX 虚拟公司会话交互（500ms 轮询版，保留兼容） | 2.14 |
+| `nvwax_stream_session_v2` | **真实 SSE 流式**（reqwest bytes_stream + app_handle.emit，替代 500ms 轮询） | **v1.4.0 / Sprint 2.16** |
+| `nvwax_set_agent_local_state` | **把单个 Agent 的启停/别名/角色持久化到 SQLite**（刷新不丢） | **v1.4.0 / Sprint 2.16** |
+| `nvwax_fetch_local_state` | 拉取单个 session 的最新 `local_state`（多设备同步） | 2.15 |
+| `nvwax_list_sessions_with_state` | 列出用户最近的虚拟公司会话（含 `local_state`） | 2.15 |
+| `nvwax_publish_to_marketplace` | **把虚拟公司发布到 NvWaX 市场**（team_skills is_public=true） | **v1.4.0 / Sprint 2.16** |
+
+### 11.6 测试覆盖
+
+- ProClaw 端：53+ 个 Vitest（`virtualCompanySync.test.ts` 14 个 + `nvwaxClient.virtualCompany.test.ts` 8 个 + `pluginFrontend.test.ts` 8 个 + `assistantAgent.test.ts` 25 个虚拟公司相关）
+- NvWaX 端：4 个 Jest（`proclaw.service.test.ts`）
+- Rust 端：4 个 `#[cfg(test)]`（`bootstrap_then_persist_writes_rows_to_in_memory_db` 等）
+- 端到端覆盖：所有"路径/命令/类型/测试名"在代码与文档中 1:1 对齐
+
+### 11.7 后续路线图（计划中，非本轮范围）
+
+- 真实 SSE 流式（`Tauri invoke_streaming` 替代 500ms 轮询）
+- 启用/停用状态真正持久化到 `virtual_company_agents.enabled/alias/owner_role` 列
+- 虚拟公司模板市场反向发布（ProClaw → NvWaX marketplace）
+- 多设备冲突 UI 提示（撤销按钮 + CRDT 风格字段级合并）
 
 ## 🚀 快速开�?
 
@@ -317,13 +397,14 @@ npm run dev
 | **前端页面** | 55+ 个路由页面（含行业插件） |
 | **前端组件** | 70+ 个UI 组件（4 个组件目录） |
 | **前端服务模块** | 65 个lib 模块 |
-| **Rust 后端** | 31+ 个命令模块，22 个API 端点 |
+| **Rust 后端** | 31+ 个命令模块，22 个API 端点（含 8 个虚拟公司专用命令） |
 | **Agent Bundles** | 25 个行业Agent 包 |
-| **行业插件** | 7 个插件（餐饮/美业/宠物/Cloud/零售/库存/虚拟公司） |
-| **数据库迁移** | 12 个迁移脚本 |
-| **单元测试** | 15 个测试模块，~200+ 测试用例 |
+| **行业插件** | 8 个插件（餐饮/美业/宠物/Cloud/零售/库存/虚拟公司/外贸柜台） |
+| **数据库迁移** | 12+ 个迁移脚本 |
+| **单元测试** | 17 个测试模块，~250+ 测试用例（含 30+ 虚拟公司集成相关） |
 | **E2E 测试** | 18 个spec 文件 |
 | **Rust 测试** | ~40 个测试用例 |
+| **跨包集成** | 1 套 JSON Schema v1.0.0（ProClaw ↔ NvWaX 双向 1:1 校验） |
 | **安装包大小** | ~6.8 MB (Windows x64) |
 
 ## ✅ 生产环境验收
@@ -352,6 +433,8 @@ npm run dev
 - [新数据库配置指南](docs/guides/NEW_DATABASE_SETUP.md)
 - [数据库快速开始](docs/guides/DATABASE_QUICKSTART.md)
 - [认证设置指南](docs/guides/AUTH_SETUP.md)
+- [NvWaX 集成指南（开发者）](docs/integration/NVWAX_INTEGRATION.md) — 跨包调用、ProClawPlugin API、虚拟公司插件开发
+- [VirtualCompanyPackage JSON Schema](docs/integration/virtual-company-package.schema.json) — ProClaw ↔ NvWaX 跨端数据交换契约（schemaVersion 1.0.0）
 
 ### 技术文�?
 - [技术方案](docs/TECHNICAL_OVERVIEW.md)
@@ -417,6 +500,17 @@ npm run dev
 ### 贡献
 - [贡献指南](CONTRIBUTING.md)
 - [Agent 开发指南](docs/guides/AGENT_DEVELOPMENT.md)
+
+## 🧪 持续集成 (CI)
+
+每次 PR 都会跑 9 个 job:
+
+- **Hermes 快速反馈**(优先) — Hermes 模块单测 + 类型检查,3 分钟内反馈
+- **Storybook 构建** — 可视化组件静态构建
+- **Rust Clippy (Hermes-aware)** — `hermes_commands.rs` 必须 0 警告
+- 全量 Frontend / Mobile / Rust fmt / lint / test
+
+详细配置见 [docs/plans/hermes_ci_setup.md](docs/plans/hermes_ci_setup.md)。
 
 ## 🤝 贡献
 

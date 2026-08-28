@@ -1,9 +1,190 @@
-﻿# Changelog
+# Changelog
 
 所有重要变更都将记录在此文件中。
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/),
+
+## [1.5.1] - 2026-XX-XX
+
+### Added
+- **🔗 NvWaX 模板市场反向发布详情页（Sprint 2.18 收尾项 #2）** — 跨仓库交付
+  - NvWaX Web 4 个 marketplace 详情页（列表首页 + Agent / AiTeam / Plugin 详情）
+  - Web Component 详情视图 `<nvwax-agent-marketplace-detail>` + `agent-detail` 事件
+  - NvWaX 后端详情端点字段补全（author / usageCount / relatedAgents / agents 等）
+  - 新增 `GET /api/v1/marketplace/agents/:id/reviews` 端点（表不存在时返回空）
+  - ProClaw Companies 页发布成功 toast 加深链（弹确认后跳转 NvWaX 详情页）
+
+### Notes
+- 推迟到 v1.5.2：端到端 e2e Playwright 套件（仅交付 marketplace 相关）
+- 推迟到 v1.5.2：多设备冲突 UI 撤销按钮（CRDT 字段级合并）
+
+## [1.5.0] - 2026-XX-XX
+
+### Added
+- **↩ Agent 状态可撤销（Sprint 2.18 收尾项 #1）**
+  - 新增 `virtual_company_agents_state_history` 表 + ALTER TABLE 自动升级
+  - 新增 Tauri 命令 `nvwax_list_agent_state_history(package_id, agent_id, limit)` 和 `nvwax_undo_agent_state_change(package_id, agent_id, history_id)`
+  - 改造 `nvwax_set_agent_local_state`：先读旧值 → UPDATE → 写历史行 → 返回 `SetAgentLocalStateResultNew { lastModifiedAt, historyId }`
+  - Companies 页每张 agent 卡片右上角加「↩ 撤销」按钮（仅当有历史时显示）
+- **📡 真实 SSE 流式（Sprint 2.18 收尾项 #2）**
+  - 改造 `nvwax_stream_session_v2` 用 `reqwest::bytes_stream()` + `tokio::sync::mpsc` channel 真 SSE
+  - 解析完整 SSE 协议 `event: <name>\ndata: {...}\n\n`，按 6 种事件类型路由（progress / agent_message / step / status / complete / error）
+  - 通过 `app_handle.emit("virtual-company-sse-chunk", payload)` 推前端，前端 `ProClawPlugin.event.listen` 接 chunks
+  - 不再 500ms 轮询模拟，真正"逐字"显示 NvWaX Agent 回复
+- **📤 模板市场反向发布详情（Sprint 2.18 收尾项 #3）**
+  - 新增 Tauri 命令 `nvwax_publish_to_marketplace(session_id)`
+  - Companies 页加绿色「📤 发布到 NvWaX 市场」按钮（带二次确认弹窗）
+  - 仅在有 `source_session` 时显示该按钮（旧版导入不可发布）
+  - 调用 NvWaX 端 `POST /api/aiteam-creation/sessions/:id/publish-to-marketplace`（Sprint 2.13 已实现的端点）
+- **新 TS 类型**：`SetAgentLocalStateResultNew { lastModifiedAt, historyId }` / `AgentStateHistoryEntry` / `AgentStateHistoryList` / `UndoAgentStateChangeResult` / `PublishMarketplaceResult`
+- **新 TS 客户端方法**：`NvwaxXService.setAgentLocalState`（返回新类型）/ `listAgentStateHistory` / `undoAgentStateChange` / `publishVirtualCompanyToMarketplace`
+
+### Technical
+- **3 个新 Tauri 命令**：`nvwax_set_agent_local_state`（改造）/ `nvwax_list_agent_state_history` / `nvwax_undo_agent_state_change` / `nvwax_publish_to_marketplace`
+- **数据库迁移**：运行时 ALTER TABLE 兜底（仅给 v1.3.x 升级场景）
+- **reqwest** crate 加 `"stream"` feature（实际 v1.4.0 之后已加）
+
+### Changed
+- 版本号同步：`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` / `src/lib/appVersion.ts` 由 `1.4.1` → `1.5.0`
+- `SetAgentLocalStateResult` 现在带 `historyId`（兼容旧调用方 — 没读这字段的不受影响）
+
+### Documentation
+- **新增**：[`RELEASE_NOTES_v1.5.0.md`](RELEASE_NOTES_v1.5.0.md) 完整发布说明
+- **更新**：[`docs/integration/NVWAX_INTEGRATION.md`](docs/integration/NVWAX_INTEGRATION.md) 加 §4.5.3 撤销 API + 6 种 SSE 事件路由表 + PublishMarketplaceResult 字段
+
+### Migration Notes
+- 100% 向后兼容 — 旧 `SetAgentLocalStateResult { lastModifiedAt }` 调用方代码无需改动
+- 旧 NvWaX 后端（v1.4.0 之前的 push-only）依然可工作；新事件路由会自动 fallback
+- 数据库 schema 增量 ALTER：无需手动 .sql 文件
+
+---
+
+
 版本遵循 [Semantic Versioning](https://semver.org/)。
+
+## [1.4.1] - 2026-XX-XX
+
+### Changed
+- **📡 真实 SSE 流式收尾（Sprint 2.17）**
+  - `nvwax_stream_session_v2` 升级：解析完整 SSE 协议 `event: <name>\ndata: {...}\n\n`，按 event 名路由 6 种事件类型（`progress` / `agent_message` / `step` / `status` / `complete` / `error`）
+  - 端到端打通：ProClaw wizard 现在**真正能流式看到** NvWaX CEO Agent 的回复（不再"逐轮等待"）
+  - 向后兼容：旧版 NvWaX 后端（无 `event:` 前缀）仍可工作
+  - 配套 NvWaX v2.2.1：`sse-progress.service` 新增 `broadcastAgentMessage()` / `broadcastComplete()` + `sendEvent` 写 `event:` 前缀 + 修 `forEach` 突变 bug + 7 个单元测试
+- 版本号同步：`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` / `src/lib/appVersion.ts` 由 `1.4.0` → `1.4.1`
+
+### Tests
+- 累计 8 Rust + 73 TS + 7 NvWaX SSE = 88 个测试通过
+
+### Documentation
+- **新增**：[`RELEASE_NOTES_v1.4.1.md`](RELEASE_NOTES_v1.4.1.md) 完整发布说明
+- **更新**：[`RELEASE_NOTES_v1.4.0.md`](RELEASE_NOTES_v1.4.0.md) "已知依赖 (S2)" 段标记为"已解决"
+- **更新**：[`docs/integration/NVWAX_INTEGRATION.md`](docs/integration/NVWAX_INTEGRATION.md) §4.5.2 新增 SSE 事件类型路由表 + 6 种事件说明
+- **更新**：[`README.md`](README.md) / [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) / [`docs/PROJECT_POSITIONING.md`](docs/PROJECT_POSITIONING.md) 同步 v1.4.1
+
+### Migration Notes
+- 100% 向后兼容——v1.4.0 升级只增强 Rust 解析逻辑（`event:` 字段不存在时 fallback 到原行为）
+- 跨端集成：需 ProClaw v1.4.1 + NvWaX ≥ v2.2.1 才有完整流式体验
+- 数据库 schema / 迁移文件不变
+
+---
+
+## [1.4.0] - 2026-XX-XX
+
+### Added
+- **💾 启用/停用状态真正持久化（Sprint 2.16）**
+  - 新增 `virtual_company_agents.enabled / alias / owner_role / local_modified_at` 4 列，启动时通过 `ALTER TABLE ADD COLUMN` 自动给 v1.3.x 旧库升级
+  - 新增 Tauri 命令 `nvwax_set_agent_local_state(package_id, agent_id, enabled?, alias?, owner_role?)` — 字段级独立 UPDATE（last-write-wins）
+  - 新增 TS 客户端方法 `NvwaxXService.setAgentLocalState()`
+  - Companies 页 UI：toggle / 改名 / 改角色 立即同步 SQLite，刷新页面不再丢失
+
+- **📡 真实 SSE 流式（Sprint 2.16，替代 500ms 轮询）**
+  - 新增 Tauri 命令 `nvwax_stream_session_v2`：用 `reqwest::Response::bytes_stream()` 拿 SSE 字节流，解析 `data: {...}\n\n` 协议，通过 `app_handle.emit("virtual-company-sse-chunk", payload)` 实时推前端
+  - 新增 `NvwaXClient::stream_get_raw()` + `format_stream_url()` + `http_post_json()` 公开 helpers
+  - reqwest crate 加 `"stream"` feature
+  - 前端 wizard 页用 `ProClawPlugin.event.listen("virtual-company-sse-chunk", ...)` 接 chunks，用 `requestAnimationFrame` 节流
+  - 旧命令 `nvwax_stream_session`（v1.3.2 轮询版）保留，向后兼容
+
+- **📤 虚拟公司模板市场反向发布（Sprint 2.16）**
+  - 新增 Tauri 命令 `nvwax_publish_to_marketplace(session_id)` → NvWaX 创建 `team_skills` 公开行（`category='virtual-company'`, `is_public=true`）
+  - 新增 TS 客户端方法 `NvwaxXService.publishVirtualCompanyToMarketplace()`
+  - Companies 页加 "📤 发布到 NvWaX 市场" 按钮（绿色）+ 二次确认（避免误操作）
+  - 仅在有 `source_session` 时显示该按钮
+
+### Technical
+- **3 个新 Tauri 命令**：`nvwax_set_agent_local_state` / `nvwax_stream_session_v2` / `nvwax_publish_to_marketplace`
+- **3 个新 TS 类型**：`SetAgentLocalStateParams` / `SetAgentLocalStateResult` / `PublishMarketplaceResult`
+- **2 个新 Rust 单元测试**：`set_agent_local_state_persists_all_three_fields` + `set_agent_local_state_partial_update_preserves_others`
+- **2 个新 TS 单元测试**：`setAgentLocalState & publishVirtualCompanyToMarketplace 参数序列化`
+- **数据库迁移**：运行时 `ALTER TABLE` 兜底（旧库无需手动跑 .sql 文件）
+
+### Changed
+- 版本号同步：`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` / `src/lib/appVersion.ts` 由 `1.3.2` → `1.4.0`
+- `virtual_company_agents` 表 schema 扩展（兼容 v1.3.x）
+- `reqwest` crate features 新增 `"stream"`
+
+### Migration Notes
+- **无需手动跑 SQL**：启动时自动检测旧库并 ALTER TABLE 补齐 4 列
+- **数据零丢失**：v1.3.2 导入的所有虚拟公司保留，启用默认值 = true（兼容老用户预期）
+- 行为差异：v1.3.2 启停状态仅内存，刷新丢；v1.4.0 启停状态持久化到 SQLite
+
+### Documentation
+- **新增**：[`RELEASE_NOTES_v1.4.0.md`](RELEASE_NOTES_v1.4.0.md) 完整发布说明
+- **更新**：[`README.md`](README.md) 同步 v1.4.0 新能力
+
+---
+
+## [1.3.2] - 2026-XX-XX
+
+### Added
+- **🌐 NvWaX 虚拟公司闭环（Sprint 2.13–2.15，三阶段交付）**
+  - **Sprint 2.13 — 最小闭环**：
+    - 双向共享 JSON Schema `VirtualCompanyPackage v1.0.0`（`docs/integration/virtual-company-package.schema.json`）
+    - NvWaX 端：`POST /api/aiteam-creation/sessions/:id/integrate-proclaw` 真正生成 `.nvwax-vc.json` 下载包
+    - ProClaw 端：3 个新 Tauri 命令 `nvwax_search_vc_templates` / `nvwax_import_virtual_company_from_url` / `bootstrap_virtual_company_tables` + `open_virtual_company_page`
+    - 内置 `virtual-company` 插件（4 个 React 路由 `/vc/{templates,wizard,import,companies}`）修复了上轮 plugin frontend 不加载的 bug
+  - **Sprint 2.14 — 4 项增强**：
+    - CEO Agent Skill：`sk_preset_open_virtual_company_wizard`（16 条 trigger phrases） + `assistantAgent.classifyAssistantIntent` 新增 `virtual_company` 类型
+    - 本地→云回写 API：`PUT /api/aiteam-creation/sessions/:id/local-state` + ProClaw `nvwax_push_virtual_company_state`
+    - 本地 SSE 流式创建：`nvwax_stream_session` Tauri 命令（POST message + 轮询 /stream，60s 上限）
+    - 开发者文档：`docs/integration/NVWAX_INTEGRATION.md`（220+ 行，完整 API 参考）
+  - **Sprint 2.15 — 多设备同步**：
+    - `GET /api/aiteam-creation/sessions/:id/local-state` + ProClaw `nvwax_fetch_local_state` / `nvwax_list_sessions_with_state`
+    - `lib/virtualCompanySync.ts` 纯函数合并引擎（`mergeAgentState` + `reconcileSync`，字段级 last-write-wins）
+    - Companies 页"🔄 立即同步（从 NvWaX 拉取最新）"按钮 + 同步报告卡片
+    - `startBackgroundSync()`：App 启动 5 秒后，若 API Key 配置则后台静默同步
+- **🛠 Plugin Frontend 加载器**：`src/lib/pluginFrontend.ts`（新增）— `import.meta.glob` 自动加载所有 `src/plugins/*\/frontend/index.js`，修复了 v1.3.0 plugin 路由不生效的 bug
+
+### Technical
+- **TS 类型新增**（`src/types/nvwax.ts`）：`VirtualCompanyPackage` / `VirtualCompanyTemplateSummary` / `VirtualCompanyImportResult` / `VirtualCompanyAgentState` / `VirtualCompanyLocalStatePayload` / `VirtualCompanyLocalStatePushResult` / `StreamSessionResponse` / `VirtualCompanyLocalStateResponse` / `VirtualCompanySessionWithState` / `VirtualCompanySessionListResponse`
+- **Rust 类型新增**（`src-tauri/src/services/nvwax_client.rs`）：与 TS 对齐的 8 个 Serde struct
+- **数据库迁移**：
+  - ProClaw 端：in-code `CREATE TABLE IF NOT EXISTS`（无独立 .sql 文件，列结构见 `bootstrap_virtual_company_tables_impl`）
+  - NvWaX 端：`migrations/012_virtual_company_local_state.sql`（新增 `aiteam_creation_sessions.local_state` JSONB 列）
+- **TS 服务方法新增**（`src/lib/nvwaxClient.ts`）：`searchVirtualCompanyTemplates` / `importVirtualCompanyPackage` / `bootstrapVirtualCompanyTables` / `parseVirtualCompanyPackage` / `pushVirtualCompanyLocalState` / `streamVirtualCompanySession` / `fetchVirtualCompanyLocalState` / `listVirtualCompanySessionsWithState`
+- **Rust 方法新增**（`src-tauri/src/services/nvwax_client.rs`）：`search_virtual_company_templates` / `download_virtual_company_package` / `push_virtual_company_local_state` / `stream_session` / `fetch_local_state` / `list_sessions_with_state`
+
+### Testing
+- **ProClaw Vitest**（合计 67 个新增，全部通过）：
+  - `src/lib/nvwaxClient.virtualCompany.test.ts`（8 个）：schema 校验、缺字段、平台错误、最小包等
+  - `src/lib/pluginFrontend.test.ts`（8 个）：openVirtualCompanyPage、installPluginRuntimeHooks、loadBuiltinPluginFrontends
+  - `src/lib/assistantAgent.test.ts`（新增 9 个）：虚拟公司意图识别 + handleVirtualCompanyIntent
+  - `src/lib/virtualCompanySync.test.ts`（14 个）：mergeAgentState + reconcileSync 全量对账
+- **ProClaw Rust 单元测试**（4 个 `#[cfg(test)]`）：`bootstrap_then_persist_writes_rows_to_in_memory_db` / `persist_is_idempotent_on_same_package_id` / `persist_handles_empty_agents` / `chrono_like_now_iso_returns_valid_format`
+- **NvWaX Jest**（4 个）：`ProClawBackendService.buildVirtualCompanyPackageFromSession` × 4 个场景
+
+### Documentation
+- **新增**：`docs/integration/virtual-company-package.schema.json`（JSON Schema v1.0.0）
+- **新增**：`docs/integration/NVWAX_INTEGRATION.md`（220+ 行开发者指南）
+- **新增**：`docs/REQUIREMENTS.md` 中标注 Sprint 2.13/2.14/2.15 为已完成
+- **新增**：`RELEASE_NOTES_v1.3.2.md`
+- **更新**：`README.md`（新增"🌐 集成 NvWaX 虚拟公司"章节、版本号同步 1.3.2）
+
+### Migration Notes
+- 配置文件：`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` / `src/lib/appVersion.ts` 由 `1.3.1` → `1.3.2`
+- 启动诊断：首次启动会通过 `bootstrap_virtual_company_tables` Tauri 命令创建本地表（`virtual_companies` / `virtual_company_agents`）
+- NvWaX 端：执行 `psql -f migrations/012_virtual_company_local_state.sql` 添加 `local_state` JSONB 列
+
+---
 
 ## [1.1.0] - 2026-07-01
 
