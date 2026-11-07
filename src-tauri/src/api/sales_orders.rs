@@ -38,6 +38,104 @@ pub struct SalesOrderQuery {
     pub status: Option<String>,
     pub search: Option<String>,
     pub customer_id: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+struct SalesOrderPage {
+    data: Vec<serde_json::Value>,
+    total: i64,
+    page: i64,
+    page_size: i64,
+}
+
+fn query_sales_order_page(
+    conn: &rusqlite::Connection,
+    status: Option<&str>,
+    customer_id: Option<&str>,
+    search: Option<&str>,
+    page: i64,
+    requested_page_size: Option<i64>,
+) -> Result<SalesOrderPage, String> {
+    let mut sql = String::from(
+        "SELECT so.id, so.so_number, so.customer_id, c.name as customer_name, \
+         so.order_date, so.expected_delivery_date, so.status, \
+         so.total_amount, so.paid_amount, so.payment_status, \
+         so.shipping_address, so.notes, so.created_by, so.created_at, so.updated_at \
+         FROM sales_orders so \
+         LEFT JOIN customers c ON so.customer_id = c.id \
+         WHERE so.deleted_at IS NULL",
+    );
+    let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+    if let Some(status) = status.filter(|s| !s.is_empty()) {
+        sql.push_str(" AND so.status = ?1");
+        params_vec.push(Box::new(status.to_string()));
+    }
+    if let Some(customer_id) = customer_id.filter(|s| !s.is_empty()) {
+        let idx = params_vec.len() + 1;
+        sql.push_str(&format!(" AND so.customer_id = ?{idx}"));
+        params_vec.push(Box::new(customer_id.to_string()));
+    }
+    if let Some(search) = search.filter(|s| !s.is_empty()) {
+        let idx = params_vec.len() + 1;
+        let idx2 = idx + 1;
+        sql.push_str(&format!(
+            " AND (so.so_number LIKE ?{idx} OR c.name LIKE ?{idx2})"
+        ));
+        let pattern = format!("%{search}%");
+        params_vec.push(Box::new(pattern.clone()));
+        params_vec.push(Box::new(pattern));
+    }
+
+    let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
+    let total = crate::database::count_unpaged(conn, &sql, count_refs.as_slice())
+        .map_err(|e| e.to_string())?;
+
+    sql.push_str(" ORDER BY so.created_at DESC");
+    let page_size = crate::database::clamp_page_size(requested_page_size, 200);
+    let page = page.max(1);
+    crate::database::append_limit_offset(
+        &mut sql,
+        &mut params_vec,
+        page_size,
+        (page - 1) * page_size,
+    );
+
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let data = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "so_number": row.get::<_, String>(1)?,
+                "customer_id": row.get::<_, String>(2)?,
+                "customer_name": row.get::<_, Option<String>>(3)?,
+                "order_date": row.get::<_, String>(4)?,
+                "expected_delivery_date": row.get::<_, Option<String>>(5)?,
+                "status": row.get::<_, String>(6)?,
+                "total_amount": row.get::<_, f64>(7)?,
+                "paid_amount": row.get::<_, f64>(8)?,
+                "payment_status": row.get::<_, String>(9)?,
+                "shipping_address": row.get::<_, Option<String>>(10)?,
+                "notes": row.get::<_, Option<String>>(11)?,
+                "created_by": row.get::<_, Option<String>>(12)?,
+                "created_at": row.get::<_, String>(13)?,
+                "updated_at": row.get::<_, String>(14)?,
+            }))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(SalesOrderPage {
+        data,
+        total,
+        page,
+        page_size,
+    })
 }
 
 /// 获取销售订单列表
@@ -56,95 +154,28 @@ pub async fn get_sales_orders(
     };
     let conn = db.connection();
 
-    let mut sql = String::from(
-        "SELECT so.id, so.so_number, so.customer_id, c.name as customer_name, \
-         so.order_date, so.expected_delivery_date, so.status, \
-         so.total_amount, so.paid_amount, so.payment_status, \
-         so.shipping_address, so.notes, so.created_by, so.created_at, so.updated_at \
-         FROM sales_orders so \
-         LEFT JOIN customers c ON so.customer_id = c.id \
-         WHERE so.deleted_at IS NULL",
-    );
-
-    let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-
-    if let Some(ref status) = query.status {
-        if !status.is_empty() {
-            sql.push_str(" AND so.status = ?1");
-            params_vec.push(Box::new(status.clone()));
-        }
+    match query_sales_order_page(
+        conn,
+        query.status.as_deref(),
+        query.customer_id.as_deref(),
+        query.search.as_deref(),
+        query.page.unwrap_or(1),
+        query.page_size,
+    ) {
+        Ok(page) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "data": page.data,
+                "total": page.total,
+                "page": page.page,
+                "page_size": page.page_size,
+            })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+        ),
     }
-
-    if let Some(ref customer_id) = query.customer_id {
-        if !customer_id.is_empty() {
-            let idx = params_vec.len() + 1;
-            sql.push_str(&format!(" AND so.customer_id = ?{}", idx));
-            params_vec.push(Box::new(customer_id.clone()));
-        }
-    }
-
-    if let Some(ref search) = query.search {
-        if !search.is_empty() {
-            let idx = params_vec.len() + 1;
-            let idx2 = idx + 1;
-            sql.push_str(&format!(
-                " AND (so.so_number LIKE ?{} OR c.name LIKE ?{})",
-                idx, idx2
-            ));
-            let pattern = format!("%{}%", search);
-            params_vec.push(Box::new(pattern.clone()));
-            params_vec.push(Box::new(pattern));
-        }
-    }
-
-    sql.push_str(" ORDER BY so.created_at DESC LIMIT 200");
-
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
-        params_vec.iter().map(|p| p.as_ref()).collect();
-
-    let mut stmt = match conn.prepare(&sql) {
-        Ok(s) => s,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
-            )
-        }
-    };
-
-    let rows = match stmt.query_map(params_refs.as_slice(), |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, String>(0)?,
-            "so_number": row.get::<_, String>(1)?,
-            "customer_id": row.get::<_, String>(2)?,
-            "customer_name": row.get::<_, Option<String>>(3)?,
-            "order_date": row.get::<_, String>(4)?,
-            "expected_delivery_date": row.get::<_, Option<String>>(5)?,
-            "status": row.get::<_, String>(6)?,
-            "total_amount": row.get::<_, f64>(7)?,
-            "paid_amount": row.get::<_, f64>(8)?,
-            "payment_status": row.get::<_, String>(9)?,
-            "shipping_address": row.get::<_, Option<String>>(10)?,
-            "notes": row.get::<_, Option<String>>(11)?,
-            "created_by": row.get::<_, Option<String>>(12)?,
-            "created_at": row.get::<_, String>(13)?,
-            "updated_at": row.get::<_, String>(14)?,
-        }))
-    }) {
-        Ok(r) => r,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
-            )
-        }
-    };
-
-    let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({ "data": result, "total": result.len() })),
-    )
 }
 
 /// 获取单个销售订单（含明细）

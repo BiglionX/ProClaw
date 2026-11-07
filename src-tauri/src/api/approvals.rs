@@ -181,6 +181,20 @@ pub async fn list_approvals(
         params_vec.push(Box::new(t.clone()));
     }
 
+    let total = {
+        let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+        match crate::database::count_unpaged(conn, &sql, count_refs.as_slice()) {
+            Ok(n) => n,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": e.to_string()})),
+                )
+            }
+        }
+    };
+
     sql.push_str(" ORDER BY a.created_at DESC LIMIT 200");
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
@@ -219,48 +233,62 @@ pub async fn list_approvals(
         }
     };
 
-    let approvals: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
+    let approvals: Vec<serde_json::Value> = match rows.collect::<Result<Vec<_>, _>>() {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        }
+    };
 
-    // 为每个审批附上关联订单摘要
-    let enriched: Vec<serde_json::Value> =
-        approvals
-            .into_iter()
-            .map(|mut a| {
-                let target_type = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
-                let target_id = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
+    let enriched: Vec<serde_json::Value> = approvals
+        .into_iter()
+        .map(|mut a| {
+            let target_type = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
+            let target_id = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
 
-                let order_info = match target_type {
-            "purchase_order" => conn.query_row(
-                "SELECT po_number, total_amount, status FROM purchase_orders WHERE id = ?1",
-                params![target_id],
-                |row| Ok(serde_json::json!({
-                    "number": row.get::<_, String>(0)?,
-                    "total_amount": row.get::<_, f64>(1)?,
-                    "status": row.get::<_, String>(2)?,
-                })),
-            ).ok(),
-            "sales_order" => conn.query_row(
-                "SELECT so_number, total_amount, status FROM sales_orders WHERE id = ?1",
-                params![target_id],
-                |row| Ok(serde_json::json!({
-                    "number": row.get::<_, String>(0)?,
-                    "total_amount": row.get::<_, f64>(1)?,
-                    "status": row.get::<_, String>(2)?,
-                })),
-            ).ok(),
-            _ => None,
-        };
+            let order_info = match target_type {
+                "purchase_order" => conn
+                    .query_row(
+                        "SELECT po_number, total_amount, status FROM purchase_orders WHERE id = ?1",
+                        params![target_id],
+                        |row| {
+                            Ok(serde_json::json!({
+                                "number": row.get::<_, String>(0)?,
+                                "total_amount": row.get::<_, f64>(1)?,
+                                "status": row.get::<_, String>(2)?,
+                            }))
+                        },
+                    )
+                    .ok(),
+                "sales_order" => conn
+                    .query_row(
+                        "SELECT so_number, total_amount, status FROM sales_orders WHERE id = ?1",
+                        params![target_id],
+                        |row| {
+                            Ok(serde_json::json!({
+                                "number": row.get::<_, String>(0)?,
+                                "total_amount": row.get::<_, f64>(1)?,
+                                "status": row.get::<_, String>(2)?,
+                            }))
+                        },
+                    )
+                    .ok(),
+                _ => None,
+            };
 
-                if let Some(order) = order_info {
-                    a["order"] = order;
-                }
-                a
-            })
-            .collect();
+            if let Some(order) = order_info {
+                a["order"] = order;
+            }
+            a
+        })
+        .collect();
 
     (
         StatusCode::OK,
-        Json(serde_json::json!({ "data": enriched, "total": enriched.len() })),
+        Json(serde_json::json!({ "data": enriched, "total": total })),
     )
 }
 

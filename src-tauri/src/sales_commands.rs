@@ -76,6 +76,9 @@ pub fn get_customers(
     }
 
     sql.push_str(" ORDER BY name ASC");
+    let page_size = crate::database::page_size_from_json(&options, 200);
+    let offset = crate::database::page_offset_from_json(&options, page_size);
+    crate::database::append_limit_offset(&mut sql, &mut params_vec, page_size, offset);
 
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -223,6 +226,9 @@ pub fn get_sales_orders(
     }
 
     sql.push_str(" ORDER BY so.created_at DESC");
+    let page_size = crate::database::page_size_from_json(&options, 200);
+    let offset = crate::database::page_offset_from_json(&options, page_size);
+    crate::database::append_limit_offset(&mut sql, &mut params_vec, page_size, offset);
 
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;

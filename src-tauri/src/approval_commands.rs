@@ -112,7 +112,12 @@ pub fn get_approvals_cmd(
         pv.push(Box::new(t.clone()));
     }
 
-    sql.push_str(" ORDER BY a.created_at DESC LIMIT 100");
+    let total = {
+        let refs: Vec<&dyn rusqlite::types::ToSql> = pv.iter().map(|b| b.as_ref()).collect();
+        crate::database::count_unpaged(conn, &sql, refs.as_slice()).map_err(|e| e.to_string())?
+    };
+
+    sql.push_str(" ORDER BY a.created_at DESC LIMIT 200");
 
     let refs: Vec<&dyn rusqlite::types::ToSql> = pv.iter().map(|b| b.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -133,47 +138,55 @@ pub fn get_approvals_cmd(
         })
         .map_err(|e| e.to_string())?;
 
-    let approvals: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
+    let approvals: Vec<serde_json::Value> = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
-    // 附上订单摘要
-    let enriched: Vec<serde_json::Value> =
-        approvals
-            .into_iter()
-            .map(|a| {
-                let tt = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
-                let tid = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
+    let enriched: Vec<serde_json::Value> = approvals
+        .into_iter()
+        .map(|a| {
+            let tt = a.get("target_type").and_then(|v| v.as_str()).unwrap_or("");
+            let tid = a.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
 
-                let order_info = match tt {
-            "purchase_order" => conn.query_row(
-                "SELECT po_number, total_amount, status FROM purchase_orders WHERE id = ?1",
-                params![tid],
-                |row| Ok(serde_json::json!({
-                    "number": row.get::<_, String>(0)?,
-                    "total_amount": row.get::<_, f64>(1)?,
-                    "status": row.get::<_, String>(2)?,
-                })),
-            ).ok(),
-            "sales_order" => conn.query_row(
-                "SELECT so_number, total_amount, status FROM sales_orders WHERE id = ?1",
-                params![tid],
-                |row| Ok(serde_json::json!({
-                    "number": row.get::<_, String>(0)?,
-                    "total_amount": row.get::<_, f64>(1)?,
-                    "status": row.get::<_, String>(2)?,
-                })),
-            ).ok(),
-            _ => None,
-        };
+            let order_info = match tt {
+                "purchase_order" => conn
+                    .query_row(
+                        "SELECT po_number, total_amount, status FROM purchase_orders WHERE id = ?1",
+                        params![tid],
+                        |row| {
+                            Ok(serde_json::json!({
+                                "number": row.get::<_, String>(0)?,
+                                "total_amount": row.get::<_, f64>(1)?,
+                                "status": row.get::<_, String>(2)?,
+                            }))
+                        },
+                    )
+                    .ok(),
+                "sales_order" => conn
+                    .query_row(
+                        "SELECT so_number, total_amount, status FROM sales_orders WHERE id = ?1",
+                        params![tid],
+                        |row| {
+                            Ok(serde_json::json!({
+                                "number": row.get::<_, String>(0)?,
+                                "total_amount": row.get::<_, f64>(1)?,
+                                "status": row.get::<_, String>(2)?,
+                            }))
+                        },
+                    )
+                    .ok(),
+                _ => None,
+            };
 
-                let mut res = a.clone();
-                if let Some(order) = order_info {
-                    res["order"] = order;
-                }
-                res
-            })
-            .collect();
+            let mut res = a.clone();
+            if let Some(order) = order_info {
+                res["order"] = order;
+            }
+            res
+        })
+        .collect();
 
-    Ok(serde_json::json!({ "data": enriched, "total": enriched.len() }))
+    Ok(serde_json::json!({ "data": enriched, "total": total }))
 }
 
 /// 批准审批

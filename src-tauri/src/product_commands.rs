@@ -111,17 +111,10 @@ pub fn get_products(
 
     sql.push_str(" ORDER BY created_at DESC");
 
-    // 添加分页（R7 修复：参数化绑定）
-    if let Some(opts) = &options {
-        if let Some(limit) = opts.get("limit").and_then(|v| v.as_u64()) {
-            params_vec.push(Box::new(limit as i64));
-            sql.push_str(&format!(" LIMIT ?{}", params_vec.len()));
-            if let Some(offset) = opts.get("offset").and_then(|v| v.as_u64()) {
-                params_vec.push(Box::new(offset as i64));
-                sql.push_str(&format!(" OFFSET ?{}", params_vec.len()));
-            }
-        }
-    }
+    // page_size / limit 上限 200；未传时默认 200，避免一次拉全表
+    let page_size = crate::database::page_size_from_json(&options, 200);
+    let offset = crate::database::page_offset_from_json(&options, page_size);
+    crate::database::append_limit_offset(&mut sql, &mut params_vec, page_size, offset);
 
     // 执行查询
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -171,7 +164,7 @@ pub fn filter_products(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
     let kw = keyword.unwrap_or_default();
-    let limit = limit.unwrap_or(10);
+    let limit = crate::database::clamp_page_size(limit, 10);
     let pattern = format!("%{}%", kw.trim());
 
     let mut stmt = conn
@@ -686,17 +679,10 @@ pub fn get_product_spus(
 
     sql.push_str(" ORDER BY created_at DESC");
 
-    // 添加分页（R7 修复：参数化绑定）
-    if let Some(opts) = &options {
-        if let Some(limit) = opts.get("limit").and_then(|v| v.as_u64()) {
-            params_vec.push(Box::new(limit as i64));
-            sql.push_str(&format!(" LIMIT ?{}", params_vec.len()));
-            if let Some(offset) = opts.get("offset").and_then(|v| v.as_u64()) {
-                params_vec.push(Box::new(offset as i64));
-                sql.push_str(&format!(" OFFSET ?{}", params_vec.len()));
-            }
-        }
-    }
+    // page_size / limit 上限 200；未传时默认 200，避免一次拉全表
+    let page_size = crate::database::page_size_from_json(&options, 200);
+    let offset = crate::database::page_offset_from_json(&options, page_size);
+    crate::database::append_limit_offset(&mut sql, &mut params_vec, page_size, offset);
 
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;

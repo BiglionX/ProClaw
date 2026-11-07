@@ -29,6 +29,8 @@ pub struct InventoryTransactionQuery {
     pub transaction_type: Option<String>,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
 }
 
 /// 库存查询参数
@@ -36,6 +38,8 @@ pub struct InventoryTransactionQuery {
 pub struct InventoryQuery {
     pub search: Option<String>,
     pub low_stock_only: Option<bool>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
 }
 
 /// 获取库存列表
@@ -76,7 +80,29 @@ pub async fn get_inventory(
         sql.push_str(" AND current_stock < min_stock AND min_stock > 0");
     }
 
-    sql.push_str(" ORDER BY name ASC LIMIT 500");
+    let total = {
+        let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+        match crate::database::count_unpaged(conn, &sql, count_refs.as_slice()) {
+            Ok(n) => n,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+                )
+            }
+        }
+    };
+
+    sql.push_str(" ORDER BY name ASC");
+    let page_size = crate::database::clamp_page_size(query.page_size, 200);
+    let page = query.page.unwrap_or(1).max(1);
+    crate::database::append_limit_offset(
+        &mut sql,
+        &mut params_vec,
+        page_size,
+        (page - 1) * page_size,
+    );
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
         params_vec.iter().map(|p| p.as_ref()).collect();
@@ -129,7 +155,9 @@ pub async fn get_inventory(
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
     (
         StatusCode::OK,
-        Json(serde_json::json!({ "data": result, "total": result.len() })),
+        Json(
+            serde_json::json!({ "data": result, "total": total, "page": page, "page_size": page_size }),
+        ),
     )
 }
 
@@ -185,7 +213,29 @@ pub async fn get_inventory_transactions(
         }
     }
 
-    sql.push_str(" ORDER BY created_at DESC LIMIT 200");
+    let total = {
+        let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+        match crate::database::count_unpaged(conn, &sql, count_refs.as_slice()) {
+            Ok(n) => n,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("Query error: {}", e)})),
+                )
+            }
+        }
+    };
+
+    sql.push_str(" ORDER BY created_at DESC");
+    let page_size = crate::database::clamp_page_size(query.page_size, 200);
+    let page = query.page.unwrap_or(1).max(1);
+    crate::database::append_limit_offset(
+        &mut sql,
+        &mut params_vec,
+        page_size,
+        (page - 1) * page_size,
+    );
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
         params_vec.iter().map(|p| p.as_ref()).collect();
@@ -226,7 +276,9 @@ pub async fn get_inventory_transactions(
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
     (
         StatusCode::OK,
-        Json(serde_json::json!({ "data": result, "total": result.len() })),
+        Json(
+            serde_json::json!({ "data": result, "total": total, "page": page, "page_size": page_size }),
+        ),
     )
 }
 

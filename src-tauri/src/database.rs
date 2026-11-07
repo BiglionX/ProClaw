@@ -67,6 +67,63 @@ pub enum DatabaseError {
 
 pub type DbResult<T> = Result<T, DatabaseError>;
 
+/// 列表接口的 page_size / limit 上限。未传时用 default，结果限制在 1..=200。
+pub fn clamp_page_size(requested: Option<i64>, default: i64) -> i64 {
+    requested.unwrap_or(default).clamp(1, 200)
+}
+
+fn json_i64(value: &serde_json::Value) -> Option<i64> {
+    value
+        .as_i64()
+        .or_else(|| value.as_u64().map(|n| n as i64))
+        .or_else(|| value.as_f64().map(|n| n as i64))
+}
+
+/// 从 Tauri options JSON 读取 page_size 或 limit，并夹到最大 200。
+pub fn page_size_from_json(options: &Option<serde_json::Value>, default: i64) -> i64 {
+    let requested = options.as_ref().and_then(|opts| {
+        opts.get("page_size")
+            .or_else(|| opts.get("limit"))
+            .and_then(json_i64)
+    });
+    clamp_page_size(requested, default)
+}
+
+/// offset 优先；否则用 page（从 1 起）换算。都没有则为 0。
+pub fn page_offset_from_json(options: &Option<serde_json::Value>, page_size: i64) -> i64 {
+    let Some(opts) = options.as_ref() else {
+        return 0;
+    };
+    if let Some(offset) = opts.get("offset").and_then(json_i64) {
+        return offset.max(0);
+    }
+    let page = opts.get("page").and_then(json_i64).unwrap_or(1).max(1);
+    (page - 1).saturating_mul(page_size.max(1))
+}
+
+/// 对尚未加 LIMIT 的筛选 SQL 做 `COUNT(*)`，得到真实总数。
+pub fn count_unpaged(
+    conn: &Connection,
+    filtered_sql: &str,
+    params: &[&dyn rusqlite::types::ToSql],
+) -> rusqlite::Result<i64> {
+    let sql = format!("SELECT COUNT(*) FROM ({filtered_sql}) AS _page_count");
+    conn.query_row(&sql, params, |row| row.get(0))
+}
+
+pub fn append_limit_offset(
+    sql: &mut String,
+    params: &mut Vec<Box<dyn rusqlite::types::ToSql>>,
+    page_size: i64,
+    offset: i64,
+) {
+    params.push(Box::new(page_size));
+    let limit_idx = params.len();
+    params.push(Box::new(offset));
+    let offset_idx = params.len();
+    sql.push_str(&format!(" LIMIT ?{limit_idx} OFFSET ?{offset_idx}"));
+}
+
 pub struct Database {
     conn: Connection,
 }
@@ -1392,6 +1449,12 @@ impl Database {
             );
         }
 
+        // Phase harden: 连接打开并跑完 schema 引导后补齐列表查询索引。
+        // 仅 CREATE INDEX IF NOT EXISTS，不改表结构、不加 CHECK。
+        if let Err(e) = ensure_list_indexes(&self.conn) {
+            eprintln!("[DB Migration WARNING] list query indexes: {}", e);
+            migration_errors.push(format!("list_query_indexes: {}", e));
+        }
         // P0-1 修复：历史已出库单的 shipped_quantity 回填。
         // 出库时写 shipped_quantity 是本次修复引入的，之前的单全是 0。
         // confirmed/shipped 是出库后的状态；delivered 是标记送达，同样已经出过库。
@@ -1529,6 +1592,16 @@ pub fn get_database_path() -> PathBuf {
         path
     );
     path
+}
+
+/// 列表查询用索引。表由 schema.sql 创建；这里只保证索引存在，幂等。
+fn ensure_list_indexes(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
+         CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+         CREATE INDEX IF NOT EXISTS idx_sales_orders_customer_created ON sales_orders(customer_id, created_at);
+         CREATE INDEX IF NOT EXISTS idx_inventory_tx_product_created ON inventory_transactions(product_id, created_at);",
+    )
 }
 
 #[cfg(test)]
