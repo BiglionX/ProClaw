@@ -20,13 +20,13 @@ use crate::finance_agent_commands::*;
 use crate::finance_commands::*;
 use crate::fresh_food_commands::*;
 use crate::hardware_commands::*;
+use crate::import::commands::*; // v1.2 P1: 批量导入中心
 #[cfg(feature = "inventory")]
 use crate::inventory_aging_commands::*;
 #[cfg(feature = "inventory")]
 use crate::inventory_calibration_commands::*;
 #[cfg(feature = "inventory")]
 use crate::inventory_commands::*;
-use crate::import::commands::*; // v1.2 P1: 批量导入中心
 use crate::invitation_commands::*;
 use crate::liquor_commands::*;
 #[cfg(feature = "virtual_company")]

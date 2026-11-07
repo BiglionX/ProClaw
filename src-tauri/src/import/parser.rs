@@ -33,10 +33,12 @@ pub fn parse_bytes(bytes: &[u8], source_format: &str) -> Result<ParseResult, Str
         "json" => parse_json(bytes),
         "xls" | "xlsx" => {
             // 把 bytes 写到临时文件，调用 calamine
-            let temp_path = std::env::temp_dir()
-                .join(format!("proclaw_import_{}.{}", std::process::id(), source_format));
-            std::fs::write(&temp_path, bytes)
-                .map_err(|e| format!("写临时文件失败: {}", e))?;
+            let temp_path = std::env::temp_dir().join(format!(
+                "proclaw_import_{}.{}",
+                std::process::id(),
+                source_format
+            ));
+            std::fs::write(&temp_path, bytes).map_err(|e| format!("写临时文件失败: {}", e))?;
             let result = parse_xls_xlsx(&temp_path);
             let _ = std::fs::remove_file(&temp_path);
             result
@@ -50,8 +52,7 @@ pub fn parse_xls_xlsx(path: &std::path::Path) -> Result<ParseResult, String> {
     use crate::import::header_detect::detect_header;
 
     let format = crate::import::parser_legacy::detect_format(path)?;
-    let (_, all_rows) =
-        crate::import::parser_legacy::parse_legacy_file(path, "generic")?;
+    let (_, all_rows) = crate::import::parser_legacy::parse_legacy_file(path, "generic")?;
 
     if all_rows.is_empty() {
         return Ok(ParseResult {
@@ -149,8 +150,8 @@ fn parse_json(bytes: &[u8]) -> Result<ParseResult, String> {
         One(serde_json::Map<String, serde_json::Value>),
     }
 
-    let parsed: ArrayOrObject = serde_json::from_slice(bytes)
-        .map_err(|e| format!("JSON 解析失败: {}", e))?;
+    let parsed: ArrayOrObject =
+        serde_json::from_slice(bytes).map_err(|e| format!("JSON 解析失败: {}", e))?;
 
     let list = match parsed {
         ArrayOrObject::Arr(v) => v,

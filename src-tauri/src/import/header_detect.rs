@@ -36,8 +36,8 @@ pub struct SegmentTitle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeaderDetectionReport {
     pub structure: HeaderStructure,
-    pub field_names: Vec<String>,        // header_row 提取的字段名
-    pub sample_rows: Vec<Vec<String>>,   // data_start_row 起 3 行预览
+    pub field_names: Vec<String>,      // header_row 提取的字段名
+    pub sample_rows: Vec<Vec<String>>, // data_start_row 起 3 行预览
     pub two_row_detected: bool,
     pub segmented_detected: bool,
 }
@@ -122,9 +122,7 @@ fn find_segment_row(rows: &[Vec<String>]) -> Option<usize> {
 
         // 分段行特征：1-2 个非空 + 总列数 ≥ 3 + 非空文本是中文标题（>= 2 字符）
         if non_empty.len() >= 1 && non_empty.len() <= 2 && row.len() >= 3 {
-            let has_chinese_title = non_empty
-                .iter()
-                .any(|(_, s)| s.trim().chars().count() >= 2);
+            let has_chinese_title = non_empty.iter().any(|(_, s)| s.trim().chars().count() >= 2);
             if has_chinese_title {
                 return Some(i);
             }
@@ -175,8 +173,13 @@ fn find_header_row(rows: &[Vec<String>]) -> usize {
         let has_star = row.iter().any(|s| s.trim().starts_with('*'));
         let has_known = row.iter().any(|s| {
             let t = s.trim();
-            t.contains("编号") || t.contains("名称") || t.contains("类别") || t.contains("电话")
-                || t.contains("客户") || t.contains("供应商") || t.contains("商品")
+            t.contains("编号")
+                || t.contains("名称")
+                || t.contains("类别")
+                || t.contains("电话")
+                || t.contains("客户")
+                || t.contains("供应商")
+                || t.contains("商品")
         });
         if has_star || has_known {
             return i;
@@ -197,16 +200,54 @@ mod tests {
     fn test_two_row_header_basic() {
         // 模拟客户导出.xls 前 3 行
         let rows = vec![
-            vec!["基础信息".into(), "".into(), "".into(), "".into(), "".into(), "".into(),
-                 "".into(), "".into(), "联系信息".into(), "".into(), "".into(), "".into(),
-                 "".into(), "".into()],
-            vec!["客户类别".into(), "*客户编号".into(), "*客户名称".into(),
-                 "纳税人识别号".into(), "开户银行".into(), "银行账号".into(),
-                 "销售人员".into(), "客户等级".into(), "联系人".into(), "手机".into(),
-                 "座机".into(), "QQ/微信".into(), "联系地址".into(), "首要联系人".into()],
-            vec!["CNS/".into(), "CNS001".into(), "李永南".into(), "".into(), "".into(),
-                 "".into(), "狮妹".into(), "零售客户".into(), "李永南".into(),
-                 "13414700036".into(), "".into(), "".into(), "广东省".into(), "是".into()],
+            vec![
+                "基础信息".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "联系信息".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+            ],
+            vec![
+                "客户类别".into(),
+                "*客户编号".into(),
+                "*客户名称".into(),
+                "纳税人识别号".into(),
+                "开户银行".into(),
+                "银行账号".into(),
+                "销售人员".into(),
+                "客户等级".into(),
+                "联系人".into(),
+                "手机".into(),
+                "座机".into(),
+                "QQ/微信".into(),
+                "联系地址".into(),
+                "首要联系人".into(),
+            ],
+            vec![
+                "CNS/".into(),
+                "CNS001".into(),
+                "李永南".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "狮妹".into(),
+                "零售客户".into(),
+                "李永南".into(),
+                "13414700036".into(),
+                "".into(),
+                "".into(),
+                "广东省".into(),
+                "是".into(),
+            ],
         ];
 
         let report = detect_header(&rows);
@@ -244,13 +285,20 @@ mod tests {
         // 供应商导出.xls 前 3 行
         let rows = vec![
             vec!["基础信息".into(), "".into(), "".into()],
-            vec!["供应商类别".into(), "*供应商编号".into(), "*供应商名称".into()],
+            vec![
+                "供应商类别".into(),
+                "*供应商编号".into(),
+                "*供应商名称".into(),
+            ],
             vec!["采购代理/".into(), "DL01".into(), "周万省采购代理".into()],
         ];
 
         let report = detect_header(&rows);
         assert!(report.two_row_detected);
-        assert_eq!(report.field_names, vec!["供应商类别", "供应商编号", "供应商名称"]);
+        assert_eq!(
+            report.field_names,
+            vec!["供应商类别", "供应商编号", "供应商名称"]
+        );
         assert_eq!(report.sample_rows.len(), 1);
     }
 
@@ -258,23 +306,51 @@ mod tests {
     fn test_two_row_header_products() {
         // 商品导出.xlsx 前 3 行
         let rows = vec![
-            vec!["基础信息".into(), "".into(), "".into(), "".into(), "".into()],
-            vec!["商品类别".into(), "*商品编号".into(), "商品名称".into(),
-                 "商品标签".into(), "规格型号".into()],
-            vec!["小零件".into(), "V1XLJ1001".into(), "SAM Watch".into(),
-                 "".into(), "".into()],
+            vec![
+                "基础信息".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+                "".into(),
+            ],
+            vec![
+                "商品类别".into(),
+                "*商品编号".into(),
+                "商品名称".into(),
+                "商品标签".into(),
+                "规格型号".into(),
+            ],
+            vec![
+                "小零件".into(),
+                "V1XLJ1001".into(),
+                "SAM Watch".into(),
+                "".into(),
+                "".into(),
+            ],
         ];
 
         let report = detect_header(&rows);
         assert!(report.two_row_detected);
-        assert_eq!(report.field_names, vec!["商品类别", "商品编号", "商品名称",
-                                             "商品标签", "规格型号"]);
+        assert_eq!(
+            report.field_names,
+            vec!["商品类别", "商品编号", "商品名称", "商品标签", "规格型号"]
+        );
     }
 
     #[test]
     fn test_extract_segments() {
-        let row = vec!["基础信息".into(), "".into(), "".into(), "".into(), "".into(),
-                       "".into(), "".into(), "".into(), "联系信息".into(), "".into()];
+        let row = vec![
+            "基础信息".into(),
+            "".into(),
+            "".into(),
+            "".into(),
+            "".into(),
+            "".into(),
+            "".into(),
+            "".into(),
+            "联系信息".into(),
+            "".into(),
+        ];
         let segs = extract_segments(&row);
         assert_eq!(segs.len(), 2);
         assert_eq!(segs[0].title, "基础信息");

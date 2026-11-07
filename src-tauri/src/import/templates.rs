@@ -24,42 +24,40 @@ pub fn ensure_templates(base_dir: &Path) -> Result<(), String> {
 /// 全部模板文件名与内容（启动时拷贝）
 fn template_files() -> Vec<(&'static str, &'static str)> {
     vec![
-        (
-            "products_template.csv",
-            PRODUCTS_TEMPLATE,
-        ),
-        (
-            "inventory_template.csv",
-            INVENTORY_TEMPLATE,
-        ),
-        (
-            "purchases_template.csv",
-            PURCHASES_TEMPLATE,
-        ),
-        (
-            "sales_template.csv",
-            SALES_TEMPLATE,
-        ),
-        (
-            "suppliers_template.csv",
-            SUPPLIERS_TEMPLATE,
-        ),
-        (
-            "customers_template.csv",
-            CUSTOMERS_TEMPLATE,
-        ),
+        ("products_template.csv", PRODUCTS_TEMPLATE),
+        ("inventory_template.csv", INVENTORY_TEMPLATE),
+        ("purchases_template.csv", PURCHASES_TEMPLATE),
+        ("sales_template.csv", SALES_TEMPLATE),
+        ("suppliers_template.csv", SUPPLIERS_TEMPLATE),
+        ("customers_template.csv", CUSTOMERS_TEMPLATE),
     ]
 }
 
 /// 返回所有模板的元数据（前端导入中心模板列表用）
 pub fn list_templates(base_dir: &Path) -> Vec<TemplateInfo> {
     let infos = vec![
-        ("products_template.csv",  "商品库模板",     "导入商品库（每个 SKU 一行）"),
-        ("inventory_template.csv", "库存交易模板",   "导入库存入库/出库/调整交易记录"),
-        ("purchases_template.csv", "采购订单模板",   "导入采购订单（一个 po_number 多行：每个 SKU 一行）"),
-        ("sales_template.csv",     "销售订单模板",   "导入销售订单（一个 so_number 多行：每个 SKU 一行）"),
-        ("suppliers_template.csv", "供应商模板",     "导入供应商主数据"),
-        ("customers_template.csv", "客户模板",       "导入客户主数据"),
+        (
+            "products_template.csv",
+            "商品库模板",
+            "导入商品库（每个 SKU 一行）",
+        ),
+        (
+            "inventory_template.csv",
+            "库存交易模板",
+            "导入库存入库/出库/调整交易记录",
+        ),
+        (
+            "purchases_template.csv",
+            "采购订单模板",
+            "导入采购订单（一个 po_number 多行：每个 SKU 一行）",
+        ),
+        (
+            "sales_template.csv",
+            "销售订单模板",
+            "导入销售订单（一个 so_number 多行：每个 SKU 一行）",
+        ),
+        ("suppliers_template.csv", "供应商模板", "导入供应商主数据"),
+        ("customers_template.csv", "客户模板", "导入客户主数据"),
     ];
 
     infos
@@ -69,7 +67,11 @@ pub fn list_templates(base_dir: &Path) -> Vec<TemplateInfo> {
             display_name: display_name.to_string(),
             description: description.to_string(),
             path: base_dir.join(filename).to_string_lossy().to_string(),
-            size_bytes: base_dir.join(filename).metadata().map(|m| m.len() as i64).unwrap_or(0),
+            size_bytes: base_dir
+                .join(filename)
+                .metadata()
+                .map(|m| m.len() as i64)
+                .unwrap_or(0),
         })
         .collect()
 }
@@ -172,8 +174,16 @@ mod tests {
         assert!(hdr.contains("quantity"));
 
         // 采购必须 po_number,supplier,sku
-        assert!(PURCHASES_TEMPLATE.lines().next().unwrap().contains("po_number"));
-        assert!(PURCHASES_TEMPLATE.lines().next().unwrap().contains("supplier"));
+        assert!(PURCHASES_TEMPLATE
+            .lines()
+            .next()
+            .unwrap()
+            .contains("po_number"));
+        assert!(PURCHASES_TEMPLATE
+            .lines()
+            .next()
+            .unwrap()
+            .contains("supplier"));
     }
 
     #[test]

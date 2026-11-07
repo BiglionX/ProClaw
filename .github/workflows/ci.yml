@@ -51,7 +51,6 @@ jobs:
   rust-clippy:
     name: Rust Clippy
     runs-on: ubuntu-latest
-    needs: rust-fmt
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
