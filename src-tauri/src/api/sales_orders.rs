@@ -508,6 +508,10 @@ pub async fn update_sales_order(
 }
 
 /// 提交销售订单（确认 + 自动扣减库存）
+// TODO(P0-1): 桌面端走 submit_sales_order_cmd。本 HTTP 路径 POST /api/sales_orders/:id/submit
+// 在仓库内没有前端或其它调用方，这一轮不补写 shipped_quantity。
+// 若外部客户端开始调用，需在 status 更新之后同样执行
+// UPDATE sales_order_items SET shipped_quantity = quantity WHERE sales_order_id = ?。
 pub async fn submit_sales_order(
     State(state): State<AppState>,
     Path(id): Path<String>,

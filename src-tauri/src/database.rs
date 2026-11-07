@@ -1392,6 +1392,27 @@ impl Database {
             );
         }
 
+        // P0-1 修复：历史已出库单的 shipped_quantity 回填。
+        // 出库时写 shipped_quantity 是本次修复引入的，之前的单全是 0。
+        // confirmed/shipped 是出库后的状态；delivered 是标记送达，同样已经出过库。
+        // completed 不是 sales_orders 的状态值，留在列表里不会命中任何行。
+        match self.conn.execute(
+            "UPDATE sales_order_items
+             SET shipped_quantity = quantity
+             WHERE sales_order_id IN (
+                 SELECT id FROM sales_orders
+                 WHERE status IN ('confirmed', 'shipped', 'delivered', 'completed')
+             )
+             AND (shipped_quantity IS NULL OR shipped_quantity = 0)",
+            [],
+        ) {
+            Ok(n) if n > 0 => {
+                eprintln!("[migrate] 回填 {} 条历史出库单的 shipped_quantity", n)
+            }
+            Ok(_) => {}
+            Err(e) => eprintln!("[migrate] 回填 shipped_quantity 失败（可忽略）: {}", e),
+        }
+
         // 审计修复 #14: 汇总迁移警告
         if !migration_errors.is_empty() {
             eprintln!(
