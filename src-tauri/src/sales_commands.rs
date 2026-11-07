@@ -1,5 +1,5 @@
 use crate::database::Database;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -402,8 +402,14 @@ pub fn submit_sales_order_cmd(
     order_id: String,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    submit_sales_order_on_conn(db.connection(), &order_id)
+}
 
+/// 出库：确认订单、按行数量扣库存，并把 shipped_quantity 写成该行 quantity。
+pub fn submit_sales_order_on_conn(
+    conn: &Connection,
+    order_id: &str,
+) -> Result<serde_json::Value, String> {
     let status: String = conn
         .query_row(
             "SELECT status FROM sales_orders WHERE id = ?1 AND deleted_at IS NULL",
@@ -475,6 +481,15 @@ pub fn submit_sales_order_cmd(
     }
 
     tx.execute("UPDATE sales_orders SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id]).map_err(|e| e.to_string())?;
+
+    // 当前不支持部分出库，整行 quantity 全部出库。
+    // 未来支持部分出库时改为按实际出库数量写。
+    tx.execute(
+        "UPDATE sales_order_items SET shipped_quantity = quantity WHERE sales_order_id = ?1",
+        params![order_id],
+    )
+    .map_err(|e| e.to_string())?;
+
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(

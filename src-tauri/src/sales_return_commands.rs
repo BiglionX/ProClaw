@@ -1,5 +1,5 @@
 use crate::database::Database;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 
 /// 生成销售退货编号
@@ -17,8 +17,14 @@ pub fn create_sales_return(
     r#return: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    create_sales_return_on_conn(db.connection(), r#return)
+}
 
+/// 创建销售退货单。草稿和已取消订单拒绝；已出库数量优先用 shipped_quantity。
+pub fn create_sales_return_on_conn(
+    conn: &Connection,
+    r#return: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let sr_number = r#return
         .get("sr_number")
@@ -39,6 +45,18 @@ pub fn create_sales_return(
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
+    // 状态校验：草稿或已取消不能退货
+    let status: String = tx
+        .query_row(
+            "SELECT status FROM sales_orders WHERE id = ?1",
+            params![sales_order_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("获取订单状态失败: {}", e))?;
+    if status == "draft" || status == "cancelled" {
+        return Err(format!("订单状态为 '{}'，尚未出库，不能退货", status));
+    }
+
     tx.execute(
         "INSERT INTO sales_returns (id, sr_number, sales_order_id, customer_id, return_date, status, total_amount, refund_amount, reason, notes, created_by, sync_status)
          VALUES (?1, ?2, ?3, ?4, ?5, 'draft', 0, 0, ?6, ?7, ?8, 'pending')",
@@ -55,16 +73,19 @@ pub fn create_sales_return(
             let item_id = uuid::Uuid::new_v4().to_string();
             let product_id = item["product_id"].as_str().ok_or("Product ID required")?;
             let quantity = item["quantity"].as_i64().ok_or("Quantity required")? as i32;
-            // 后端校验：退货数量不超过原发货数量
-            let shipped_qty: i32 = tx.query_row(
-                "SELECT COALESCE(shipped_quantity, quantity) FROM sales_order_items WHERE sales_order_id = ?1 AND product_id = ?2",
-                params![sales_order_id, product_id],
-                |row| row.get(0),
-            ).map_err(|e| format!("获取原订单发货数量失败: {}", e))?;
+            // 数量校验：shipped_quantity > 0 用它，否则回退 quantity（历史数据兼容）
+            let shipped_qty: i32 = tx
+                .query_row(
+                    "SELECT CASE WHEN shipped_quantity > 0 THEN shipped_quantity ELSE quantity END
+                 FROM sales_order_items WHERE sales_order_id = ?1 AND product_id = ?2",
+                    params![sales_order_id, product_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| format!("获取原订单发货数量失败: {}", e))?;
             if quantity > shipped_qty {
                 return Err(format!(
-                    "商品「{}」退货数量({})超过原发货数量({})",
-                    product_id, quantity, shipped_qty
+                    "退货数量({})超过已出库数量({})",
+                    quantity, shipped_qty
                 ));
             }
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
