@@ -158,9 +158,9 @@ fn e2e_import_three_files() {
         );
     }
 
-    let imported_any = reports.iter().any(|row| {
-        row.stored_rows.parse::<i64>().unwrap_or(0) > 0
-    });
+    let imported_any = reports
+        .iter()
+        .any(|row| row.stored_rows.parse::<i64>().unwrap_or(0) > 0);
     let verdict = if !chain_errors.is_empty() && !imported_any {
         format!("链路不通，错误是 {}", chain_errors.join("；"))
     } else if failures.is_empty() && soft.is_empty() && chain_errors.is_empty() {
@@ -357,7 +357,11 @@ fn assert_customers(
     }
     row.stored_rows = customers.to_string();
     row.distinct = distinct_code.to_string();
-    row.aggregated = if customers == 6 { "是".into() } else { "否".into() };
+    row.aggregated = if customers == 6 {
+        "是".into()
+    } else {
+        "否".into()
+    };
     row.assertion = marks.join(" / ");
 }
 
@@ -500,10 +504,7 @@ fn assert_products(
             marks.push("PASS 多SKU桥");
         }
         Ok(samples) => {
-            failures.push(format!(
-                "多 SKU 桥接样本不足或关联失败: {:?}",
-                samples
-            ));
+            failures.push(format!("多 SKU 桥接样本不足或关联失败: {:?}", samples));
             marks.push("FAIL 多SKU桥");
         }
         Err(e) => {
@@ -518,7 +519,11 @@ fn assert_products(
     }
     row.stored_rows = products.to_string();
     row.distinct = distinct_sku.to_string();
-    row.aggregated = if multi > 0 { "是".into() } else { "否".into() };
+    row.aggregated = if multi > 0 {
+        "是".into()
+    } else {
+        "否".into()
+    };
     row.assertion = marks.join(" / ");
 }
 
@@ -536,9 +541,12 @@ fn bridge_samples(conn: &rusqlite::Connection) -> Result<Vec<(String, i64)>, Str
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
         .map_err(|e| e.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 struct TableCounts {
@@ -561,8 +569,14 @@ fn table_counts(conn: &rusqlite::Connection) -> TableCounts {
     }
 }
 
-fn run_legacy(db: &mut Database, filename: &str, target_type: &str, source_format: &str) -> Result<(), String> {
-    let bytes = std::fs::read(sample_path(filename)).map_err(|e| format!("{filename} 读取失败: {e}"))?;
+fn run_legacy(
+    db: &mut Database,
+    filename: &str,
+    target_type: &str,
+    source_format: &str,
+) -> Result<(), String> {
+    let bytes =
+        std::fs::read(sample_path(filename)).map_err(|e| format!("{filename} 读取失败: {e}"))?;
     let created = block_on(import_create_batch_inner(
         db,
         target_type,
@@ -579,10 +593,7 @@ fn run_legacy(db: &mut Database, filename: &str, target_type: &str, source_forma
 #[test]
 fn imports_are_idempotent() {
     let _guard = import_lock();
-    let dir = std::env::temp_dir().join(format!(
-        "proclaw-e2e-import-idem-{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("proclaw-e2e-import-idem-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("创建临时目录");
     let db_path = dir.join("e2e.db");
     println!("临时库: {}", db_path.display());
@@ -644,7 +655,11 @@ fn imports_are_idempotent() {
 
     let pairs = [
         ("customers", first.customers, second.customers),
-        ("customer_contacts", first.customer_contacts, second.customer_contacts),
+        (
+            "customer_contacts",
+            first.customer_contacts,
+            second.customer_contacts,
+        ),
         ("suppliers", first.suppliers, second.suppliers),
         ("products", first.products, second.products),
         ("product_sku", first.product_sku, second.product_sku),
@@ -672,7 +687,9 @@ fn imports_are_idempotent() {
         }
     }
     if first_bridged != 8 {
-        expected_miss.push(format!("第一次 product_spus_bridged={first_bridged}，预期 8"));
+        expected_miss.push(format!(
+            "第一次 product_spus_bridged={first_bridged}，预期 8"
+        ));
     }
     if diffs.is_empty() && second_errors.is_empty() && expected_miss.is_empty() {
         println!("重复导入幂等：六张表行数不变");
@@ -724,27 +741,20 @@ fn assert_batches(conn: &rusqlite::Connection, failures: &mut Vec<String>) {
         }
     };
     for row in rows {
-        let (
-            target,
-            filename,
-            row_count,
-            status,
-            processed,
-            success,
-            failed,
-            skipped,
-            notes,
-        ) = match row {
-            Ok(row) => row,
-            Err(e) => {
-                failures.push(format!("读取批次行失败: {e}"));
-                continue;
-            }
-        };
+        let (target, filename, row_count, status, processed, success, failed, skipped, notes) =
+            match row {
+                Ok(row) => row,
+                Err(e) => {
+                    failures.push(format!("读取批次行失败: {e}"));
+                    continue;
+                }
+            };
         let total_rows = match row_count {
             Some(n) => n,
             None => {
-                failures.push(format!("{filename} 的 stats 解析不出 total_rows（row_count 为空）"));
+                failures.push(format!(
+                    "{filename} 的 stats 解析不出 total_rows（row_count 为空）"
+                ));
                 -1
             }
         };

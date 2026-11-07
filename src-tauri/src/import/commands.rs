@@ -3,9 +3,13 @@
 //! 13 个 Tauri 命令，与前端 `src/lib/services/importService.ts` 一一对应。
 
 use crate::database::Database;
-use crate::import::executor::{execute_batch as exec_execute_batch, validate_batch as exec_validate_batch};
+use crate::import::executor::{
+    execute_batch as exec_execute_batch, validate_batch as exec_validate_batch,
+};
 use crate::import::parser::parse_bytes;
-use crate::import::templates::{default_templates_dir, ensure_templates, list_templates, TemplateInfo};
+use crate::import::templates::{
+    default_templates_dir, ensure_templates, list_templates, TemplateInfo,
+};
 use crate::import::types::{
     BatchStatus, ExecuteRequest as _ExecuteRequest, ImportBatch, ImportBatchError, ImportRequest,
     ImportTarget, ValidateRequest as _ValidateRequest,
@@ -111,7 +115,11 @@ pub async fn import_create_batch_inner(
     // import_batches.source_format 的 CHECK 约束为 ('csv','xlsx','json')，不含 'xls'。
     // calamine 对 .xls/.xlsx 走同一解析分支（parse_xls_xlsx 内部 detect_format 识别真实格式），
     // 因此写入 DB 时把 'xls' 归一化为 'xlsx'，避免旧库 CHECK 约束报错；解析仍用原始格式。
-    let db_format: &str = if source_format == "xls" { "xlsx" } else { &source_format };
+    let db_format: &str = if source_format == "xls" {
+        "xlsx"
+    } else {
+        &source_format
+    };
 
     let parsed = parse_bytes(source_bytes, &source_format)?;
     let total_rows = parsed.total_rows as i64;
@@ -121,15 +129,13 @@ pub async fn import_create_batch_inner(
     // 2) 写文件到 APPDATA/proclaw/desktop/import_uploads/<batch_id>/
     let id = Uuid::new_v4().to_string();
     let upload_dir = import_uploads_root().join(&id);
-    std::fs::create_dir_all(&upload_dir)
-        .map_err(|e| format!("创建上传目录失败: {}", e))?;
+    std::fs::create_dir_all(&upload_dir).map_err(|e| format!("创建上传目录失败: {}", e))?;
     let target_file = upload_dir.join(&safe_filename);
     std::fs::write(&target_file, source_bytes).map_err(|e| format!("写文件失败: {}", e))?;
-    let target_file = ensure_within_dir(&upload_dir, Path::new(&safe_filename))
-        .map_err(|e| {
-            let _ = std::fs::remove_file(upload_dir.join(&safe_filename));
-            e.to_string()
-        })?;
+    let target_file = ensure_within_dir(&upload_dir, Path::new(&safe_filename)).map_err(|e| {
+        let _ = std::fs::remove_file(upload_dir.join(&safe_filename));
+        e.to_string()
+    })?;
     let size_bytes = source_bytes.len() as i64;
 
     // 3) 写 import_batches 行
@@ -205,7 +211,9 @@ pub fn import_parse_file(
         .map_err(|e| format!("查询批次失败: {}", e))?;
 
     let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
-    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
+    let path = resolve_stored_import_path(&path)?
+        .to_string_lossy()
+        .to_string();
     let target = ImportTarget::from_str(&target_type)
         .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
 
@@ -221,8 +229,11 @@ pub fn import_parse_file(
     .map_err(|e| e.to_string())?;
 
     // 清掉历史错误（重新解析前）
-    conn.execute("DELETE FROM import_batch_errors WHERE batch_id = ?1", params![batch_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM import_batch_errors WHERE batch_id = ?1",
+        params![batch_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(ImportCreateResponse {
         batch_id,
@@ -290,7 +301,9 @@ pub fn import_validate_batch(
 
     let parsed = {
         let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
-    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
+        let path = resolve_stored_import_path(&path)?
+            .to_string_lossy()
+            .to_string();
         let bytes = std::fs::read(&path).map_err(|e| format!("读取文件失败: {}", e))?;
         parse_bytes(&bytes, &source_format)?
     };
@@ -310,8 +323,11 @@ pub fn import_validate_batch(
     .map_err(|e| e.to_string())?;
 
     // 清掉上一次的错误（重新校验前）
-    conn.execute("DELETE FROM import_batch_errors WHERE batch_id = ?1", params![batch_id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM import_batch_errors WHERE batch_id = ?1",
+        params![batch_id],
+    )
+    .map_err(|e| e.to_string())?;
 
     for v in &validated {
         if v.is_valid {
@@ -384,11 +400,11 @@ pub fn import_execute_batch(
 
     let (target_type, source_format, source_path): (String, String, Option<String>) = conn
         .query_row(
-        "SELECT target_type, source_format, source_path FROM import_batches WHERE id = ?1",
-        params![batch_id],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-    )
-    .map_err(|e| format!("查询批次失败: {}", e))?;
+            "SELECT target_type, source_format, source_path FROM import_batches WHERE id = ?1",
+            params![batch_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|e| format!("查询批次失败: {}", e))?;
 
     let target = ImportTarget::from_str(&target_type)
         .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
@@ -402,12 +418,22 @@ pub fn import_execute_batch(
 
     let parsed = {
         let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
-    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
+        let path = resolve_stored_import_path(&path)?
+            .to_string_lossy()
+            .to_string();
         let bytes = std::fs::read(&path).map_err(|e| format!("读取文件失败: {}", e))?;
         parse_bytes(&bytes, &source_format)?
     };
 
-    let stats = exec_execute_batch(&dbg, &batch_id, target, &parsed, &column_mapping, &default_values, skip_errors)?;
+    let stats = exec_execute_batch(
+        &dbg,
+        &batch_id,
+        target,
+        &parsed,
+        &column_mapping,
+        &default_values,
+        skip_errors,
+    )?;
 
     // 更新 processed / success / failed / skipped + finished_at + 最终状态
     let final_status = if stats.processed == 0 {
@@ -561,7 +587,9 @@ pub struct ListBatchesRequest {
     #[serde(default)]
     pub offset: i64,
 }
-fn default_limit() -> i64 { 50 }
+fn default_limit() -> i64 {
+    50
+}
 
 #[tauri::command]
 pub fn import_list_batches(
@@ -639,7 +667,8 @@ pub fn import_get_batch_errors(
             })
         })
         .map_err(|e| e.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 // ============================================
@@ -705,10 +734,8 @@ pub fn import_list_mapping_templates(
     };
 
     // 根据是否带 target_type 过滤，分两路 query_map
-    let rows_vec: Vec<MappingTemplate> = if let Some(t) = req
-        .target_type
-        .as_ref()
-        .filter(|s| !s.is_empty())
+    let rows_vec: Vec<MappingTemplate> = if let Some(t) =
+        req.target_type.as_ref().filter(|s| !s.is_empty())
     {
         let mut stmt = conn
             .prepare(
@@ -720,7 +747,8 @@ pub fn import_list_mapping_templates(
         let rows = stmt
             .query_map(params![t], map_row)
             .map_err(|e| format!("查询映射模板失败: {}", e))?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     } else {
         let mut stmt = conn
             .prepare(
@@ -732,7 +760,8 @@ pub fn import_list_mapping_templates(
         let rows = stmt
             .query_map([], map_row)
             .map_err(|e| format!("查询映射模板失败: {}", e))?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     };
 
     Ok(rows_vec)
@@ -879,14 +908,10 @@ mod tests {
 // v1.3 老系统数据迁移 — 新增 3 个命令
 // ============================================
 
-use crate::import::aggregator::{
-    persist_customer_with_contacts, persist_product_with_skus,
-};
+use crate::import::aggregator::{persist_customer_with_contacts, persist_product_with_skus};
 use crate::import::category_resolver::bulk_ensure_categories;
 use crate::import::parser_legacy::parse_legacy_file;
-use crate::import::types::{
-    CategoryCreateSummary, LegacyExecuteRequest, LegacyParseResult,
-};
+use crate::import::types::{CategoryCreateSummary, LegacyExecuteRequest, LegacyParseResult};
 
 /// 供应商 upsert（按 code → name 优先），私有辅助函数
 fn ensure_supplier_legacy(
@@ -952,9 +977,7 @@ fn stage_business_keys<'a>(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     {
         let mut stmt = tx
-            .prepare(&format!(
-                "INSERT OR IGNORE INTO {table} (key) VALUES (?1)"
-            ))
+            .prepare(&format!("INSERT OR IGNORE INTO {table} (key) VALUES (?1)"))
             .map_err(|e| e.to_string())?;
         for key in keys {
             let key = key.trim();
@@ -984,9 +1007,7 @@ pub struct LegacyPreviewRequest {
 }
 
 #[tauri::command]
-pub fn import_preview_legacy(
-    request: LegacyPreviewRequest,
-) -> Result<LegacyParseResult, String> {
+pub fn import_preview_legacy(request: LegacyPreviewRequest) -> Result<LegacyParseResult, String> {
     eprintln!(
         "[ImportDiag] import_preview_legacy ENTERED: path={}, target={}",
         request.source_path, request.target_type
@@ -1012,10 +1033,7 @@ pub fn import_preview_legacy(
             .collect::<Vec<_>>()
             .join(",")
     );
-    eprintln!(
-        "[ImportDiag] field_names: {:?}",
-        result.field_names
-    );
+    eprintln!("[ImportDiag] field_names: {:?}", result.field_names);
     Ok(result)
 }
 
@@ -1069,7 +1087,9 @@ pub fn import_execute_legacy_inner(
         .map_err(|e| format!("查询批次失败: {}", e))?;
 
     let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
-    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
+    let path = resolve_stored_import_path(&path)?
+        .to_string_lossy()
+        .to_string();
     let target = crate::import::types::ImportTarget::from_str(&target_type)
         .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
 
@@ -1106,7 +1126,10 @@ pub fn import_execute_legacy_inner(
             stage_business_keys(
                 conn,
                 "import_cover_customer_codes",
-                preview.customer_groups.iter().map(|group| group.code.as_str()),
+                preview
+                    .customer_groups
+                    .iter()
+                    .map(|group| group.code.as_str()),
             )?;
             conn.execute(
                 "DELETE FROM customer_contacts
@@ -1122,7 +1145,8 @@ pub fn import_execute_legacy_inner(
             // 类别批量建档
             if !skip_category {
                 if let Some(cats) = preview.categories_to_create.get("customer") {
-                    let (created, skipped) = bulk_ensure_categories(conn, "customer", cats, &batch_id)?;
+                    let (created, skipped) =
+                        bulk_ensure_categories(conn, "customer", cats, &batch_id)?;
                     categories_summary.customer_created = created;
                     categories_summary.customer_skipped = skipped;
                 }
@@ -1139,7 +1163,8 @@ pub fn import_execute_legacy_inner(
                     customer_contacts_created += agg.contacts.len() as i64;
                     processed_rows += 1;
                 }
-                tx.commit().map_err(|e| format!("commit customer chunk 失败: {}", e))?;
+                tx.commit()
+                    .map_err(|e| format!("commit customer chunk 失败: {}", e))?;
                 conn.execute(
                     "UPDATE import_batches SET processed_rows = ?1 WHERE id = ?2",
                     rusqlite::params![processed_rows, batch_id],
@@ -1153,7 +1178,10 @@ pub fn import_execute_legacy_inner(
             stage_business_keys(
                 conn,
                 "import_cover_product_skus",
-                preview.product_groups.iter().map(|group| group.sku.as_str()),
+                preview
+                    .product_groups
+                    .iter()
+                    .map(|group| group.sku.as_str()),
             )?;
             stage_business_keys(
                 conn,
@@ -1177,7 +1205,8 @@ pub fn import_execute_legacy_inner(
 
             if !skip_category {
                 if let Some(cats) = preview.categories_to_create.get("product") {
-                    let (created, skipped) = bulk_ensure_categories(conn, "product", cats, &batch_id)?;
+                    let (created, skipped) =
+                        bulk_ensure_categories(conn, "product", cats, &batch_id)?;
                     categories_summary.product_created = created;
                     categories_summary.product_skipped = skipped;
                 }
@@ -1190,7 +1219,8 @@ pub fn import_execute_legacy_inner(
                     product_skus_created += agg.variants.len() as i64;
                     processed_rows += 1;
                 }
-                tx.commit().map_err(|e| format!("commit product chunk 失败: {}", e))?;
+                tx.commit()
+                    .map_err(|e| format!("commit product chunk 失败: {}", e))?;
                 conn.execute(
                     "UPDATE import_batches SET processed_rows = ?1 WHERE id = ?2",
                     rusqlite::params![processed_rows, batch_id],
@@ -1226,7 +1256,8 @@ pub fn import_execute_legacy_inner(
             // 类别批量建档
             if !skip_category {
                 if let Some(cats) = preview.categories_to_create.get("supplier") {
-                    let (created, skipped) = bulk_ensure_categories(conn, "supplier", cats, &batch_id)?;
+                    let (created, skipped) =
+                        bulk_ensure_categories(conn, "supplier", cats, &batch_id)?;
                     categories_summary.supplier_created = created;
                     categories_summary.supplier_skipped = skipped;
                 }
@@ -1289,15 +1320,14 @@ pub fn import_execute_legacy_inner(
                         .filter(|s| !s.is_empty());
 
                     if let Some(ref cn) = category_name {
-                        crate::import::category_resolver::ensure_category(
-                            &tx, "supplier", cn,
-                        )?;
+                        crate::import::category_resolver::ensure_category(&tx, "supplier", cn)?;
                     }
                     let _ = ensure_supplier_legacy(&tx, &code, &name)?;
                     suppliers_created += 1;
                     valid_count += 1;
                 }
-                tx.commit().map_err(|e| format!("commit supplier chunk 失败: {}", e))?;
+                tx.commit()
+                    .map_err(|e| format!("commit supplier chunk 失败: {}", e))?;
                 processed_rows = valid_seen;
                 conn.execute(
                     "UPDATE import_batches SET processed_rows = ?1 WHERE id = ?2",
@@ -1306,7 +1336,7 @@ pub fn import_execute_legacy_inner(
                 .map_err(|e| e.to_string())?;
             }
             // 避免 unused warning
-                let _ = valid_count;
+            let _ = valid_count;
         }
         _ => {
             return Err(format!(
@@ -1336,8 +1366,11 @@ pub fn import_execute_legacy_inner(
             finished_at,
             format!(
                 " | v1.3 legacy: customers={}, contacts={}, products={}, skus={}, suppliers={}",
-                customers_created, customer_contacts_created,
-                products_created, product_skus_created, suppliers_created
+                customers_created,
+                customer_contacts_created,
+                products_created,
+                product_skus_created,
+                suppliers_created
             ),
             batch_id,
         ],

@@ -58,8 +58,7 @@ fn row_to_vec(row: &[Data], max_cols: usize) -> Vec<String> {
 
 /// 检测文件实际格式
 pub fn detect_format(path: &Path) -> Result<&'static str, String> {
-    let mut file = std::fs::File::open(path)
-        .map_err(|e| format!("打开文件失败: {}", e))?;
+    let mut file = std::fs::File::open(path).map_err(|e| format!("打开文件失败: {}", e))?;
     use std::io::Read;
     let mut header = [0u8; 4];
     file.read_exact(&mut header)
@@ -87,8 +86,7 @@ pub fn parse_legacy_file(
 ) -> Result<(LegacyParseResult, Vec<Vec<String>>), String> {
     let format = detect_format(path)?;
 
-    let mut workbook = open_workbook_auto(path)
-        .map_err(|e| format!("打开工作簿失败: {}", e))?;
+    let mut workbook = open_workbook_auto(path).map_err(|e| format!("打开工作簿失败: {}", e))?;
 
     // 取第一个非空 sheet
     let sheet_names = workbook.sheet_names();
@@ -114,10 +112,7 @@ pub fn parse_legacy_file(
         .min(MAX_COLS_CAP);
 
     // 第二遍：转 Vec<Vec<String>>
-    let rows: Vec<Vec<String>> = range
-        .rows()
-        .map(|r| row_to_vec(r, max_cols))
-        .collect();
+    let rows: Vec<Vec<String>> = range.rows().map(|r| row_to_vec(r, max_cols)).collect();
 
     drop(workbook); // 显式释放
 
@@ -128,7 +123,9 @@ pub fn parse_legacy_file(
     let mut result = LegacyParseResult {
         format: format.to_string(),
         detected_format: format.to_string(),
-        total_data_rows: rows.len().saturating_sub(header_report.structure.data_start_row),
+        total_data_rows: rows
+            .len()
+            .saturating_sub(header_report.structure.data_start_row),
         field_names: header_report.field_names.clone(),
         segment_titles: header_report
             .structure
@@ -145,11 +142,7 @@ pub fn parse_legacy_file(
         customer_groups: Vec::new(),
         product_groups: Vec::new(),
         categories_to_create: std::collections::HashMap::new(),
-        header_preview: rows
-            .iter()
-            .take(3.min(rows.len()))
-            .cloned()
-            .collect(),
+        header_preview: rows.iter().take(3.min(rows.len())).cloned().collect(),
     };
 
     // 根据 target_type 做聚合预览
@@ -160,10 +153,8 @@ pub fn parse_legacy_file(
 
     match target_type {
         "customers" => {
-            result.customer_groups = aggregate_customers_preview(
-                &header_report.field_names,
-                data_rows,
-            );
+            result.customer_groups =
+                aggregate_customers_preview(&header_report.field_names, data_rows);
             // 类别新值
             let cats: Vec<String> = result
                 .customer_groups
@@ -190,11 +181,8 @@ pub fn parse_legacy_file(
         }
         "suppliers" => {
             // 供应商不聚合（每行 = 1 个供应商），但仍提取类别
-            let cats: Vec<String> = extract_column_values(
-                &header_report.field_names,
-                data_rows,
-                "供应商类别",
-            );
+            let cats: Vec<String> =
+                extract_column_values(&header_report.field_names, data_rows, "供应商类别");
             result
                 .categories_to_create
                 .insert("supplier".to_string(), cats);
@@ -297,10 +285,22 @@ pub fn aggregate_customers_preview(
                 .unwrap_or(false);
             entry.contacts.push(CustomerContactRecord {
                 contact_name,
-                phone: phone_idx.and_then(|i| row.get(i)).filter(|s| !s.trim().is_empty()).cloned(),
-                landline: landline_idx.and_then(|i| row.get(i)).filter(|s| !s.trim().is_empty()).cloned(),
-                qq_wechat: qq_idx.and_then(|i| row.get(i)).filter(|s| !s.trim().is_empty()).cloned(),
-                address: address_idx.and_then(|i| row.get(i)).filter(|s| !s.trim().is_empty()).cloned(),
+                phone: phone_idx
+                    .and_then(|i| row.get(i))
+                    .filter(|s| !s.trim().is_empty())
+                    .cloned(),
+                landline: landline_idx
+                    .and_then(|i| row.get(i))
+                    .filter(|s| !s.trim().is_empty())
+                    .cloned(),
+                qq_wechat: qq_idx
+                    .and_then(|i| row.get(i))
+                    .filter(|s| !s.trim().is_empty())
+                    .cloned(),
+                address: address_idx
+                    .and_then(|i| row.get(i))
+                    .filter(|s| !s.trim().is_empty())
+                    .cloned(),
                 is_primary,
             });
         }
@@ -418,7 +418,11 @@ fn find_column(field_names: &[String], candidates: &[&str]) -> Option<usize> {
 }
 
 /// 提取某列的所有非空值
-fn extract_column_values(field_names: &[String], data_rows: &[Vec<String>], column_name: &str) -> Vec<String> {
+fn extract_column_values(
+    field_names: &[String],
+    data_rows: &[Vec<String>],
+    column_name: &str,
+) -> Vec<String> {
     let idx = match find_column(field_names, &[column_name]) {
         Some(i) => i,
         None => return Vec::new(),
