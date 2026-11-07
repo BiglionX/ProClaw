@@ -16,9 +16,7 @@ use crate::database::Database;
 use crate::import::aggregator::persist_product_with_skus;
 use crate::import::category_resolver::ensure_category as ensure_category_v13;
 use crate::import::parser::{parse_bytes, ParseResult};
-use crate::import::types::{
-    required_fields_for, FieldMap, ImportTarget, ProductAggregate,
-};
+use crate::import::types::{required_fields_for, FieldMap, ImportTarget, ProductAggregate};
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
@@ -37,7 +35,7 @@ pub struct RowValidation {
 #[derive(Debug, Clone)]
 pub struct RowError {
     pub field: Option<String>,
-    pub code: String,    // e.g. "required_missing" / "invalid_number" / "duplicate_key"
+    pub code: String, // e.g. "required_missing" / "invalid_number" / "duplicate_key"
     pub message: String,
     pub raw_value: Option<String>,
 }
@@ -101,7 +99,15 @@ pub fn validate_batch(
         }
 
         // 4) 可选数值字段 - 出现了就要能解析
-        for optional_numeric in &["quantity", "unit_price", "cost_price", "sell_price", "current_stock", "min_stock", "max_stock"] {
+        for optional_numeric in &[
+            "quantity",
+            "unit_price",
+            "cost_price",
+            "sell_price",
+            "current_stock",
+            "min_stock",
+            "max_stock",
+        ] {
             if let Some(v) = mapped.get(*optional_numeric) {
                 if !v.trim().is_empty() && v.trim().parse::<f64>().is_err() {
                     errors.push(RowError {
@@ -131,11 +137,24 @@ pub fn validate_batch(
         // 6) 库存交易类型白名单
         if target == ImportTarget::Inventory {
             if let Some(t) = mapped.get("transaction_type") {
-                if !matches!(t.to_lowercase().as_str(), "inbound" | "outbound" | "adjustment" | "transfer" | "入库" | "出库" | "调整" | "调拨") {
+                if !matches!(
+                    t.to_lowercase().as_str(),
+                    "inbound"
+                        | "outbound"
+                        | "adjustment"
+                        | "transfer"
+                        | "入库"
+                        | "出库"
+                        | "调整"
+                        | "调拨"
+                ) {
                     errors.push(RowError {
                         field: Some("transaction_type".to_string()),
                         code: "invalid_enum".to_string(),
-                        message: format!("交易类型应为 inbound/outbound/adjustment/transfer: {}", t),
+                        message: format!(
+                            "交易类型应为 inbound/outbound/adjustment/transfer: {}",
+                            t
+                        ),
                         raw_value: Some(t.clone()),
                     });
                 }
@@ -160,9 +179,12 @@ fn is_valid_date(s: &str) -> bool {
     if parts.len() != 3 {
         return false;
     }
-    let ok = parts[0].len() == 4 && parts[0].chars().all(|c| c.is_ascii_digit())
-        && parts[1].len() == 2 && parts[1].chars().all(|c| c.is_ascii_digit())
-        && parts[2].len() == 2 && parts[2].chars().all(|c| c.is_ascii_digit());
+    let ok = parts[0].len() == 4
+        && parts[0].chars().all(|c| c.is_ascii_digit())
+        && parts[1].len() == 2
+        && parts[1].chars().all(|c| c.is_ascii_digit())
+        && parts[2].len() == 2
+        && parts[2].chars().all(|c| c.is_ascii_digit());
     if !ok {
         return false;
     }
@@ -283,10 +305,7 @@ pub fn execute_batch(
 
 /// 商品库（products 简单表 + 可选 product_spus / product_skus）
 /// 幂等：以 sku 为 upsert key
-fn process_product(
-    conn: &rusqlite::Connection,
-    fields: &FieldMap,
-) -> Result<(), String> {
+fn process_product(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<(), String> {
     let sku = fields.get("sku").cloned().unwrap_or_default();
     let name = fields.get("name").cloned().unwrap_or_default();
     if sku.is_empty() || name.is_empty() {
@@ -319,8 +338,14 @@ fn process_product(
         .get("current_stock")
         .map(|s| s.parse().unwrap_or(0))
         .unwrap_or(0);
-    let min_stock: i64 = fields.get("min_stock").map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
-    let max_stock: i64 = fields.get("max_stock").map(|s| s.parse().unwrap_or(999999)).unwrap_or(999999);
+    let min_stock: i64 = fields
+        .get("min_stock")
+        .map(|s| s.parse().unwrap_or(0))
+        .unwrap_or(0);
+    let max_stock: i64 = fields
+        .get("max_stock")
+        .map(|s| s.parse().unwrap_or(999999))
+        .unwrap_or(999999);
 
     // 3) 简单模式 products 表 upsert by sku
     let existing: Option<String> = conn
@@ -377,10 +402,7 @@ fn process_product(
 }
 
 /// 库存交易（按 sku_code + date + transaction_type + reference_no 去重）
-fn process_inventory(
-    conn: &rusqlite::Connection,
-    fields: &FieldMap,
-) -> Result<(), String> {
+fn process_inventory(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<(), String> {
     let sku = fields.get("sku").cloned().unwrap_or_default();
     if sku.is_empty() {
         return Err("sku 不能为空".to_string());
@@ -399,7 +421,10 @@ fn process_inventory(
 
     let raw_type = fields.get("transaction_type").cloned().unwrap_or_default();
     let transaction_type = normalize_txn_type(&raw_type);
-    let quantity: i64 = fields.get("quantity").map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
+    let quantity: i64 = fields
+        .get("quantity")
+        .map(|s| s.parse().unwrap_or(0))
+        .unwrap_or(0);
     let transaction_date = fields
         .get("transaction_date")
         .cloned()
@@ -454,10 +479,7 @@ fn process_inventory(
 }
 
 /// 采购订单（按 po_number upsert）
-fn process_purchase(
-    conn: &rusqlite::Connection,
-    fields: &FieldMap,
-) -> Result<(), String> {
+fn process_purchase(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<(), String> {
     let po_number = fields.get("po_number").cloned().unwrap_or_default();
     if po_number.is_empty() {
         return Err("po_number 不能为空".to_string());
@@ -483,10 +505,19 @@ fn process_purchase(
         .ok_or_else(|| format!("找不到 SKU: {}", sku))?;
 
     let order_date = fields.get("order_date").cloned().unwrap_or_default();
-    let quantity: i64 = fields.get("quantity").map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
-    let unit_price: f64 = fields.get("unit_price").map(|s| s.parse().unwrap_or(0.0)).unwrap_or(0.0);
+    let quantity: i64 = fields
+        .get("quantity")
+        .map(|s| s.parse().unwrap_or(0))
+        .unwrap_or(0);
+    let unit_price: f64 = fields
+        .get("unit_price")
+        .map(|s| s.parse().unwrap_or(0.0))
+        .unwrap_or(0.0);
     let total_price = unit_price * quantity as f64;
-    let status = fields.get("status").cloned().unwrap_or_else(|| "draft".to_string());
+    let status = fields
+        .get("status")
+        .cloned()
+        .unwrap_or_else(|| "draft".to_string());
     let notes = fields.get("notes").cloned().unwrap_or_default();
 
     // 3) 幂等：po_number 已存在则更新（重用订单号；item 全量替换）
@@ -538,10 +569,7 @@ fn process_purchase(
 }
 
 /// 销售订单（按 so_number upsert）
-fn process_sales(
-    conn: &rusqlite::Connection,
-    fields: &FieldMap,
-) -> Result<(), String> {
+fn process_sales(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<(), String> {
     let so_number = fields.get("so_number").cloned().unwrap_or_default();
     if so_number.is_empty() {
         return Err("so_number 不能为空".to_string());
@@ -565,10 +593,19 @@ fn process_sales(
         .ok_or_else(|| format!("找不到 SKU: {}", sku))?;
 
     let order_date = fields.get("order_date").cloned().unwrap_or_default();
-    let quantity: i64 = fields.get("quantity").map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
-    let unit_price: f64 = fields.get("unit_price").map(|s| s.parse().unwrap_or(0.0)).unwrap_or(0.0);
+    let quantity: i64 = fields
+        .get("quantity")
+        .map(|s| s.parse().unwrap_or(0))
+        .unwrap_or(0);
+    let unit_price: f64 = fields
+        .get("unit_price")
+        .map(|s| s.parse().unwrap_or(0.0))
+        .unwrap_or(0.0);
     let total_price = unit_price * quantity as f64;
-    let status = fields.get("status").cloned().unwrap_or_else(|| "draft".to_string());
+    let status = fields
+        .get("status")
+        .cloned()
+        .unwrap_or_else(|| "draft".to_string());
     let notes = fields.get("notes").cloned().unwrap_or_default();
 
     let existing_so: Option<String> = conn
@@ -617,10 +654,7 @@ fn process_sales(
 }
 
 /// 供应商（按 name 或 code upsert）
-fn process_supplier(
-    conn: &rusqlite::Connection,
-    fields: &FieldMap,
-) -> Result<(), String> {
+fn process_supplier(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<(), String> {
     let name = fields.get("name").cloned().unwrap_or_default();
     if name.is_empty() {
         return Err("name 不能为空".to_string());
@@ -636,7 +670,10 @@ fn process_supplier(
             sync_status = 'pending', updated_at = CURRENT_TIMESTAMP
          WHERE id = ?6",
         params![
-            fields.get("contact_person").cloned().filter(|s| !s.is_empty()),
+            fields
+                .get("contact_person")
+                .cloned()
+                .filter(|s| !s.is_empty()),
             fields.get("phone").cloned().filter(|s| !s.is_empty()),
             fields.get("email").cloned().filter(|s| !s.is_empty()),
             fields.get("address").cloned().filter(|s| !s.is_empty()),
@@ -649,10 +686,7 @@ fn process_supplier(
 }
 
 /// 客户（按 name 或 code upsert）
-fn process_customer(
-    conn: &rusqlite::Connection,
-    fields: &FieldMap,
-) -> Result<(), String> {
+fn process_customer(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<(), String> {
     let name = fields.get("name").cloned().unwrap_or_default();
     if name.is_empty() {
         return Err("name 不能为空".to_string());
@@ -660,7 +694,10 @@ fn process_customer(
     let code = fields.get("code").cloned().unwrap_or_default();
     let id = ensure_customer_with_code(conn, &name, &code)?;
 
-    let customer_type = fields.get("customer_type").cloned().unwrap_or_else(|| "individual".to_string());
+    let customer_type = fields
+        .get("customer_type")
+        .cloned()
+        .unwrap_or_else(|| "individual".to_string());
     conn.execute(
         "UPDATE customers SET contact_person = COALESCE(?1, contact_person),
             phone = COALESCE(?2, phone), email = COALESCE(?3, email),
@@ -668,7 +705,10 @@ fn process_customer(
             sync_status = 'pending', updated_at = CURRENT_TIMESTAMP
          WHERE id = ?6",
         params![
-            fields.get("contact_person").cloned().filter(|s| !s.is_empty()),
+            fields
+                .get("contact_person")
+                .cloned()
+                .filter(|s| !s.is_empty()),
             fields.get("phone").cloned().filter(|s| !s.is_empty()),
             fields.get("email").cloned().filter(|s| !s.is_empty()),
             fields.get("address").cloned().filter(|s| !s.is_empty()),
@@ -730,7 +770,11 @@ pub fn ensure_supplier(conn: &rusqlite::Connection, name: &str) -> Result<String
     ensure_supplier_with_code(conn, name, "")
 }
 
-fn ensure_supplier_with_code(conn: &rusqlite::Connection, name: &str, code: &str) -> Result<String, String> {
+fn ensure_supplier_with_code(
+    conn: &rusqlite::Connection,
+    name: &str,
+    code: &str,
+) -> Result<String, String> {
     // 优先按 code 找
     if !code.is_empty() {
         if let Some(id) = conn
@@ -771,7 +815,11 @@ pub fn ensure_customer(conn: &rusqlite::Connection, name: &str) -> Result<String
     ensure_customer_with_code(conn, name, "")
 }
 
-fn ensure_customer_with_code(conn: &rusqlite::Connection, name: &str, code: &str) -> Result<String, String> {
+fn ensure_customer_with_code(
+    conn: &rusqlite::Connection,
+    name: &str,
+    code: &str,
+) -> Result<String, String> {
     if !code.is_empty() {
         if let Some(id) = conn
             .query_row(
@@ -909,7 +957,8 @@ mod tests {
 
     #[test]
     fn test_validate_invalid_date() {
-        let csv = "po_number,supplier,order_date,sku,quantity,unit_price\nPO-1,S,date-bad,SKU-1,1,1";
+        let csv =
+            "po_number,supplier,order_date,sku,quantity,unit_price\nPO-1,S,date-bad,SKU-1,1,1";
         let parsed = parse_bytes(csv.as_bytes(), "csv").unwrap();
         let mapping = std::collections::HashMap::from([
             ("po_number".to_string(), "po_number".to_string()),
@@ -931,7 +980,10 @@ mod tests {
         let parsed = parse_bytes(csv.as_bytes(), "csv").unwrap();
         let mapping = std::collections::HashMap::from([
             ("sku".to_string(), "sku".to_string()),
-            ("transaction_type".to_string(), "transaction_type".to_string()),
+            (
+                "transaction_type".to_string(),
+                "transaction_type".to_string(),
+            ),
             ("quantity".to_string(), "quantity".to_string()),
         ]);
         let defaults = std::collections::HashMap::new();

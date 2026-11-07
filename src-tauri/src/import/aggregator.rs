@@ -81,11 +81,7 @@ pub fn persist_customer_with_contacts(
     Ok(customer_id)
 }
 
-fn upsert_customer(
-    conn: &rusqlite::Connection,
-    code: &str,
-    name: &str,
-) -> Result<String, String> {
+fn upsert_customer(conn: &rusqlite::Connection, code: &str, name: &str) -> Result<String, String> {
     // 优先按 code 找
     if !code.is_empty() {
         if let Some(id) = conn

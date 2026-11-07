@@ -1502,8 +1502,7 @@ pub fn get_database_path() -> PathBuf {
         return path;
     }
     // fallback 3: temp + PID（最后手段）
-    let path = std::env::temp_dir()
-        .join(format!("proclaw-fallback-{}.db", std::process::id()));
+    let path = std::env::temp_dir().join(format!("proclaw-fallback-{}.db", std::process::id()));
     eprintln!(
         "WARN: ProjectDirs + LOCALAPPDATA 都失败，fallback 到 temp: {:?}",
         path

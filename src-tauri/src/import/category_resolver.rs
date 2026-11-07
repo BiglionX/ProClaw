@@ -89,12 +89,13 @@ pub fn bulk_ensure_categories(
         }
 
         let id = Uuid::new_v4().to_string();
-        let inserted = conn.execute(
-            "INSERT OR IGNORE INTO categories (id, type, name, source, batch_id, created_at)
+        let inserted = conn
+            .execute(
+                "INSERT OR IGNORE INTO categories (id, type, name, source, batch_id, created_at)
              VALUES (?1, ?2, ?3, 'import_legacy', ?4, datetime('now'))",
-            params![id, category_type, name, batch_id],
-        )
-        .map_err(|e| format!("批量创建类别失败 ({}:{}): {}", category_type, name, e))?;
+                params![id, category_type, name, batch_id],
+            )
+            .map_err(|e| format!("批量创建类别失败 ({}:{}): {}", category_type, name, e))?;
 
         if inserted > 0 {
             created += 1;

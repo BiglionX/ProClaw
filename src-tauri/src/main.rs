@@ -228,7 +228,8 @@ fn install_panic_hook() {
         let _ = writeln!(
             std::io::stderr(),
             "[PROCLAW_PANIC] ⚠️ PANIC at {}: {}",
-            location, payload
+            location,
+            payload
         );
 
         // ========== 阶段 2：backtrace 抓取（用 catch_unwind 防护）==========
@@ -283,7 +284,10 @@ async fn main() {
         Ok(db) => db,
         Err(e) => {
             eprintln!("⚠️ 数据库打开失败: {}. 尝试自动恢复（备份+重建）...", e);
-            diag_log(&format!("WARN: 第一次 Database::new 失败: {}，尝试恢复...", e));
+            diag_log(&format!(
+                "WARN: 第一次 Database::new 失败: {}，尝试恢复...",
+                e
+            ));
             backup_and_remove_corrupted_db_files(&db_path);
             match Database::new(db_path.clone()) {
                 Ok(db) => db,
@@ -325,10 +329,9 @@ async fn main() {
                 };
                 match db.initialize() {
                     Ok(()) => db,
-                    Err(e2) => fatal_exit(
-                        "db.initialize 二次失败",
-                        format!("{} (首次: {})", e2, e),
-                    ),
+                    Err(e2) => {
+                        fatal_exit("db.initialize 二次失败", format!("{} (首次: {})", e2, e))
+                    }
                 }
             }
         }
@@ -403,10 +406,12 @@ async fn main() {
             "proclaw-nvwax-default-cipher-key".to_string()
         });
     // 闪退修复 #2: NvwaX cipher 创建改 fatal_exit
-    let nvwax_cipher = Arc::new(match Aes256GcmCipher::from_password(&nvwax_password, nvwax_key_salt) {
-        Ok(c) => c,
-        Err(e) => fatal_exit("NvwaX cipher 创建", e),
-    });
+    let nvwax_cipher = Arc::new(
+        match Aes256GcmCipher::from_password(&nvwax_password, nvwax_key_salt) {
+            Ok(c) => c,
+            Err(e) => fatal_exit("NvwaX cipher 创建", e),
+        },
+    );
 
     // 优先使用环境变量 NVWAX_API_KEY，其次尝试从数据库加载已保存的 Key
     // 审计修复 #15: 解密/加载失败时打印警告，不再静默回退为空字符串
@@ -469,7 +474,10 @@ async fn main() {
     // 失败不中断启动（用户在导入中心能手动点击补拷）
     let templates_dir = crate::import::templates::default_templates_dir();
     if let Err(e) = crate::import::templates::ensure_templates(&templates_dir) {
-        diag_log(&format!("WARN: ensure_templates 失败: {} (dir: {:?})", e, templates_dir));
+        diag_log(&format!(
+            "WARN: ensure_templates 失败: {} (dir: {:?})",
+            e, templates_dir
+        ));
     } else {
         diag_log(&format!("导入模板就绪: {:?}", templates_dir));
     }
