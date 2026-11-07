@@ -10,31 +10,65 @@ use crate::import::types::{
     BatchStatus, ExecuteRequest as _ExecuteRequest, ImportBatch, ImportBatchError, ImportRequest,
     ImportTarget, ValidateRequest as _ValidateRequest,
 };
+use crate::utils::path_safety::{ensure_within_dir, sanitize_file_name};
 use rusqlite::{params, OptionalExtension};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use uuid::Uuid;
+
+fn import_uploads_root() -> PathBuf {
+    default_templates_dir()
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(std::env::temp_dir)
+        .join("import_uploads")
+}
+
+/// 只允许读取 import_uploads 目录内的已保存文件，拒绝客户端传入的任意路径。
+///
+/// `ensure_within_dir` 在文件已存在时会返回 `canonicalize()` 的结果。Windows 上这是
+/// `\\?\` 前缀，和 `import_uploads_root()` 的普通路径对不上，`strip_prefix` 会误拒。
+/// 两边都规范化后再比较。
+fn resolve_stored_import_path(path: &str) -> Result<PathBuf, String> {
+    let root = import_uploads_root();
+    std::fs::create_dir_all(&root).map_err(|e| format!("创建导入目录失败: {}", e))?;
+    let root = root
+        .canonicalize()
+        .map_err(|e| format!("规范化导入目录失败: {}", e))?;
+    let candidate = PathBuf::from(path);
+    let full = if candidate.is_absolute() {
+        candidate
+    } else {
+        root.join(candidate)
+    };
+    let full = full
+        .canonicalize()
+        .map_err(|e| format!("导入文件不存在: {}", e))?;
+    if !full.starts_with(&root) {
+        return Err("导入文件路径不在允许目录内".to_string());
+    }
+    Ok(full)
+}
 
 // ============================================
 // 1. import_create_batch：上传文件 + 创建批次
 // ============================================
 
-/// 创建批次：上传文件 + 创建 import_batches 行，返回 batch_id + 解析摘要
+/// 创建批次：上传文件 + 创建 import_batches 行，返回 batch_id + 解析摘要。
+/// 薄壳只做 base64 解码，解析和写库在 `import_create_batch_inner`。
 #[tauri::command]
 pub fn import_create_batch(
     db: tauri::State<Mutex<Database>>,
     request: ImportRequest,
 ) -> Result<ImportCreateResponse, String> {
-    let target_type = request.target_type.clone();
-    let target = ImportTarget::from_str(&target_type)
-        .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
-
-    let source_format = request.source_format.clone();
-    if !matches!(source_format.as_str(), "csv" | "xlsx" | "json") {
-        return Err(format!("不支持的文件格式: {}", source_format));
-    }
-
-    // 1) 解析文件（如果是 base64）
+    eprintln!(
+        "[ImportDiag] import_create_batch ENTERED: target={}, filename={}, format={}, base64_len={}",
+        request.target_type,
+        request.source_filename,
+        request.source_format,
+        request.source_base64.as_ref().map(|s| s.len()).unwrap_or(0),
+    );
     let bytes = if let Some(b64) = &request.source_base64 {
         use base64::{engine::general_purpose, Engine as _};
         general_purpose::STANDARD
@@ -43,26 +77,63 @@ pub fn import_create_batch(
     } else {
         return Err("必须提供 source_base64（暂未支持无文件模式）".to_string());
     };
+    let guard = db.lock().map_err(|e| e.to_string())?;
+    futures::executor::block_on(import_create_batch_inner(
+        &*guard,
+        &request.target_type,
+        &request.source_filename,
+        &request.source_format,
+        &bytes,
+        request.performed_by.as_deref(),
+        request.notes.as_deref(),
+    ))
+}
 
-    let parsed = parse_bytes(&bytes, &source_format)?;
+/// 创建批次的纯函数。不读 base64，调用方传入原始字节。
+pub async fn import_create_batch_inner(
+    db: &Database,
+    target_type: &str,
+    source_filename: &str,
+    source_format: &str,
+    source_bytes: &[u8],
+    performed_by: Option<&str>,
+    notes: Option<&str>,
+) -> Result<ImportCreateResponse, String> {
+    let target_type = target_type.to_string();
+    let target = ImportTarget::from_str(&target_type)
+        .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
+
+    let source_format = source_format.to_string();
+    if !matches!(source_format.as_str(), "csv" | "xlsx" | "xls" | "json") {
+        return Err(format!("不支持的文件格式: {}", source_format));
+    }
+    // 数据库兼容（P0-S4 修复）：
+    // import_batches.source_format 的 CHECK 约束为 ('csv','xlsx','json')，不含 'xls'。
+    // calamine 对 .xls/.xlsx 走同一解析分支（parse_xls_xlsx 内部 detect_format 识别真实格式），
+    // 因此写入 DB 时把 'xls' 归一化为 'xlsx'，避免旧库 CHECK 约束报错；解析仍用原始格式。
+    let db_format: &str = if source_format == "xls" { "xlsx" } else { &source_format };
+
+    let parsed = parse_bytes(source_bytes, &source_format)?;
     let total_rows = parsed.total_rows as i64;
+
+    let safe_filename = sanitize_file_name(source_filename).map_err(|e| e.to_string())?;
 
     // 2) 写文件到 APPDATA/proclaw/desktop/import_uploads/<batch_id>/
     let id = Uuid::new_v4().to_string();
-    let upload_dir = default_templates_dir()
-        .parent()
-        .unwrap_or(&std::env::temp_dir())
-        .join("import_uploads")
-        .join(&id);
+    let upload_dir = import_uploads_root().join(&id);
     std::fs::create_dir_all(&upload_dir)
         .map_err(|e| format!("创建上传目录失败: {}", e))?;
-    let target_file = upload_dir.join(&request.source_filename);
-    std::fs::write(&target_file, &bytes).map_err(|e| format!("写文件失败: {}", e))?;
-    let size_bytes = bytes.len() as i64;
+    let target_file = upload_dir.join(&safe_filename);
+    std::fs::write(&target_file, source_bytes).map_err(|e| format!("写文件失败: {}", e))?;
+    let target_file = ensure_within_dir(&upload_dir, Path::new(&safe_filename))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(upload_dir.join(&safe_filename));
+            e.to_string()
+        })?;
+    let size_bytes = source_bytes.len() as i64;
 
     // 3) 写 import_batches 行
-    let dbg = db.lock().map_err(|e| e.to_string())?;
-    let conn = dbg.connection();
+    let conn = db.connection();
     conn.execute(
         "INSERT INTO import_batches
             (id, target_type, source_filename, source_format, source_size, source_path,
@@ -72,13 +143,13 @@ pub fn import_create_batch(
         params![
             id,
             target_type,
-            request.source_filename,
-            source_format,
+            safe_filename,
+            db_format,
             size_bytes,
             target_file.to_string_lossy().to_string(),
             total_rows,
-            request.performed_by,
-            request.notes,
+            performed_by,
+            notes,
         ],
     )
     .map_err(|e| format!("写 import_batches 失败: {}", e))?;
@@ -134,6 +205,7 @@ pub fn import_parse_file(
         .map_err(|e| format!("查询批次失败: {}", e))?;
 
     let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
+    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
     let target = ImportTarget::from_str(&target_type)
         .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
 
@@ -218,6 +290,7 @@ pub fn import_validate_batch(
 
     let parsed = {
         let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
+    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
         let bytes = std::fs::read(&path).map_err(|e| format!("读取文件失败: {}", e))?;
         parse_bytes(&bytes, &source_format)?
     };
@@ -329,6 +402,7 @@ pub fn import_execute_batch(
 
     let parsed = {
         let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
+    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
         let bytes = std::fs::read(&path).map_err(|e| format!("读取文件失败: {}", e))?;
         parse_bytes(&bytes, &source_format)?
     };
@@ -863,6 +937,39 @@ fn ensure_supplier_legacy(
     Ok(id)
 }
 
+/// 把本次导入的业务键放进临时表，供覆盖删除使用。
+/// 表名只接受本函数的调用方传入的固定标识。
+fn stage_business_keys<'a>(
+    conn: &mut rusqlite::Connection,
+    table: &str,
+    keys: impl IntoIterator<Item = &'a str>,
+) -> Result<(), String> {
+    conn.execute_batch(&format!(
+        "CREATE TEMP TABLE IF NOT EXISTS {table} (key TEXT PRIMARY KEY);
+         DELETE FROM {table};"
+    ))
+    .map_err(|e| format!("准备覆盖键 {table} 失败: {e}"))?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    {
+        let mut stmt = tx
+            .prepare(&format!(
+                "INSERT OR IGNORE INTO {table} (key) VALUES (?1)"
+            ))
+            .map_err(|e| e.to_string())?;
+        for key in keys {
+            let key = key.trim();
+            if key.is_empty() {
+                continue;
+            }
+            stmt.execute(rusqlite::params![key])
+                .map_err(|e| format!("写入覆盖键失败: {e}"))?;
+        }
+    }
+    tx.commit()
+        .map_err(|e| format!("提交覆盖键 {table} 失败: {e}"))?;
+    Ok(())
+}
+
 // ----------------------------------------------------------------------------
 // import_preview_legacy：上传后立刻解析 + 探测表头 + 聚合预览
 // （仅做预览，不写库，不创建批次 — 用户在 Step 4 编辑后再调 import_execute_legacy）
@@ -880,11 +987,35 @@ pub struct LegacyPreviewRequest {
 pub fn import_preview_legacy(
     request: LegacyPreviewRequest,
 ) -> Result<LegacyParseResult, String> {
-    let path = std::path::Path::new(&request.source_path);
+    eprintln!(
+        "[ImportDiag] import_preview_legacy ENTERED: path={}, target={}",
+        request.source_path, request.target_type
+    );
+    let path = resolve_stored_import_path(&request.source_path)?;
     if !path.exists() {
-        return Err(format!("文件不存在: {}", request.source_path));
+        return Err(format!("文件不存在: {}", path.display()));
     }
-    let (result, _rows) = parse_legacy_file(path, &request.target_type)?;
+    let (result, _rows) = parse_legacy_file(&path, &request.target_type)?;
+    eprintln!(
+        "[ImportDiag] import_preview_legacy RESULT: format={}, detected_format={}, total_data_rows={}, field_names.len={}, segment_titles.len={}, customer_groups.len={}, product_groups.len={}, categories_to_create={}",
+        result.format,
+        result.detected_format,
+        result.total_data_rows,
+        result.field_names.len(),
+        result.segment_titles.len(),
+        result.customer_groups.len(),
+        result.product_groups.len(),
+        result
+            .categories_to_create
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v.len()))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    eprintln!(
+        "[ImportDiag] field_names: {:?}",
+        result.field_names
+    );
     Ok(result)
 }
 
@@ -910,12 +1041,23 @@ pub fn import_execute_legacy(
     db: tauri::State<Mutex<Database>>,
     request: LegacyExecuteRequest,
 ) -> Result<LegacyExecuteResponse, String> {
+    let mut dbg = db.lock().map_err(|e| e.to_string())?;
+    import_execute_legacy_inner(&mut dbg, request)
+}
+
+/// `import_execute_legacy` 的函数体。桌面端老格式导入写 customers / products / suppliers 走这里。
+pub fn import_execute_legacy_inner(
+    db: &mut Database,
+    request: LegacyExecuteRequest,
+) -> Result<LegacyExecuteResponse, String> {
     let batch_id = request.batch_id;
     let _skip_errors = request.skip_errors.unwrap_or(true);
     let skip_category = request.skip_category_auto_create.unwrap_or(false);
 
-    let dbg = db.lock().map_err(|e| e.to_string())?;
-    let conn = dbg.connection();
+    // 用 connection_mut() 拿到 &mut Connection，这样才能调 conn.transaction()。
+    // （connection() 返回 &Connection 只能调 unchecked_transaction()，
+    //   但后者错误时不会自动 ROLLBACK，所以 P0-S1 修复要求用 transaction()。）
+    let conn = db.connection_mut();
 
     // 1) 查 source_path + 校验状态
     let (target_type, source_path): (String, Option<String>) = conn
@@ -927,6 +1069,7 @@ pub fn import_execute_legacy(
         .map_err(|e| format!("查询批次失败: {}", e))?;
 
     let path = source_path.ok_or_else(|| "批次没有 source_path，请重新上传".to_string())?;
+    let path = resolve_stored_import_path(&path)?.to_string_lossy().to_string();
     let target = crate::import::types::ImportTarget::from_str(&target_type)
         .ok_or_else(|| format!("未知的目标类型: {}", target_type))?;
 
@@ -958,10 +1101,21 @@ pub fn import_execute_legacy(
 
     match target {
         crate::import::types::ImportTarget::Customers => {
-            // 预清理：本批次旧的联系人（精准回滚基础）
+            // 覆盖：同一客户编号再次导入时换掉旧联系人。
+            // 新行仍写当前 batch_id，撤销继续按批次追溯。
+            stage_business_keys(
+                conn,
+                "import_cover_customer_codes",
+                preview.customer_groups.iter().map(|group| group.code.as_str()),
+            )?;
             conn.execute(
-                "DELETE FROM customer_contacts WHERE batch_id = ?1",
-                rusqlite::params![batch_id],
+                "DELETE FROM customer_contacts
+                 WHERE customer_id IN (
+                     SELECT c.id FROM customers c
+                     JOIN import_cover_customer_codes k ON k.key = c.code
+                     WHERE c.deleted_at IS NULL
+                 )",
+                [],
             )
             .map_err(|e| e.to_string())?;
 
@@ -974,8 +1128,11 @@ pub fn import_execute_legacy(
                 }
             }
             // chunked：每 1000 个聚合组一个事务
+            // 注意：用标准 transaction() 替代 unchecked_transaction()，
+            // 这样在 `?` 传播错误时事务会自动 ROLLBACK，
+            // 避免部分 chunk 提交 + 当前 chunk 中途失败导致数据残留。
             for chunk in preview.customer_groups.chunks(CHUNK_SIZE) {
-                let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+                let tx = conn.transaction().map_err(|e| e.to_string())?;
                 for agg in chunk {
                     let _cid = persist_customer_with_contacts(&tx, agg, skip_category, &batch_id)?;
                     customers_created += 1;
@@ -991,9 +1148,30 @@ pub fn import_execute_legacy(
             }
         }
         crate::import::types::ImportTarget::Products => {
+            // 覆盖：按商品编号和变体 sku 删掉旧 product_sku，避免第二次撞 UNIQUE(sku)。
+            // 新行仍写当前 batch_id。product_spus 不在这里删，INSERT OR IGNORE 按 id/spu_code 保持幂等。
+            stage_business_keys(
+                conn,
+                "import_cover_product_skus",
+                preview.product_groups.iter().map(|group| group.sku.as_str()),
+            )?;
+            stage_business_keys(
+                conn,
+                "import_cover_variant_skus",
+                preview
+                    .product_groups
+                    .iter()
+                    .flat_map(|group| group.variants.iter().map(|variant| variant.sku.as_str())),
+            )?;
             conn.execute(
-                "DELETE FROM product_sku WHERE batch_id = ?1",
-                rusqlite::params![batch_id],
+                "DELETE FROM product_sku
+                 WHERE sku IN (SELECT key FROM import_cover_variant_skus)
+                    OR product_id IN (
+                        SELECT p.id FROM products p
+                        JOIN import_cover_product_skus k ON k.key = p.sku
+                        WHERE p.deleted_at IS NULL
+                    )",
+                [],
             )
             .map_err(|e| e.to_string())?;
 
@@ -1005,7 +1183,7 @@ pub fn import_execute_legacy(
                 }
             }
             for chunk in preview.product_groups.chunks(CHUNK_SIZE) {
-                let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+                let tx = conn.transaction().map_err(|e| e.to_string())?;
                 for agg in chunk {
                     let _pid = persist_product_with_skus(&tx, agg, skip_category, &batch_id)?;
                     products_created += 1;
@@ -1019,6 +1197,30 @@ pub fn import_execute_legacy(
                 )
                 .map_err(|e| e.to_string())?;
             }
+            // 云店 / 库存视图读 product_spus.spu_code，老导入写的是 products.sku。
+            // 用 products.id 作为 product_spus.id，和阶段一双写约定一致，才能 JOIN 回 product_sku.product_id。
+            // category_id / brand_id 留空：老类别在 categories 表，不是 product_categories / brands 的外键。
+            conn.execute(
+                "INSERT OR IGNORE INTO product_spus
+                    (id, spu_code, name, description, unit, is_on_sale, status, sync_status)
+                 SELECT p.id,
+                        p.sku,
+                        CASE WHEN TRIM(IFNULL(p.name, '')) = '' THEN p.sku ELSE p.name END,
+                        p.description,
+                        COALESCE(NULLIF(TRIM(p.unit), ''), '件'),
+                        1,
+                        'on_sale',
+                        'pending'
+                 FROM products p
+                 WHERE p.deleted_at IS NULL
+                   AND p.sku IS NOT NULL
+                   AND TRIM(p.sku) != ''
+                   AND p.id IN (
+                       SELECT product_id FROM product_sku WHERE batch_id = ?1
+                   )",
+                rusqlite::params![batch_id],
+            )
+            .map_err(|e| format!("写入 product_spus 失败: {}", e))?;
         }
         crate::import::types::ImportTarget::Suppliers => {
             // 类别批量建档
@@ -1050,12 +1252,23 @@ pub fn import_execute_legacy(
                 .position(|f| f.contains("供应商类别"));
 
             let total = _rows.len();
+            // 表头行的 B 列是「*供应商编号」。从 row 0 找到它，数据从下一行开始。
+            // 找不到时从 0 开始，避免误跳过没有这段表头的文件。
+            let data_start = _rows
+                .iter()
+                .position(|row| {
+                    row.get(1)
+                        .map(|cell| cell.contains("供应商编号"))
+                        .unwrap_or(false)
+                })
+                .map(|idx| idx + 1)
+                .unwrap_or(0);
             let mut valid_count = 0i64;
             let mut valid_seen = 0i64;
-            // chunked：每 1000 行一个事务
-            for chunk_start in (0..total).step_by(CHUNK_SIZE) {
+            // chunked：每 1000 行一个事务。只扫数据行，不把表头插进 suppliers。
+            for chunk_start in (data_start..total).step_by(CHUNK_SIZE) {
                 let chunk_end = (chunk_start + CHUNK_SIZE).min(total);
-                let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+                let tx = conn.transaction().map_err(|e| e.to_string())?;
                 for row_idx in chunk_start..chunk_end {
                     let row = &_rows[row_idx];
                     valid_seen += 1;
@@ -1168,10 +1381,10 @@ pub fn import_rollback_batch(
     db: tauri::State<Mutex<Database>>,
     batch_id: String,
 ) -> Result<RollbackResponse, String> {
-    let dbg = db.lock().map_err(|e| e.to_string())?;
-    let conn = dbg.connection();
+    let mut dbg = db.lock().map_err(|e| e.to_string())?;
+    let conn = dbg.connection_mut();
 
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // P0-S1 修复：按 batch_id 精准过滤，避免跨批次误删
     let contacts_deleted = tx

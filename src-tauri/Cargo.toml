@@ -1,11 +1,15 @@
 [package]
 name = "proclaw-desktop"
-version = "1.5.1"
+version = "1.6.0"
 description = "ProClaw Desktop Application - AI-Powered Business Operating System"
 authors = ["You"]
 license = "MIT"
 repository = ""
 edition = "2021"
+
+[lib]
+name = "proclaw_desktop"
+path = "src/lib.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.0.0", features = [] }
@@ -105,6 +109,9 @@ libloading = "0.8"
 # Tauri 自动更新插件（任务 #10）
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
+
+[dev-dependencies]
+rusqlite = { version = "0.31.0", features = ["bundled"] }
 
 [lints.rust]
 

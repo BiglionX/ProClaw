@@ -102,11 +102,16 @@ pub fn parse_legacy_file(
         .map_err(|e| format!("读取 sheet '{}' 失败: {}", sheet_name, e))?;
 
     // 第一遍：算出最大列数（避免某些行少列时长度不一致）
+    // P1-S3 优化：限制 max_cols 上限，避免被「全空填充行」拉高后导致短行被无意义地 pad 拉伸。
+    // xls/xlsx 老系统导出中偶尔会出现一整行“空 N 个列”的填充行，让 max_cols 看起来很大；
+    // 这会让中间 99% 的数据行都被 pad 到该列数，浪费内存。设上限 50 列足以覆盖所有现有模板。
+    const MAX_COLS_CAP: usize = 50;
     let max_cols = range
         .rows()
         .map(|r| r.len())
         .max()
-        .unwrap_or(0);
+        .unwrap_or(0)
+        .min(MAX_COLS_CAP);
 
     // 第二遍：转 Vec<Vec<String>>
     let rows: Vec<Vec<String>> = range
@@ -148,14 +153,16 @@ pub fn parse_legacy_file(
     };
 
     // 根据 target_type 做聚合预览
+    // P1-S3 优化：data_rows 改为借用 rows，不多倍复制。聚合函数接受 &[Vec<String>]。
+    // 空 sheet 时 detect_header 的 data_start_row 默认为 1，直接切片会 panic。
     let data_start = header_report.structure.data_start_row;
-    let data_rows: Vec<Vec<String>> = rows.iter().skip(data_start).cloned().collect();
+    let data_rows = rows.get(data_start..).unwrap_or(&[]);
 
     match target_type {
         "customers" => {
             result.customer_groups = aggregate_customers_preview(
                 &header_report.field_names,
-                &data_rows,
+                data_rows,
             );
             // 类别新值
             let cats: Vec<String> = result
@@ -170,7 +177,7 @@ pub fn parse_legacy_file(
         }
         "products" => {
             result.product_groups =
-                aggregate_products_preview(&header_report.field_names, &data_rows);
+                aggregate_products_preview(&header_report.field_names, data_rows);
             let cats: Vec<String> = result
                 .product_groups
                 .iter()
@@ -185,7 +192,7 @@ pub fn parse_legacy_file(
             // 供应商不聚合（每行 = 1 个供应商），但仍提取类别
             let cats: Vec<String> = extract_column_values(
                 &header_report.field_names,
-                &data_rows,
+                data_rows,
                 "供应商类别",
             );
             result
@@ -371,8 +378,20 @@ pub fn aggregate_products_preview(
                 .cloned();
         }
 
+        // 变体 SKU 唯一化（P0-S5 修复）：
+        // 老系统导出中同一商品编号（SPU）下多行 = 多个变体，但它们共用同一商品编号。
+        // product_sku.sku 有 UNIQUE 约束，若直接写商品编号，同组第 2 个变体插入即冲突
+        // （真实案例：商品导出 V1XLJ1001 有 163 个变体 → 导入失败）。
+        // 规则：组内第 1 个变体保留商品编号，后续变体追加序号 `-{seq}`（seq 从 2 起），
+        // 保证 SKU 全局唯一且可追溯回 SPU。
+        let variant_seq = entry.variants.len() + 1;
+        let variant_sku = if variant_seq == 1 {
+            sku.clone()
+        } else {
+            format!("{}-{}", sku, variant_seq)
+        };
         entry.variants.push(ProductSkuRecord {
-            sku: sku.clone(),
+            sku: variant_sku,
             variant_name,
             spec,
         });

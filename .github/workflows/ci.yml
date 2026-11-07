@@ -65,6 +65,29 @@ jobs:
       - run: cargo check --tests
         working-directory: src-tauri
 
+  # ========================================================
+  # 老系统三文件导入：建批次、落库、重复导入幂等
+  # 样例在仓库根目录 test-old-date/，测试是 src-tauri/tests/e2e_import.rs
+  # ========================================================
+  rust-import-e2e:
+    name: Rust Import E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: 安装 Tauri 系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+      - run: mkdir -p dist && echo '<!DOCTYPE html><html><body></body></html>' > dist/index.html
+      - name: 三个老系统导出文件导入与重复导入
+        working-directory: src-tauri
+        run: cargo test --test e2e_import -- --nocapture --test-threads=1
+
   # ==================== Mobile (Expo + RN) ====================
   mobile-lint:
     name: Mobile Type Check

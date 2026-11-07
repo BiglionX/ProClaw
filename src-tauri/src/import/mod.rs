@@ -25,7 +25,8 @@ pub mod types;
 // 本身作为 public API 供 invoke_handler 与前端调用，未在本 crate 内部使用。
 #[allow(unused_imports)]
 pub use commands::{
-    import_cancel_batch, import_create_batch, import_execute_batch, import_execute_legacy,
+    import_cancel_batch, import_create_batch, import_create_batch_inner, import_execute_batch,
+    import_execute_legacy, import_execute_legacy_inner,
     import_get_batch, import_get_batch_errors, import_get_templates, import_list_batches,
     import_list_mapping_templates, import_parse_file, import_pause_batch,
     import_preview_legacy, import_retry_batch, import_rollback_batch, import_save_mapping_template,

@@ -74,6 +74,9 @@ test_output*.txt
 final_check*.txt
 check_err*.txt
 
+# 真实老系统导出，含个人联系信息。CI 用 fixtures/legacy-import/
+test-old-date/
+
 # Database
 *.db
 *.db-shm
@@ -110,3 +113,5 @@ test-list.txt
 
 # Playwright browsers
 playwright-browsers/
+src-tauri/src/import/legacy_import_e2e.rs
+src-tauri/src/import/parser_legacy_smoke.rs
