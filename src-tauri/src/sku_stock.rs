@@ -109,7 +109,7 @@ pub fn apply_default_sku_delta(
 
 #[cfg(test)]
 mod tests {
-    use super::deduct_default_sku;
+    use super::{apply_default_sku_delta, deduct_default_sku, SkuStockError};
     use rusqlite::{params, Connection};
 
     fn schema_with_view(conn: &Connection) {
@@ -288,5 +288,125 @@ mod tests {
             )
             .unwrap();
         assert_eq!(products_stock, 12, "products 只保留外键锚点，不再跟着扣");
+    }
+
+    fn sku_stock_of(conn: &Connection, sku_id: &str) -> i32 {
+        conn.query_row(
+            "SELECT current_stock FROM product_skus WHERE id = ?1",
+            params![sku_id],
+            |row| row.get(0),
+        )
+        .unwrap()
+    }
+
+    fn set_created_at(conn: &Connection, sku_id: &str, created_at: &str) {
+        conn.execute(
+            "UPDATE product_skus SET created_at = ?1 WHERE id = ?2",
+            params![created_at, sku_id],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn default_sku_is_preferred_over_earlier_enabled_sku() {
+        let conn = Connection::open_in_memory().unwrap();
+        schema_with_view(&conn);
+        insert_test_product(&conn, "p-pref", "SPU-PREF", "默认优先");
+        insert_test_sku(&conn, "sku-earlier", "p-pref", "SKU-EARLY", "{}", 8, false);
+        insert_test_sku(&conn, "sku-default", "p-pref", "SKU-DEF", "{}", 10, true);
+        set_created_at(&conn, "sku-earlier", "2020-01-01 00:00:00");
+        set_created_at(&conn, "sku-default", "2024-06-01 00:00:00");
+
+        deduct_default_sku(&conn, "p-pref", 3).expect("应扣默认 SKU");
+
+        assert_eq!(sku_stock_of(&conn, "sku-default"), 7);
+        assert_eq!(sku_stock_of(&conn, "sku-earlier"), 8, "只动默认行");
+    }
+
+    #[test]
+    fn falls_back_to_earliest_enabled_sku_when_none_is_default() {
+        // 回退到最早创建的启用 SKU 是第 2 批的设计语义，不是 bug。
+        let conn = Connection::open_in_memory().unwrap();
+        schema_with_view(&conn);
+        insert_test_product(&conn, "p-fb", "SPU-FB", "回退");
+        insert_test_sku(&conn, "sku-only", "p-fb", "SKU-ONLY", "{}", 8, false);
+
+        deduct_default_sku(&conn, "p-fb", 1).expect("无默认时回退到这条启用 SKU");
+
+        assert_eq!(sku_stock_of(&conn, "sku-only"), 7);
+    }
+
+    #[test]
+    fn no_enabled_sku_returns_no_sku_and_leaves_rows_unchanged() {
+        let conn = Connection::open_in_memory().unwrap();
+        schema_with_view(&conn);
+        insert_test_product(&conn, "p-none", "SPU-NONE", "零启用");
+        conn.execute(
+            "INSERT INTO product_skus (
+                id, spu_id, sku_code, specifications, current_stock, is_default, is_active
+             ) VALUES ('sku-off', 'p-none', 'SKU-OFF', '{}', 10, 1, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO product_skus (
+                id, spu_id, sku_code, specifications, current_stock, is_default, is_active, deleted_at
+             ) VALUES ('sku-del', 'p-none', 'SKU-DEL', '{}', 6, 0, 1, '2020-01-01')",
+            [],
+        )
+        .unwrap();
+
+        let err = deduct_default_sku(&conn, "p-none", 1).expect_err("没有启用 SKU 时应失败");
+        assert_eq!(err.to_string(), "没有启用的默认 SKU");
+        assert!(matches!(err, SkuStockError::NoSku));
+        assert_eq!(sku_stock_of(&conn, "sku-off"), 10);
+        assert_eq!(sku_stock_of(&conn, "sku-del"), 6);
+    }
+
+    #[test]
+    fn deduct_more_than_stock_errors_and_leaves_rows_unchanged() {
+        let conn = Connection::open_in_memory().unwrap();
+        schema_with_view(&conn);
+        insert_test_product(&conn, "p-low", "SPU-LOW", "库存不足");
+        insert_test_sku(&conn, "sku-default", "p-low", "SKU-DEF", "{}", 2, true);
+        insert_test_sku(&conn, "sku-other", "p-low", "SKU-OTHER", "{}", 9, false);
+
+        let err = deduct_default_sku(&conn, "p-low", 5).expect_err("库存 2 扣 5 应失败");
+        match err {
+            SkuStockError::Insufficient { current, required } => {
+                assert_eq!(current, 2);
+                assert_eq!(required, 5);
+            }
+            other => panic!("expected Insufficient, got {other}"),
+        }
+        assert_eq!(sku_stock_of(&conn, "sku-default"), 2, "不足时不得部分扣减");
+        assert_eq!(
+            sku_stock_of(&conn, "sku-other"),
+            9,
+            "不足时不得改扣其他 SKU"
+        );
+    }
+
+    #[test]
+    fn apply_signed_delta_updates_current_stock() {
+        let conn = Connection::open_in_memory().unwrap();
+        schema_with_view(&conn);
+        insert_test_product(&conn, "p-delta", "SPU-DELTA", "带符号增量");
+        insert_test_sku(&conn, "sku-delta", "p-delta", "SKU-DELTA", "{}", 10, true);
+
+        apply_default_sku_delta(&conn, "p-delta", 6).expect("入库 +6");
+        assert_eq!(sku_stock_of(&conn, "sku-delta"), 16);
+
+        apply_default_sku_delta(&conn, "p-delta", -4).expect("出库 -4");
+        assert_eq!(sku_stock_of(&conn, "sku-delta"), 12);
+
+        let view_stock: i64 = conn
+            .query_row(
+                "SELECT total_stock FROM v_spu_inventory WHERE id = ?1",
+                params!["p-delta"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(view_stock, 12);
     }
 }
