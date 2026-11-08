@@ -431,3 +431,7 @@ pub fn update_purchase_return(
 
     Ok(serde_json::json!({"id": return_id, "message": "Purchase return updated"}))
 }
+
+#[cfg(test)]
+#[path = "purchase_stock_tests.rs"]
+mod purchase_stock_tests;
