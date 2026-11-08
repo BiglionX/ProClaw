@@ -1775,4 +1775,268 @@ mod tests {
         std::fs::remove_file(&db_path).ok();
         std::fs::remove_dir(&temp_dir).ok();
     }
+
+    /// 迁移前的销采存表：有数量/单价列，但没有 P0-06 的 CHECK。
+    fn legacy_p0_06_schema(conn: &Connection) {
+        conn.execute_batch(
+            "CREATE TABLE products (
+                id TEXT PRIMARY KEY,
+                sku TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                current_stock INTEGER
+            );
+            CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+            CREATE TABLE suppliers (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+            CREATE TABLE sales_orders (
+                id TEXT PRIMARY KEY,
+                so_number TEXT UNIQUE NOT NULL,
+                customer_id TEXT NOT NULL,
+                order_date TEXT NOT NULL
+            );
+            CREATE TABLE purchase_orders (
+                id TEXT PRIMARY KEY,
+                po_number TEXT UNIQUE NOT NULL,
+                supplier_id TEXT NOT NULL,
+                order_date TEXT NOT NULL
+            );
+            CREATE TABLE sales_order_items (
+                id TEXT PRIMARY KEY,
+                sales_order_id TEXT NOT NULL,
+                product_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                total_price REAL NOT NULL,
+                shipped_quantity INTEGER,
+                notes TEXT,
+                created_at TEXT,
+                updated_at TEXT
+            );
+            CREATE TABLE purchase_order_items (
+                id TEXT PRIMARY KEY,
+                purchase_order_id TEXT NOT NULL,
+                product_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                total_price REAL NOT NULL,
+                received_quantity INTEGER,
+                notes TEXT,
+                created_at TEXT,
+                updated_at TEXT
+            );
+            CREATE TABLE inventory_transactions (
+                id TEXT PRIMARY KEY,
+                product_id TEXT NOT NULL,
+                transaction_type TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                reference_no TEXT,
+                reason TEXT,
+                performed_by TEXT,
+                notes TEXT,
+                created_at TEXT,
+                sync_status TEXT,
+                last_synced_at TEXT
+            );",
+        )
+        .unwrap();
+    }
+
+    fn item_qty_price(conn: &Connection, table: &str, id: &str) -> (i32, f64) {
+        conn.query_row(
+            &format!("SELECT quantity, unit_price FROM {table} WHERE id = ?1"),
+            params![id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap()
+    }
+
+    fn assert_check_rejected(result: Result<usize, rusqlite::Error>) {
+        let err = result.expect_err("负数应被约束拒绝");
+        let msg = err.to_string();
+        assert!(
+            msg.to_ascii_lowercase().contains("check"),
+            "expected CHECK failure, got {msg}"
+        );
+    }
+
+    fn assert_p0_06_constraints(conn: &Connection) {
+        let sales_sql: String = conn
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='sales_order_items'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(sales_sql.contains("quantity > 0"), "{sales_sql}");
+        assert!(sales_sql.contains("unit_price >= 0"), "{sales_sql}");
+
+        let purchase_sql: String = conn
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='purchase_order_items'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(purchase_sql.contains("quantity > 0"), "{purchase_sql}");
+        assert!(purchase_sql.contains("unit_price >= 0"), "{purchase_sql}");
+
+        assert_check_rejected(conn.execute(
+            "INSERT INTO sales_order_items (
+                id, sales_order_id, product_id, quantity, unit_price, total_price
+             ) VALUES ('soi-neg-qty', 'so1', 'p-ok', -1, 1.0, -1.0)",
+            [],
+        ));
+        assert_check_rejected(conn.execute(
+            "INSERT INTO sales_order_items (
+                id, sales_order_id, product_id, quantity, unit_price, total_price
+             ) VALUES ('soi-neg-price', 'so1', 'p-ok', 1, -0.5, -0.5)",
+            [],
+        ));
+        assert_check_rejected(conn.execute(
+            "INSERT INTO purchase_order_items (
+                id, purchase_order_id, product_id, quantity, unit_price, total_price
+             ) VALUES ('poi-neg-qty', 'po1', 'p-ok', -3, 1.0, -3.0)",
+            [],
+        ));
+        assert_check_rejected(conn.execute(
+            "INSERT INTO purchase_order_items (
+                id, purchase_order_id, product_id, quantity, unit_price, total_price
+             ) VALUES ('poi-neg-price', 'po1', 'p-ok', 1, -4.0, -4.0)",
+            [],
+        ));
+    }
+
+    /// 062 的实际清洗：非正数量改为 1，负单价改为 0，库存流水删掉 0，库存低于下限则钳制。
+    fn assert_p0_06_legacy_corrections(conn: &Connection) {
+        assert_eq!(
+            item_qty_price(conn, "sales_order_items", "soi-bad"),
+            (1, 0.0)
+        );
+        assert_eq!(
+            item_qty_price(conn, "sales_order_items", "soi-zero"),
+            (1, 4.0)
+        );
+        assert_eq!(
+            item_qty_price(conn, "sales_order_items", "soi-ok"),
+            (3, 9.5)
+        );
+        assert_eq!(
+            item_qty_price(conn, "purchase_order_items", "poi-bad"),
+            (1, 0.0)
+        );
+        assert_eq!(
+            item_qty_price(conn, "purchase_order_items", "poi-ok"),
+            (4, 2.0)
+        );
+
+        let zero_rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM inventory_transactions WHERE id = 'inv-zero'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(zero_rows, 0, "quantity = 0 的流水会被删掉");
+        let kept_neg: i32 = conn
+            .query_row(
+                "SELECT quantity FROM inventory_transactions WHERE id = 'inv-neg'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept_neg, -4, "非零负库存流水保留，CHECK 只禁止 0");
+        let kept_ok: i32 = conn
+            .query_row(
+                "SELECT quantity FROM inventory_transactions WHERE id = 'inv-ok'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept_ok, 2);
+
+        let bad_stock: i32 = conn
+            .query_row(
+                "SELECT current_stock FROM products WHERE id = 'p-bad'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(bad_stock, -999999);
+        let ok_stock: i32 = conn
+            .query_row(
+                "SELECT current_stock FROM products WHERE id = 'p-ok'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(ok_stock, 12);
+    }
+
+    #[test]
+    fn apply_p0_06_corrects_legacy_rows_enforces_checks_and_is_idempotent() {
+        let conn = Connection::open_in_memory().unwrap();
+        legacy_p0_06_schema(&conn);
+        conn.execute_batch(
+            "INSERT INTO customers (id, name) VALUES ('c1', '客户');
+             INSERT INTO suppliers (id, name) VALUES ('s1', '供应商');
+             INSERT INTO products (id, sku, name, current_stock) VALUES
+                ('p-bad', 'SKU-BAD', '超低下限', -1000005),
+                ('p-ok', 'SKU-OK', '正常', 12);
+             INSERT INTO sales_orders (id, so_number, customer_id, order_date)
+                VALUES ('so1', 'SO-1', 'c1', '2024-01-01');
+             INSERT INTO purchase_orders (id, po_number, supplier_id, order_date)
+                VALUES ('po1', 'PO-1', 's1', '2024-01-01');
+             INSERT INTO sales_order_items (
+                id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity
+             ) VALUES
+                ('soi-bad', 'so1', 'p-ok', -5, -2.5, 12.5, 0),
+                ('soi-zero', 'so1', 'p-ok', 0, 4.0, 0, 0),
+                ('soi-ok', 'so1', 'p-ok', 3, 9.5, 28.5, 0);
+             INSERT INTO purchase_order_items (
+                id, purchase_order_id, product_id, quantity, unit_price, total_price, received_quantity
+             ) VALUES
+                ('poi-bad', 'po1', 'p-ok', 0, -8.0, 0, 0),
+                ('poi-ok', 'po1', 'p-ok', 4, 2.0, 8, 0);
+             INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity) VALUES
+                ('inv-zero', 'p-ok', 'inbound', 0),
+                ('inv-neg', 'p-ok', 'adjustment', -4),
+                ('inv-ok', 'p-ok', 'inbound', 2);",
+        )
+        .unwrap();
+
+        Database::apply_p0_06_check_constraints(&conn).expect("first apply_p0_06");
+        assert_p0_06_legacy_corrections(&conn);
+        assert_p0_06_constraints(&conn);
+        conn.execute(
+            "INSERT INTO sales_order_items (
+                id, sales_order_id, product_id, quantity, unit_price, total_price
+             ) VALUES ('soi-new-ok', 'so1', 'p-ok', 2, 3.5, 7.0)",
+            [],
+        )
+        .expect("正数明细在迁移后仍可写入");
+
+        let patch_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM schema_patches WHERE id = '062_quantity_price_checks'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(patch_count, 1);
+
+        Database::apply_p0_06_check_constraints(&conn).expect("second apply_p0_06");
+        assert_p0_06_legacy_corrections(&conn);
+        assert_eq!(
+            item_qty_price(&conn, "sales_order_items", "soi-new-ok"),
+            (2, 3.5)
+        );
+        let patch_count_again: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM schema_patches WHERE id = '062_quantity_price_checks'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(patch_count_again, 1);
+        assert_p0_06_constraints(&conn);
+    }
 }
