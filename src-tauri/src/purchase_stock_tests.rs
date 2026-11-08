@@ -112,9 +112,21 @@ fn insert_purchase_order(conn: &Connection, order_id: &str, product_id: &str, qt
 
 fn assert_only_buy_default_changed(conn: &Connection, buy_default: i32) {
     assert_eq!(sku_stock(conn, "sku-p-buy-default"), buy_default);
-    assert_eq!(sku_stock(conn, "sku-p-buy-other"), 4, "同商品非默认 SKU 不应变化");
-    assert_eq!(sku_stock(conn, "sku-p-other-default"), 8, "其他商品默认 SKU 不应变化");
-    assert_eq!(sku_stock(conn, "sku-p-other-other"), 2, "其他商品非默认 SKU 不应变化");
+    assert_eq!(
+        sku_stock(conn, "sku-p-buy-other"),
+        4,
+        "同商品非默认 SKU 不应变化"
+    );
+    assert_eq!(
+        sku_stock(conn, "sku-p-other-default"),
+        8,
+        "其他商品默认 SKU 不应变化"
+    );
+    assert_eq!(
+        sku_stock(conn, "sku-p-other-other"),
+        2,
+        "其他商品非默认 SKU 不应变化"
+    );
     assert_eq!(
         product_stock(conn, "p-buy"),
         1,
@@ -195,9 +207,9 @@ fn http_app_state(db: Arc<Mutex<Database>>) -> crate::api::AppState {
         db,
         cipher: Arc::new(crate::utils::crypto::Aes256GcmCipher::new(&key).expect("cipher")),
         ws_manager: Arc::new(crate::api::websocket::WebSocketManager::new()),
-        cloud_backup: Arc::new(crate::services::cloud_backup_service::CloudBackupService::new(
-            backup, &key,
-        )),
+        cloud_backup: Arc::new(
+            crate::services::cloud_backup_service::CloudBackupService::new(backup, &key),
+        ),
         jwt_secret: Arc::new(vec![1u8; 32]),
     }
 }

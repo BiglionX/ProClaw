@@ -119,9 +119,17 @@ fn submit_sets_shipped_quantity_and_deducts_default_sku() {
     assert_eq!(qty, 5);
     assert_eq!(shipped, qty);
     assert_eq!(sku_stock(conn, "sku-p-sell-default"), 7);
-    assert_eq!(sku_stock(conn, "sku-p-sell-other"), 100, "同商品非默认 SKU 不应扣减");
+    assert_eq!(
+        sku_stock(conn, "sku-p-sell-other"),
+        100,
+        "同商品非默认 SKU 不应扣减"
+    );
     assert_eq!(sku_stock(conn, "sku-p-other-default"), 8);
-    assert_eq!(product_stock(conn, "p-sell"), 1, "products.current_stock 不是出库写入目标");
+    assert_eq!(
+        product_stock(conn, "p-sell"),
+        1,
+        "products.current_stock 不是出库写入目标"
+    );
     let status: String = conn
         .query_row(
             "SELECT status FROM sales_orders WHERE id = 'so-out'",
