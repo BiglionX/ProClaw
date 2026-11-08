@@ -264,28 +264,21 @@ pub fn confirm_purchase_return(
 
     // 库存扣减（退货 = 退回给供应商，库存减少）
     for (pid, qty) in &items {
-        let current: i32 = tx
-            .query_row(
-                "SELECT current_stock FROM products WHERE id = ?1 AND deleted_at IS NULL",
-                params![pid],
-                |row| row.get(0),
-            )
-            .map_err(|_| format!("Product {} not found", pid))?;
-
-        if current < *qty {
+        if let Err(e) = crate::sku_stock::deduct_default_sku(&tx, pid, *qty) {
             if let Err(rb) = tx.rollback() {
                 eprintln!("[purchase_return] rollback failed: {}", rb);
             }
-            return Err(format!(
-                "Insufficient stock for product {}. Current: {}, To return: {}",
-                pid, current, qty
-            ));
+            return Err(match e {
+                crate::sku_stock::SkuStockError::Insufficient { current, required } => format!(
+                    "Insufficient stock for product {}. Current: {}, To return: {}",
+                    pid, current, required
+                ),
+                crate::sku_stock::SkuStockError::NoSku => {
+                    format!("Product {} 没有启用的默认 SKU", pid)
+                }
+                other => other.to_string(),
+            });
         }
-
-        tx.execute(
-            "UPDATE products SET current_stock = current_stock - ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-            params![qty, pid],
-        ).map_err(|e| e.to_string())?;
 
         let txn_id = uuid::Uuid::new_v4().to_string();
         tx.execute(

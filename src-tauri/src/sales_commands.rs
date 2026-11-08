@@ -153,11 +153,14 @@ pub fn create_sales_order(
     ).map_err(|e| e.to_string())?;
 
     if let Some(items) = order.get("items").and_then(|v| v.as_array()) {
-        for item in items {
+        for (idx, item) in items.iter().enumerate() {
             let item_id = Uuid::new_v4().to_string();
             let product_id = item["product_id"].as_str().ok_or("Product ID required")?;
             let quantity = item["quantity"].as_i64().ok_or("Quantity required")? as i32;
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
+            crate::api::quantity_price::validate_order_item_qty_price_str(
+                idx, quantity, unit_price,
+            )?;
             let total_price = quantity as f64 * unit_price;
 
             tx.execute(
@@ -352,10 +355,11 @@ pub fn update_sales_order_cmd(
     .map_err(|e| e.to_string())?;
 
     if let Some(items) = order.get("items").and_then(|v| v.as_array()) {
-        for item in items {
+        for (idx, item) in items.iter().enumerate() {
             let item_id = Uuid::new_v4().to_string();
             let q = item["quantity"].as_i64().unwrap_or(0) as i32;
             let up = item["unit_price"].as_f64().unwrap_or(0.0);
+            crate::api::quantity_price::validate_order_item_qty_price_str(idx, q, up)?;
             tx.execute(
                 "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity, notes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
                 params![item_id, order_id, item["product_id"].as_str().unwrap_or(""), q, up, q as f64 * up, item.get("notes").and_then(|v| v.as_str())],
@@ -443,13 +447,20 @@ pub fn submit_sales_order_on_conn(
     };
 
     for (pid, qty) in &items {
-        let (current, allow_negative): (i32, bool) = tx
+        let allow_negative: bool = tx
             .query_row(
-                "SELECT current_stock, COALESCE(allow_negative_stock, 0) FROM products WHERE id = ?1 AND deleted_at IS NULL",
+                "SELECT COALESCE(allow_negative_stock, 0) FROM products WHERE id = ?1 AND deleted_at IS NULL",
                 params![pid],
-                |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)? != 0)),
+                |row| Ok(row.get::<_, i64>(0)? != 0),
             )
             .map_err(|_| format!("Product {} not found", pid))?;
+
+        let current = crate::sku_stock::default_sku_stock(&tx, pid).map_err(|e| match e {
+            crate::sku_stock::SkuStockError::NoSku => {
+                format!("Product {} 没有启用的默认 SKU", pid)
+            }
+            other => other.to_string(),
+        })?;
 
         if current < *qty && !allow_negative {
             if let Err(rb) = tx.rollback() {
@@ -461,11 +472,26 @@ pub fn submit_sales_order_on_conn(
             ));
         }
 
-        // PRD v12.0：软约束通过（负库存销售），在原负库存时负负库存→0
-        // 如果销售后库存变为负，记录 negative_since（会在库存交易后续写入）
+        // PRD v12.0：软约束通过（负库存销售）。库存数字改在默认 SKU 上。
         let is_soft_constraint = current < *qty;
 
-        tx.execute("UPDATE products SET current_stock = current_stock - ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", params![qty, pid]).map_err(|e| e.to_string())?;
+        let deducted = if allow_negative {
+            crate::sku_stock::apply_default_sku_delta(&tx, pid, -qty)
+        } else {
+            crate::sku_stock::deduct_default_sku(&tx, pid, *qty)
+        };
+        if let Err(e) = deducted {
+            if let Err(rb) = tx.rollback() {
+                eprintln!("[sales] rollback failed: {}", rb);
+            }
+            return Err(match e {
+                crate::sku_stock::SkuStockError::Insufficient { current, required } => format!(
+                    "Insufficient stock for product {}. Current: {}, Required: {}. 可在商品设置中开启“允许负库存销售”以启用软约束（PRD v12.0）",
+                    pid, current, required
+                ),
+                other => other.to_string(),
+            });
+        }
         let txn_id = Uuid::new_v4().to_string();
         tx.execute("INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, reference_no, reason) VALUES (?1, ?2, 'outbound', ?3, ?4, 'sales_order')",
             params![txn_id, pid, qty, order_id]).map_err(|e| e.to_string())?;

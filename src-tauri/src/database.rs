@@ -279,6 +279,14 @@ impl Database {
             eprintln!("✓ [DB Migration] 061_legacy_import_extras 老系统迁移扩展表已加载");
         }
 
+        // P0-06：销采存 quantity/unit_price CHECK + 库存条件扣减兜底
+        if let Err(e) = Self::apply_p0_06_check_constraints(&self.conn) {
+            eprintln!("[DB Migration WARNING] 062_quantity_price_checks: {}", e);
+            migration_errors.push(format!("062: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] 062_quantity_price_checks 正数/非零 CHECK 已加载");
+        }
+
         // 运行迁移：给缺 deleted_at 列的表补充软删除列（v1.0.0+tray 补丁）
         // 原因：销售/采购/联系人代码使用 WHERE deleted_at IS NULL，但 src/db/schema.sql
         // 原始定义里没建这个列。SQLite 不支持 ADD COLUMN IF NOT EXISTS，
@@ -1552,6 +1560,71 @@ impl Database {
     #[allow(dead_code)]
     pub fn close(self) -> DbResult<()> {
         // Connection 会在 drop 时自动关闭
+        Ok(())
+    }
+
+    /// P0-06：销采存 CHECK 约束（可重入，schema_patches 门禁）
+    fn apply_p0_06_check_constraints(conn: &Connection) -> Result<(), String> {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_patches (
+                id TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );",
+        )
+        .map_err(|e| e.to_string())?;
+
+        let applied: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM schema_patches WHERE id = '062_quantity_price_checks')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+        if applied {
+            return Ok(());
+        }
+
+        // 若表 SQL 已含目标 CHECK（例如新 schema 已带约束），仍打补丁标记，避免重复重建
+        let soi_sql: String = conn
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='sales_order_items'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or_default();
+        let already_checked =
+            soi_sql.contains("quantity > 0") && soi_sql.contains("unit_price >= 0");
+
+        if !already_checked {
+            let sql =
+                include_str!("../../database/migrations/062_quantity_price_check_constraints.sql");
+            conn.execute_batch(sql).map_err(|e| e.to_string())?;
+        } else {
+            // 仍确保 products 库存下限触发器存在
+            conn.execute_batch(
+                "CREATE TRIGGER IF NOT EXISTS trg_chk_products_current_stock_ins
+                 BEFORE INSERT ON products
+                 FOR EACH ROW
+                 WHEN NEW.current_stock IS NOT NULL AND NEW.current_stock < -999999
+                 BEGIN
+                     SELECT RAISE(ABORT, 'CHECK failed: products.current_stock >= -999999');
+                 END;
+                 CREATE TRIGGER IF NOT EXISTS trg_chk_products_current_stock_upd
+                 BEFORE UPDATE OF current_stock ON products
+                 FOR EACH ROW
+                 WHEN NEW.current_stock IS NOT NULL AND NEW.current_stock < -999999
+                 BEGIN
+                     SELECT RAISE(ABORT, 'CHECK failed: products.current_stock >= -999999');
+                 END;",
+            )
+            .map_err(|e| e.to_string())?;
+        }
+
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_patches (id) VALUES ('062_quantity_price_checks')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 }

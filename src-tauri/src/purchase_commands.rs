@@ -160,7 +160,7 @@ pub fn create_purchase_order(
 
     // 插入采购订单明细
     if let Some(items) = order.get("items").and_then(|v| v.as_array()) {
-        for item in items {
+        for (idx, item) in items.iter().enumerate() {
             let item_id = Uuid::new_v4().to_string();
             let product_id = item["product_id"]
                 .as_str()
@@ -171,6 +171,9 @@ pub fn create_purchase_order(
             let unit_price = item["unit_price"]
                 .as_f64()
                 .ok_or("Unit price required in items")?;
+            crate::api::quantity_price::validate_order_item_qty_price_str(
+                idx, quantity, unit_price,
+            )?;
             let total_price = quantity as f64 * unit_price;
 
             tx.execute(
@@ -399,10 +402,13 @@ pub fn update_purchase_order_cmd(
     .map_err(|e| e.to_string())?;
 
     if let Some(items) = order.get("items").and_then(|v| v.as_array()) {
-        for item in items {
+        for (idx, item) in items.iter().enumerate() {
             let item_id = Uuid::new_v4().to_string();
             let quantity = item["quantity"].as_i64().unwrap_or(0) as i32;
             let unit_price = item["unit_price"].as_f64().unwrap_or(0.0);
+            crate::api::quantity_price::validate_order_item_qty_price_str(
+                idx, quantity, unit_price,
+            )?;
             tx.execute(
                 "INSERT INTO purchase_order_items (id, purchase_order_id, product_id, quantity, unit_price, total_price, received_quantity, notes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
                 params![item_id, order_id, item["product_id"].as_str().unwrap_or(""), quantity, unit_price, quantity as f64 * unit_price, item.get("notes").and_then(|v| v.as_str())],
@@ -485,15 +491,12 @@ pub fn receive_purchase_order_cmd(
 
     for (pid, qty) in &items {
         // PRD v12.0：进货前检查是否存在负库存，自动冲销
-        let pre_stock: i32 = tx
-            .query_row(
-                "SELECT current_stock FROM products WHERE id = ?1 AND deleted_at IS NULL",
-                params![pid],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
+        let pre_stock = crate::sku_stock::default_sku_stock(&tx, pid).map_err(|e| match e {
+            crate::sku_stock::SkuStockError::NoSku => format!("Product {} 没有启用的默认 SKU", pid),
+            other => other.to_string(),
+        })?;
 
-        tx.execute("UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2", params![qty, pid]).map_err(|e| e.to_string())?;
+        crate::sku_stock::apply_default_sku_delta(&tx, pid, *qty).map_err(|e| e.to_string())?;
         let txn_id = Uuid::new_v4().to_string();
         tx.execute("INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, reference_no, reason) VALUES (?1, ?2, 'inbound', ?3, ?4, 'purchase_order')",
             params![txn_id, pid, qty, order_id]).map_err(|e| e.to_string())?;

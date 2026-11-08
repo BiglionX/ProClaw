@@ -307,6 +307,20 @@ pub async fn create_inventory_transaction(
         );
     }
 
+    if payload.transaction_type == "adjustment" {
+        if let Err(e) = super::quantity_price::validate_inventory_quantity(payload.quantity) {
+            return e;
+        }
+    } else if payload.quantity <= 0 {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(serde_json::json!({
+                "error": format!("quantity must be a positive integer (> 0), got {}", payload.quantity),
+                "field": "quantity",
+            })),
+        );
+    }
+
     let product_exists: bool = conn
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 AND deleted_at IS NULL)",
@@ -320,25 +334,6 @@ pub async fn create_inventory_transaction(
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Product not found"})),
         );
-    }
-
-    if payload.transaction_type == "outbound" {
-        let current_stock: i32 = conn
-            .query_row(
-                "SELECT current_stock FROM products WHERE id = ?1",
-                params![payload.product_id],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-
-        if current_stock < payload.quantity {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({
-                    "error": format!("Insufficient stock. Current: {}, Requested: {}", current_stock, payload.quantity)
-                })),
-            );
-        }
     }
 
     let id = Uuid::new_v4().to_string();
@@ -380,13 +375,38 @@ pub async fn create_inventory_transaction(
         );
     }
 
-    if let Err(e) = tx.execute(
-        "UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-        params![stock_change, payload.product_id],
-    ) {
-        if let Err(rb) = tx.rollback() { eprintln!("[inventory] rollback failed: {}", rb); }
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update stock: {}", e)})));
+    if payload.transaction_type == "outbound" {
+        if let Err(e) =
+            crate::sku_stock::deduct_default_sku(&tx, &payload.product_id, payload.quantity)
+        {
+            if let Err(rb) = tx.rollback() {
+                eprintln!("[inventory] rollback failed: {}", rb);
+            }
+            return match e {
+                crate::sku_stock::SkuStockError::Insufficient { current, required } => (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": format!("Insufficient stock. Current: {}, Requested: {}", current, required)
+                    })),
+                ),
+                other => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        serde_json::json!({"error": format!("Failed to update stock: {}", other)}),
+                    ),
+                ),
+            };
+        }
+    } else if let Err(e) =
+        crate::sku_stock::apply_default_sku_delta(&tx, &payload.product_id, stock_change)
+    {
+        if let Err(rb) = tx.rollback() {
+            eprintln!("[inventory] rollback failed: {}", rb);
+        }
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("Failed to update stock: {}", e)})),
+        );
     }
 
     if let Err(e) = tx.commit() {

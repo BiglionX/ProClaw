@@ -699,20 +699,28 @@ pub async fn submit_order_draft(
     // ---- 预检查: 验证所有商品存在且库存充足 ----
     for item in items.iter() {
         let product_info = tx.query_row(
-            "SELECT id, name, current_stock FROM products
+            "SELECT id, name FROM products
              WHERE (name = ?1 OR sku = ?1) AND deleted_at IS NULL LIMIT 1",
             params![item.product_name],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i32>(2)?,
-                ))
-            },
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         );
 
         match product_info {
-            Ok((_, _, stock)) => {
+            Ok((product_id, _)) => {
+                let stock = match crate::sku_stock::default_sku_stock(&tx, &product_id) {
+                    Ok(stock) => stock,
+                    Err(e) => {
+                        if let Err(rb) = tx.rollback() {
+                            eprintln!("[ai] rollback failed: {}", rb);
+                        }
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(json!({
+                                "error": format!("库存不足: 商品 '{}' {}", item.product_name, e)
+                            })),
+                        );
+                    }
+                };
                 if (stock as f64) < item.quantity {
                     if let Err(rb) = tx.rollback() {
                         eprintln!("[ai] rollback failed: {}", rb);
@@ -756,16 +764,10 @@ pub async fn submit_order_draft(
     for item in items.iter() {
         // 获取产品信息
         let product_info = match tx.query_row(
-            "SELECT id, name, current_stock FROM products
+            "SELECT id, name FROM products
              WHERE (name = ?1 OR sku = ?1) AND deleted_at IS NULL LIMIT 1",
             params![item.product_name],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i32>(2)?,
-                ))
-            },
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         ) {
             Ok(p) => p,
             Err(e) => {
@@ -779,7 +781,19 @@ pub async fn submit_order_draft(
             }
         };
 
-        let (product_id, product_name, before_stock) = product_info;
+        let (product_id, product_name) = product_info;
+        let before_stock = match crate::sku_stock::default_sku_stock(&tx, &product_id) {
+            Ok(stock) => stock,
+            Err(e) => {
+                if let Err(rb) = tx.rollback() {
+                    eprintln!("[ai] rollback failed: {}", rb);
+                }
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("没有可扣减的 SKU: {}", e)})),
+                );
+            }
+        };
 
         // 插入销售订单明细
         let so_item_id = Uuid::new_v4().to_string();
@@ -795,11 +809,9 @@ pub async fn submit_order_draft(
             );
         }
 
-        // 扣减库存
-        if let Err(e) = tx.execute(
-            "UPDATE products SET current_stock = current_stock - ?1, updated_at = ?2 WHERE id = ?3",
-            params![item.quantity as i32, now, product_id],
-        ) {
+        // 扣减默认 SKU 库存
+        if let Err(e) = crate::sku_stock::deduct_default_sku(&tx, &product_id, item.quantity as i32)
+        {
             if let Err(rb) = tx.rollback() {
                 eprintln!("[ai] rollback failed: {}", rb);
             }

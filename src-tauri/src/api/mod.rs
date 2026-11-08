@@ -56,6 +56,7 @@ pub mod livekit;
 pub mod messages;
 pub mod products;
 pub mod purchase_orders;
+pub mod quantity_price;
 pub mod relay;
 pub mod sales_orders;
 pub mod store;

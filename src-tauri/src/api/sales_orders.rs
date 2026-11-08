@@ -7,9 +7,34 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use rusqlite::params;
+use rusqlite::{params, Transaction};
 use serde::Deserialize;
 use uuid::Uuid;
+
+/// 条件扣减库存错误（P0-06）
+#[derive(Debug)]
+pub(crate) enum DeductStockError {
+    NotFound,
+    Insufficient { current: i32, required: i32 },
+    Db(String),
+}
+
+/// P0-06：条件扣减默认 SKU，affected_rows=0 视为库存不足。
+/// `product_id` 仍是 `products.id`（等于 SPU id），不改明细外键。
+pub(crate) fn try_deduct_product_stock(
+    tx: &Transaction<'_>,
+    product_id: &str,
+    quantity: i32,
+) -> Result<(), DeductStockError> {
+    match crate::sku_stock::deduct_default_sku(tx, product_id, quantity) {
+        Ok(()) => Ok(()),
+        Err(crate::sku_stock::SkuStockError::NoSku) => Err(DeductStockError::NotFound),
+        Err(crate::sku_stock::SkuStockError::Insufficient { current, required }) => {
+            Err(DeductStockError::Insufficient { current, required })
+        }
+        Err(crate::sku_stock::SkuStockError::Db(msg)) => Err(DeductStockError::Db(msg)),
+    }
+}
 
 /// 销售订单创建请求
 #[derive(Debug, Deserialize)]
@@ -319,6 +344,31 @@ pub async fn create_sales_order(
         );
     }
 
+    for (idx, item) in payload.items.iter().enumerate() {
+        if let Err(e) = super::quantity_price::validate_order_item_qty_price(
+            idx,
+            item.quantity,
+            item.unit_price,
+        ) {
+            return e;
+        }
+        let product_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 AND deleted_at IS NULL)",
+                params![item.product_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+        if !product_exists {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(
+                    serde_json::json!({"error": format!("Product {} not found", item.product_id)}),
+                ),
+            );
+        }
+    }
+
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
         Err(e) => {
@@ -457,6 +507,22 @@ pub async fn update_sales_order(
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Only draft orders can be updated"})),
         );
+    }
+
+    if payload.items.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Order must have at least one item"})),
+        );
+    }
+    for (idx, item) in payload.items.iter().enumerate() {
+        if let Err(e) = super::quantity_price::validate_order_item_qty_price(
+            idx,
+            item.quantity,
+            item.unit_price,
+        ) {
+            return e;
+        }
     }
 
     let tx = match conn.unchecked_transaction() {
@@ -619,39 +685,37 @@ pub async fn submit_sales_order(
     }; // stmt 在这里被 drop，tx 可以重新使用了
 
     for (product_id, quantity) in &items {
-        let current_stock: i32 = match tx.query_row(
-            "SELECT current_stock FROM products WHERE id = ?1 AND deleted_at IS NULL",
-            params![product_id],
-            |row| row.get(0),
-        ) {
-            Ok(s) => s,
-            Err(_) => {
+        // P0-06 第三层：条件更新，禁止先查后改导致的并发超卖
+        match try_deduct_product_stock(&tx, product_id, *quantity) {
+            Ok(()) => {}
+            Err(DeductStockError::NotFound) => {
                 let _ = tx.rollback();
                 return (
                     StatusCode::BAD_REQUEST,
                     Json(serde_json::json!({"error": format!("Product {} not found", product_id)})),
                 );
             }
-        };
-
-        if current_stock < *quantity {
-            let _ = tx.rollback();
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({
-                    "error": format!("Insufficient stock for product {}. Current: {}, Required: {}",
-                        product_id, current_stock, quantity)
-                })),
-            );
-        }
-
-        if let Err(e) = tx.execute(
-            "UPDATE products SET current_stock = current_stock - ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-            params![quantity, product_id],
-        ) {
-            let _ = tx.rollback();
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to deduct inventory: {}", e)})));
+            Err(DeductStockError::Insufficient { current, required }) => {
+                let _ = tx.rollback();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": format!(
+                            "库存不足 for product {}. Current: {}, Required: {}",
+                            product_id, current, required
+                        )
+                    })),
+                );
+            }
+            Err(DeductStockError::Db(e)) => {
+                let _ = tx.rollback();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        serde_json::json!({"error": format!("Failed to deduct inventory: {}", e)}),
+                    ),
+                );
+            }
         }
 
         let txn_id = Uuid::new_v4().to_string();
@@ -690,4 +754,232 @@ pub async fn submit_sales_order(
             "message": "Sales order submitted successfully. Inventory deducted."
         })),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::quantity_price::validate_order_item_qty_price;
+    use axum::http::StatusCode;
+    use rusqlite::{params, Connection, TransactionBehavior};
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    fn deduct_conn(
+        conn: &mut Connection,
+        product_id: &str,
+        quantity: i32,
+    ) -> Result<(), DeductStockError> {
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| DeductStockError::Db(e.to_string()))?;
+        match try_deduct_product_stock(&tx, product_id, quantity) {
+            Ok(()) => {
+                tx.commit()
+                    .map_err(|e| DeductStockError::Db(e.to_string()))?;
+                Ok(())
+            }
+            Err(e) => {
+                let _ = tx.rollback();
+                Err(e)
+            }
+        }
+    }
+
+    fn stock_of(conn: &Connection, id: &str) -> i32 {
+        conn.query_row(
+            "SELECT current_stock FROM product_skus WHERE spu_id = ?1 AND is_active = 1",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap()
+    }
+
+    /// 模拟创建销售单明细前的 DTO 校验：负数量 → 422，库存不变
+    #[test]
+    fn create_rejects_negative_quantity_stock_unchanged() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE products (
+               id TEXT PRIMARY KEY, sku TEXT, name TEXT,
+               current_stock INTEGER DEFAULT 0, deleted_at TIMESTAMP, updated_at TIMESTAMP
+             );
+             INSERT INTO products (id, sku, name, current_stock) VALUES ('p1', 'S1', 'T', 30);
+             CREATE TABLE product_skus (
+               id TEXT PRIMARY KEY, spu_id TEXT NOT NULL, sku_code TEXT NOT NULL,
+               current_stock INTEGER DEFAULT 0, is_default INTEGER DEFAULT 1,
+               is_active INTEGER DEFAULT 1, deleted_at TIMESTAMP, updated_at TIMESTAMP, created_at TIMESTAMP
+             );
+             INSERT INTO product_skus (id, spu_id, sku_code, current_stock, is_default, is_active)
+               VALUES ('sku-p1', 'p1', 'S1', 30, 1, 1);",
+        )
+        .unwrap();
+
+        let before = stock_of(&conn, "p1");
+        let err = validate_order_item_qty_price(0, -10, 100.0).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.1 .0["field"].as_str().unwrap().contains("quantity"));
+        assert_eq!(stock_of(&conn, "p1"), before);
+    }
+
+    #[test]
+    fn create_rejects_negative_unit_price() {
+        let err = validate_order_item_qty_price(0, 1, -5.0).unwrap_err();
+        assert_eq!(err.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.1 .0["field"].as_str().unwrap().contains("unit_price"));
+    }
+
+    #[test]
+    fn db_check_rejects_negative_quantity_insert() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE sales_orders (id TEXT PRIMARY KEY);
+             CREATE TABLE products (id TEXT PRIMARY KEY);
+             INSERT INTO sales_orders (id) VALUES ('so1');
+             INSERT INTO products (id) VALUES ('p1');
+             CREATE TABLE sales_order_items (
+               id TEXT PRIMARY KEY,
+               sales_order_id TEXT NOT NULL REFERENCES sales_orders(id),
+               product_id TEXT NOT NULL REFERENCES products(id),
+               quantity INTEGER NOT NULL CHECK(quantity > 0),
+               unit_price REAL NOT NULL CHECK(unit_price >= 0),
+               total_price REAL NOT NULL
+             );",
+        )
+        .unwrap();
+
+        let bad = conn.execute(
+            "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, unit_price, total_price)
+             VALUES ('i1', 'so1', 'p1', -10, 9.9, -99.0)",
+            [],
+        );
+        assert!(bad.is_err(), "CHECK(quantity > 0) must reject -10");
+    }
+
+    /// 并发 10 个各扣 1、库存 5 → 恰好 5 成功，库存归 0
+    #[test]
+    fn concurrent_deduct_five_of_ten_stock_not_negative() {
+        let dir = std::env::temp_dir().join(format!(
+            "p006_conc_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&dir);
+        let db_path = dir.join("stock.db");
+        {
+            let conn = Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "PRAGMA journal_mode=WAL;
+                 PRAGMA busy_timeout = 8000;
+                 CREATE TABLE products (
+                   id TEXT PRIMARY KEY, sku TEXT, name TEXT,
+                   current_stock INTEGER DEFAULT 0, deleted_at TIMESTAMP, updated_at TIMESTAMP
+                 );
+                 INSERT INTO products (id, sku, name, current_stock) VALUES ('p1', 'S1', 'T', 5);
+                 CREATE TABLE product_skus (
+                   id TEXT PRIMARY KEY, spu_id TEXT NOT NULL, sku_code TEXT NOT NULL,
+                   current_stock INTEGER DEFAULT 0, is_default INTEGER DEFAULT 1,
+                   is_active INTEGER DEFAULT 1, deleted_at TIMESTAMP, updated_at TIMESTAMP, created_at TIMESTAMP
+                 );
+                 INSERT INTO product_skus (id, spu_id, sku_code, current_stock, is_default, is_active)
+                   VALUES ('sku-p1', 'p1', 'S1', 5, 1, 1);",
+            )
+            .unwrap();
+        }
+
+        let barrier = Arc::new(Barrier::new(10));
+        let path = Arc::new(db_path.clone());
+        let mut handles = Vec::new();
+        for _ in 0..10 {
+            let barrier = Arc::clone(&barrier);
+            let path = Arc::clone(&path);
+            handles.push(thread::spawn(move || {
+                let mut conn = Connection::open(path.as_ref()).unwrap();
+                let _ = conn.execute_batch("PRAGMA busy_timeout = 8000;");
+                barrier.wait();
+                // busy/locked 时重试；库存不足则计为失败
+                for _ in 0..40 {
+                    match deduct_conn(&mut conn, "p1", 1) {
+                        Ok(()) => return true,
+                        Err(DeductStockError::Insufficient { .. }) => return false,
+                        Err(DeductStockError::NotFound) => return false,
+                        Err(DeductStockError::Db(msg)) => {
+                            let lower = msg.to_lowercase();
+                            if lower.contains("busy") || lower.contains("locked") {
+                                thread::sleep(std::time::Duration::from_millis(15));
+                                continue;
+                            }
+                            return false;
+                        }
+                    }
+                }
+                false
+            }));
+        }
+
+        let success = handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .filter(|ok| *ok)
+            .count();
+
+        let conn = Connection::open(&db_path).unwrap();
+        let stock = stock_of(&conn, "p1");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(
+            success, 5,
+            "exactly 5 of 10 concurrent deducts should succeed"
+        );
+        assert_eq!(stock, 0, "stock must be 0, not negative");
+    }
+
+    #[test]
+    fn page_size_1000_returns_at_most_200_and_real_total() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT);
+             INSERT INTO customers (id, name) VALUES ('c1', 'Acme');
+             CREATE TABLE sales_orders (
+               id TEXT PRIMARY KEY,
+               so_number TEXT,
+               customer_id TEXT,
+               order_date TEXT,
+               expected_delivery_date TEXT,
+               status TEXT,
+               total_amount REAL,
+               paid_amount REAL,
+               payment_status TEXT,
+               shipping_address TEXT,
+               notes TEXT,
+               created_by TEXT,
+               created_at TEXT,
+               updated_at TEXT,
+               deleted_at TEXT
+             );",
+        )
+        .unwrap();
+        for i in 0..250 {
+            conn.execute(
+                "INSERT INTO sales_orders (
+                   id, so_number, customer_id, order_date, status,
+                   total_amount, paid_amount, payment_status, created_at, updated_at
+                 ) VALUES (?1, ?2, 'c1', '2026-01-01', 'draft', 1, 0, 'unpaid', ?3, ?3)",
+                params![
+                    format!("so-{i}"),
+                    format!("SO-{i:04}"),
+                    format!("2026-01-01T00:00:{i:02}")
+                ],
+            )
+            .unwrap();
+        }
+
+        let page = query_sales_order_page(&conn, None, None, None, 1, Some(1000)).unwrap();
+        assert!(page.data.len() <= 200);
+        assert_eq!(page.data.len(), 200);
+        assert_eq!(page.page_size, 200);
+        assert_eq!(page.total, 250);
+    }
 }

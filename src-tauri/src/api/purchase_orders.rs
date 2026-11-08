@@ -311,6 +311,16 @@ pub async fn create_purchase_order(
         );
     }
 
+    for (idx, item) in payload.items.iter().enumerate() {
+        if let Err(e) = super::quantity_price::validate_order_item_qty_price(
+            idx,
+            item.quantity,
+            item.unit_price,
+        ) {
+            return e;
+        }
+    }
+
     let tx = match conn.unchecked_transaction() {
         Ok(tx) => tx,
         Err(e) => {
@@ -446,6 +456,22 @@ pub async fn update_purchase_order(
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "Only draft orders can be updated"})),
         );
+    }
+
+    if payload.items.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Order must have at least one item"})),
+        );
+    }
+    for (idx, item) in payload.items.iter().enumerate() {
+        if let Err(e) = super::quantity_price::validate_order_item_qty_price(
+            idx,
+            item.quantity,
+            item.unit_price,
+        ) {
+            return e;
+        }
     }
 
     let tx = match conn.unchecked_transaction() {
@@ -630,13 +656,12 @@ pub async fn receive_purchase_order(
             );
         }
 
-        if let Err(e) = tx.execute(
-            "UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-            params![quantity, product_id],
-        ) {
+        if let Err(e) = crate::sku_stock::apply_default_sku_delta(&tx, product_id, *quantity) {
             let _ = tx.rollback();
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to increase inventory: {}", e)})));
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("Failed to increase inventory: {}", e)})),
+            );
         }
 
         let txn_id = Uuid::new_v4().to_string();

@@ -285,10 +285,7 @@ pub fn confirm_sales_return(
 
     // 销售退货 = 恢复库存（入库）
     for (pid, qty) in &items {
-        tx.execute(
-            "UPDATE products SET current_stock = current_stock + ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-            params![qty, pid],
-        ).map_err(|e| e.to_string())?;
+        crate::sku_stock::apply_default_sku_delta(&tx, pid, *qty).map_err(|e| e.to_string())?;
 
         let txn_id = uuid::Uuid::new_v4().to_string();
         tx.execute(

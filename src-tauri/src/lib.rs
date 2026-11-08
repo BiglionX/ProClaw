@@ -42,6 +42,7 @@ pub mod reconciliation_commands;
 pub mod sales_commands;
 #[cfg(feature = "inventory")]
 pub mod sales_return_commands;
+pub mod sku_stock;
 
 pub mod approval_commands;
 pub mod call_commands;
