@@ -1,5 +1,5 @@
 use crate::database::Database;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -461,8 +461,13 @@ pub fn receive_purchase_order_cmd(
     order_id: String,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    receive_purchase_order_on_conn(db.connection(), order_id)
+}
 
+pub(crate) fn receive_purchase_order_on_conn(
+    conn: &Connection,
+    order_id: String,
+) -> Result<serde_json::Value, String> {
     let status: String = conn
         .query_row(
             "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",

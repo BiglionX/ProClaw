@@ -1,32 +1,17 @@
 //! 采购入库 / 退货写 `product_skus.current_stock`。
 //!
-//! 桌面命令的第一个参数是 `tauri::State`，字段私有，没有公开构造函数。
-//! 下面按单字段引用的尺寸把它转成 `State`，调用的仍是命令本体，不模拟库存写入。
+//! 命令在锁库后调用 `*_on_conn`。测试直接传入 `&Connection`。
 //! 采购明细只有 `product_id`，库存落在该商品启用的默认 SKU 上。
 
-use super::{confirm_purchase_return, create_purchase_return};
+use super::{confirm_purchase_return_on_conn, create_purchase_return_on_conn};
 use crate::database::Database;
-use crate::purchase_commands::receive_purchase_order_cmd;
+use crate::purchase_commands::receive_purchase_order_on_conn;
 use axum::body::to_bytes;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use rusqlite::{params, Connection};
 use std::sync::{Arc, Mutex};
-
-fn command_db_state<'a>(db: &'a Mutex<Database>) -> tauri::State<'a, Mutex<Database>> {
-    const _: () = {
-        assert!(
-            std::mem::size_of::<tauri::State<Mutex<Database>>>()
-                == std::mem::size_of::<&Mutex<Database>>()
-        );
-        assert!(
-            std::mem::align_of::<tauri::State<Mutex<Database>>>()
-                == std::mem::align_of::<&Mutex<Database>>()
-        );
-    };
-    unsafe { std::mem::transmute::<&'a Mutex<Database>, tauri::State<'a, Mutex<Database>>>(db) }
-}
 
 fn open_db() -> Database {
     let db = Database::new_in_memory().expect("memory db");
@@ -139,19 +124,13 @@ fn assert_only_buy_default_changed(conn: &Connection, buy_default: i32) {
 
 #[test]
 fn ordered_default_sku_stock_increases_on_purchase_receive() {
-    let db = Mutex::new(open_db());
-    {
-        let guard = db.lock().unwrap();
-        let conn = guard.connection();
-        seed_catalog(conn);
-        insert_purchase_order(conn, "po-in", "p-buy", 6);
-    }
+    let db = open_db();
+    let conn = db.connection();
+    seed_catalog(conn);
+    insert_purchase_order(conn, "po-in", "p-buy", 6);
 
-    receive_purchase_order_cmd(command_db_state(&db), "po-in".to_string())
-        .expect("采购入库应成功");
+    receive_purchase_order_on_conn(conn, "po-in".to_string()).expect("采购入库应成功");
 
-    let guard = db.lock().unwrap();
-    let conn = guard.connection();
     assert_only_buy_default_changed(conn, 16);
     let received: i32 = conn
         .query_row(
@@ -173,16 +152,13 @@ fn ordered_default_sku_stock_increases_on_purchase_receive() {
 
 #[test]
 fn ordered_default_sku_stock_decreases_on_purchase_return() {
-    let db = Mutex::new(open_db());
-    {
-        let guard = db.lock().unwrap();
-        let conn = guard.connection();
-        seed_catalog(conn);
-        insert_purchase_order(conn, "po-ret", "p-buy", 10);
-    }
+    let db = open_db();
+    let conn = db.connection();
+    seed_catalog(conn);
+    insert_purchase_order(conn, "po-ret", "p-buy", 10);
 
-    let created = create_purchase_return(
-        command_db_state(&db),
+    let created = create_purchase_return_on_conn(
+        conn,
         serde_json::json!({
             "purchase_order_id": "po-ret",
             "supplier_id": "sup-1",
@@ -196,20 +172,15 @@ fn ordered_default_sku_stock_decreases_on_purchase_return() {
     )
     .expect("创建采购退货单");
 
-    {
-        let guard = db.lock().unwrap();
-        assert_eq!(
-            sku_stock(guard.connection(), "sku-p-buy-default"),
-            10,
-            "创建退货单不应改库存"
-        );
-    }
+    assert_eq!(
+        sku_stock(conn, "sku-p-buy-default"),
+        10,
+        "创建退货单不应改库存"
+    );
 
     let return_id = created["id"].as_str().unwrap().to_string();
-    confirm_purchase_return(command_db_state(&db), return_id).expect("确认采购退货应回减库存");
+    confirm_purchase_return_on_conn(conn, return_id).expect("确认采购退货应回减库存");
 
-    let guard = db.lock().unwrap();
-    let conn = guard.connection();
     assert_only_buy_default_changed(conn, 7);
     let status: String = conn
         .query_row("SELECT status FROM purchase_returns", [], |row| row.get(0))

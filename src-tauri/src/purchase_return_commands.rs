@@ -1,5 +1,5 @@
 use crate::database::Database;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 
 /// 生成采购退货编号
@@ -17,8 +17,13 @@ pub fn create_purchase_return(
     r#return: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    create_purchase_return_on_conn(db.connection(), r#return)
+}
 
+pub(crate) fn create_purchase_return_on_conn(
+    conn: &Connection,
+    r#return: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let pr_number = r#return
         .get("pr_number")
@@ -233,8 +238,13 @@ pub fn confirm_purchase_return(
     return_id: String,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    confirm_purchase_return_on_conn(db.connection(), return_id)
+}
 
+pub(crate) fn confirm_purchase_return_on_conn(
+    conn: &Connection,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let status: String = conn
         .query_row(
             "SELECT status FROM purchase_returns WHERE id = ?1 AND deleted_at IS NULL",
