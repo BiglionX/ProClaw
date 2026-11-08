@@ -1,5 +1,5 @@
 use crate::database::Database;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 
 /// 记录采购付款
@@ -242,12 +242,17 @@ pub fn get_ar_ap_summary_cmd(
     counterparty_type: Option<String>, // 'supplier' 或 'customer'
 ) -> Result<Vec<serde_json::Value>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    get_ar_ap_summary_on_conn(db.connection(), counterparty_type.as_deref())
+}
 
+pub(crate) fn get_ar_ap_summary_on_conn(
+    conn: &Connection,
+    counterparty_type: Option<&str>,
+) -> Result<Vec<serde_json::Value>, String> {
     let mut results: Vec<serde_json::Value> = Vec::new();
 
     // 应付汇总（供应商维度）
-    if counterparty_type.as_deref() != Some("customer") {
+    if counterparty_type != Some("customer") {
         let mut stmt = conn.prepare(
             "SELECT po.supplier_id, s.name as supplier_name, s.code as supplier_code, s.email,
                     s.contact_person, s.phone,
@@ -266,8 +271,10 @@ pub fn get_ar_ap_summary_cmd(
 
         let rows = stmt
             .query_map([], |row| {
-                let total: f64 = row.get(6)?;
-                let paid: f64 = row.get(7)?;
+                let order_count: i64 = row.get(6)?;
+                let total: f64 = row.get(7)?;
+                let paid: f64 = row.get(8)?;
+                let ledger_total: f64 = row.get(9)?;
                 Ok(serde_json::json!({
                     "counterparty_id": row.get::<_, String>(0)?,
                     "counterparty_name": row.get::<_, Option<String>>(1)?,
@@ -275,10 +282,11 @@ pub fn get_ar_ap_summary_cmd(
                     "email": row.get::<_, Option<String>>(3)?,
                     "contact_person": row.get::<_, Option<String>>(4)?,
                     "phone": row.get::<_, Option<String>>(5)?,
-                    "order_count": row.get::<_, i32>(6)?,
+                    "order_count": order_count,
                     "total_amount": total,
                     "paid_amount": paid,
                     "balance": total - paid,
+                    "ledger_total": ledger_total,
                     "counterparty_type": "supplier",
                 }))
             })
@@ -290,7 +298,7 @@ pub fn get_ar_ap_summary_cmd(
     }
 
     // 应收汇总（客户维度）
-    if counterparty_type.as_deref() != Some("supplier") {
+    if counterparty_type != Some("supplier") {
         let mut stmt = conn
             .prepare(
                 "SELECT so.customer_id, c.name as customer_name, c.code as customer_code, c.email,
@@ -308,8 +316,9 @@ pub fn get_ar_ap_summary_cmd(
 
         let rows = stmt
             .query_map([], |row| {
-                let total: f64 = row.get(6)?;
-                let paid: f64 = row.get(7)?;
+                let order_count: i64 = row.get(6)?;
+                let total: f64 = row.get(7)?;
+                let paid: f64 = row.get(8)?;
                 Ok(serde_json::json!({
                     "counterparty_id": row.get::<_, String>(0)?,
                     "counterparty_name": row.get::<_, Option<String>>(1)?,
@@ -317,7 +326,7 @@ pub fn get_ar_ap_summary_cmd(
                     "email": row.get::<_, Option<String>>(3)?,
                     "contact_person": row.get::<_, Option<String>>(4)?,
                     "phone": row.get::<_, Option<String>>(5)?,
-                    "order_count": row.get::<_, i32>(6)?,
+                    "order_count": order_count,
                     "total_amount": total,
                     "paid_amount": paid,
                     "balance": total - paid,
@@ -410,3 +419,7 @@ pub fn get_ar_ap_detail_cmd(
         Ok(items)
     }
 }
+
+#[cfg(test)]
+#[path = "payment_summary_tests.rs"]
+mod payment_summary_tests;
