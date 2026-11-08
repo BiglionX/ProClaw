@@ -158,6 +158,8 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         create_sales_order,
         #[cfg(feature = "inventory")]
         get_sales_orders,
+        #[cfg(feature = "inventory")]
+        get_sales_order_detail,
         // 财务报表 (进销存版)
         #[cfg(feature = "inventory")]
         get_profit_loss_report,
