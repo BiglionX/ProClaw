@@ -163,9 +163,9 @@ mod tests {
 
     #[test]
     fn test_templates_have_required_headers() {
-        // 商品库模板必须有 sku,name
-        assert!(PRODUCTS_TEMPLATE.lines().nth(1).unwrap().contains("sku"));
-        assert!(PRODUCTS_TEMPLATE.lines().nth(1).unwrap().contains("name"));
+        // 商品库模板必须有 sku,name（表头在第 1 行，即 lines().next()）
+        assert!(PRODUCTS_TEMPLATE.lines().next().unwrap().contains("sku"));
+        assert!(PRODUCTS_TEMPLATE.lines().next().unwrap().contains("name"));
 
         // 库存必须 sku,transaction_type,quantity
         let hdr = INVENTORY_TEMPLATE.lines().next().unwrap();
