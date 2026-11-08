@@ -86,6 +86,15 @@ jobs:
       - name: 三个老系统导出文件导入与重复导入
         working-directory: src-tauri
         run: cargo test --test e2e_import -- --nocapture --test-threads=1
+      - name: Rust Lib Tests (key_manager serial)
+        working-directory: src-tauri
+        run: cargo test --locked --lib key_manager -- --test-threads=1
+      - name: Rust Lib Tests (parallel)
+        working-directory: src-tauri
+        run: cargo test --locked --lib -- --skip key_manager
+      - name: Rust Integration Tests
+        working-directory: src-tauri
+        run: cargo test --locked --test integration_test --test sales_outbound_test --test sales_return_test
 
   # ==================== Mobile (Expo + RN) ====================
   mobile-lint:
