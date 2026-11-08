@@ -244,7 +244,15 @@ mod tests {
         schema_with_view(&conn);
 
         insert_test_product(&conn, "p-test-1", "SPU-TEST-1", "测试商品1");
-        insert_test_sku(&conn, "sku-test-1", "p-test-1", "SKU-TEST-1", "{}", 12, true);
+        insert_test_sku(
+            &conn,
+            "sku-test-1",
+            "p-test-1",
+            "SKU-TEST-1",
+            "{}",
+            12,
+            true,
+        );
         // 扣减只改 SKU。products 起点写成 12，才能断言它没有跟着变成 10。
         conn.execute(
             "UPDATE products SET current_stock = 12 WHERE id = 'p-test-1'",
