@@ -367,13 +367,14 @@ impl Database {
         }
 
         // 运行迁移：iPhone 电池演示案例数据（v1.0.0+tray+db+contacts+msgs+safety+view+demo 补丁）
-        // 原因：模拟账号依赖 20 个 iPhone 电池 SPU + 对应 SKU + 图片作为初始案例数据。
+        // 原因：模拟账号依赖 20 个 iPhone 电池 SPU + 对应 SKU 作为初始案例数据。
+        //       主图不在 seed 里预置，由演示引导下载后再写入 product_images。
         //       src-tauri 此前未加载 seed_iphone_batteries.sql，导致新装数据库空空如也。
         // SQL 使用 INSERT OR IGNORE 幂等插入：老用户重复运行不会报错。
         let iphone_seed = include_str!("../../database/seed_iphone_batteries.sql");
         match self.conn.execute_batch(iphone_seed) {
             Ok(_) => {
-                eprintln!("✓ [DB Migration] iPhone 电池案例数据已载入（20 个 SPU + 20 个 SKU + 20 张图片）");
+                eprintln!("✓ [DB Migration] iPhone 电池案例数据已载入（20 个 SPU + 20 个 SKU，图片不在 seed 中预置）");
             }
             Err(e) => {
                 // 部分失败是允许的（例如某条 INSERT 违反约束），记录警告
@@ -1742,6 +1743,21 @@ mod tests {
             "expected >= 20 SPUs after seed, got {}",
             spu_count
         );
+        // seed_iphone_batteries.sql 不再写入占位图，主图由演示引导下载后再入库。
+        let sku_count: i64 = db
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM product_skus WHERE spu_id LIKE 'spu_iphone%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            sku_count >= 20,
+            "expected >= 20 SKUs after seed, got {}",
+            sku_count
+        );
+        // seed_iphone_batteries.sql 不写占位图，主图由演示引导下载后再入库。
         let image_count: i64 = db
             .connection()
             .query_row(
@@ -1749,10 +1765,10 @@ mod tests {
                 [],
                 |row| row.get(0),
             )
-            .unwrap();
-        assert!(
-            image_count >= 20,
-            "expected >= 20 demo images after seed, got {}",
+            .expect("product_images should exist after initialize");
+        assert_eq!(
+            image_count, 0,
+            "seed must not insert placeholder images; got {}",
             image_count
         );
 
