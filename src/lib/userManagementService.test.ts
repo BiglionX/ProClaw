@@ -38,6 +38,19 @@ describe('userManagementService invoke 参数', () => {
       roles: ['manager'],
     });
 
+    expect(invoke).toHaveBeenCalledWith('update_user_cmd', {
+      id: 'user-1',
+      name: '张三',
+      phone: '13800000000',
+      email: 'a@b.c',
+      isActive: null,
+    });
+    const updateArgs = (invoke as any).mock.calls.find(
+      (call: unknown[]) => call[0] === 'update_user_cmd',
+    )?.[1] as { isActive?: boolean | null; is_active?: boolean | null };
+    expect(updateArgs).toHaveProperty('isActive');
+    expect(updateArgs).not.toHaveProperty('is_active');
+
     expect(invoke).toHaveBeenCalledWith('assign_user_role_cmd', {
       userId: 'user-1',
       roleName: 'manager',

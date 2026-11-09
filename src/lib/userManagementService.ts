@@ -177,7 +177,7 @@ export async function updateManagedUser(id: string, input: UpdateUserInput): Pro
     name: input.name,
     phone: input.phone || null,
     email: input.email || null,
-    is_active: null,
+    isActive: null,
   });
   if (input.roles.length > 0) {
     await ipcInvoke('assign_user_role_cmd', {
