@@ -18,6 +18,24 @@ interface Release {
 
 const releases: Release[] = [
   {
+    version: '1.5.1',
+    date: '2026-11-09',
+    title: 'Windows 未签名内测包',
+    sections: [
+      {
+        type: 'changed',
+        label: '下载',
+        color: 'bg-blue-100 text-blue-800',
+        items: [
+          '桌面安装包版本是 1.5.1，Windows x64 同时提供 NSIS 和 MSI',
+          '安装包在 CI 构建 32cdb66 的 Artifacts 中，下载需要登录 GitHub，包未签名',
+          '设置页「系统信息」显示 v1.5.1',
+          'GitHub Releases 里还没有 1.5.1 附件；可直接下载的最新 Release 安装包仍是 v1.3.0',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v0.1.0',
     date: '2026-05-26',
     title: '首个桌面安装包发布',

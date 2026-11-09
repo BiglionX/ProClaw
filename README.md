@@ -7,13 +7,26 @@
 > 开源AI驱动的商户经营操作系统 | Open-Source AI-Powered Business OS
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/BiglionX/ProClaw/releases)
+[![Version](https://img.shields.io/badge/version-1.5.1-green.svg)](https://github.com/BiglionX/ProClaw/actions/runs/42558458129)
 [![Tauri](https://img.shields.io/badge/Tauri-2.11-blue.svg)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![Stars](https://img.shields.io/github/stars/BiglionX/ProClaw?style=social)](https://github.com/BiglionX/ProClaw)
 
 > **🎉 v1.5.1 已发布！跨仓库交付：NvWaX Web marketplace 详情页 + 后端字段补全（author / usageCount / relatedAgents）+ ProClaw 发布成功 toast 深链。详见 [RELEASE_NOTES_v1.5.1.md](RELEASE_NOTES_v1.5.1.md)。**
+
+## 下载桌面端 1.5.1（Windows）
+
+当前安装包版本是 **1.5.1**，与 `package.json`、`src-tauri/tauri.conf.json` 一致。`src-tauri/Cargo.toml` 的 `1.6.0` 只是 crate 版本，不出现在安装包文件名里。
+
+GitHub Releases 里没有 `ProClaw_1.5.1_x64-setup.exe`。tag `v1.5.1` 指向更早的提交 `b64418c`，不能当作这个安装包的标签。未签名的 NSIS 和 MSI 在这次 CI 构建的 Artifacts 里，下载需要登录 GitHub：
+
+https://github.com/BiglionX/ProClaw/actions/runs/42558458129
+
+- `ProClaw-nsis-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+- `ProClaw-msi-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+
+安装包未签名，Windows 会提示。设置页「系统信息」显示 `v1.5.1`。Releases 里可以直接下载的最新安装包仍是 [ProClaw_1.3.0_x64-setup.exe](https://github.com/BiglionX/ProClaw/releases/download/v1.3.0/ProClaw_1.3.0_x64-setup.exe)。
 
 ## 🎯 项目定位
 

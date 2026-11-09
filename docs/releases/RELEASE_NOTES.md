@@ -1,3 +1,12 @@
+# 🦞 ProClaw Desktop 当前下载
+
+桌面端安装包版本是 **1.5.1**（Windows x64，未签名）。下载需要登录 GitHub，文件在 [CI 构建 32cdb66](https://github.com/BiglionX/ProClaw/actions/runs/42558458129) 的 Artifacts：
+
+- `ProClaw-nsis-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+- `ProClaw-msi-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+
+GitHub Releases 没有 1.5.1 附件。可直接下载的最新 Release 是 [ProClaw_1.3.0_x64-setup.exe](https://github.com/BiglionX/ProClaw/releases/download/v1.3.0/ProClaw_1.3.0_x64-setup.exe)。下面是历史 beta 说明，不是当前安装包。
+
 # 🦞 ProClaw Desktop v0.1.0-beta 发布说明
 
 > **发布日期**: 2026-04-12

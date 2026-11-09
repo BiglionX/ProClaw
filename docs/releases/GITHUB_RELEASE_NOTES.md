@@ -1,3 +1,12 @@
+# 🦞 ProClaw Desktop 当前下载
+
+桌面端安装包版本是 **1.5.1**（Windows x64，未签名）。下载需要登录 GitHub，文件在 [CI 构建 32cdb66](https://github.com/BiglionX/ProClaw/actions/runs/42558458129) 的 Artifacts：
+
+- `ProClaw-nsis-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+- `ProClaw-msi-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+
+GitHub Releases 没有 1.5.1 附件。可直接下载的最新 Release 是 [ProClaw_1.3.0_x64-setup.exe](https://github.com/BiglionX/ProClaw/releases/download/v1.3.0/ProClaw_1.3.0_x64-setup.exe)。`Cargo.toml` 的 1.6.0 只影响 crate。下面是历史 beta 说明，不是当前安装包。
+
 # 🦞 ProClaw Desktop v0.1.0-beta 发布说明
 
 ## 📦 发布信息
@@ -59,7 +68,7 @@ ProClaw Desktop 是为中小企业设计的**一体化商业管理平台**，主
 
 ### Windows 安装
 
-1. **下载** MSI 安装包：`Proclaw_0.1.0_x64_en-US.msi`
+1. **下载** 当前包：见文首的 1.5.1 CI Artifacts。历史 beta 文件名是 `Proclaw_0.1.0_x64_en-US.msi`
 2. **双击** 安装包文件
 3. **按照** 安装向导完成安装
 4. **启动** ProClaw Desktop

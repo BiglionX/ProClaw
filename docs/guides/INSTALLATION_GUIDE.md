@@ -1,6 +1,6 @@
 # 📦 ProClaw Desktop 安装指南
 
-> 适用于 v0.1.0-beta 版本
+> 适用于桌面端 1.5.1（Windows x64，未签名内测包）
 
 ---
 
@@ -32,21 +32,22 @@
 
 ## 📥 下载步骤
 
-### 方法 1: GitHub Releases (推荐)
+### 方法 1: 当前 Windows 1.5.1 内测包
 
-1. 访问 [GitHub Releases 页面](https://github.com/your-org/proclaw-desktop/releases)
-2. 找到 `v0.1.0-beta` 版本
-3. 根据您的操作系统下载对应的安装包:
-   - Windows: `ProClaw_0.1.0_x64_en-US.msi`
-   - macOS: `ProClaw_0.1.0_x64.dmg`
-   - Linux: `proclaw_0.1.0_amd64.deb`
+1. 打开 [CI 构建 32cdb66](https://github.com/BiglionX/ProClaw/actions/runs/42558458129)（需要登录 GitHub）
+2. 下载 Artifacts：
+   - NSIS：`ProClaw-nsis-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+   - MSI：`ProClaw-msi-32cdb66e014838549a7342f46d7ae2f04d1cd7a6`
+3. 解压后安装。包未签名，Windows 会提示，这是预期。
+4. 当前只有 Windows x64。macOS 和 Linux 安装包没有随这次构建发布。
 
-### 方法 2: 官方网站
+GitHub Releases 里没有 1.5.1 附件。可以直接下载的最新 Release 安装包是 [ProClaw_1.3.0_x64-setup.exe](https://github.com/BiglionX/ProClaw/releases/download/v1.3.0/ProClaw_1.3.0_x64-setup.exe)。tag `v1.5.1` 指向 `b64418c`，不是这个安装包。
 
-1. 访问 ProClaw 官方网站
-2. 点击"下载桌面客户端"
-3. 选择您的操作系统
-4. 开始下载
+### 方法 2: 营销网站
+
+1. 打开营销网站的下载页
+2. Plus 和 Light 都指向上面同一个 1.5.1 构建
+3. 手机端 APK 仍是 [proclaw-mobile-1.0.3.apk](https://github.com/BiglionX/ProClaw/releases/download/1.0.7/proclaw-mobile-1.0.3.apk)
 
 ---
 

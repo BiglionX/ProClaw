@@ -8,6 +8,9 @@ import RouteSEO from '../components/RouteSEO';
 import { getPublishedPlugins } from '../lib/pluginService';
 import type { IndustryPlugin } from '../types';
 
+const DESKTOP_151_BUILD =
+  'https://github.com/BiglionX/ProClaw/actions/runs/42558458129';
+
 const productCards = [
   {
     id: 'plus',
@@ -27,9 +30,9 @@ const productCards = [
       '本地加密存储 (SQLCipher)',
       '离线完全可用',
     ],
-    cta: '免费下载',
-    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/v1.1.1/ProClaw_1.1.1_x64-setup.exe',
-    platforms: 'Windows · macOS · Linux',
+    cta: '下载 Windows 1.5.1',
+    ctaLink: DESKTOP_151_BUILD,
+    platforms: '未签名 NSIS / MSI · 需登录 GitHub',
     highlighted: true,
     color: 'black',
   },
@@ -51,9 +54,9 @@ const productCards = [
       '本地加密存储 (SQLCipher)',
       '离线完全可用',
     ],
-    cta: '免费下载',
-    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/v1.1.1/ProClaw_1.1.1_x64-setup.exe',
-    platforms: 'Windows · macOS · Linux',
+    cta: '下载 Windows 1.5.1',
+    ctaLink: DESKTOP_151_BUILD,
+    platforms: '未签名 NSIS / MSI · 需登录 GitHub',
     highlighted: false,
     color: 'gray',
   },
@@ -98,7 +101,7 @@ const productCards = [
       '消息推送提醒',
     ],
     cta: '免费下载 APK',
-    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/v1.1.0/proclaw-mobile-1.0.3.apk',
+    ctaLink: 'https://github.com/BiglionX/ProClaw/releases/download/1.0.7/proclaw-mobile-1.0.3.apk',
     platforms: 'Android 6.0+',
     highlighted: false,
     color: 'gray',
@@ -219,7 +222,7 @@ const DownloadPage: React.FC = () => {
       <PageHeader
         title="下载 ProClaw"
         description="ProClaw Plus / Light 桌面端 · Cloud 云商城 · 手机端 App"
-        subtitle="Plus 版 v1.1.1 | Light 版 v1.1.1 | 发布日期：2026-07-01（v1.1.0 启动闪退 hotfix）"
+        subtitle="桌面端 1.5.1 · Windows x64 · 未签名内测包（32cdb66）"
       />
 
       {/* 四产品并列卡片 */}
@@ -528,7 +531,9 @@ const DownloadPage: React.FC = () => {
                 <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold shrink-0">1</div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">下载安装包</h3>
-                  <p className="text-sm text-gray-600">从 Plus 或 Light 版选择对应平台下载安装程序。</p>
+                  <p className="text-sm text-gray-600">
+                    Plus 和 Light 是同一个 Windows 安装包。打开构建页后下载 Artifacts 里的 NSIS 或 MSI，解压后安装。包未签名，Windows 会提示。
+                  </p>
                 </div>
               </div>
               <div className="flex gap-4">
@@ -552,7 +557,7 @@ const DownloadPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">文件校验 (SHA256)</h2>
             <p className="text-sm text-gray-500 mb-4">
-              下载后建议校验文件完整性，确保安装包未被篡改。
+              1.5.1 未签名包还没有公布 SHA256，不要沿用下面的历史校验值。NSIS artifact 名是 ProClaw-nsis-32cdb66e014838549a7342f46d7ae2f04d1cd7a6，MSI artifact 名是 ProClaw-msi-32cdb66e014838549a7342f46d7ae2f04d1cd7a6。
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -564,7 +569,7 @@ const DownloadPage: React.FC = () => {
                 </thead>
                 <tbody>
                   <tr className="border-b border-gray-100">
-                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw (桌面端 v1.1.1 hotfix)</td>
+                    <td className="py-3 pr-4 text-sm text-gray-500 whitespace-nowrap">ProClaw (桌面端 v1.1.1 hotfix，历史)</td>
                     <td className="py-3 text-sm text-gray-500 font-mono break-all">fc48a6217532fd414cd6d294b901e01c901a88bc69cf6ce7539a9ae113d3fff1</td>
                   </tr>
                   <tr className="border-b border-gray-100">
@@ -597,7 +602,7 @@ const DownloadPage: React.FC = () => {
           </div>
 
           <p className="text-center text-gray-400 text-sm mt-8">
-            源码与历史版本请查看{' '}
+            1.5.1 还没有 GitHub Release 附件。可直接下载的最新安装包是 <a href="https://github.com/BiglionX/ProClaw/releases/download/v1.3.0/ProClaw_1.3.0_x64-setup.exe" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ProClaw_1.3.0_x64-setup.exe</a>。历史版本请查看{' '}
             <a href="https://github.com/BigLionX/ProClaw/releases" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
               GitHub Releases
             </a>
