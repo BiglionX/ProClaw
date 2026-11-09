@@ -25,11 +25,11 @@ const productCards = [
     ),
     target: '适用于实体商户、批发商、小型工厂',
     features: [
-      'AI 经营团队（CEO Agent + 多 Agent 协作）',
+      'AI 经营助手（即将推出）',
       '进销存核心（采购/销售/库存/报表）',
-      'SPU-SKU 商品管理体系',
-      '行业插件按需下载',
-      '本地加密存储 (SQLCipher)',
+      '商品管理',
+      '内置行业模板',
+      '本地数据存储',
       '离线完全可用',
     ],
     cta: '下载 Windows 1.5.1',
@@ -50,10 +50,10 @@ const productCards = [
     target: '适用于虚拟团队、个人创业者',
     features: [
       'CEO Agent 主控官',
-      '多 Agent 自动分工协作',
+      'AI 经营助手（即将推出）',
       '任务 / 项目管理',
-      '行业插件按需下载',
-      '本地加密存储 (SQLCipher)',
+      '内置行业模板',
+      '本地数据存储',
       '离线完全可用',
     ],
     cta: '下载 Windows 1.5.1',
@@ -123,13 +123,13 @@ const desktopPlans = [
     name: 'ProClaw 基础桌面端',
     price: '免费',
     period: '',
-    description: '统一构建，适配所有行业。插件按需下载。',
+    description: '统一构建，适配所有行业。含内置行业模板。',
     features: [
-      'AI 经营底座（CEO Agent + 多 Agent 协作）',
+      'AI 经营助手（即将推出）',
       '进销存核心（采购/销售/库存/报表）',
-      'SPU-SKU 商品管理体系',
-      '行业插件免费按需下载',
-      '本地加密存储 (SQLCipher)',
+      '商品管理',
+      '内置行业模板',
+      '本地数据存储',
       '离线完全可用',
       '可选 Supabase 云同步',
       '设备直连通信（语音/视频）',
@@ -317,7 +317,7 @@ const DownloadPage: React.FC = () => {
               行业插件
             </h2>
             <p className="text-sm text-gray-500 text-center mb-8">
-              安装 Plus 或 Light 版后选择行业，即可自动下载对应插件
+              桌面端含内置行业模板
             </p>
             {pluginsLoading ? (
               <div className="text-center py-8 text-gray-400">加载中...</div>
@@ -357,7 +357,7 @@ const DownloadPage: React.FC = () => {
               </div>
             )}
             <p className="text-center text-gray-400 text-sm mt-6">
-              💡 安装 Plus 或 Light 版后，选择行业即可自动下载对应插件
+              💡 桌面端含内置行业模板
             </p>
           </div>
 

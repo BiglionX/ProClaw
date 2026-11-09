@@ -41,7 +41,7 @@ const defaultUseCases: UseCase[] = [
     title: '零售行业',
     role: '多品类精细化管控',
     story: '批发市场租柜台卖电子产品/配件，SKU 几百个，颜色/规格/型号组合多。手工记录容易出错，客户报价时查不准库存，赊账客户对账头疼。',
-    keyNarrative: '几百个 SKU？不用怕。SPU-SKU 模式专门处理多规格商品，颜色、尺寸、批次自动归类。客户欠了多少钱，AI 比你记得清楚。',
+    keyNarrative: '按商品名称和编码管理库存。客户欠了多少钱，AI 比你记得清楚。',
     industry: 'retail',
     industryLabel: '零售',
     iconEmoji: '🛍️',
@@ -182,7 +182,7 @@ const UseCasesPage: React.FC = () => {
 
       <CTASection
         title="一个软件，所有行业"
-        description="下载基础桌面端，安装时选择行业即可自动下载对应插件。免费使用，无需承诺。"
+        description="下载基础桌面端，含内置行业模板。免费使用，无需承诺。"
         primaryButtonText="免费下载桌面端"
         primaryButtonLink="/download"
       />

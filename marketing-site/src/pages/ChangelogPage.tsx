@@ -45,7 +45,7 @@ const releases: Release[] = [
         color: 'bg-green-100 text-green-800',
         items: [
           '首个桌面安装包: Windows x64 NSIS 安装程序 (~6.8 MB)',
-          'AI 经营团队: 内置 7 个专业 Agent（库存、销售、数据分析、采购、财务、客服、AI 智能找图）',
+          'AI 经营助手（即将推出）',
           'AI 智能找图 Agent: 有产品时自动推荐，作为第 7 个内置 Agent',
           'AI 团队管理：创建/编辑/删除/导入/导出，发布到市场',
           'Phase 8: 测试与文档 - 全面质量保证',
@@ -103,13 +103,12 @@ const releases: Release[] = [
         items: [
           'Tauri 2.0 + React 18 桌面应用框架',
           '经营智能体主界面',
-          '产品库管理模块 (简单模式 + SPU-SKU 电商模式)',
+          '产品库管理模块（商品管理）',
           '进销存 AI 模块',
           '技能商店基础架构',
           'SQLite 本地数据库 + Supabase 云端同步',
           'MUI + Tailwind CSS UI 系统',
           '离线优先架构',
-          '数据加密 (SQLCipher)',
           '仪表盘页面功能（实时数据、图表、预警）',
           '仪表盘单元测试',
         ],
