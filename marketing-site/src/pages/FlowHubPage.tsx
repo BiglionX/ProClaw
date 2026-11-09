@@ -10,8 +10,8 @@ const PARTNERS = [
 
 const FEATURES = [
   {
-    title: '即装即用',
-    desc: '一键安装行业插件，自动添加功能模块、操作面板和 AI 经营团队，无需复杂配置。',
+    title: '内置行业模板',
+    desc: '桌面端含内置行业模板（内测），带有行业功能模块和操作面板。多 Agent 即将推出。',
     icon: '⚡',
   },
   {
@@ -30,8 +30,8 @@ const FEATURES = [
     icon: '🔧',
   },
   {
-    title: 'AI 联动',
-    desc: '插件自动向 ProClaw AI Agent 暴露上下文，Agent 能够触发插件内的业务操作，实现智能自动化。',
+    title: 'AI 经营助手',
+    desc: '当前是单模型 CEO 对话。多 Agent 即将推出。',
     icon: '🤖',
   },
   {
@@ -43,8 +43,8 @@ const FEATURES = [
 
 const WORKFLOW = [
   { step: '01', title: '浏览插件', desc: '在插件商店中按行业、功能浏览或搜索插件。' },
-  { step: '02', title: '一键安装', desc: '点击安装，查看权限声明并确认。插件自动加载功能模块和导航。' },
-  { step: '03', title: '开始使用', desc: '新菜单、新面板即刻生效。AI Agent 自动感知插件能力，协同工作。' },
+  { step: '02', title: '选择模板', desc: '在安装向导里选择内置行业模板。' },
+  { step: '03', title: '开始使用', desc: '对应的行业界面会出现在导航里。多 Agent 即将推出。' },
   { step: '04', title: '持续更新', desc: '插件自动推送更新，业务功能持续进化，永不掉队。' },
 ];
 
@@ -68,7 +68,7 @@ export default function FlowHubPage() {
             </h1>
             <p className="text-xl text-gray-300 leading-relaxed mb-8">
               FlowHub 是 ProClaw 的行业工作流插件生态市场。
-              从餐饮 POS 到宠物店管理，发现适合你业务的插件，即装即用，无限扩展。
+              从餐饮 POS 到宠物店管理，桌面端含内置行业模板（内测）。
             </p>
             <div className="flex items-center gap-4">
               <button
@@ -93,7 +93,7 @@ export default function FlowHubPage() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-3">覆盖多个行业</h2>
           <p className="text-gray-500 max-w-2xl mx-auto">
-            FlowHub 为不同行业提供定制化插件，每个插件都包含专属功能模块、操作面板和 AI 经营团队。
+            桌面端为不同行业准备了内置模板（内测），带有对应的功能模块和操作面板。多 Agent 即将推出。
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

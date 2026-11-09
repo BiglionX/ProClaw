@@ -125,7 +125,7 @@ export default function PluginStorePage() {
         <div className="max-w-7xl mx-auto px-6 py-16">
           <h1 className="text-4xl font-bold mb-3">行业插件商店</h1>
           <p className="text-gray-300 text-lg max-w-2xl">
-            发现适合你业务的行业插件。每个插件都包含专属功能模块、操作面板和 AI 经营团队，即装即用。
+            桌面端含内置行业模板（内测），带有餐饮、美业、宠物等行业界面。多 Agent 即将推出。
           </p>
         </div>
       </div>

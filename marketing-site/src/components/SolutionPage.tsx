@@ -81,7 +81,7 @@ const SolutionPage: React.FC<SolutionPageProps> = ({ data, routeKey }) => {
       <div className="py-16 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">AI 赋能</h2>
-          <p className="text-gray-500 text-center mb-10">{data.name}专属 AI Agent，24 小时在线待命</p>
+          <p className="text-gray-500 text-center mb-10">多 Agent 即将推出。当前是单模型 CEO 对话。</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {data.aiAgents.map((agent, idx) => (
               <div key={idx} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-all">

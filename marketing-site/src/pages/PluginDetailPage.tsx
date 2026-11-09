@@ -198,7 +198,7 @@ export default function PluginDetailPage() {
                   安装插件
                 </button>
                 <span className="text-xs text-gray-400">
-                  安装后将同时激活关联的 AI 经营团队
+                  选择内置行业模板后，可以使用对应的行业界面。多 Agent 即将推出。
                 </span>
               </div>
             </div>

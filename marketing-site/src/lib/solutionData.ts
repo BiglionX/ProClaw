@@ -69,11 +69,11 @@ export const solutionData: Record<string, SolutionData> = {
       { name: '菜单优化', desc: '分析菜品销售数据，推荐高利润菜品和菜单结构调整。', agentId: 'ma_catering_menu' },
     ],
     pricing: [
-      { planName: '基础桌面端', price: '免费', desc: '含基础进销存 + 标准 AI 团队，下载即用。' },
-      { planName: '餐饮插件', price: '免费', desc: 'POS/KDS/桌台管理/菜单管理，安装即激活。' },
+      { planName: '基础桌面端', price: '免费', desc: '含基础进销存 + AI 经营助手（内测：单模型 CEO 对话，多 Agent 即将推出）。' },
+      { planName: '餐饮插件', price: '免费', desc: 'POS/KDS/桌台管理/菜单管理，内置行业模板（内测）。' },
       { planName: '云商城 + AI 增强', price: '按 Token 计费', desc: '外卖网站生成、高级 AI 分析、云端备份。' },
     ],
-    ctaText: '免费下载桌面端，安装后选择餐饮行业即可激活全部功能',
+    ctaText: '免费下载桌面端，在向导里选择餐饮内置模板（内测）',
   },
 
   beauty: {
@@ -114,11 +114,11 @@ export const solutionData: Record<string, SolutionData> = {
       { name: '营销策划', desc: '分析客群画像，自动生成精准营销方案和优惠策略。', agentId: 'ma_beauty_marketing' },
     ],
     pricing: [
-      { planName: '基础桌面端', price: '免费', desc: '含基础进销存 + 标准 AI 团队，下载即用。' },
-      { planName: '美业插件', price: '免费', desc: '预约/排班/服务管理/会员系统，安装即激活。' },
+      { planName: '基础桌面端', price: '免费', desc: '含基础进销存 + AI 经营助手（内测：单模型 CEO 对话，多 Agent 即将推出）。' },
+      { planName: '美业插件', price: '免费', desc: '预约/排班/服务管理/会员系统，内置行业模板（内测）。' },
       { planName: '云商城 + AI 增强', price: '按 Token 计费', desc: '在线预约网站、AI 营销分析、云端备份。' },
     ],
-    ctaText: '免费下载桌面端，安装后选择美业行业即可激活全部功能',
+    ctaText: '免费下载桌面端，在向导里选择美业内置模板（内测）',
   },
 
   pet: {
@@ -159,11 +159,11 @@ export const solutionData: Record<string, SolutionData> = {
       { name: '健康管理', desc: '记录宠物体检和疫苗记录，自动提醒主人到期时间。', agentId: 'ma_pet_health' },
     ],
     pricing: [
-      { planName: '基础桌面端', price: '免费', desc: '含基础进销存 + 标准 AI 团队，下载即用。' },
-      { planName: '宠物插件', price: '免费', desc: '宠物档案/寄养管理/美容预约，安装即激活。' },
+      { planName: '基础桌面端', price: '免费', desc: '含基础进销存 + AI 经营助手（内测：单模型 CEO 对话，多 Agent 即将推出）。' },
+      { planName: '宠物插件', price: '免费', desc: '宠物档案/寄养管理/美容预约，内置行业模板（内测）。' },
       { planName: '云商城 + AI 增强', price: '按 Token 计费', desc: '在线预约网站、AI 健康管理、云端备份。' },
     ],
-    ctaText: '免费下载桌面端，安装后选择宠物行业即可激活全部功能',
+    ctaText: '免费下载桌面端，在向导里选择宠物内置模板（内测）',
   },
 
   cloud: {
@@ -179,7 +179,7 @@ export const solutionData: Record<string, SolutionData> = {
     painPoints: [
       {
         problem: '电脑坏了数据全丢？没有备份方案，经营数据安全毫无保障。',
-        solution: '自动云端备份，数据加密传输存储。即使电脑损坏，换台新设备登录即可恢复全部数据。',
+        solution: '可以做云端备份，换设备登录后恢复已同步的数据。云同步传输使用 TLS 加密。',
       },
       {
         problem: '想开网店但不懂技术，搭建网站太复杂，维护成本高。',
@@ -192,10 +192,10 @@ export const solutionData: Record<string, SolutionData> = {
     ],
     features: [
       { title: 'Token 计费', desc: '透明用量、实时监控、预算上限设置，完全掌控AI花费。', icon: '\uD83D\uDCB0' },
-      { title: '云端备份', desc: '经营数据自动加密备份到云端，换设备登录即可恢复。', icon: '\uD83D\uDD04' },
+      { title: '云端备份', desc: '经营数据可以备份到云端，换设备登录即可恢复。云同步传输使用 TLS 加密。', icon: '\uD83D\uDD04' },
       { title: '云商城托管', desc: 'AI 自动生成电商网站，商品同步、订单自动处理。', icon: '\uD83C\uDF10' },
       { title: '数据同步', desc: '桌面端和移动端数据实时同步，随时随地管店。', icon: '\uD83D\uDCF2' },
-      { title: '安全管理', desc: '加密传输、权限控制、操作审计，数据安全多重保障。', icon: '\uD83D\uDD12' },
+      { title: '安全管理', desc: '云同步传输使用 TLS 加密，并支持权限控制和操作审计。', icon: '\uD83D\uDD12' },
       { title: '弹性扩展', desc: '按需使用，不绑定长期合约，随时升级或降级。', icon: '\uD83D\uDCC8' },
     ],
     aiAgents: [
@@ -204,10 +204,10 @@ export const solutionData: Record<string, SolutionData> = {
       { name: '运维助手', desc: '监控云服务健康状态，自动处理常见运维问题。', agentId: 'ma_cloud_ops' },
     ],
     pricing: [
-      { planName: '基础桌面端', price: '免费', desc: '含本地进销存 + 标准 AI 团队，完全免费使用。' },
-      { planName: 'Cloud 插件', price: '免费', desc: '云端备份/数据同步/计费监控，安装即激活。' },
+      { planName: '基础桌面端', price: '免费', desc: '含本地进销存 + AI 经营助手（内测：单模型 CEO 对话，多 Agent 即将推出）。' },
+      { planName: 'Cloud 插件', price: '免费', desc: '云端备份/数据同步/计费监控，内置行业模板（内测）。' },
       { planName: '云商城 + Token', price: '按量付费', desc: '云商城生成和托管、高级 AI 调用按 Token 计费。' },
     ],
-    ctaText: '免费下载桌面端，安装后激活 Cloud 插件即可享受云服务',
+    ctaText: '免费下载桌面端。云同步传输使用 TLS 加密。',
   },
 };

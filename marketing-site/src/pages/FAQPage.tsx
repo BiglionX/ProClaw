@@ -21,7 +21,7 @@ const faqData: FAQCategory[] = [
     questions: [
       {
         question: 'ProClaw 是什么？',
-        answer: 'ProClaw 是一个开源的 AI 驱动商户经营操作系统。它不仅仅是进销存软件，更集成了 AI 经营团队（7 个专业 Agent）、CEO 主控官、云托管商城、Agent 生态、移动端 App 等完整能力，帮助中小商户实现智能化经营。',
+        answer: 'ProClaw 是一个开源的商户经营软件，包含进销存、云托管商城和移动端 App。AI 经营助手目前是内测：单模型 CEO 对话，多 Agent 即将推出。',
         featured: true,
       },
       {
