@@ -26,7 +26,7 @@ const StructuredData: React.FC = () => {
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Windows, macOS, Linux',
       description:
-        '开源 AI 驱动的商户经营操作系统。内置 25+ AI Agent 与 CEO 主控官，支持 ProClaw Plus / ProClaw Light / ProClaw Cloud 三种模式，搭配行业插件生态。自然语言进销存管理、数据分析、云商城。',
+        '开源 AI 驱动的商户经营操作系统。内置 AI 经营助手（即将推出），支持 ProClaw Plus / ProClaw Light / ProClaw Cloud 三种模式，含内置行业模板。自然语言进销存管理、数据分析、云商城。',
       url: baseUrl,
       downloadUrl: `${baseUrl}/download`,
       offers: {
@@ -42,7 +42,7 @@ const StructuredData: React.FC = () => {
       '@type': 'WebSite',
       name: 'ProClaw - 开源 AI 驱动商户经营操作系统',
       url: baseUrl,
-      description: '开源 AI 驱动的商户经营操作系统。内置 25+ AI Agent，支持多模式、行业插件生态。',
+      description: '开源 AI 驱动的商户经营操作系统。内置 AI 经营助手（即将推出），支持多模式，含内置行业模板。',
       potentialAction: {
         '@type': 'SearchAction',
         target: {

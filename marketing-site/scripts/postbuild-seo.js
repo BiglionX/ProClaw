@@ -16,24 +16,24 @@ const routeConfigs = [
   {
     path: '/',
     dir: '',
-    title: 'ProClaw - 开源 AI 驱动的商户经营操作系统 | 25+ Agent · 三模式 · 行业插件',
+    title: 'ProClaw - 开源 AI 驱动的商户经营操作系统 | 进销存 · 三模式 · 内置行业模板',
     description:
-      'ProClaw 开源免费，内置 25+ AI Agent 与 CEO 主控官。双模式（ProClaw Plus / ProClaw Light）加云托管商城（ProClaw Cloud），搭配行业插件生态。自然语言进销存管理、数据分析、云商城。本地优先，使用本地数据存储。',
+      'ProClaw 开源免费，内置 AI 经营助手（即将推出）。双模式（ProClaw Plus / ProClaw Light）加云托管商城（ProClaw Cloud），含内置行业模板。自然语言进销存管理、数据分析、云商城。本地优先，使用本地数据存储。',
     keywords:
       'ProClaw, AI经营系统, 进销存, 商户管理, AI Agent, ProClaw Plus, ProClaw Light, ProClaw Cloud, 行业插件, 餐饮管理系统, 美业管理系统, 宠物店管理系统, 开源, 本地优先, 云商城',
     ogTitle: 'ProClaw - 开源 AI 驱动的商户经营操作系统 | Plus · Light · Cloud',
     ogDescription:
-      '开源免费，内置 25+ AI Agent 与 CEO 主控官。双模式（ProClaw Plus / ProClaw Light）加 ProClaw Cloud 云商城，行业插件生态。本地优先架构，数据 100% 自主可控。',
+      '开源免费，内置 AI 经营助手（即将推出）。双模式（ProClaw Plus / ProClaw Light）加 ProClaw Cloud 云商城，含内置行业模板。本地优先架构，数据保存在本地。',
   },
   {
     path: '/features',
     dir: 'features',
-    title: '功能全景 - ProClaw AI 经营系统 | AI Agent · 进销存 · 云商城 · 行业插件',
+    title: '功能全景 - ProClaw AI 经营系统 | 进销存 · 云商城 · 内置行业模板',
     description:
-      'ProClaw 功能全景：AI CEO 主控官 + 25+ Agent 协作、进销存管理、云托管商城、Agent 生态市场、团队协作与通信、3 分钟安装向导。一个软件搞定所有经营场景。',
+      'ProClaw 功能全景：内置 AI 经营助手（即将推出）、进销存管理、云托管商城、内置行业模板、团队协作与通信、3 分钟安装向导。一个软件搞定所有经营场景。',
     keywords: 'ProClaw功能, AI进销存, AI Agent, 云商城, 行业插件, 商户管理软件, 开源进销存, 智能经营',
-    ogTitle: '功能全景 - ProClaw | AI Agent · 进销存 · 云商城 · 行业插件',
-    ogDescription: 'AI CEO 主控官 + 25+ Agent 自动分工协作。进销存管理、云托管商城、行业插件生态、团队协作。一个软件搞定所有经营场景。',
+    ogTitle: '功能全景 - ProClaw | 进销存 · 云商城 · 内置行业模板',
+    ogDescription: '内置 AI 经营助手（即将推出）。进销存管理、云托管商城、内置行业模板、团队协作。一个软件搞定所有经营场景。',
   },
   {
     path: '/use-cases',
@@ -50,7 +50,7 @@ const routeConfigs = [
     dir: 'pricing',
     title: '透明定价 - ProClaw | 桌面端免费 · 云商城按 Token 计费',
     description:
-      'ProClaw 定价：桌面端永久免费开源，含基础进销存 + 标准 AI 团队。云托管商城按 Token 计费，新用户赠送 50,000 PT 免费体验。无隐藏费用。',
+      'ProClaw 定价：桌面端永久免费开源，含基础进销存。内置 AI 经营助手（即将推出）。云托管商城按 Token 计费，新用户赠送 50,000 PT 免费体验。无隐藏费用。',
     keywords: 'ProClaw定价, Token计费, 免费进销存, 开源免费, 云商城价格, AI经营成本, ProClaw价格',
     ogTitle: '透明定价 - ProClaw | 桌面端永久免费 · 云商城按量付费',
     ogDescription: '桌面端永久免费开源。云托管商城按 Token 计费，新用户赠送 50,000 PT（约人民币50元）免费体验。无隐藏费用。',
@@ -88,12 +88,12 @@ const routeConfigs = [
   {
     path: '/plugins',
     dir: 'plugins',
-    title: '插件商店 - ProClaw | 行业插件 · Agent 生态 · 扩展功能',
+    title: '插件商店 - ProClaw | 内置行业模板',
     description:
-      'ProClaw 插件商店：餐饮 POS/KDS 插件、美业预约营销插件、宠物店管理插件、Cloud 托管插件。按需安装，即装即用，无限扩展。',
+      'ProClaw 桌面端含内置行业模板，覆盖餐饮、美业、宠物店等场景。',
     keywords: 'ProClaw插件, 餐饮插件, 美业插件, 宠物插件, Cloud插件, 行业方案, 功能扩展',
-    ogTitle: '插件商店 - ProClaw | 行业插件 · 即装即用 · 无限扩展',
-    ogDescription: 'ProClaw 插件商店：餐饮 POS/KDS、美业预约营销、宠物店管理、Cloud 托管。按需安装，即装即用。',
+    ogTitle: '插件商店 - ProClaw | 内置行业模板',
+    ogDescription: 'ProClaw 桌面端含内置行业模板，覆盖餐饮、美业、宠物店等场景。',
   },
   {
     path: '/solutions/catering',
@@ -154,7 +154,7 @@ function getJsonLd(path) {
       '@type': 'WebSite',
       name: 'ProClaw - 开源 AI 驱动商户经营操作系统',
       url: baseUrl + path,
-      description: '开源 AI 驱动的商户经营操作系统。内置 25+ AI Agent，支持多模式、行业插件生态。',
+      description: '开源 AI 驱动的商户经营操作系统。内置 AI 经营助手（即将推出），支持多模式，含内置行业模板。',
     },
   ];
   // 首页添加 SoftwareApplication schema
@@ -166,7 +166,7 @@ function getJsonLd(path) {
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Windows, macOS, Linux',
       description:
-        '开源 AI 驱动的商户经营操作系统。内置 25+ AI Agent 与 CEO 主控官，支持 ProClaw Plus / ProClaw Light / ProClaw Cloud 三种模式，搭配行业插件生态。',
+        '开源 AI 驱动的商户经营操作系统。内置 AI 经营助手（即将推出），支持 ProClaw Plus / ProClaw Light / ProClaw Cloud 三种模式，含内置行业模板。',
       url: baseUrl,
       downloadUrl: baseUrl + '/download',
       offers: {
