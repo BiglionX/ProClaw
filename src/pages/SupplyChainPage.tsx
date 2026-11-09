@@ -129,6 +129,41 @@ const getTransactionTypeColor = (type: string) => {
   return colors[type] || 'default';
 };
 
+const PURCHASE_ORDER_STATUS_TEXT: Record<string, string> = {
+  draft: '草稿',
+  confirmed: '已确认',
+  received: '已入库',
+  cancelled: '已取消',
+  shipped: '已发货',
+};
+
+const SALES_ORDER_STATUS_TEXT: Record<string, string> = {
+  draft: '草稿',
+  confirmed: '已确认',
+  shipped: '已发货',
+  delivered: '已送达',
+  completed: '已完成',
+  cancelled: '已取消',
+};
+
+const PAYMENT_STATUS_TEXT: Record<string, string> = {
+  unpaid: '未付款',
+  partial: '部分付款',
+  paid: '已付款',
+};
+
+function getStatusText(status: string): string {
+  return PURCHASE_ORDER_STATUS_TEXT[status] || status;
+}
+
+function getSalesStatusText(status: string): string {
+  return SALES_ORDER_STATUS_TEXT[status] || status;
+}
+
+function getPaymentStatusText(status: string): string {
+  return PAYMENT_STATUS_TEXT[status] || status;
+}
+
 /* ========== PRD v12.0 灵活库存：模块级辅助函数 ========== */
 
 type CalibrationPromptSetter = React.Dispatch<React.SetStateAction<{
@@ -743,9 +778,9 @@ function PurchaseTab({
                     <TableRow key={o.id} hover sx={{ cursor: 'pointer' }} onClick={() => loadOrderDetail(o.id)}>
                       <TableCell><Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>{o.po_number}</Typography></TableCell>
                       <TableCell>{o.supplier_name || '-'}</TableCell><TableCell>{o.order_date}</TableCell>
-                      <TableCell><Chip label={o.status} size="small" color={o.status === 'received' ? 'success' : o.status === 'confirmed' ? 'primary' : o.status === 'shipped' ? 'info' : 'default'} /></TableCell>
+                      <TableCell><Chip label={getStatusText(o.status)} size="small" color={o.status === 'received' ? 'success' : o.status === 'confirmed' ? 'primary' : o.status === 'shipped' ? 'info' : 'default'} /></TableCell>
                       <TableCell align="right"><Typography sx={{ fontWeight: 'bold' }}>¥{o.total_amount.toFixed(2)}</Typography></TableCell>
-                      <TableCell><Chip label={o.payment_status} size="small" color={o.payment_status === 'paid' ? 'success' : o.payment_status === 'partial' ? 'warning' : 'default'} /></TableCell>
+                      <TableCell><Chip label={getPaymentStatusText(o.payment_status)} size="small" color={o.payment_status === 'paid' ? 'success' : o.payment_status === 'partial' ? 'warning' : 'default'} /></TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <Button size="small" variant="outlined" color="info" onClick={e => { e.stopPropagation(); loadOrderDetail(o.id); }}>
@@ -880,7 +915,7 @@ function PurchaseTab({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h6">采购订单详情</Typography>
             {selectedOrderDetail && (
-              <Chip label={selectedOrderDetail.order.status}
+              <Chip label={getStatusText(selectedOrderDetail.order.status)}
                 color={selectedOrderDetail.order.status === 'received' ? 'success' : selectedOrderDetail.order.status === 'confirmed' ? 'primary' : selectedOrderDetail.order.status === 'shipped' ? 'info' : 'default'} />
             )}
           </Box>
@@ -894,7 +929,7 @@ function PurchaseTab({
                 <Typography variant="body2"><b>订单日期：</b>{selectedOrderDetail.order.order_date}</Typography>
                 <Typography variant="body2"><b>预计交货：</b>{selectedOrderDetail.order.expected_delivery_date || '-'}</Typography>
                 <Typography variant="body2"><b>总金额：</b>¥{selectedOrderDetail.order.total_amount.toFixed(2)}</Typography>
-                <Typography variant="body2"><b>付款状态：</b>{selectedOrderDetail.order.payment_status}</Typography>
+                <Typography variant="body2"><b>付款状态：</b>{getPaymentStatusText(selectedOrderDetail.order.payment_status)}</Typography>
               </Box>
               <Typography variant="body2"><b>备注：</b>{selectedOrderDetail.order.notes || '无'}</Typography>
 
@@ -1710,9 +1745,9 @@ function SalesTab({
                     <TableRow key={o.id} hover sx={{ cursor: 'pointer' }} onClick={() => loadOrderDetail(o.id)}>
                       <TableCell><Typography sx={{ fontWeight: 'bold', color: 'primary.main' }}>{o.so_number}</Typography></TableCell>
                       <TableCell>{o.customer_name || '-'}</TableCell><TableCell>{o.order_date}</TableCell>
-                      <TableCell><Chip label={o.status} size="small" color={o.status === 'delivered' ? 'success' : o.status === 'confirmed' ? 'primary' : o.status === 'shipped' ? 'info' : 'default'} /></TableCell>
+                      <TableCell><Chip label={getSalesStatusText(o.status)} size="small" color={o.status === 'delivered' ? 'success' : o.status === 'confirmed' ? 'primary' : o.status === 'shipped' ? 'info' : 'default'} /></TableCell>
                       <TableCell align="right"><Typography sx={{ fontWeight: 'bold' }}>¥{o.total_amount.toFixed(2)}</Typography></TableCell>
-                      <TableCell><Chip label={o.payment_status} size="small" color={o.payment_status === 'paid' ? 'success' : o.payment_status === 'partial' ? 'warning' : 'default'} /></TableCell>
+                      <TableCell><Chip label={getPaymentStatusText(o.payment_status)} size="small" color={o.payment_status === 'paid' ? 'success' : o.payment_status === 'partial' ? 'warning' : 'default'} /></TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <Button size="small" variant="outlined" color="info" onClick={e => { e.stopPropagation(); loadOrderDetail(o.id); }}>
@@ -1856,7 +1891,7 @@ function SalesTab({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h6">销售订单详情</Typography>
             {selectedOrderDetail && (
-              <Chip label={selectedOrderDetail.order.status}
+              <Chip label={getSalesStatusText(selectedOrderDetail.order.status)}
                 color={selectedOrderDetail.order.status === 'delivered' ? 'success' : selectedOrderDetail.order.status === 'confirmed' ? 'primary' : selectedOrderDetail.order.status === 'shipped' ? 'info' : 'default'} />
             )}
           </Box>
@@ -1870,7 +1905,7 @@ function SalesTab({
                 <Typography variant="body2"><b>订单日期：</b>{selectedOrderDetail.order.order_date}</Typography>
                 <Typography variant="body2"><b>预计交货：</b>{selectedOrderDetail.order.expected_delivery_date || '-'}</Typography>
                 <Typography variant="body2"><b>总金额：</b>¥{selectedOrderDetail.order.total_amount.toFixed(2)}</Typography>
-                <Typography variant="body2"><b>付款状态：</b>{selectedOrderDetail.order.payment_status}</Typography>
+                <Typography variant="body2"><b>付款状态：</b>{getPaymentStatusText(selectedOrderDetail.order.payment_status)}</Typography>
                 <Typography variant="body2" sx={{ gridColumn: '1 / -1' }}><b>收货地址：</b>{selectedOrderDetail.order.shipping_address || '无'}</Typography>
               </Box>
               <Typography variant="body2"><b>备注：</b>{selectedOrderDetail.order.notes || '无'}</Typography>
