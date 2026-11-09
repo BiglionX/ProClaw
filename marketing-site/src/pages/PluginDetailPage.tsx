@@ -7,7 +7,6 @@ import {
   getPluginRatingSummary,
   getPluginReviews,
   parseManifest,
-  recordPluginDownload,
 } from '../lib/pluginService';
 import type { IndustryPlugin, PluginVersion, PluginRatingSummary, PluginReview, IndustryPluginManifest } from '../types';
 
@@ -81,19 +80,8 @@ export default function PluginDetailPage() {
     load();
   }, [pluginId]);
 
-  const handleInstall = async () => {
-    if (!data) return;
-    const installUrl = `proclaw://install-plugin?id=${data.plugin.id}&version=${data.plugin.version}`;
-
-    // 尝试通过 deep link 唤起桌面端
-    try {
-      window.location.href = installUrl;
-      // 记录下载
-      await recordPluginDownload(data.plugin.id);
-    } catch {
-      // 如果 deep link 失败，引导用户到下载页面先安装桌面端
-      navigate('/download');
-    }
+  const handleInstall = () => {
+    navigate('/features#industry-plugins');
   };
 
   if (loading) {
@@ -195,7 +183,7 @@ export default function PluginDetailPage() {
                   onClick={handleInstall}
                   className="px-8 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-sm"
                 >
-                  安装插件
+                  查看内置行业模板
                 </button>
                 <span className="text-xs text-gray-400">
                   选择内置行业模板后，可以使用对应的行业界面。多 Agent 即将推出。
