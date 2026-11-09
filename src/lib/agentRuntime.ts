@@ -125,9 +125,15 @@ const apiHandlers: Record<string, ApiHandler> = {
     }
   },
 
-  async sendMessage(args) {
+  async sendMessage(args, context) {
     const [to, content] = args as [string, string];
-    return invokeTauri('send_message', { to, content });
+    return invokeTauri('send_message', {
+      message: {
+        from_user: context.agentId,
+        to_user: to,
+        content,
+      },
+    });
   },
 
   async showNotification(args) {
@@ -410,9 +416,19 @@ class AgentRuntimeManager {
     if (!action) return;
 
     if (action.triggerMessage) {
-      // 通过聊天发送触发消息
+      // 通过聊天发送触发消息。接收者是目标 Agent；发送者是当前登录用户。
       const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('send_message', { to: agentId, content: action.triggerMessage });
+      const { useAuthStore } = await import('./authStore');
+      const fromUser = useAuthStore.getState().user?.id;
+      // TODO: 未登录时没有发送者 id，不使用占位身份。
+      const payload: { to_user: string; content: string; from_user?: string } = {
+        to_user: agentId,
+        content: action.triggerMessage,
+      };
+      if (fromUser) {
+        payload.from_user = fromUser;
+      }
+      await invoke('send_message', { message: payload });
     } else if (action.triggerMethod) {
       // 通过 postMessage 调用 Agent 方法
       await this.request(agentId, action.triggerMethod, ...(action.triggerParams || []));

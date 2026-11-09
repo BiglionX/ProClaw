@@ -312,9 +312,18 @@ const pluginApi: ProClawPluginAPI = {
 
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const reply = await invoke<string>('send_message', {
-        to: agentId,
+      const { useAuthStore } = await import('./authStore');
+      const fromUser = useAuthStore.getState().user?.id;
+      // TODO: 插件 API 没有独立发送者参数。已登录时用当前用户 id；未登录不写占位身份。待产品确认发送者是否应为登录用户。
+      const payload: { to_user: string; content: string; from_user?: string } = {
+        to_user: agentId,
         content: message,
+      };
+      if (fromUser) {
+        payload.from_user = fromUser;
+      }
+      const reply = await invoke<string>('send_message', {
+        message: payload,
       });
       return reply;
     } catch (error: any) {
