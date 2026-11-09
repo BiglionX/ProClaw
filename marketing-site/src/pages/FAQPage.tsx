@@ -57,7 +57,7 @@ const faqData: FAQCategory[] = [
     questions: [
       {
         question: '我的数据安全吗？会上传到云端吗？',
-        answer: '非常安全。ProClaw 采用"本地优先"架构，所有业务数据默认使用 SQLCipher AES-256 加密存储在你本地的 SQLite 数据库中。除非你主动开启 Supabase 云同步功能，否则数据永远不会离开你的设备。云同步也是加密传输，你可以随时关闭。',
+        answer: '业务数据默认保存在你本地的 SQLite 数据库中。除非你主动开启 Supabase 云同步，数据不会离开这台设备。云同步的传输使用 TLS 加密，你可以随时关闭。',
         featured: true,
       },
     ],

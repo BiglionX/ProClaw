@@ -18,7 +18,7 @@ const routeConfigs = [
     dir: '',
     title: 'ProClaw - 开源 AI 驱动的商户经营操作系统 | 25+ Agent · 三模式 · 行业插件',
     description:
-      'ProClaw 开源免费，内置 25+ AI Agent 与 CEO 主控官。双模式（ProClaw Plus / ProClaw Light）加云托管商城（ProClaw Cloud），搭配行业插件生态。自然语言进销存管理、数据分析、云商城。本地优先，数据 100% 加密存储。',
+      'ProClaw 开源免费，内置 25+ AI Agent 与 CEO 主控官。双模式（ProClaw Plus / ProClaw Light）加云托管商城（ProClaw Cloud），搭配行业插件生态。自然语言进销存管理、数据分析、云商城。本地优先，使用本地数据存储。',
     keywords:
       'ProClaw, AI经营系统, 进销存, 商户管理, AI Agent, ProClaw Plus, ProClaw Light, ProClaw Cloud, 行业插件, 餐饮管理系统, 美业管理系统, 宠物店管理系统, 开源, 本地优先, 云商城',
     ogTitle: 'ProClaw - 开源 AI 驱动的商户经营操作系统 | Plus · Light · Cloud',
@@ -60,10 +60,10 @@ const routeConfigs = [
     dir: 'download',
     title: '免费下载 - ProClaw 桌面端 | Windows · macOS · Linux',
     description:
-      '免费下载 ProClaw 桌面端，支持 Windows、macOS、Linux。3 分钟完成安装，CEO Agent 对话引导配置。开源免费，数据 100% 本地加密存储。',
+      '免费下载 ProClaw 桌面端，支持 Windows、macOS、Linux。3 分钟完成安装，CEO Agent 对话引导配置。开源免费，使用本地数据存储。',
     keywords: 'ProClaw下载, 免费下载, 进销存软件下载, Windows进销存, macOS进销存, Linux进销存, 开源软件下载',
     ogTitle: '免费下载 - ProClaw 桌面端 | 支持 Windows · macOS · Linux',
-    ogDescription: '免费下载 ProClaw 桌面端。支持 Windows、macOS、Linux。3 分钟安装，CEO Agent 对话引导配置。开源免费，数据本地加密存储。',
+    ogDescription: '免费下载 ProClaw 桌面端。支持 Windows、macOS、Linux。3 分钟安装，CEO Agent 对话引导配置。开源免费，使用本地数据存储。',
   },
   {
     path: '/faq',
