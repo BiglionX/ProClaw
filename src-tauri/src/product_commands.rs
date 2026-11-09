@@ -450,9 +450,11 @@ pub fn create_product_spu(
         let sku_code = sku_item["sku_code"]
             .as_str()
             .ok_or("SKU code is required")?;
-        let specifications = sku_item["specifications"]
-            .as_str()
-            .ok_or("Specifications is required")?;
+        let specifications = match &sku_item["specifications"] {
+            serde_json::Value::String(text) => text.clone(),
+            serde_json::Value::Null => return Err("Specifications is required".to_string()),
+            other => serde_json::to_string(other).map_err(|e| e.to_string())?,
+        };
 
         tx.execute(
             "INSERT INTO product_skus (id, spu_id, sku_code, specifications, spec_text, cost_price, sell_price, current_stock, min_stock, max_stock, barcode, weight, volume, is_default, sort_order, is_active, sync_status)
