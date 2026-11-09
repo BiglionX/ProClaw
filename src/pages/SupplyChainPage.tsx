@@ -44,7 +44,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PaymentDialog from '../components/PaymentDialog';
 import MicroStocktakingPrompt from '../components/Inventory/MicroStocktakingPrompt';
 import {
@@ -164,6 +164,15 @@ function getPaymentStatusText(status: string): string {
   return PAYMENT_STATUS_TEXT[status] || status;
 }
 
+type InboundReason = 'purchase' | 'return' | 'gain' | 'other';
+
+const INBOUND_REASON_TEXT: Record<InboundReason, string> = {
+  purchase: '采购入库',
+  return: '退货入库',
+  gain: '盘盈',
+  other: '其他',
+};
+
 /* ========== PRD v12.0 灵活库存：模块级辅助函数 ========== */
 
 type CalibrationPromptSetter = React.Dispatch<React.SetStateAction<{
@@ -247,27 +256,83 @@ function InventoryTab({
   setSuccessMessage: (e: string | null) => void;
 }) {
   const invalidateDashboard = useInvalidateInventoryDashboard();
+  const invalidatePurchase = useInvalidatePurchase();
   const { data, isLoading: loading } = useInventoryDashboard();
   const stats = data?.stats ?? null;
   const transactions = data?.transactions ?? [];
   const products = data?.products ?? [];
   const [mutating, setMutating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [reasonKind, setReasonKind] = useState<InboundReason>('other');
+  const [purchaseOrderId, setPurchaseOrderId] = useState('');
+  const [purchaseDetail, setPurchaseDetail] = useState<PurchaseOrderDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const { data: purchaseOrders = [] } = usePurchaseOrders(undefined, dialogOpen);
+  const unreceivedOrders = purchaseOrders.filter(order => order.status === 'draft' || order.status === 'confirmed');
   const [form, setForm] = useState<CreateTransactionInput>({
     product_id: '', transaction_type: 'inbound', quantity: 0, reference_no: '', reason: '', notes: '',
   });
 
   const loadData = () => invalidateDashboard();
 
+  const resetTransactionForm = () => {
+    setReasonKind('other');
+    setPurchaseOrderId('');
+    setPurchaseDetail(null);
+    setForm({ product_id: '', transaction_type: 'inbound', quantity: 0, reference_no: '', reason: '', notes: '' });
+  };
+
+  useEffect(() => {
+    if (!dialogOpen || reasonKind !== 'purchase' || !purchaseOrderId) {
+      setPurchaseDetail(null);
+      return;
+    }
+    let cancelled = false;
+    setDetailLoading(true);
+    getPurchaseOrderDetail(purchaseOrderId)
+      .then(detail => {
+        if (!cancelled) setPurchaseDetail(detail);
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setPurchaseDetail(null);
+          setError(err instanceof Error ? err.message : '加载采购单明细失败');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dialogOpen, reasonKind, purchaseOrderId, setError]);
+
   const handleSubmit = async () => {
-    if (!form.product_id) { setError('请选择产品'); return; }
-    if (form.quantity <= 0) { setError('数量必须大于0'); return; }
+    if (reasonKind === 'purchase') {
+      if (!purchaseOrderId) { setError('请选择未入库的采购单'); return; }
+    } else if (!form.product_id) {
+      setError('请选择产品');
+      return;
+    } else if (form.quantity <= 0) {
+      setError('数量必须大于0');
+      return;
+    }
     try {
       setMutating(true);
-      await createInventoryTransaction(form);
-      setSuccessMessage('库存交易创建成功!');
+      if (reasonKind === 'purchase') {
+        await receivePurchaseOrder(purchaseOrderId);
+        setSuccessMessage('采购入库成功，库存已更新!');
+        invalidatePurchase();
+        window.dispatchEvent(new CustomEvent('proclaw:products-changed'));
+      } else {
+        await createInventoryTransaction({
+          ...form,
+          reason: INBOUND_REASON_TEXT[reasonKind],
+        });
+        setSuccessMessage('库存交易创建成功!');
+      }
       setDialogOpen(false);
-      setForm({ product_id: '', transaction_type: 'inbound', quantity: 0, reference_no: '', reason: '', notes: '' });
+      resetTransactionForm();
       invalidateDashboard();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建交易失败');
@@ -399,19 +464,88 @@ function InventoryTab({
               </Select>
             </FormControl>
             <FormControl fullWidth>
-              <InputLabel>产品</InputLabel>
-              <Select value={form.product_id} label="产品" onChange={e => setForm({ ...form, product_id: e.target.value })}>
-                {products.map(product => {
-                  const totalStock = product.skus?.reduce((sum, sku) => sum + sku.current_stock, 0) || 0;
-                  return <MenuItem key={product.id} value={product.id}>{product.name} (SPU: {product.spu_code}) - 总库存: {totalStock}</MenuItem>;
-                })}
+              <InputLabel>原因</InputLabel>
+              <Select
+                value={reasonKind}
+                label="原因"
+                onChange={e => {
+                  const next = e.target.value as InboundReason;
+                  setReasonKind(next);
+                  if (next !== 'purchase') {
+                    setPurchaseOrderId('');
+                    setPurchaseDetail(null);
+                  }
+                }}
+              >
+                <MenuItem value="purchase">采购入库</MenuItem>
+                <MenuItem value="return">退货入库</MenuItem>
+                <MenuItem value="gain">盘盈</MenuItem>
+                <MenuItem value="other">其他</MenuItem>
               </Select>
             </FormControl>
-            <TextField label="数量" type="number" value={form.quantity}
-              onChange={e => setForm({ ...form, quantity: parseInt(e.target.value) || 0 })} inputProps={{ min: 1 }} fullWidth />
-            <TextField label="参考单号" value={form.reference_no} onChange={e => setForm({ ...form, reference_no: e.target.value })} placeholder="例如: PO-2024-001" fullWidth />
-            <TextField label="原因" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="例如: 采购入库、销售出库" fullWidth />
-            <TextField label="备注" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} multiline rows={2} fullWidth />
+            {reasonKind === 'purchase' ? (
+              <>
+                <FormControl fullWidth>
+                  <InputLabel>选择采购单</InputLabel>
+                  <Select
+                    value={purchaseOrderId}
+                    label="选择采购单"
+                    onChange={e => setPurchaseOrderId(e.target.value)}
+                  >
+                    <MenuItem value="" disabled>
+                      {unreceivedOrders.length === 0 ? '没有未入库的采购单' : '请选择采购单'}
+                    </MenuItem>
+                    {unreceivedOrders.map(order => (
+                      <MenuItem key={order.id} value={order.id}>
+                        {order.po_number} · {order.supplier_name || '未知供应商'} · {getStatusText(order.status)}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography variant="body2" color="text.secondary">
+                  确认后按该采购单整单收货，并写入库存。
+                </Typography>
+                {detailLoading && <Typography variant="body2">正在加载明细…</Typography>}
+                {purchaseDetail && (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>商品</TableCell>
+                          <TableCell align="right">数量</TableCell>
+                          <TableCell align="right">单价</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {purchaseDetail.items.map(item => (
+                          <TableRow key={item.id || item.product_id}>
+                            <TableCell>{item.product_name || item.product_id}</TableCell>
+                            <TableCell align="right">{item.quantity}</TableCell>
+                            <TableCell align="right">¥{item.unit_price.toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </>
+            ) : (
+              <>
+                <FormControl fullWidth>
+                  <InputLabel>产品</InputLabel>
+                  <Select value={form.product_id} label="产品" onChange={e => setForm({ ...form, product_id: e.target.value })}>
+                    {products.map(product => {
+                      const totalStock = product.skus?.reduce((sum, sku) => sum + sku.current_stock, 0) || 0;
+                      return <MenuItem key={product.id} value={product.id}>{product.name} (SPU: {product.spu_code}) - 总库存: {totalStock}</MenuItem>;
+                    })}
+                  </Select>
+                </FormControl>
+                <TextField label="数量" type="number" value={form.quantity}
+                  onChange={e => setForm({ ...form, quantity: parseInt(e.target.value) || 0 })} inputProps={{ min: 1 }} fullWidth />
+                <TextField label="参考单号" value={form.reference_no} onChange={e => setForm({ ...form, reference_no: e.target.value })} placeholder="例如: PO-2024-001" fullWidth />
+                <TextField label="备注" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} multiline rows={2} fullWidth />
+              </>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -448,6 +582,7 @@ function PurchaseTab({
     orderSearchQuery,
     subTab === 1
   );
+  const { data: paymentOrderSource = [] } = usePurchaseOrders(undefined, subTab === 1);
   const { data: products = [] } = useProductSPUs(100, subTab === 1);
 
   const loading = loadingSuppliers || loadingOrders || detailLoading || mutating;
@@ -506,6 +641,7 @@ function PurchaseTab({
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<PurchaseOrderDetail | null>(null);
   // 付款记录
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [payOrderId, setPayOrderId] = useState('');
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
   // PRD v12.0 灵活库存：微盘点弹窗
@@ -592,11 +728,15 @@ function PurchaseTab({
     }
   };
 
-  const handlePaymentSuccess = (result: any) => {
+  const payableOrders = paymentOrderSource.filter(
+    order => order.status !== 'cancelled' && order.payment_status !== 'paid',
+  );
+
+  const handlePaymentSuccess = (result: { paid_amount: number; payment_status: string }) => {
     setSuccessMessage(`付款记录成功! 已付: ¥${result.paid_amount.toFixed(2)}`);
-    // 刷新详情和付款历史
-    if (selectedOrderDetail) {
-      loadOrderDetail(selectedOrderDetail.order.id);
+    invalidatePurchase();
+    if (selectedOrderDetail && selectedOrderDetail.order.id === payOrderId) {
+      void loadOrderDetail(selectedOrderDetail.order.id);
     }
   };
 
@@ -757,6 +897,17 @@ function PurchaseTab({
               size="small" sx={{ minWidth: 300 }}
               InputProps={{ endAdornment: <Button size="small" onClick={loadOrders} disabled={loading}><SearchIcon /></Button> }} />
             <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateOrderDialog} disabled={loading}>创建采购订单</Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={() => {
+                setPayOrderId('');
+                setPaymentDialogOpen(true);
+              }}
+              disabled={loading}
+            >
+              登记付款
+            </Button>
             <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadOrders} disabled={loading}>刷新</Button>
           </Paper>
           <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
@@ -1019,7 +1170,10 @@ function PurchaseTab({
               )}
               {/* 付款按钮 */}
               {selectedOrderDetail && selectedOrderDetail.order.status !== 'cancelled' && selectedOrderDetail.order.payment_status !== 'paid' && (
-                <Button variant="contained" color="secondary" onClick={() => setPaymentDialogOpen(true)} disabled={loading}>
+                <Button variant="contained" color="secondary" onClick={() => {
+                  setPayOrderId(selectedOrderDetail.order.id);
+                  setPaymentDialogOpen(true);
+                }} disabled={loading}>
                   记录付款
                 </Button>
               )}
@@ -1030,17 +1184,22 @@ function PurchaseTab({
       </Dialog>
 
       {/* 付款对话框 */}
-      {selectedOrderDetail && (
-        <PaymentDialog
-          open={paymentDialogOpen}
-          onClose={() => setPaymentDialogOpen(false)}
-          orderId={selectedOrderDetail.order.id}
-          orderType="purchase"
-          totalAmount={selectedOrderDetail.order.total_amount}
-          paidAmount={selectedOrderDetail.order.paid_amount}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
+      <PaymentDialog
+        open={paymentDialogOpen}
+        onClose={() => setPaymentDialogOpen(false)}
+        orderId={payOrderId}
+        orderType="purchase"
+        totalAmount={payableOrders.find(order => order.id === payOrderId)?.total_amount ?? 0}
+        paidAmount={payableOrders.find(order => order.id === payOrderId)?.paid_amount ?? 0}
+        payableOrders={payableOrders.map(order => ({
+          id: order.id,
+          label: `${order.po_number} · ${order.supplier_name || '未知供应商'} · 未付 ¥${Math.max(0, order.total_amount - order.paid_amount).toFixed(2)}`,
+          totalAmount: order.total_amount,
+          paidAmount: order.paid_amount,
+        }))}
+        onSelectOrder={setPayOrderId}
+        onSuccess={handlePaymentSuccess}
+      />
 
       {/* 灵活库存微盘点建议（PRD v12.0） */}
       <MicroStocktakingPrompt

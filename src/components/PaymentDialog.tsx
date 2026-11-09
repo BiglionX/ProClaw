@@ -7,8 +7,15 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { recordPurchasePayment, recordSalesReceipt } from '../lib/paymentService';
+
+export interface PayableOrderOption {
+  id: string;
+  label: string;
+  totalAmount: number;
+  paidAmount: number;
+}
 
 interface PaymentDialogProps {
   open: boolean;
@@ -17,6 +24,8 @@ interface PaymentDialogProps {
   orderType: 'purchase' | 'sales';
   totalAmount: number;
   paidAmount: number;
+  payableOrders?: PayableOrderOption[];
+  onSelectOrder?: (orderId: string) => void;
   onSuccess: (result: { paid_amount: number; payment_status: string }) => void;
 }
 
@@ -36,6 +45,8 @@ export default function PaymentDialog({
   orderType,
   totalAmount,
   paidAmount,
+  payableOrders,
+  onSelectOrder,
   onSuccess,
 }: PaymentDialogProps) {
   const remaining = Math.max(0, totalAmount - paidAmount);
@@ -47,10 +58,20 @@ export default function PaymentDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (!open) return;
+    setAmount(Math.max(0, totalAmount - paidAmount));
+    setError('');
+  }, [open, orderId, totalAmount, paidAmount]);
+
   const title = orderType === 'purchase' ? '记录付款' : '记录收款';
   const unitLabel = orderType === 'purchase' ? '付款' : '收款';
 
   const handleSubmit = async () => {
+    if (payableOrders && !orderId) {
+      setError('请选择应付采购单');
+      return;
+    }
     if (amount <= 0) {
       setError(`${unitLabel}金额必须大于0`);
       return;
@@ -88,6 +109,23 @@ export default function PaymentDialog({
     <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+        {payableOrders && (
+          <TextField
+            select
+            label="选择应付采购单"
+            fullWidth
+            sx={{ mt: 1 }}
+            value={orderId}
+            onChange={(e) => onSelectOrder?.(e.target.value)}
+          >
+            <MenuItem value="" disabled>
+              {payableOrders.length === 0 ? '没有未付清的采购单' : '请选择采购单'}
+            </MenuItem>
+            {payableOrders.map(order => (
+              <MenuItem key={order.id} value={order.id}>{order.label}</MenuItem>
+            ))}
+          </TextField>
+        )}
         <TextField
           label={`${unitLabel}金额`}
           type="number"
@@ -145,7 +183,7 @@ export default function PaymentDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} disabled={loading}>取消</Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={loading}>
+        <Button variant="contained" onClick={handleSubmit} disabled={loading || (Boolean(payableOrders) && !orderId)}>
           {loading ? '处理中...' : `确认${unitLabel}`}
         </Button>
       </DialogActions>
