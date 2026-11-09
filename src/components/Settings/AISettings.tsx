@@ -35,6 +35,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
@@ -319,11 +320,9 @@ export default function AISettings() {
       </Card>
 
       {/* 默认 AI 服务提示 */}
-      <Alert severity="warning" sx={{ mb: 3 }} icon={<AIIcon />}>
+      <Alert severity="info" sx={{ mb: 3 }} icon={<AIIcon />}>
         <Typography variant="body2">
-          <strong>⚠️ 服务暂时不可用</strong> - ProClaw 集成 LLM
-          服务当前无法连接，请自行配置大模型 API（如
-          OpenAI、阿里云、智谱等）以确保 AI 功能正常使用。
+          内置服务未接通。请点击下方【+ 添加提供商】配置你自己的 API（如 DeepSeek、OpenAI），或点击列表中的提供商进行编辑。
         </Typography>
       </Alert>
 
@@ -393,7 +392,7 @@ export default function AISettings() {
           >
             <Typography variant="h6">AI 提供商列表</Typography>
             <Button
-              variant="outlined"
+              variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddProvider}
             >
@@ -509,6 +508,13 @@ export default function AISettings() {
                           >
                             设为默认
                           </Button>
+                        )}
+                        {provider.type === 'default' && (
+                          <Tooltip title="内置服务不可编辑。请使用上方的「添加提供商」，或编辑列表中的其他提供商。">
+                            <Typography variant="caption" color="text.disabled" sx={{ alignSelf: 'center', px: 0.5 }}>
+                              不可编辑
+                            </Typography>
+                          </Tooltip>
                         )}
                         {provider.type !== 'default' && (
                           <IconButton
