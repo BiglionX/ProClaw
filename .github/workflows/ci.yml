@@ -132,10 +132,11 @@ jobs:
   # ==================== Desktop installers ====================
   # 只在 push main 或手动触发时打未签名 NSIS/MSI。PR 跳过，不拉长门禁。
   # NSIS 与 WiX 由 Tauri CLI 自行下载。不改 tauri.conf.json 的 targets / identifier。
+  # windows-latest 的 VS 18 让 node-gyp 编不过 better-sqlite3，固定 windows-2022。
   desktop-installers:
     name: Desktop Installers
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
