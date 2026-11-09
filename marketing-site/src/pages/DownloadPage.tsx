@@ -8,8 +8,10 @@ import RouteSEO from '../components/RouteSEO';
 import { getPublishedPlugins } from '../lib/pluginService';
 import type { IndustryPlugin } from '../types';
 
-const DESKTOP_151_BUILD =
-  'https://github.com/BiglionX/ProClaw/actions/runs/42558458129';
+const DESKTOP_151_NSIS =
+  'https://github.com/BiglionX/ProClaw/releases/download/v1.5.1/ProClaw_1.5.1_x64-setup.exe';
+const DESKTOP_151_MSI =
+  'https://github.com/BiglionX/ProClaw/releases/download/v1.5.1/ProClaw_1.5.1_x64_en-US.msi';
 
 const productCards = [
   {
@@ -31,8 +33,8 @@ const productCards = [
       '离线完全可用',
     ],
     cta: '下载 Windows 1.5.1',
-    ctaLink: DESKTOP_151_BUILD,
-    platforms: '未签名 NSIS / MSI · 需登录 GitHub',
+    ctaLink: DESKTOP_151_NSIS,
+    platforms: 'Windows x64 安装包 · 未签名',
     highlighted: true,
     color: 'black',
   },
@@ -55,8 +57,8 @@ const productCards = [
       '离线完全可用',
     ],
     cta: '下载 Windows 1.5.1',
-    ctaLink: DESKTOP_151_BUILD,
-    platforms: '未签名 NSIS / MSI · 需登录 GitHub',
+    ctaLink: DESKTOP_151_NSIS,
+    platforms: 'Windows x64 安装包 · 未签名',
     highlighted: false,
     color: 'gray',
   },
@@ -222,7 +224,7 @@ const DownloadPage: React.FC = () => {
       <PageHeader
         title="下载 ProClaw"
         description="ProClaw Plus / Light 桌面端 · Cloud 云商城 · 手机端 App"
-        subtitle="桌面端 1.5.1 · Windows x64 · 未签名内测包（32cdb66）"
+        subtitle="桌面端 1.5.1 · Windows x64 · 未签名"
       />
 
       {/* 四产品并列卡片 */}
@@ -532,7 +534,9 @@ const DownloadPage: React.FC = () => {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">下载安装包</h3>
                   <p className="text-sm text-gray-600">
-                    Plus 和 Light 是同一个 Windows 安装包。打开构建页后下载 Artifacts 里的 NSIS 或 MSI，解压后安装。包未签名，Windows 会提示。
+                    Plus 和 Light 是同一个 Windows 安装包，按钮直接下载 ProClaw_1.5.1_x64-setup.exe。也可以改用{' '}
+                    <a href={DESKTOP_151_MSI} className="text-blue-600 hover:underline">MSI</a>
+                    。包未签名，Windows 会提示。
                   </p>
                 </div>
               </div>
@@ -557,7 +561,7 @@ const DownloadPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">文件校验 (SHA256)</h2>
             <p className="text-sm text-gray-500 mb-4">
-              1.5.1 未签名包还没有公布 SHA256，不要沿用下面的历史校验值。NSIS artifact 名是 ProClaw-nsis-32cdb66e014838549a7342f46d7ae2f04d1cd7a6，MSI artifact 名是 ProClaw-msi-32cdb66e014838549a7342f46d7ae2f04d1cd7a6。
+              1.5.1 还没有公布 SHA256，不要沿用下面的历史校验值。
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -602,7 +606,9 @@ const DownloadPage: React.FC = () => {
           </div>
 
           <p className="text-center text-gray-400 text-sm mt-8">
-            1.5.1 还没有 GitHub Release 附件。可直接下载的最新安装包是 <a href="https://github.com/BiglionX/ProClaw/releases/download/v1.3.0/ProClaw_1.3.0_x64-setup.exe" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ProClaw_1.3.0_x64-setup.exe</a>。历史版本请查看{' '}
+            也可以直接下载{' '}
+            <a href={DESKTOP_151_MSI} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ProClaw_1.5.1_x64_en-US.msi</a>
+            。历史版本请查看{' '}
             <a href="https://github.com/BigLionX/ProClaw/releases" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
               GitHub Releases
             </a>
