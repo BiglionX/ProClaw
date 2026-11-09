@@ -53,7 +53,7 @@ export async function getBackupStatus(): Promise<BackupStatus> {
 /** 获取云备份配置 */
 export async function getBackupConfig(userId: string): Promise<BackupConfig> {
   const result = await invoke<{ data: BackupConfig }>('get_backup_config_cmd', {
-    user_id: userId,
+    userId,
   });
   return result.data;
 }
@@ -61,7 +61,7 @@ export async function getBackupConfig(userId: string): Promise<BackupConfig> {
 /** 触发手动备份 */
 export async function triggerBackup(userId: string): Promise<BackupResult> {
   const result = await invoke<{ data: BackupResult }>('trigger_cloud_backup_cmd', {
-    user_id: userId,
+    userId,
   });
   return result.data;
 }
@@ -76,18 +76,18 @@ export async function setAutoBackupSchedule(
   encryptBackup: boolean,
 ): Promise<void> {
   await invoke('set_auto_backup_schedule_cmd', {
-    user_id: userId,
+    userId,
     enabled,
     frequency,
-    backup_time: backupTime,
-    retention_days: retentionDays,
-    encrypt_backup: encryptBackup,
+    backupTime,
+    retentionDays,
+    encryptBackup,
   });
 }
 
 /** 从备份恢复 */
 export async function restoreFromBackup(backupId: string): Promise<void> {
   await invoke('restore_from_backup_cmd', {
-    backup_id: backupId,
+    backupId,
   });
 }
