@@ -34,6 +34,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { useAppModeStore } from '../config/appMode';
+import { APP_VERSION } from '../lib/appVersion';
 import { isDemoAccountContext, readDemoFlag, recordDemoReset } from '../lib/demoFlag';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
@@ -283,7 +284,7 @@ export default function SettingsPage() {
                     应用版本
                   </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                    v0.1.0
+                    v{APP_VERSION}
                   </Typography>
                 </Paper>
               </Grid>
