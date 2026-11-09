@@ -5,6 +5,7 @@
  * 未来（Phase 2+）：从 Supabase 插件目录加载已发布行业列表
  */
 import { Box, Button, Card, CardContent, CircularProgress, Typography } from '@mui/material';
+import { BUILTIN_VERTICAL_MANIFESTS } from '../../config/builtinIndustries';
 
 export interface IndustryOption {
   id: string;
@@ -32,6 +33,12 @@ export const DEFAULT_INDUSTRIES: IndustryOption[] = [
     icon: '🏢',
     description: '虚拟团队与Agent协作平台，CEO Agent主控官系统',
   },
+  ...BUILTIN_VERTICAL_MANIFESTS.map((manifest) => ({
+    id: manifest.id,
+    name: manifest.name,
+    icon: manifest.icon,
+    description: manifest.description,
+  })),
 ];
 
 interface IndustrySelectorProps {

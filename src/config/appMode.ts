@@ -8,6 +8,7 @@
  * 新代码建议使用 useAppModeStore hook 获取响应式状态
  */
 import { create } from 'zustand';
+import { builtinVerticalManifest } from './builtinIndustries';
 
 /** 行业模式标识 - 内置模式 + 第三方插件模式（branded type） */
 export type BuiltinAppMode = 'inventory' | 'virtual_company' | 'light' | 'catering' | 'beauty' | 'pet' | 'cloud-proclaw';
@@ -216,13 +217,15 @@ export class PluginManager {
 
   /** 设置行业模式（Phase 2 将改为通过插件加载实现） */
   async setIndustry(id: AppMode): Promise<void> {
+    const manifest = builtinVerticalManifest(id);
     const store = useAppModeStore.getState();
-    if (store.mode === id) return;
+    const currentPluginId = store.activePlugin?.id ?? null;
+    if (store.mode === id && currentPluginId === (manifest?.id ?? null)) return;
 
     useAppModeStore.getState().setMode(id);
+    useAppModeStore.getState().setActivePlugin(manifest);
 
-    // Phase 2 将在此处触发插件下载 + 验证 + 加载
-    // Phase 1 仅更新模式状态
+    // 内置行业直接挂主包里的 manifest。远程下载仍由 SetupWizard 在有商店地址时单独处理。
     console.log(`[PluginManager] Industry switched to: ${id}`);
 
     // 触发页面刷新（通过 React key 机制实现）
