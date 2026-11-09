@@ -325,7 +325,7 @@ const AdminSettingsPage: React.FC = () => {
                   手动更新
                 </label>
               </div>
-              <p className="text-xs text-gray-500 mt-1">自动更新：桌面端启动时自动检查并安装插件更新。手动更新：仅提示用户有可用更新</p>
+              <p className="text-xs text-gray-500 mt-1">自动更新：桌面端启动时检查是否有新版本。手动更新：只提示有可用更新</p>
             </div>
           </div>
         </SettingSection>

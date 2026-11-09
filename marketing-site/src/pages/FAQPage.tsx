@@ -26,7 +26,7 @@ const faqData: FAQCategory[] = [
       },
       {
         question: 'ProClaw Plus 和 ProClaw Light 怎么选？',
-        answer: 'ProClaw Plus 面向实体商户，提供完整的产品库管理、采购销售、库存跟踪功能。ProClaw Light 面向创业团队、自由职业者、虚拟组织，剥离进销存模块，以 Agent 化架构为基础，内置财务管理 Agent，支持从 Agent 市场安装其他能力（任务管理、CRM、文档协作等）。如果两者都需要，可以分别安装使用。',
+        answer: 'ProClaw Plus 面向实体商户，提供产品库、采购销售和库存跟踪。ProClaw Light 面向创业团队和自由职业者，不含进销存。AI 经营助手目前是内测：单模型 CEO 对话，多 Agent 即将推出。',
       },
       {
         question: '支持哪些操作系统？',
@@ -39,7 +39,7 @@ const faqData: FAQCategory[] = [
     questions: [
       {
         question: 'CEO Agent 和普通 AI 聊天有什么区别？',
-        answer: 'CEO Agent 是 ProClaw 的核心创新。普通 AI 聊天只是一问一答，而 CEO Agent 作为"主控官"，具备项目上下文协议 (PCP) 能力。它会自动捕获你的宏观决策，维护公司愿景、目标、约束、里程碑等结构化知识。更重要的是，CEO Agent 可以主动分派任务给合适的子 Agent（如财务 Agent、营销 Agent），审查执行结果，并向你汇报进展。你可以使用 /task list、/context show、/report daily 等快捷命令进行管理。',
+        answer: '当前内测是单模型 CEO 对话，用来问经营问题。多 Agent 即将推出。现在还不能把任务分派给其他助手。',
         featured: true,
       },
       {
@@ -48,7 +48,7 @@ const faqData: FAQCategory[] = [
       },
       {
         question: '可以自己开发 Agent 吗？怎么发布？',
-        answer: '可以。ProClaw 提供完整的 Agent 开发 SDK，使用 TypeScript/JavaScript 即可编写。Agent 以 ZIP 包形式分发，包含 manifest.json 声明权限和能力，前端资源独立运行在沙箱 (WebWorker/iframe) 中。开发完成后上传到 Agent 市场 (nvwa.proclaw.cc) 供其他用户安装。详见贡献指南。',
+        answer: '多 Agent 与 Agent 市场即将推出。当前没有开放第三方助手安装。',
       },
     ],
   },
