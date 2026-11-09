@@ -329,6 +329,7 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         get_contacts,
         get_messages,
         send_message,
+        ensure_chat_user,
         mark_message_read,
         mark_conversation_read,
         get_recent_contacts,

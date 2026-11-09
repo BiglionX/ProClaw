@@ -202,6 +202,27 @@ pub fn send_message(
     }))
 }
 
+/// 确保聊天参与者在 users 表中存在，供 messages 外键引用。
+#[tauri::command]
+pub fn ensure_chat_user(
+    db: tauri::State<Mutex<Database>>,
+    user_id: String,
+    display_name: Option<String>,
+) -> Result<(), String> {
+    let name = match display_name {
+        Some(n) if !n.is_empty() => n,
+        _ => user_id.clone(),
+    };
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    conn.execute(
+        "INSERT OR IGNORE INTO users (id, name, user_type) VALUES (?1, ?2, 'internal')",
+        params![user_id, name],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// 标记消息已读
 #[tauri::command]
 pub fn mark_message_read(

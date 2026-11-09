@@ -31,6 +31,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -74,6 +75,7 @@ const CEO_COMMANDS = [
 
 export default function ChatPage() {
   const { contactId } = useParams<{ contactId: string }>();
+  const selfUserId = useAuthStore((s) => s.user?.id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: contact = null } = useChatContact(contactId);
@@ -154,14 +156,23 @@ export default function ChatPage() {
     setSending(true);
     setAiError(null);
     try {
-      if (!useAuthStore.getState().user?.id) {
+      const authUser = useAuthStore.getState().user;
+      if (!authUser?.id) {
         setAiError('未登录');
         setSending(false);
         return;
       }
+      const fromUser = authUser.id;
+      const rawName = (authUser as { name?: string }).name?.trim();
+      const displayName = rawName ? rawName : null;
+      await invoke('ensure_chat_user', { userId: fromUser, displayName });
+      const toUser = isGroupChat ? CEO_AGENT_ID : contactId;
+      await invoke('ensure_chat_user', {
+        userId: toUser,
+        displayName: toUser === CEO_AGENT_ID ? 'CEO Agent' : null,
+      });
       // 群聊模式：from_user_name 显示为 "Boss 👑"
-      const fromUser = isGroupChat ? 'self' : 'self';
-      const newMsg = await sendMessage(fromUser, contactId, content);
+      const newMsg = await sendMessage(fromUser, toUser, content);
       // 群聊模式下补上发言人名称
       if (isGroupChat) {
         newMsg.from_user_name = 'Boss 👑';
@@ -181,7 +192,7 @@ export default function ChatPage() {
 
           // 构建聊天历史
           const history: ChatHistoryItem[] = messages.map(msg => {
-            if (msg.from_user === 'self') {
+            if (msg.from_user === fromUser) {
               return { role: 'user' as const, name: 'Boss 👑', content: msg.content };
             }
             if (msg.content_type === 'system_event') {
@@ -207,7 +218,7 @@ export default function ChatPage() {
           setAiError(null);
 
           // 将 AI 回复作为 ceo-agent 的消息写入
-          const aiMsg = await sendMessage('ceo-agent', contactId, aiResponse.replyContent);
+          const aiMsg = await sendMessage(CEO_AGENT_ID, fromUser, aiResponse.replyContent);
           aiMsg.from_user_name = 'CEO Agent';
           aiMsg.content_type = 'text';
           appendMessage(aiMsg);
@@ -632,7 +643,7 @@ export default function ChatPage() {
               </Box>
 
               {group.items.map(msg => {
-                const isSelf = msg.from_user === 'self';
+                const isSelf = !!selfUserId && msg.from_user === selfUserId;
                 const isSystem = msg.content_type === 'system_event';
                 const isTaskDispatch = msg.content_type === 'task_dispatch';
                 const isTaskUpdate = msg.content_type === 'task_update';

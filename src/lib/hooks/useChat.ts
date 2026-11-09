@@ -1,10 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../authStore';
 import {
   Contact,
   Message,
   getAgentGreeting,
   getContacts,
   getMessages,
+  isAITeamGroupId,
   sendMessage,
 } from '../contactService';
 
@@ -27,7 +29,10 @@ export function useChatMessages(contactId: string | undefined) {
     queryKey: [...chatQueryKey, 'messages', contactId ?? ''],
     queryFn: async () => {
       if (!contactId) return [];
-      let msgs = await getMessages('self', contactId);
+      const userId = useAuthStore.getState().user?.id;
+      if (!userId) return [];
+      const peerId = isAITeamGroupId(contactId) ? 'ceo-agent' : contactId;
+      let msgs = await getMessages(userId, peerId);
       if (msgs.length === 0) {
         const greeting = getAgentGreeting(contactId);
         if (greeting) {
