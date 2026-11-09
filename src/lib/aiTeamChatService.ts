@@ -23,8 +23,17 @@ const FALLBACK_API_KEY = import.meta.env.VITE_LLM_API_KEY as string | undefined;
 const FALLBACK_API_BASE = import.meta.env.VITE_LLM_API_BASE as string | undefined;
 const FALLBACK_MODEL = import.meta.env.VITE_LLM_MODEL as string | undefined;
 
+/** 界面和回复里共用的未配置文案 */
+export const UNCONFIGURED_MODEL_MESSAGE = '未配置模型。请在设置页配置 DeepSeek 或其他大模型 API。';
+
 /** 上次初始化时的 apiKey 指纹，用于检测用户是否在设置页更新了配置 */
 let _lastConfigHash = '';
+
+function providerCanCall(provider: AIProvider): boolean {
+  if (!provider.isActive) return false;
+  if (provider.type === 'ollama') return true;
+  return Boolean(provider.apiKey && provider.apiKey.trim());
+}
 
 /** 懒加载 LLM 实例（优先使用 LLMProviderManager 体系，兜底用 DeepSeek） */
 async function getLLM(): Promise<BaseChatModel> {
@@ -32,26 +41,30 @@ async function getLLM(): Promise<BaseChatModel> {
 
   // 检查是否需要重新初始化（用户可能在设置页更新了配置）
   let config = await getAIConfig();
+
+  // 注入环境变量兜底：如果所有 provider 的 apiKey 都为空，用 VITE_ env
+  const hasAnyKey = config.providers.some(p => p.apiKey && p.isActive);
+  if (!hasAnyKey && FALLBACK_API_KEY) {
+    const fallbackProvider: AIProvider = {
+      id: 'deepseek-fallback',
+      name: 'DeepSeek（兜底）',
+      type: 'deepseek',
+      endpoint: FALLBACK_API_BASE || 'https://api.deepseek.com',
+      apiKey: FALLBACK_API_KEY,
+      model: FALLBACK_MODEL || 'deepseek-chat',
+      isActive: true,
+    };
+    config = { ...config, providers: [...config.providers, fallbackProvider] };
+  }
+
+  // 空 key 的默认端点不能初始化，否则会去请求 https://ai.proclaw.cc/api/v1
+  if (!config.providers.some(providerCanCall)) {
+    throw new Error(UNCONFIGURED_MODEL_MESSAGE);
+  }
+
   const configHash = JSON.stringify(config.providers.map(p => p.apiKey));
-  
   if (configHash !== _lastConfigHash) {
     _lastConfigHash = configHash;
-
-    // 注入环境变量兜底：如果所有 provider 的 apiKey 都为空，用 VITE_ env
-    const hasAnyKey = config.providers.some(p => p.apiKey && p.isActive);
-    if (!hasAnyKey && FALLBACK_API_KEY) {
-      const fallbackProvider: AIProvider = {
-        id: 'deepseek-fallback',
-        name: 'DeepSeek（兜底）',
-        type: 'deepseek',
-        endpoint: FALLBACK_API_BASE || 'https://api.deepseek.com',
-        apiKey: FALLBACK_API_KEY,
-        model: FALLBACK_MODEL || 'deepseek-chat',
-        isActive: true,
-      };
-      config = { ...config, providers: [...config.providers, fallbackProvider] };
-    }
-
     await manager.initialize(config);
   }
 
@@ -215,6 +228,14 @@ export async function generateGroupChatResponse(
       };
     }
     console.error('[AI Team Chat] LLM 调用失败:', error);
+    const rawMessage = error instanceof Error ? error.message : String(error ?? '');
+    if (rawMessage.includes('未配置模型') || rawMessage.includes('没有可用的 LLM')) {
+      return {
+        replyContent: rawMessage.includes('未配置模型') ? rawMessage : UNCONFIGURED_MODEL_MESSAGE,
+        tokensUsed: 0,
+        remainingTokens: isDemoAccount() ? getTokenBalance() : -1,
+      };
+    }
     // 出站连接失败（超时或网络）→ 统一提示
     let errorMsg = OUTBOUND_ERROR_MESSAGE;
     if (isAbortError(error)) {

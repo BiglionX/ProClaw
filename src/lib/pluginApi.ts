@@ -44,7 +44,7 @@ export interface ProClawPluginAPI {
   /** 获取当前已安装的 AI Team 列表及其能力 */
   getAgentContext: () => Promise<AgentContextItem[]>;
   /** 向指定 AI Team 发送消息并接收回复 */
-  sendToAgent: (agentId: string, message: string) => Promise<string | null>;
+  sendToAgent: (agentId: string, message: string) => Promise<string>;
 }
 
 /** AI Team 上下文项 */
@@ -304,31 +304,31 @@ const pluginApi: ProClawPluginAPI = {
    * @param message - 要发送的消息文本
    * @returns Agent 的回复文本
    */
-  async sendToAgent(agentId: string, message: string): Promise<string | null> {
+  async sendToAgent(agentId: string, message: string): Promise<string> {
     if (!isTauri()) {
-      console.warn('[ProClawPlugin] 发送消息仅在 Tauri 环境中可用');
-      return null;
+      throw new Error('发送消息仅在 Tauri 环境中可用');
+    }
+
+    const { invoke } = await import('@tauri-apps/api/core');
+    const { useAuthStore } = await import('./authStore');
+    const fromUser = useAuthStore.getState().user?.id;
+    if (!fromUser) {
+      throw new Error('未登录');
     }
 
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const { useAuthStore } = await import('./authStore');
-      const fromUser = useAuthStore.getState().user?.id;
-      // TODO: 插件 API 没有独立发送者参数。已登录时用当前用户 id；未登录不写占位身份。待产品确认发送者是否应为登录用户。
-      const payload: { to_user: string; content: string; from_user?: string } = {
-        to_user: agentId,
-        content: message,
-      };
-      if (fromUser) {
-        payload.from_user = fromUser;
-      }
       const reply = await invoke<string>('send_message', {
-        message: payload,
+        message: {
+          from_user: fromUser,
+          to_user: agentId,
+          content: message,
+        },
       });
       return reply;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error ?? '发送失败');
       console.error(`[ProClawPlugin] 向 Agent "${agentId}" 发送消息失败:`, error);
-      return null;
+      throw new Error(detail || '发送失败');
     }
   },
 };

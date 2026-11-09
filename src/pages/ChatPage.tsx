@@ -37,7 +37,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Message, sendMessage, isAITeamGroupId, getAITeamGroupConfig, parseTeamId, type AITeamGroupConfig } from '../lib/contactService';
 import { useChatContact, useChatMessages, chatQueryKey } from '../lib/hooks/useChat';
 import { generateGroupChatResponse, type ChatHistoryItem } from '../lib/aiTeamChatService';
-import { OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
+import { isChatFailureText, visibleChatError } from '../lib/chatFailure';
+import { useAuthStore } from '../lib/authStore';
 import { getTokenBalance, isDemoAccount } from '../lib/aiTeamTokenService';
 import { agentRuntime } from '../lib/agentRuntime';
 import desktopCallManager from '../services/CallManager';
@@ -153,6 +154,11 @@ export default function ChatPage() {
     setSending(true);
     setAiError(null);
     try {
+      if (!useAuthStore.getState().user?.id) {
+        setAiError('未登录');
+        setSending(false);
+        return;
+      }
       // 群聊模式：from_user_name 显示为 "Boss 👑"
       const fromUser = isGroupChat ? 'self' : 'self';
       const newMsg = await sendMessage(fromUser, contactId, content);
@@ -194,16 +200,11 @@ export default function ChatPage() {
           // 用户取消：不需要显示任何内容
           if (aiResponse.aborted) return;
 
-          // 检测是否是出站连接失败的回复，如果是则设置 aiError 供顶部红色提示
-          const isOutboundFailure =
-            aiResponse.replyContent.includes(OUTBOUND_ERROR_MESSAGE) ||
-            aiResponse.replyContent.includes('无法连接到 AI 服务') ||
-            aiResponse.replyContent.includes('网络异常');
-          if (isOutboundFailure) {
-            setAiError(aiResponse.replyContent);
-          } else {
-            setAiError(null);
+          if (isChatFailureText(aiResponse.replyContent)) {
+            setAiError(visibleChatError(aiResponse.replyContent));
+            return;
           }
+          setAiError(null);
 
           // 将 AI 回复作为 ceo-agent 的消息写入
           const aiMsg = await sendMessage('ceo-agent', contactId, aiResponse.replyContent);
@@ -218,8 +219,7 @@ export default function ChatPage() {
           scrollToBottom();
         } catch (aiErr) {
           console.error('AI 响应失败:', aiErr);
-          // 兜底：LLM 本身抛错（被 aiTeamChatService 包装为友好消息）但这里仍有理论上可能的额外错误
-          setAiError(OUTBOUND_ERROR_MESSAGE);
+          setAiError(visibleChatError(aiErr));
         } finally {
           abortControllerRef.current = null;
           setAiResponding(false);
@@ -227,6 +227,8 @@ export default function ChatPage() {
       }
     } catch (e) {
       console.error('发送失败:', e);
+      setAiError(visibleChatError(e));
+      setSending(false);
     } finally {
       if (!isGroupChat) {
         setSending(false);
@@ -857,7 +859,7 @@ export default function ChatPage() {
         )}
 
         {/* AI 调用失败提示（出站连接错误） */}
-        {isGroupChat && aiError && !aiResponding && (
+        {aiError && !aiResponding && (
           <Box
             sx={{
               display: 'flex',
@@ -875,7 +877,7 @@ export default function ChatPage() {
               variant="caption"
               sx={{ color: '#dc2626', fontWeight: 500, flex: 1, fontSize: '0.75rem' }}
             >
-              {aiError}（30s 未响应已自动超时）
+              {aiError}
             </Typography>
             <Button
               size="small"
