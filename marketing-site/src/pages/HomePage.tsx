@@ -8,8 +8,8 @@ const modeCards = [
   {
     id: 'standard',
     title: 'ProClaw Plus',
-    subtitle: '完整进销存 + AI 团队',
-    desc: '完整进销存管理 + AI 经营团队 + 行业插件。适合需要多岗位协作的成长型商户。',
+    subtitle: '完整进销存 + AI 经营助手（内测）',
+    desc: '完整进销存管理 + AI 经营助手（内测） + 行业插件。适合需要多岗位协作的成长型商户。',
     color: 'bg-blue-50 border-blue-200 hover:border-blue-400',
     badge: 'bg-blue-100 text-blue-700',
     link: '/features',
@@ -42,7 +42,7 @@ const featureCards = [
       </svg>
     ),
     title: 'AI CEO 主控官',
-    desc: '你跟它说目标，它自己安排怎么干。25+ AI 助手自动分好工、做完了给你汇报。',
+    desc: '内置 AI 经营助手（多 Agent 即将推出）。',
     link: '/features#ai-team',
     tags: [] as string[],
   },
@@ -53,7 +53,7 @@ const featureCards = [
       </svg>
     ),
     title: '行业插件',
-    desc: '一个基础桌面端统一构建，安装后按需下载行业插件。餐饮 POS/KDS、美业预约/营销、宠物寄养/美容，覆盖更多商家场景。',
+    desc: '一个基础桌面端统一构建，安装后使用内置行业模板。餐饮 POS/KDS、美业预约/营销、宠物寄养/美容，覆盖更多商家场景。',
     link: '/solutions/catering',
     tags: ['#餐饮', '#美业', '#宠物'],
   },
@@ -242,7 +242,7 @@ const HomePage: React.FC = () => {
                   <div className="w-3 h-3 rounded-full bg-red-500"></div>
                   <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="ml-3 text-xs text-gray-400 font-mono">CEO Agent - 25+ AI 团队在线</span>
+                  <span className="ml-3 text-xs text-gray-400 font-mono">CEO 对话（内测）</span>
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-end">

@@ -296,7 +296,7 @@ export default function SettingsPage() {
                     数据库引擎
                   </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                    SQLite + SQLCipher
+                    SQLite / 本地数据存储
                   </Typography>
                 </Paper>
               </Grid>
