@@ -38,6 +38,8 @@ import { APP_VERSION } from '../lib/appVersion';
 import { isDemoAccountContext, readDemoFlag, recordDemoReset } from '../lib/demoFlag';
 import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
+import InviteManager from '../components/Settings/InviteManager';
+import UpdaterSettings from '../components/Settings/UpdaterSettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -172,14 +174,13 @@ export default function SettingsPage() {
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab label="🤖 AI 模型设置" {...a11yProps(0)} />
-          {mode !== 'light' && <Tab label="🗄️ 数据库设置" {...a11yProps(1)} />}
-          {mode !== 'light' && <Tab label="🔍 指令分析" {...a11yProps(2)} />}
-          <Tab label="ℹ️ 系统信息" {...a11yProps(3)} />
-          {mode !== 'light' && <Tab label="📧 邀请管理" {...a11yProps(4)} />}
-          {isDemo && <Tab label="🧪 数据管理" {...a11yProps(5)} />}
-          {/* 补全 5：自动更新 Tab */}
-          <Tab label="🔄 自动更新" {...a11yProps(6)} />
+          <Tab label="🤖 AI 模型设置" value={0} {...a11yProps(0)} />
+          {mode !== 'light' && <Tab label="🗄️ 数据库设置" value={1} {...a11yProps(1)} />}
+          {mode !== 'light' && <Tab label="🔍 指令分析" value={2} {...a11yProps(2)} />}
+          <Tab label="ℹ️ 系统信息" value={3} {...a11yProps(3)} />
+          {mode !== 'light' && <Tab label="📧 邀请管理" value={4} {...a11yProps(4)} />}
+          {isDemo && <Tab label="🧪 数据管理" value={5} {...a11yProps(5)} />}
+          <Tab label="🔄 自动更新" value={6} {...a11yProps(6)} />
         </Tabs>
       </Paper>
 
@@ -363,6 +364,14 @@ export default function SettingsPage() {
             </Dialog>
           </CardContent>
         </Card>
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={4}>
+        <InviteManager />
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={6}>
+        <UpdaterSettings />
       </TabPanel>
 
       {/* Tab 5: 数据管理（仅演示账号） */}
