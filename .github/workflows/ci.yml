@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -127,3 +128,37 @@ jobs:
         working-directory: mobile
       - run: npm test -- --ci
         working-directory: mobile
+
+  # ==================== Desktop installers ====================
+  # 只在 push main 或手动触发时打未签名 NSIS/MSI。PR 跳过，不拉长门禁。
+  # NSIS 与 WiX 由 Tauri CLI 自行下载。不改 tauri.conf.json 的 targets / identifier。
+  desktop-installers:
+    name: Desktop Installers
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: Build unsigned NSIS and MSI
+        run: npx tauri build --bundles nsis,msi
+      - name: Upload NSIS
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProClaw-nsis-${{ github.sha }}
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProClaw-msi-${{ github.sha }}
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
