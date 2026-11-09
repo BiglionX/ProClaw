@@ -147,7 +147,7 @@ export async function fetchUsersAndRoles(): Promise<UsersAndRoles> {
   const [usersRes, roles] = await Promise.all([
     ipcInvoke<{ data: RawUserRow[] }>('get_users_cmd', {
       search: null,
-      user_type: null,
+      userType: null,
       role: null,
     }),
     fetchRoles(),
@@ -164,7 +164,7 @@ export async function createManagedUser(input: CreateUserInput): Promise<void> {
     name: input.name,
     phone: input.phone || null,
     email: input.email || null,
-    user_type: input.user_type,
+    userType: input.user_type,
     password: null,
     role: input.roles[0] || null,
   });
@@ -181,8 +181,8 @@ export async function updateManagedUser(id: string, input: UpdateUserInput): Pro
   });
   if (input.roles.length > 0) {
     await ipcInvoke('assign_user_role_cmd', {
-      user_id: id,
-      role_name: input.roles[0],
+      userId: id,
+      roleName: input.roles[0],
     });
   }
 }
