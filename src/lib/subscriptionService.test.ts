@@ -7,6 +7,8 @@ import {
   getTokenSummary,
   getTokenUsage,
   recordToken,
+  getTokenBalance,
+  estimateTokenCost,
   getInvoices,
 } from '../lib/subscriptionService';
 import { invoke } from '@tauri-apps/api/core';
@@ -27,7 +29,7 @@ describe('subscriptionService', () => {
           max_devices: 3, features: '基础功能', is_active: true, sort_order: 1,
         },
       ];
-      (invoke as any).mockResolvedValue(mockPlans);
+      (invoke as any).mockResolvedValue({ data: mockPlans });
 
       const result = await getPlans();
       expect(result).toEqual(mockPlans);
@@ -47,6 +49,7 @@ describe('subscriptionService', () => {
 
       const result = await getMySubscription('user1');
       expect(result).toEqual(mockSub);
+      expect(invoke).toHaveBeenCalledWith('get_my_subscription_cmd', { userId: 'user1' });
     });
 
     it('订阅不存在时应返回 null', async () => {
@@ -69,9 +72,9 @@ describe('subscriptionService', () => {
 
       expect(result).toEqual(mockResult);
       expect(invoke).toHaveBeenCalledWith('subscribe_plan_cmd', {
-        user_id: 'user1',
-        plan_id: 'plan1',
-        billing_cycle: 'monthly',
+        userId: 'user1',
+        planId: 'plan1',
+        billingCycle: 'monthly',
       });
     });
   });
@@ -83,7 +86,7 @@ describe('subscriptionService', () => {
 
       const result = await cancelSubscription('user1');
       expect(result).toEqual(mockResult);
-      expect(invoke).toHaveBeenCalledWith('cancel_subscription_cmd', { user_id: 'user1' });
+      expect(invoke).toHaveBeenCalledWith('cancel_subscription_cmd', { userId: 'user1' });
     });
   });
 
@@ -98,6 +101,7 @@ describe('subscriptionService', () => {
 
       const result = await getTokenSummary('user1');
       expect(result).toEqual(mockSummary);
+      expect(invoke).toHaveBeenCalledWith('get_token_summary_cmd', { userId: 'user1' });
     });
   });
 
@@ -110,6 +114,11 @@ describe('subscriptionService', () => {
 
       const result = await getTokenUsage('user1');
       expect(result).toEqual(mockEntries);
+      expect(invoke).toHaveBeenCalledWith('get_token_usage_cmd', {
+        userId: 'user1',
+        limit: 50,
+        offset: 0,
+      });
     });
   });
 
@@ -119,9 +128,9 @@ describe('subscriptionService', () => {
 
       await recordToken('user1', 'api_call', '/api/products');
       expect(invoke).toHaveBeenCalledWith('record_token_cmd', {
-        user_id: 'user1',
-        action_type: 'api_call',
-        resource_path: '/api/products',
+        userId: 'user1',
+        actionType: 'api_call',
+        resourcePath: '/api/products',
       });
     });
   });
@@ -135,6 +144,26 @@ describe('subscriptionService', () => {
 
       const result = await getInvoices('user1');
       expect(result).toEqual(mockInvoices);
+      expect(invoke).toHaveBeenCalledWith('get_invoices_cmd', { userId: 'user1' });
+    });
+  });
+
+  describe('getTokenBalance', () => {
+    it('以 userId 传给 get_token_balance_cmd', async () => {
+      (invoke as any).mockResolvedValue({ data: { user_id: 'user1', balance: 10 } });
+      await getTokenBalance('user1');
+      expect(invoke).toHaveBeenCalledWith('get_token_balance_cmd', { userId: 'user1' });
+    });
+  });
+
+  describe('estimateTokenCost', () => {
+    it('以 resourceType 传给 estimate_token_cost_cmd', async () => {
+      (invoke as any).mockResolvedValue({ cost: 5, resource_type: 'ai_chat', quantity: 2 });
+      await estimateTokenCost('ai_chat', 2);
+      expect(invoke).toHaveBeenCalledWith('estimate_token_cost_cmd', {
+        resourceType: 'ai_chat',
+        quantity: 2,
+      });
     });
   });
 });

@@ -100,28 +100,30 @@ export interface SubscribeParams {
 // ========== 套餐 ==========
 
 export async function getPlans(): Promise<Plan[]> {
-  const result = await invoke<Plan[]>('get_plans_cmd');
-  return result;
+  const result = await invoke<{ data: Plan[] }>('get_plans_cmd');
+  return result.data;
 }
 
 // ========== 订阅管理 ==========
 
 export async function getMySubscription(userId: string): Promise<UserSubscription | null> {
   const result = await invoke<{ data: UserSubscription | null; message?: string }>('get_my_subscription_cmd', {
-    user_id: userId,
+    userId,
   });
   return result.data;
 }
 
 export async function subscribePlan(params: SubscribeParams): Promise<{ subscription_id: string; message: string }> {
   return invoke('subscribe_plan_cmd', {
-    ...params,
+    userId: params.user_id,
+    planId: params.plan_id,
+    billingCycle: params.billing_cycle,
   });
 }
 
 export async function cancelSubscription(userId: string): Promise<{ message: string }> {
   return invoke('cancel_subscription_cmd', {
-    user_id: userId,
+    userId,
   });
 }
 
@@ -129,14 +131,14 @@ export async function cancelSubscription(userId: string): Promise<{ message: str
 
 export async function getTokenSummary(userId: string): Promise<TokenUsageSummary> {
   const result = await invoke<{ data: TokenUsageSummary }>('get_token_summary_cmd', {
-    user_id: userId,
+    userId,
   });
   return result.data;
 }
 
 export async function getTokenUsage(userId: string, limit: number = 50, offset: number = 0): Promise<TokenUsageEntry[]> {
   const result = await invoke<{ data: TokenUsageEntry[] }>('get_token_usage_cmd', {
-    user_id: userId,
+    userId,
     limit,
     offset,
   });
@@ -151,9 +153,9 @@ export async function recordToken(
 ): Promise<void> {
   // 1. 记录到本地 SQLite
   await invoke('record_token_cmd', {
-    user_id: userId,
-    action_type: actionType,
-    resource_path: resourcePath || '',
+    userId,
+    actionType,
+    resourcePath: resourcePath || '',
   });
 
   // 2. 同步到 Supabase（平台侧统一统计）
@@ -216,7 +218,7 @@ export async function getTokenPricing(): Promise<TokenPricingRule[]> {
  */
 export async function getTokenBalance(userId: string): Promise<TokenBalanceInfo> {
   const result = await invoke<{ data: TokenBalanceInfo }>('get_token_balance_cmd', {
-    user_id: userId,
+    userId,
   });
   return result.data;
 }
@@ -226,7 +228,7 @@ export async function getTokenBalance(userId: string): Promise<TokenBalanceInfo>
  */
 export async function estimateTokenCost(resourceType: string, quantity: number): Promise<EstimateCostResult> {
   return invoke('estimate_token_cost_cmd', {
-    resource_type: resourceType,
+    resourceType,
     quantity,
   });
 }
@@ -235,7 +237,7 @@ export async function estimateTokenCost(resourceType: string, quantity: number):
 
 export async function getInvoices(userId: string): Promise<Invoice[]> {
   const result = await invoke<{ data: Invoice[] }>('get_invoices_cmd', {
-    user_id: userId,
+    userId,
   });
   return result.data;
 }
