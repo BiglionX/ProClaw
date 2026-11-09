@@ -154,10 +154,10 @@ export default function DatabaseSettings() {
                   数据库类型
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
-                  SQLite + SQLCipher
+                  SQLite
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  加密本地存储
+                  本地数据存储
                 </Typography>
               </Paper>
             </Grid>
