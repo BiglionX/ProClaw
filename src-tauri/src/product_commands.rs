@@ -654,8 +654,17 @@ pub fn get_product_spus(
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
     if let Some(opts) = &options {
-        // 搜索条件
-        if let Some(search) = opts.get("search").and_then(|v| v.as_str()) {
+        // 搜索条件。前端传 search，也接受 keyword，避免只带其中一个时搜不到。
+        if let Some(search) = opts
+            .get("search")
+            .and_then(|v| v.as_str())
+            .filter(|value| !value.is_empty())
+            .or_else(|| {
+                opts.get("keyword")
+                    .and_then(|v| v.as_str())
+                    .filter(|value| !value.is_empty())
+            })
+        {
             sql.push_str(" AND (spu_code LIKE ? OR name LIKE ?)");
             let pattern = format!("%{}%", search);
             params_vec.push(Box::new(pattern.clone()));

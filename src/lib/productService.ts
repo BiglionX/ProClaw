@@ -204,6 +204,7 @@ export async function getProductSPUs(options?: {
   category_id?: string;
   brand_id?: string;
   search?: string;
+  keyword?: string;
   status?: string;
 }): Promise<ProductSPU[]> {
   if (!isTauri()) {

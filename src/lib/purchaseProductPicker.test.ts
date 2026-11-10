@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   defaultPickerTab,
   filterPickerProducts,
+  productCatalogSearchOptions,
   historyToPickerProduct,
   mergePickedProducts,
   rememberRecentProductIds,
@@ -14,6 +15,11 @@ const battery: PickerProduct = { id: 'p1', name: '电池', code: 'SPU-BAT', unit
 const cable: PickerProduct = { id: 'p2', name: '数据线', code: 'SKU-CBL', unitPrice: 5 };
 
 describe('purchaseProductPicker', () => {
+  it('全部商品搜索把词交给后端，空词不请求', () => {
+    expect(productCatalogSearchOptions('  电池 ')).toEqual({ search: '电池', keyword: '电池', limit: 200 });
+    expect(productCatalogSearchOptions('   ')).toBeNull();
+  });
+
   it('按名称或编码搜索，忽略大小写和首尾空格', () => {
     const all = [battery, cable];
     expect(filterPickerProducts(all, '  bat ')).toEqual([battery]);

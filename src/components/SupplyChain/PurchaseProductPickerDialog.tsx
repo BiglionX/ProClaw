@@ -18,13 +18,18 @@ import {
   Typography,
 } from '@mui/material';
 import { getSupplierHistoryProducts, type SupplierHistoryProduct } from '../../lib/purchaseService';
+import { getProductSPUs } from '../../lib/productService';
+import { isTauri } from '../../lib/tauri';
 import {
+  PICKER_CATALOG_SEARCH_DEBOUNCE_MS,
   RECENT_PRODUCT_STORAGE_KEY,
   defaultPickerTab,
   filterPickerProducts,
   historyToPickerProduct,
+  productCatalogSearchOptions,
   rememberRecentProductIds,
   resolveRecentProducts,
+  spuToPickerProduct,
   type PickerProduct,
   type PickerTab,
 } from '../../lib/purchaseProductPicker';
@@ -44,6 +49,8 @@ interface PurchaseProductPickerDialogProps {
   historyAudience?: 'supplier' | 'customer';
   loadHistory?: (partyId: string) => Promise<SupplierHistoryProduct[]>;
   catalog: PickerProduct[];
+  /** 全部商品搜索结果用哪一个价。采购用成本价，销售用销售价。 */
+  priceSource?: 'cost' | 'sell';
   onClose: () => void;
   onConfirm: (picked: PickerProduct[]) => void;
   onQuickCreate: (input: QuickCreateProductInput) => Promise<PickerProduct>;
@@ -76,6 +83,7 @@ export default function PurchaseProductPickerDialog({
   historyAudience = 'supplier',
   loadHistory = getSupplierHistoryProducts,
   catalog,
+  priceSource = 'cost',
   onClose,
   onConfirm,
   onQuickCreate,
@@ -92,6 +100,8 @@ export default function PurchaseProductPickerDialog({
   const [history, setHistory] = useState<PickerProduct[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [remoteCatalog, setRemoteCatalog] = useState<PickerProduct[] | null>(null);
+  const [catalogSearching, setCatalogSearching] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createCost, setCreateCost] = useState('0');
@@ -137,6 +147,38 @@ export default function PurchaseProductPickerDialog({
     };
   }, [open, partyId, loadHistory]);
 
+  useEffect(() => {
+    if (!open || tab !== 'all' || !isTauri()) {
+      setRemoteCatalog(null);
+      setCatalogSearching(false);
+      return;
+    }
+    const options = productCatalogSearchOptions(query);
+    if (!options) {
+      setRemoteCatalog(null);
+      setCatalogSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setCatalogSearching(true);
+    const timer = window.setTimeout(() => {
+      getProductSPUs(options)
+        .then(spus => {
+          if (!cancelled) setRemoteCatalog(spus.map(spu => spuToPickerProduct(spu, priceSource)));
+        })
+        .catch(() => {
+          if (!cancelled) setRemoteCatalog(null);
+        })
+        .finally(() => {
+          if (!cancelled) setCatalogSearching(false);
+        });
+    }, PICKER_CATALOG_SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [open, tab, query, priceSource]);
+
   const knownProducts = useMemo(() => {
     const byId = new Map<string, PickerProduct>();
     for (const product of [...created, ...catalog, ...history]) {
@@ -146,13 +188,14 @@ export default function PurchaseProductPickerDialog({
   }, [catalog, created, history]);
 
   const visibleProducts = useMemo(() => {
+    if (tab === 'all' && remoteCatalog) return remoteCatalog;
     const source = tab === 'history'
       ? history
       : tab === 'recent'
         ? resolveRecentProducts(recentIds, knownProducts)
         : knownProducts;
     return filterPickerProducts(source, query);
-  }, [history, knownProducts, query, recentIds, tab]);
+  }, [history, knownProducts, query, recentIds, remoteCatalog, tab]);
 
   const picked = Object.values(selected);
 
@@ -231,7 +274,12 @@ export default function PurchaseProductPickerDialog({
               <Tab value="all" label="全部商品" />
             </Tabs>
             {tab === 'history' && historyError && <Alert severity="error">{historyError}</Alert>}
-            {tab === 'history' && historyLoading ? (
+            {tab === 'all' && catalogSearching ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 3 }}>
+                <CircularProgress size={18} />
+                <Typography variant="body2" color="text.secondary">正在搜索全部商品…</Typography>
+              </Box>
+            ) : tab === 'history' && historyLoading ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 3 }}>
                 <CircularProgress size={18} />
                 <Typography variant="body2" color="text.secondary">正在查询该{audienceLabel}{dealLabel}过的商品…</Typography>

@@ -2251,6 +2251,7 @@ function SalesTab({
         historyAudience="customer"
         loadHistory={getCustomerHistoryProducts}
         catalog={pickerCatalog}
+        priceSource="sell"
         onClose={() => setPickerOpen(false)}
         onConfirm={picked => {
           setOrderItems(prev => mergePickedProducts(prev, picked));
@@ -2280,6 +2281,7 @@ function SalesTab({
         historyAudience="customer"
         loadHistory={getCustomerHistoryProducts}
         catalog={pickerCatalog}
+        priceSource="sell"
         onClose={() => setDraftPickerOpen(false)}
         onConfirm={picked => {
           setDraftItems(prev => mergePickedProducts(prev, picked));

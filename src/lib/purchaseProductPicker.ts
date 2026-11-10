@@ -36,6 +36,15 @@ export type PickerTab = 'history' | 'recent' | 'all';
 export const RECENT_PRODUCT_STORAGE_KEY = 'proclaw.purchase.recentProductIds';
 export const RECENT_PRODUCT_LIMIT = 30;
 
+export const PICKER_CATALOG_SEARCH_DEBOUNCE_MS = 300;
+
+/** 全部商品的搜索交给后端。空词不请求，同时带 search 和 keyword。 */
+export function productCatalogSearchOptions(query: string): { search: string; keyword: string; limit: number } | null {
+  const keyword = query.trim();
+  if (!keyword) return null;
+  return { search: keyword, keyword, limit: 200 };
+}
+
 export function filterPickerProducts(products: PickerProduct[], query: string): PickerProduct[] {
   const keyword = query.trim().toLowerCase();
   if (!keyword) return products;
