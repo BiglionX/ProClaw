@@ -116,6 +116,11 @@ export default function PaymentTermsFields({
           error={Boolean(credit.error)}
           helperText={credit.error || '月结或自定义结算时填写可欠款额度'}
           inputProps={{ min: 0 }}
+          color={credit.error ? 'error' : 'warning'}
+          sx={{
+            '& .MuiOutlinedInput-root': { bgcolor: 'rgba(237, 108, 2, 0.08)' },
+            '& .MuiOutlinedInput-notchedOutline': { borderWidth: 2 },
+          }}
           fullWidth
         />
       )}
