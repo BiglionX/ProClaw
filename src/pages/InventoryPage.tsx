@@ -50,6 +50,8 @@ import StockCalibrationDialog from '../components/Inventory/StockCalibrationDial
 // v1.2 P1: 批量导入按钮
 import ImportButton from '../components/ImportCenter/ImportButton';
 import PartyContactFields from '../components/SupplyChain/PartyContactFields';
+import PaymentTermsFields from '../components/SupplyChain/PaymentTermsFields';
+import { validateCreditLimit } from '../lib/validation/creditLimit';
 import {
   hasSupplierContactErrors,
   validateSupplierContact,
@@ -122,6 +124,8 @@ export default function InventoryPage() {
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
   const [supplierContactErrors, setSupplierContactErrors] = useState<SupplierContactErrors>({});
   const [customerContactErrors, setCustomerContactErrors] = useState<SupplierContactErrors>({});
+  const [paymentTermsError, setPaymentTermsError] = useState<string | undefined>();
+  const [creditError, setCreditError] = useState<string | undefined>();
   const [supplierForm, setSupplierForm] = useState<CreateSupplierInput>({
     name: '',
     code: '',
@@ -324,7 +328,7 @@ export default function InventoryPage() {
       }
       const nextErrors = validateSupplierContact(supplierForm);
       setSupplierContactErrors(nextErrors);
-      if (hasSupplierContactErrors(nextErrors)) return;
+      if (hasSupplierContactErrors(nextErrors) || paymentTermsError) return;
 
       setLoading(true);
       await createSupplier(supplierForm);
@@ -365,6 +369,8 @@ export default function InventoryPage() {
       const nextErrors = validateSupplierContact(customerForm);
       setCustomerContactErrors(nextErrors);
       if (hasSupplierContactErrors(nextErrors)) return;
+      const nextCreditError = validateCreditLimit(customerForm.credit_limit);
+      if (nextCreditError) { setCreditError(nextCreditError); return; }
 
       setLoading(true);
       await createCustomer(customerForm);
@@ -1212,6 +1218,13 @@ export default function InventoryPage() {
               }
               fullWidth
             />
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <PaymentTermsFields
+                terms={supplierForm.payment_terms}
+                onTermsChange={payment_terms => setSupplierForm({ ...supplierForm, payment_terms })}
+                onError={setPaymentTermsError}
+              />
+            </Box>
             <TextField
               label="备注"
               value={supplierForm.notes}
@@ -1347,6 +1360,20 @@ export default function InventoryPage() {
               }
               fullWidth
             />
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <PaymentTermsFields
+                persistTerms={false}
+                terms="月结30天"
+                credit={{
+                  value: customerForm.credit_limit ?? 0,
+                  error: creditError,
+                  onChange: credit_limit => {
+                    setCustomerForm({ ...customerForm, credit_limit });
+                    setCreditError(prev => prev ? validateCreditLimit(credit_limit) : prev);
+                  },
+                }}
+              />
+            </Box>
             <TextField
               label="备注"
               value={customerForm.notes}

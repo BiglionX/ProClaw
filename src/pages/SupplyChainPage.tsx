@@ -46,6 +46,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import PartyContactFields from '../components/SupplyChain/PartyContactFields';
+import PaymentTermsFields from '../components/SupplyChain/PaymentTermsFields';
 import PurchaseProductPickerDialog from '../components/SupplyChain/PurchaseProductPickerDialog';
 import PaymentDialog from '../components/PaymentDialog';
 import MicroStocktakingPrompt from '../components/Inventory/MicroStocktakingPrompt';
@@ -629,12 +630,13 @@ function PurchaseTab({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<CreateSupplierInput>(emptySupplierForm);
   const [contactErrors, setContactErrors] = useState<SupplierContactErrors>({});
+  const [paymentTermsError, setPaymentTermsError] = useState<string | undefined>();
 
   const handleSupplierSubmit = async () => {
     if (!formData.name.trim()) { setError('供应商名称不能为空'); return; }
     const nextErrors = validateSupplierContact(formData);
     setContactErrors(nextErrors);
-    if (hasSupplierContactErrors(nextErrors)) return;
+    if (hasSupplierContactErrors(nextErrors) || paymentTermsError) return;
     try {
       setMutating(true);
       await createSupplier(formData);
@@ -1027,7 +1029,11 @@ function PurchaseTab({
             />
             <TextField label="地址" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} fullWidth />
             <TextField label="税号" value={formData.tax_number} onChange={e => setFormData({ ...formData, tax_number: e.target.value })} fullWidth />
-            <TextField label="付款条件" value={formData.payment_terms} onChange={e => setFormData({ ...formData, payment_terms: e.target.value })} placeholder="例如: Net 30, COD" fullWidth />
+            <PaymentTermsFields
+              terms={formData.payment_terms}
+              onTermsChange={payment_terms => setFormData({ ...formData, payment_terms })}
+              onError={setPaymentTermsError}
+            />
             <TextField label="备注" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} multiline rows={3} fullWidth />
           </Box>
         </DialogContent>
@@ -2127,17 +2133,18 @@ function SalesTab({
             />
             <TextField label="地址" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} fullWidth />
             <TextField label="税号" value={formData.tax_number} onChange={e => setFormData({ ...formData, tax_number: e.target.value })} fullWidth />
-            <TextField label="信用额度" type="number" value={formData.credit_limit}
-              onChange={e => {
-                const parsed = Number.parseFloat(e.target.value);
-                const credit_limit = Number.isFinite(parsed) ? parsed : 0;
-                setFormData({ ...formData, credit_limit });
-                setCreditError(prev => prev ? validateCreditLimit(credit_limit) : prev);
+            <PaymentTermsFields
+              persistTerms={false}
+              terms="月结30天"
+              credit={{
+                value: formData.credit_limit ?? 0,
+                error: creditError,
+                onChange: credit_limit => {
+                  setFormData({ ...formData, credit_limit });
+                  setCreditError(prev => prev ? validateCreditLimit(credit_limit) : prev);
+                },
               }}
-              error={Boolean(creditError)}
-              helperText={creditError}
-              inputProps={{ min: 0 }}
-              fullWidth />
+            />
             <TextField label="备注" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} multiline rows={3} fullWidth />
           </Box>
         </DialogContent>

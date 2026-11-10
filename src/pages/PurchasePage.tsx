@@ -29,6 +29,7 @@ import {
 } from '@mui/material';
 import { useState } from 'react';
 import PartyContactFields from '../components/SupplyChain/PartyContactFields';
+import PaymentTermsFields from '../components/SupplyChain/PaymentTermsFields';
 import {
   hasSupplierContactErrors,
   validateSupplierContact,
@@ -73,6 +74,7 @@ export default function PurchasePage() {
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
   const [contactErrors, setContactErrors] = useState<SupplierContactErrors>({});
+  const [paymentTermsError, setPaymentTermsError] = useState<string | undefined>();
   const [formData, setFormData] = useState<CreateSupplierInput>({
     name: '',
     contact_person: '',
@@ -98,7 +100,7 @@ export default function PurchasePage() {
       }
       const nextErrors = validateSupplierContact(formData);
       setContactErrors(nextErrors);
-      if (hasSupplierContactErrors(nextErrors)) return;
+      if (hasSupplierContactErrors(nextErrors) || paymentTermsError) return;
 
       setMutating(true);
       await createSupplier(formData);
@@ -354,14 +356,10 @@ export default function PurchasePage() {
               />
             </Box>
 
-            <TextField
-              label="付款条件"
-              value={formData.payment_terms}
-              onChange={e =>
-                setFormData({ ...formData, payment_terms: e.target.value })
-              }
-              placeholder="例如: Net 30, COD"
-              fullWidth
+            <PaymentTermsFields
+              terms={formData.payment_terms}
+              onTermsChange={payment_terms => setFormData({ ...formData, payment_terms })}
+              onError={setPaymentTermsError}
             />
 
             <TextField

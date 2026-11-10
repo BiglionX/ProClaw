@@ -41,6 +41,7 @@ import {
   type SupplierContactErrors,
 } from '../lib/validation/supplierContact';
 import PartyContactFields from '../components/SupplyChain/PartyContactFields';
+import PaymentTermsFields from '../components/SupplyChain/PaymentTermsFields';
 import {
   useCustomers,
   useInvalidateSales,
@@ -562,20 +563,17 @@ export default function SalesPage() {
                 fullWidth
               />
             </Box>
-            <TextField
-              label="信用额度"
-              type="number"
-              value={formData.credit_limit}
-              onChange={e => {
-                const parsed = Number.parseFloat(e.target.value);
-                const credit_limit = Number.isFinite(parsed) ? parsed : 0;
-                setFormData({ ...formData, credit_limit });
-                setCreditError(prev => prev ? validateCreditLimit(credit_limit) : prev);
+            <PaymentTermsFields
+              persistTerms={false}
+              terms="月结30天"
+              credit={{
+                value: formData.credit_limit ?? 0,
+                error: creditError,
+                onChange: credit_limit => {
+                  setFormData({ ...formData, credit_limit });
+                  setCreditError(prev => prev ? validateCreditLimit(credit_limit) : prev);
+                },
               }}
-              error={Boolean(creditError)}
-              helperText={creditError}
-              inputProps={{ min: 0 }}
-              fullWidth
             />
             <TextField
               label="备注"
