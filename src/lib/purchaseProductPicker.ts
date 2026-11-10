@@ -28,7 +28,7 @@ export interface PickerSpu {
   id: string;
   name: string;
   spu_code: string;
-  skus?: Array<{ is_default?: boolean; cost_price: number }>;
+  skus?: Array<{ is_default?: boolean; cost_price: number; sell_price?: number }>;
 }
 
 export type PickerTab = 'history' | 'recent' | 'all';
@@ -97,12 +97,15 @@ export function historyToPickerProduct(row: SupplierHistoryProduct): PickerProdu
   };
 }
 
-export function spuToPickerProduct(spu: PickerSpu): PickerProduct {
+export function spuToPickerProduct(spu: PickerSpu, priceSource: 'cost' | 'sell' = 'cost'): PickerProduct {
   const sku = spu.skus?.find(item => item.is_default) ?? spu.skus?.[0];
+  const unitPrice = priceSource === 'sell'
+    ? (sku?.sell_price ?? sku?.cost_price ?? 0)
+    : (sku?.cost_price ?? 0);
   return {
     id: spu.id,
     name: spu.name,
     code: spu.spu_code,
-    unitPrice: sku?.cost_price ?? 0,
+    unitPrice,
   };
 }

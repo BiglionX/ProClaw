@@ -702,6 +702,11 @@ pub mod inventory {
                     description: "获取销售订单列表",
                 },
                 CommandDef {
+                    name: "get_customer_history_products",
+                    module: "sales",
+                    description: "查询客户历史购买商品",
+                },
+                CommandDef {
                     name: "update_sales_order_cmd",
                     module: "sales",
                     description: "更新销售订单",

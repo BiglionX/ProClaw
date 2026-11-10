@@ -17,7 +17,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { getSupplierHistoryProducts } from '../../lib/purchaseService';
+import { getSupplierHistoryProducts, type SupplierHistoryProduct } from '../../lib/purchaseService';
 import {
   RECENT_PRODUCT_STORAGE_KEY,
   defaultPickerTab,
@@ -36,8 +36,13 @@ export interface QuickCreateProductInput {
 
 interface PurchaseProductPickerDialogProps {
   open: boolean;
-  supplierId: string;
+  supplierId?: string;
   supplierName?: string;
+  /** 历史交易的对方。采购单传供应商，销售单传客户。 */
+  historyPartyId?: string;
+  historyPartyName?: string;
+  historyAudience?: 'supplier' | 'customer';
+  loadHistory?: (partyId: string) => Promise<SupplierHistoryProduct[]>;
   catalog: PickerProduct[];
   onClose: () => void;
   onConfirm: (picked: PickerProduct[]) => void;
@@ -64,13 +69,21 @@ function writeRecentIds(ids: string[]) {
 
 export default function PurchaseProductPickerDialog({
   open,
-  supplierId,
+  supplierId = '',
   supplierName,
+  historyPartyId,
+  historyPartyName,
+  historyAudience = 'supplier',
+  loadHistory = getSupplierHistoryProducts,
   catalog,
   onClose,
   onConfirm,
   onQuickCreate,
 }: PurchaseProductPickerDialogProps) {
+  const partyId = historyPartyId ?? supplierId;
+  const partyName = historyPartyName ?? supplierName;
+  const audienceLabel = historyAudience === 'customer' ? '客户' : '供应商';
+  const dealLabel = historyAudience === 'customer' ? '购买' : '采购';
   const [tab, setTab] = useState<PickerTab>('history');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Record<string, PickerProduct>>({});
@@ -87,17 +100,17 @@ export default function PurchaseProductPickerDialog({
 
   useEffect(() => {
     if (!open) return;
-    setTab(defaultPickerTab(supplierId));
+    setTab(defaultPickerTab(partyId));
     setQuery('');
     setSelected({});
     setCreated([]);
     setRecentIds(readRecentIds());
     setCreateOpen(false);
     setCreateError(null);
-  }, [open, supplierId]);
+  }, [open, partyId]);
 
   useEffect(() => {
-    if (!open || !supplierId.trim()) {
+    if (!open || !partyId.trim()) {
       setHistory([]);
       setHistoryError(null);
       setHistoryLoading(false);
@@ -106,7 +119,7 @@ export default function PurchaseProductPickerDialog({
     let cancelled = false;
     setHistoryLoading(true);
     setHistoryError(null);
-    getSupplierHistoryProducts(supplierId)
+    loadHistory(partyId)
       .then(rows => {
         if (!cancelled) setHistory(rows.map(historyToPickerProduct));
       })
@@ -122,7 +135,7 @@ export default function PurchaseProductPickerDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, supplierId]);
+  }, [open, partyId, loadHistory]);
 
   const knownProducts = useMemo(() => {
     const byId = new Map<string, PickerProduct>();
@@ -193,7 +206,7 @@ export default function PurchaseProductPickerDialog({
   };
 
   const emptyText = tab === 'history'
-    ? (supplierName ? `${supplierName} 还没有采购记录` : '这个供应商还没有采购记录')
+    ? (partyName ? `${partyName} 还没有${dealLabel}记录` : `这个${audienceLabel}还没有${dealLabel}记录`)
     : tab === 'recent'
       ? '还没有最近添加的商品'
       : '没有匹配的商品';
@@ -201,7 +214,7 @@ export default function PurchaseProductPickerDialog({
   return (
     <>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle>选择商品{supplierName ? ` · ${supplierName}` : ''}</DialogTitle>
+        <DialogTitle>选择商品{partyName ? ` · ${partyName}` : ''}</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <TextField
@@ -221,7 +234,7 @@ export default function PurchaseProductPickerDialog({
             {tab === 'history' && historyLoading ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 3 }}>
                 <CircularProgress size={18} />
-                <Typography variant="body2" color="text.secondary">正在查询该供应商买过的商品…</Typography>
+                <Typography variant="body2" color="text.secondary">正在查询该{audienceLabel}{dealLabel}过的商品…</Typography>
               </Box>
             ) : visibleProducts.length === 0 ? (
               tab === 'history' && historyError ? null : (

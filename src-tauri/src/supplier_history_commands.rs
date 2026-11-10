@@ -33,15 +33,45 @@ ORDER BY last_order_date DESC, name ASC
 LIMIT 50
 ";
 
-pub fn query_supplier_history_products(
+const CUSTOMER_HISTORY_SQL: &str = "
+SELECT
+    soi.product_id AS id,
+    COALESCE(NULLIF(spu.name, ''), NULLIF(p.name, ''), soi.product_id) AS name,
+    COALESCE(NULLIF(spu.spu_code, ''), NULLIF(p.sku, ''), '') AS code,
+    COUNT(DISTINCT so.id) AS order_count,
+    COALESCE(SUM(soi.quantity), 0) AS total_quantity,
+    MAX(so.order_date) AS last_order_date,
+    (
+        SELECT soi2.unit_price
+        FROM sales_order_items soi2
+        INNER JOIN sales_orders so2 ON so2.id = soi2.sales_order_id
+        WHERE so2.customer_id = ?1
+          AND soi2.product_id = soi.product_id
+          AND so2.deleted_at IS NULL
+          AND so2.status != 'cancelled'
+        ORDER BY so2.order_date DESC, so2.created_at DESC, soi2.rowid DESC
+        LIMIT 1
+    ) AS last_unit_price
+FROM sales_order_items soi
+INNER JOIN sales_orders so ON so.id = soi.sales_order_id
+LEFT JOIN products p ON p.id = soi.product_id
+LEFT JOIN product_spus spu ON spu.id = soi.product_id
+WHERE so.customer_id = ?1
+  AND so.deleted_at IS NULL
+  AND so.status != 'cancelled'
+GROUP BY soi.product_id
+ORDER BY last_order_date DESC, name ASC
+LIMIT 50
+";
+
+fn query_history_products(
     conn: &Connection,
-    supplier_id: &str,
+    sql: &str,
+    party_id: &str,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let mut stmt = conn
-        .prepare(SUPPLIER_HISTORY_SQL)
-        .map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map(params![supplier_id], |row| {
+        .query_map(params![party_id], |row| {
             let order_count = row_i64(row, 3)?;
             let total_quantity = row_i64(row, 4)?;
             let last_unit_price = row_f64(row, 6)?;
@@ -59,6 +89,20 @@ pub fn query_supplier_history_products(
 
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
+}
+
+pub fn query_supplier_history_products(
+    conn: &Connection,
+    supplier_id: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    query_history_products(conn, SUPPLIER_HISTORY_SQL, supplier_id)
+}
+
+pub fn query_customer_history_products(
+    conn: &Connection,
+    customer_id: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    query_history_products(conn, CUSTOMER_HISTORY_SQL, customer_id)
 }
 
 fn row_i64(row: &rusqlite::Row, idx: usize) -> rusqlite::Result<i64> {
@@ -89,9 +133,23 @@ pub fn get_supplier_history_products(
     query_supplier_history_products(db.connection(), supplier_id)
 }
 
+/// 查询某客户历史上购买过的商品。不改表，只读 sales_orders / sales_order_items。
+#[tauri::command]
+pub fn get_customer_history_products(
+    db: tauri::State<Mutex<Database>>,
+    customer_id: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    let customer_id = customer_id.trim();
+    if customer_id.is_empty() {
+        return Err("customer_id is required".to_string());
+    }
+    let db = db.lock().map_err(|e| e.to_string())?;
+    query_customer_history_products(db.connection(), customer_id)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::query_supplier_history_products;
+    use super::{query_customer_history_products, query_supplier_history_products};
     use crate::database::Database;
     use rusqlite::params;
 
@@ -240,5 +298,65 @@ mod tests {
         let other = query_supplier_history_products(conn, "sup-b").unwrap();
         assert_eq!(other.len(), 1);
         assert_eq!(other[0]["id"], "p-other");
+    }
+
+    #[test]
+    fn customer_history_uses_latest_sale_and_skips_other_customers() {
+        let db = Database::new_in_memory().unwrap();
+        db.initialize().unwrap();
+        let conn = db.connection();
+        conn.execute(
+            "INSERT INTO customers (id, name) VALUES ('cust-a', '甲'), ('cust-b', '乙')",
+            [],
+        )
+        .unwrap();
+        insert_product(conn, "s1", "SKU-S1", "电池", Some("SPU-S1"));
+        insert_product(conn, "s2", "SKU-S2", "别人的货", Some("SPU-S2"));
+
+        let insert_sale = |order_id: &str,
+                           customer_id: &str,
+                           date: &str,
+                           status: &str,
+                           price: f64| {
+            conn.execute(
+                "INSERT INTO sales_orders (id, so_number, customer_id, order_date, status, total_amount)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![order_id, format!("SO-{order_id}"), customer_id, date, status, price],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO sales_order_items
+                    (id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity)
+                 VALUES (?1, ?2, 's1', 1, ?3, ?3, 0)",
+                params![format!("line-{order_id}"), order_id, price],
+            )
+            .unwrap();
+        };
+        insert_sale("so-old", "cust-a", "2026-01-01", "confirmed", 8.0);
+        insert_sale("so-new", "cust-a", "2026-03-01", "delivered", 20.0);
+        insert_sale("so-cancel", "cust-a", "2026-04-01", "cancelled", 99.0);
+        conn.execute(
+            "INSERT INTO sales_orders (id, so_number, customer_id, order_date, status, total_amount)
+             VALUES ('so-b', 'SO-so-b', 'cust-b', '2026-06-01', 'confirmed', 3)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sales_order_items
+                (id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity)
+             VALUES ('line-so-b', 'so-b', 's2', 1, 3, 3, 0)",
+            [],
+        )
+        .unwrap();
+
+        let rows = query_customer_history_products(conn, "cust-a").unwrap();
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0]["id"], "s1");
+        assert_eq!(rows[0]["order_count"], 2);
+        assert_eq!(rows[0]["last_unit_price"], 20.0);
+        assert_eq!(rows[0]["last_order_date"], "2026-03-01");
+        let other = query_customer_history_products(conn, "cust-b").unwrap();
+        assert_eq!(other.len(), 1);
+        assert_eq!(other[0]["id"], "s2");
     }
 }

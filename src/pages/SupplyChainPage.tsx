@@ -106,6 +106,7 @@ import {
   SalesOrderDetail,
   createCustomer,
   createSalesOrder,
+  getCustomerHistoryProducts,
   getSalesOrderDetail,
   generateCustomerCode,
   submitSalesOrder,
@@ -600,7 +601,7 @@ function PurchaseTab({
   const { data: products = [] } = useProductSPUs(200, subTab === 1);
   const invalidateProducts = useInvalidateProducts();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerCatalog = useMemo(() => products.map(spuToPickerProduct), [products]);
+  const pickerCatalog = useMemo(() => products.map(product => spuToPickerProduct(product)), [products]);
 
   const loading = loadingSuppliers || loadingOrders || detailLoading || mutating;
   const loadSuppliers = () => setSupplierSearchQuery(searchTerm);
@@ -1621,13 +1622,19 @@ function SalesTab({
 
   const { data: customers = [], isLoading: loadingCustomers } = useCustomers(
     customerSearchQuery,
-    subTab === 0
+    subTab === 0 || subTab === 1
   );
   const { data: orders = [], isLoading: loadingOrders } = useSalesOrders(
     { search: orderSearchQuery },
     subTab === 1
   );
-  const { data: products = [] } = useProductSPUs(100, subTab === 1);
+  const { data: products = [] } = useProductSPUs(200, subTab === 1);
+  const invalidateProducts = useInvalidateProducts();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerCatalog = useMemo(
+    () => products.map(product => spuToPickerProduct(product, 'sell')),
+    [products],
+  );
 
   const loading = loadingCustomers || loadingOrders || detailLoading || mutating;
   const loadCustomers = () => setCustomerSearchQuery(custSearch);
@@ -1662,19 +1669,12 @@ function SalesTab({
   // 销售订单创建
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [createOrderLoading, setCreateOrderLoading] = useState(false);
-  const [orderForm, setOrderForm] = useState<{
-    customer_id: string;
-    order_date: string;
-    expected_delivery_date: string;
-    shipping_address: string;
-    notes: string;
-  }>({
+  const [orderForm, setOrderForm] = useState({
     customer_id: '',
-    order_date: new Date().toISOString().slice(0, 10),
-    expected_delivery_date: '',
     shipping_address: '',
     notes: '',
   });
+  const [deliveryDates, setDeliveryDates] = useState(() => createDeliveryDateState(todayLocalIso()));
   const [orderItems, setOrderItems] = useState<Array<{
     product_id: string;
     product_name: string;
@@ -1707,19 +1707,16 @@ function SalesTab({
   });
 
   const openCreateOrderDialog = () => {
-    setOrderForm({
-      customer_id: '',
-      order_date: new Date().toISOString().slice(0, 10),
-      expected_delivery_date: '',
-      shipping_address: '',
-      notes: '',
-    });
+    setOrderForm({ customer_id: '', shipping_address: '', notes: '' });
+    setDeliveryDates(createDeliveryDateState(todayLocalIso()));
     setOrderItems([]);
+    setPickerOpen(false);
     setOrderDialogOpen(true);
   };
 
-  const addOrderItem = () => {
-    setOrderItems([...orderItems, { product_id: '', product_name: '', quantity: 1, unit_price: 0 }]);
+  const openProductPicker = () => {
+    if (!orderForm.customer_id) { setError('请选择客户'); return; }
+    setPickerOpen(true);
   };
 
   const removeOrderItem = (index: number) => {
@@ -1738,8 +1735,8 @@ function SalesTab({
       setCreateOrderLoading(true);
       const result = await createSalesOrder({
         customer_id: orderForm.customer_id,
-        order_date: orderForm.order_date,
-        expected_delivery_date: orderForm.expected_delivery_date || undefined,
+        order_date: deliveryDates.orderDate,
+        expected_delivery_date: deliveryDates.expectedDeliveryDate || undefined,
         shipping_address: orderForm.shipping_address || undefined,
         notes: orderForm.notes || undefined,
         items: orderItems.map(item => ({
@@ -2049,11 +2046,12 @@ function SalesTab({
                 ))}
               </Select>
             </FormControl>
-            <TextField label="订单日期" type="date" value={orderForm.order_date}
-              onChange={e => setOrderForm({ ...orderForm, order_date: e.target.value })}
+            <TextField label="订单日期" type="date" value={deliveryDates.orderDate}
+              onChange={e => setDeliveryDates(prev => changeOrderDate(prev, e.target.value))}
               InputLabelProps={{ shrink: true }} fullWidth />
-            <TextField label="预计交货日期" type="date" value={orderForm.expected_delivery_date}
-              onChange={e => setOrderForm({ ...orderForm, expected_delivery_date: e.target.value })}
+            <TextField label="预计交货日期" type="date" value={deliveryDates.expectedDeliveryDate}
+              onChange={e => setDeliveryDates(prev => changeExpectedDeliveryDate(prev, e.target.value))}
+              helperText={deliveryDates.expectedTouched ? '已手动指定，不再跟随订单日期。清空后恢复默认。' : '默认是订单日期的次日'}
               InputLabelProps={{ shrink: true }} fullWidth />
             <TextField label="收货地址" value={orderForm.shipping_address}
               onChange={e => setOrderForm({ ...orderForm, shipping_address: e.target.value })} multiline rows={2} fullWidth />
@@ -2061,23 +2059,14 @@ function SalesTab({
               onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} multiline rows={2} fullWidth />
 
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>订单明细</Typography>
+            {orderItems.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                还没有商品。点击「添加商品」，默认从该客户的历史购买里勾选。
+              </Typography>
+            )}
             {orderItems.map((item, idx) => (
-              <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel>商品</InputLabel>
-                  <Select value={item.product_id} label="商品"
-                    onChange={e => {
-                      const prod = products.find(p => p.id === e.target.value);
-                      const newItems = [...orderItems];
-                      newItems[idx].product_id = e.target.value;
-                      newItems[idx].product_name = prod ? prod.name : '';
-                      setOrderItems(newItems);
-                    }}>
-                    {products.map(p => (
-                      <MenuItem key={p.id} value={p.id}>{p.name} (SPU: {p.spu_code})</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+              <Box key={item.product_id || idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Typography sx={{ flex: 1, minWidth: 160 }}>{item.product_name || item.product_id}</Typography>
                 <TextField label="数量" type="number" size="small" sx={{ width: 100 }}
                   value={item.quantity}
                   onChange={e => {
@@ -2097,12 +2086,12 @@ function SalesTab({
                 <Typography sx={{ minWidth: 80, textAlign: 'right', fontWeight: 600 }}>
                   ¥{(item.quantity * item.unit_price).toFixed(2)}
                 </Typography>
-                <IconButton size="small" color="error" onClick={() => removeOrderItem(idx)} disabled={orderItems.length <= 1}>
+                <IconButton size="small" color="error" onClick={() => removeOrderItem(idx)}>
                   <CloseIcon fontSize="small" />
                 </IconButton>
               </Box>
             ))}
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={addOrderItem} size="small">添加商品行</Button>
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={openProductPicker} size="small">添加商品</Button>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -2112,6 +2101,35 @@ function SalesTab({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <PurchaseProductPickerDialog
+        open={pickerOpen}
+        historyPartyId={orderForm.customer_id}
+        historyPartyName={customers.find(customer => customer.id === orderForm.customer_id)?.name}
+        historyAudience="customer"
+        loadHistory={getCustomerHistoryProducts}
+        catalog={pickerCatalog}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={picked => {
+          setOrderItems(prev => mergePickedProducts(prev, picked));
+          setPickerOpen(false);
+        }}
+        onQuickCreate={async input => {
+          const created = await createProduct({
+            name: input.name,
+            sku: generateSimpleSKU(),
+            cost_price: input.costPrice,
+            sell_price: input.costPrice,
+          });
+          invalidateProducts();
+          return spuToPickerProduct({
+            id: created.id,
+            name: created.name,
+            spu_code: created.sku,
+            skus: [{ is_default: true, cost_price: created.cost_price, sell_price: created.sell_price }],
+          }, 'sell');
+        }}
+      />
 
       {/* 销售订单详情对话框 */}
       <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>

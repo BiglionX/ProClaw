@@ -63,8 +63,14 @@ describe('purchaseProductPicker', () => {
       spu_code: 'SPU-NEW',
       skus: [
         { is_default: false, cost_price: 3 },
-        { is_default: true, cost_price: 7 },
+        { is_default: true, cost_price: 7, sell_price: 15 },
       ],
     }).unitPrice).toBe(7);
+    expect(spuToPickerProduct({
+      id: 'p9',
+      name: '新商品',
+      spu_code: 'SPU-NEW',
+      skus: [{ is_default: true, cost_price: 7, sell_price: 15 }],
+    }, 'sell').unitPrice).toBe(15);
   });
 });
