@@ -45,8 +45,6 @@ use crate::purchase_commands::*;
 #[cfg(feature = "inventory")]
 use crate::purchase_return_commands::*;
 #[cfg(feature = "inventory")]
-use crate::supplier_history_commands::*;
-#[cfg(feature = "inventory")]
 use crate::reconciliation_commands::*;
 #[cfg(feature = "inventory")]
 use crate::sales_commands::*;
@@ -58,6 +56,8 @@ use crate::setup_commands::*;
 #[cfg(any(feature = "light", feature = "inventory"))]
 use crate::store_commands::*;
 use crate::subscription_commands::*;
+#[cfg(feature = "inventory")]
+use crate::supplier_history_commands::*;
 use crate::sync_engine::*;
 use crate::team_commands::*;
 use crate::tray_commands::*;

@@ -37,7 +37,9 @@ pub fn query_supplier_history_products(
     conn: &Connection,
     supplier_id: &str,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let mut stmt = conn.prepare(SUPPLIER_HISTORY_SQL).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(SUPPLIER_HISTORY_SQL)
+        .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params![supplier_id], |row| {
             let order_count = row_i64(row, 3)?;
@@ -55,7 +57,8 @@ pub fn query_supplier_history_products(
         })
         .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 fn row_i64(row: &rusqlite::Row, idx: usize) -> rusqlite::Result<i64> {
@@ -92,7 +95,13 @@ mod tests {
     use crate::database::Database;
     use rusqlite::params;
 
-    fn insert_product(conn: &rusqlite::Connection, id: &str, sku: &str, name: &str, spu_code: Option<&str>) {
+    fn insert_product(
+        conn: &rusqlite::Connection,
+        id: &str,
+        sku: &str,
+        name: &str,
+        spu_code: Option<&str>,
+    ) {
         conn.execute(
             "INSERT INTO products (id, sku, name, unit, cost_price, current_stock)
              VALUES (?1, ?2, ?3, '件', 10, 0)",
@@ -147,15 +156,67 @@ mod tests {
         insert_product(conn, "p-legacy", "SKU-LEG", "旧商品", None);
         insert_product(conn, "p-other", "SKU-OTH", "别人的货", Some("SPU-OTH"));
 
-        insert_order(conn, "po-old", "sup-a", "2026-01-01", "confirmed", &[("p1", 2, 10.0)]);
-        insert_order(conn, "po-mid", "sup-a", "2026-02-15", "received", &[("p2", 1, 5.0)]);
-        insert_order(conn, "po-legacy", "sup-a", "2026-02-20", "draft", &[("p-legacy", 3, 4.0)]);
-        insert_order(conn, "po-new", "sup-a", "2026-03-01", "confirmed", &[("p1", 4, 12.5)]);
-        insert_order(conn, "po-cancel", "sup-a", "2026-04-01", "cancelled", &[("p1", 9, 99.0)]);
-        insert_order(conn, "po-del", "sup-a", "2026-05-01", "confirmed", &[("p1", 8, 77.0)]);
-        conn.execute("UPDATE purchase_orders SET deleted_at = '2026-05-02' WHERE id = 'po-del'", [])
-            .unwrap();
-        insert_order(conn, "po-b", "sup-b", "2026-06-01", "confirmed", &[("p-other", 1, 3.0)]);
+        insert_order(
+            conn,
+            "po-old",
+            "sup-a",
+            "2026-01-01",
+            "confirmed",
+            &[("p1", 2, 10.0)],
+        );
+        insert_order(
+            conn,
+            "po-mid",
+            "sup-a",
+            "2026-02-15",
+            "received",
+            &[("p2", 1, 5.0)],
+        );
+        insert_order(
+            conn,
+            "po-legacy",
+            "sup-a",
+            "2026-02-20",
+            "draft",
+            &[("p-legacy", 3, 4.0)],
+        );
+        insert_order(
+            conn,
+            "po-new",
+            "sup-a",
+            "2026-03-01",
+            "confirmed",
+            &[("p1", 4, 12.5)],
+        );
+        insert_order(
+            conn,
+            "po-cancel",
+            "sup-a",
+            "2026-04-01",
+            "cancelled",
+            &[("p1", 9, 99.0)],
+        );
+        insert_order(
+            conn,
+            "po-del",
+            "sup-a",
+            "2026-05-01",
+            "confirmed",
+            &[("p1", 8, 77.0)],
+        );
+        conn.execute(
+            "UPDATE purchase_orders SET deleted_at = '2026-05-02' WHERE id = 'po-del'",
+            [],
+        )
+        .unwrap();
+        insert_order(
+            conn,
+            "po-b",
+            "sup-b",
+            "2026-06-01",
+            "confirmed",
+            &[("p-other", 1, 3.0)],
+        );
 
         let rows = query_supplier_history_products(conn, "sup-a").unwrap();
         assert_eq!(rows.len(), 3, "{rows:?}");
@@ -173,7 +234,9 @@ mod tests {
         assert_eq!(rows[1]["last_unit_price"], 4.0);
 
         assert_eq!(rows[2]["id"], "p2");
-        assert!(query_supplier_history_products(conn, "sup-empty").unwrap().is_empty());
+        assert!(query_supplier_history_products(conn, "sup-empty")
+            .unwrap()
+            .is_empty());
         let other = query_supplier_history_products(conn, "sup-b").unwrap();
         assert_eq!(other.len(), 1);
         assert_eq!(other[0]["id"], "p-other");

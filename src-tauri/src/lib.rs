@@ -37,14 +37,14 @@ pub mod purchase_commands;
 #[cfg(feature = "inventory")]
 pub mod purchase_return_commands;
 #[cfg(feature = "inventory")]
-pub mod supplier_history_commands;
-#[cfg(feature = "inventory")]
 pub mod reconciliation_commands;
 #[cfg(feature = "inventory")]
 pub mod sales_commands;
 #[cfg(feature = "inventory")]
 pub mod sales_return_commands;
 pub mod sku_stock;
+#[cfg(feature = "inventory")]
+pub mod supplier_history_commands;
 
 pub mod approval_commands;
 pub mod call_commands;
