@@ -1,15 +1,14 @@
 import { ipcInvoke as invoke } from './tauri';
 import { isTauri } from './tauri';
+import { formatReturnNumber } from './returnOrderForm';
 
 /**
  * 生成采购退货单编号
- * 格式: PR-YYYYMMDD-XXXX
+ * 格式: PR-YYYYMMDD-XXXX，日期按本地日历。
  */
-export function generatePRNumber(): string {
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+export function generatePRNumber(now = new Date()): string {
   const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `PR-${dateStr}-${randomStr}`;
+  return formatReturnNumber('PR', now, randomStr);
 }
 
 export interface PurchaseReturn {

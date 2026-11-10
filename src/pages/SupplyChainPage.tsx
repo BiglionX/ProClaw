@@ -47,6 +47,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import PartyContactFields from '../components/SupplyChain/PartyContactFields';
 import PaymentTermsFields from '../components/SupplyChain/PaymentTermsFields';
+import ReturnLinesEditor from '../components/SupplyChain/ReturnLinesEditor';
 import PurchaseProductPickerDialog from '../components/SupplyChain/PurchaseProductPickerDialog';
 import PaymentDialog from '../components/PaymentDialog';
 import MicroStocktakingPrompt from '../components/Inventory/MicroStocktakingPrompt';
@@ -70,6 +71,7 @@ import {
 import { useInvalidateProducts, useProductSPUs } from '../lib/hooks/useProducts';
 import { createProduct, generateSimpleSKU } from '../lib/productService';
 import { mergePickedProducts, spuToPickerProduct } from '../lib/purchaseProductPicker';
+import { summarizeReturnLines, type ReturnLineDraft } from '../lib/returnOrderForm';
 import {
   buildPurchaseDraftUpdate,
   buildSalesDraftUpdate,
@@ -132,6 +134,7 @@ import {
 import {
   PurchaseReturnDetail,
   createPurchaseReturn,
+  generatePRNumber,
   getPurchaseReturnDetail,
   confirmPurchaseReturn,
   cancelPurchaseReturn,
@@ -1389,24 +1392,20 @@ function PurchaseReturnTab({
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [returnNumber, setReturnNumber] = useState('');
   const [returnForm, setReturnForm] = useState<{
     purchase_order_id: string;
     return_date: string;
     reason: string;
     notes: string;
-  }>({ purchase_order_id: '', return_date: new Date().toISOString().slice(0, 10), reason: '', notes: '' });
-  const [returnItems, setReturnItems] = useState<Array<{
-    product_id: string;
-    product_name: string;
-    quantity: number;
-    unit_price: number;
-    max_quantity?: number;
-  }>>([]);
+  }>({ purchase_order_id: '', return_date: todayLocalIso(), reason: '', notes: '' });
+  const [returnItems, setReturnItems] = useState<ReturnLineDraft[]>([]);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<PurchaseReturnDetail | null>(null);
 
   const openCreateDialog = () => {
-    setReturnForm({ purchase_order_id: '', return_date: new Date().toISOString().slice(0, 10), reason: '', notes: '' });
+    setReturnNumber(generatePRNumber());
+    setReturnForm({ purchase_order_id: '', return_date: todayLocalIso(), reason: '', notes: '' });
     setReturnItems([]);
     setCreateDialogOpen(true);
   };
@@ -1421,15 +1420,10 @@ function PurchaseReturnTab({
         quantity: 0,
         unit_price: item.unit_price,
         max_quantity: item.quantity,
+        line_note: '',
       }));
       setReturnItems(items);
     }).catch(err => setError(err instanceof Error ? err.message : '加载订单详情失败'));
-  };
-
-  const updateReturnItem = (index: number, field: string, value: any) => {
-    const newItems = [...returnItems];
-    (newItems[index] as any)[field] = value;
-    setReturnItems(newItems);
   };
 
   const handleCreate = async () => {
@@ -1448,6 +1442,7 @@ function PurchaseReturnTab({
     try {
       setCreateLoading(true);
       const result = await createPurchaseReturn({
+        pr_number: returnNumber,
         purchase_order_id: returnForm.purchase_order_id,
         supplier_id: selectedOrder.supplier_id,
         return_date: returnForm.return_date,
@@ -1457,6 +1452,7 @@ function PurchaseReturnTab({
           product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
+          reason: item.line_note.trim() || undefined,
         })),
       });
       setSuccessMessage(`采购退货单 ${result.pr_number} 创建成功!`);
@@ -1573,10 +1569,11 @@ function PurchaseReturnTab({
       </Paper>
 
       {/* 创建采购退货对话框 */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>创建采购退货单</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField label="退货单号" value={returnNumber} InputProps={{ readOnly: true }} fullWidth />
             <FormControl fullWidth>
               <InputLabel>关联采购订单 *</InputLabel>
               <Select value={returnForm.purchase_order_id} label="关联采购订单 *"
@@ -1594,25 +1591,8 @@ function PurchaseReturnTab({
             <TextField label="备注" value={returnForm.notes}
               onChange={e => setReturnForm({ ...returnForm, notes: e.target.value })} multiline rows={2} fullWidth />
 
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>退货明细（输入数量 {'>'} 0 的将被提交）</Typography>
-            {returnItems.map((item, idx) => (
-              <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <Typography sx={{ minWidth: 200, fontSize: '0.9rem' }}>{item.product_name || item.product_id}</Typography>
-                <TextField label="退货数量" type="number" size="small" sx={{ width: 120 }}
-                  value={item.quantity || ''}
-                  onChange={e => updateReturnItem(idx, 'quantity', parseInt(e.target.value) || 0)}
-                  inputProps={{ min: 0, max: item.max_quantity }}
-                  helperText={item.max_quantity ? `最多 ${item.max_quantity}` : ''}
-                  FormHelperTextProps={{ sx: { fontSize: '0.7rem' } }} />
-                <TextField label="单价" type="number" size="small" sx={{ width: 120 }}
-                  value={item.unit_price}
-                  onChange={e => updateReturnItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
-                  inputProps={{ min: 0, step: 0.01 }} />
-                <Typography sx={{ minWidth: 80, textAlign: 'right', fontWeight: 600 }}>
-                  ¥{(item.quantity * item.unit_price).toFixed(2)}
-                </Typography>
-              </Box>
-            ))}
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>退货明细（数量大于 0 的行会提交）</Typography>
+            <ReturnLinesEditor lines={returnItems} onChange={setReturnItems} />
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1652,13 +1632,16 @@ function PurchaseReturnTab({
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>商品</TableCell><TableCell align="right">数量</TableCell>
-                      <TableCell align="right">单价</TableCell><TableCell align="right">小计</TableCell><TableCell>原因</TableCell>
+                      <TableCell sx={{ width: 56 }}>序号</TableCell>
+                      <TableCell>商品</TableCell><TableCell align="right" sx={{ width: 90 }}>数量</TableCell>
+                      <TableCell align="right" sx={{ width: 110 }}>单价</TableCell><TableCell align="right" sx={{ width: 110 }}>小计</TableCell>
+                      <TableCell sx={{ width: 180 }}>行说明</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {selectedDetail.items.map(item => (
+                    {selectedDetail.items.map((item, index) => (
                       <TableRow key={item.id}>
+                        <TableCell>{index + 1}</TableCell>
                         <TableCell>{item.product_name || item.product_id}</TableCell>
                         <TableCell align="right">{item.quantity}</TableCell>
                         <TableCell align="right">¥{item.unit_price.toFixed(2)}</TableCell>
@@ -1669,6 +1652,10 @@ function PurchaseReturnTab({
                   </TableBody>
                 </Table>
               </TableContainer>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                <Typography variant="body2">退货总数量：{summarizeReturnLines(selectedDetail.items).quantity}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>退货总金额：¥{summarizeReturnLines(selectedDetail.items).amount.toFixed(2)}</Typography>
+              </Box>
             </Box>
           )}
         </DialogContent>
