@@ -105,6 +105,7 @@ import {
   validateSupplierContact,
   type SupplierContactErrors,
 } from '../lib/validation/supplierContact';
+import { validateCreditLimit } from '../lib/validation/creditLimit';
 import {
   changeExpectedDeliveryDate,
   changeOrderDate,
@@ -1746,6 +1747,7 @@ function SalesTab({
   const loadOrders = () => setOrderSearchQuery(orderSearch);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [creditError, setCreditError] = useState<string | undefined>();
   const [formData, setFormData] = useState<CreateCustomerInput>({
     name: '', code: generateCustomerCode(), contact_person: '', phone: '', email: '',
     address: '', website: '', customer_type: 'company', tax_number: '', credit_limit: 0, notes: '', is_active: true,
@@ -1753,6 +1755,8 @@ function SalesTab({
 
   const handleSubmit = async () => {
     if (!formData.name) { setError('客户名称不能为空'); return; }
+    const nextCreditError = validateCreditLimit(formData.credit_limit);
+    if (nextCreditError) { setCreditError(nextCreditError); return; }
     try {
       setMutating(true);
       await createCustomer(formData);
@@ -1768,6 +1772,7 @@ function SalesTab({
   const openDialog = () => {
     setFormData({ name: '', code: generateCustomerCode(), contact_person: '', phone: '', email: '',
       address: '', website: '', customer_type: 'company', tax_number: '', credit_limit: 0, notes: '', is_active: true });
+    setCreditError(undefined);
     setDialogOpen(true);
   };
 
@@ -2149,7 +2154,17 @@ function SalesTab({
               <TextField label="网站" value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} fullWidth />
               <TextField label="税号" value={formData.tax_number} onChange={e => setFormData({ ...formData, tax_number: e.target.value })} fullWidth />
             </Box>
-            <TextField label="信用额度" type="number" value={formData.credit_limit} onChange={e => setFormData({ ...formData, credit_limit: parseFloat(e.target.value) || 0 })} fullWidth />
+            <TextField label="信用额度" type="number" value={formData.credit_limit}
+              onChange={e => {
+                const parsed = Number.parseFloat(e.target.value);
+                const credit_limit = Number.isFinite(parsed) ? parsed : 0;
+                setFormData({ ...formData, credit_limit });
+                setCreditError(prev => prev ? validateCreditLimit(credit_limit) : prev);
+              }}
+              error={Boolean(creditError)}
+              helperText={creditError}
+              inputProps={{ min: 0 }}
+              fullWidth />
             <TextField label="备注" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} multiline rows={3} fullWidth />
           </Box>
         </DialogContent>

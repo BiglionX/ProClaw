@@ -54,6 +54,11 @@ import {
   // 新增：自动生成SKU
   generateSimpleSKU,
 } from '../lib/productService';
+import {
+  hasProductFormErrors,
+  validateProductForm,
+  type ProductFormErrors,
+} from '../lib/validation/productForm';
 // 新增：导入模式切换组件
 import {
   UpgradeConfirmDialog,
@@ -105,6 +110,7 @@ export default function ProductsPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ProductFormErrors>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
 
@@ -216,6 +222,7 @@ export default function ProductsPage() {
     }
     setOpenDialog(true);
     setError(null);
+    setFieldErrors({});
   };
 
   // 处理图片选择（支持多图）
@@ -280,6 +287,12 @@ export default function ProductsPage() {
 
   // 保存产品
   const handleSave = async () => {
+    const nextFieldErrors = validateProductForm(formData);
+    if (hasProductFormErrors(nextFieldErrors)) {
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
+    setFieldErrors({});
     try {
       setMutating(true);
 
@@ -882,10 +895,16 @@ export default function ProductsPage() {
                   fullWidth
                   label="产品名称"
                   value={formData.name}
-                  onChange={e =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
+                  onChange={e => {
+                    const name = e.target.value;
+                    setFormData({ ...formData, name });
+                    setFieldErrors(prev => prev.name
+                      ? { ...prev, name: validateProductForm({ ...formData, name }).name }
+                      : prev);
+                  }}
                   required
+                  error={Boolean(fieldErrors.name)}
+                  helperText={fieldErrors.name}
                   size="small"
                 />
               </Grid>
@@ -908,12 +927,16 @@ export default function ProductsPage() {
                   label="成本价"
                   type="number"
                   value={formData.cost_price}
-                  onChange={e =>
-                    setFormData({
-                      ...formData,
-                      cost_price: parseFloat(e.target.value) || 0,
-                    })
-                  }
+                  onChange={e => {
+                    const parsed = Number.parseFloat(e.target.value);
+                    const cost_price = Number.isFinite(parsed) ? parsed : 0;
+                    setFormData({ ...formData, cost_price });
+                    setFieldErrors(prev => prev.cost_price
+                      ? { ...prev, cost_price: validateProductForm({ ...formData, cost_price }).cost_price }
+                      : prev);
+                  }}
+                  error={Boolean(fieldErrors.cost_price)}
+                  helperText={fieldErrors.cost_price}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">¥</InputAdornment>
@@ -928,12 +951,16 @@ export default function ProductsPage() {
                   label="销售价"
                   type="number"
                   value={formData.sell_price}
-                  onChange={e =>
-                    setFormData({
-                      ...formData,
-                      sell_price: parseFloat(e.target.value) || 0,
-                    })
-                  }
+                  onChange={e => {
+                    const parsed = Number.parseFloat(e.target.value);
+                    const sell_price = Number.isFinite(parsed) ? parsed : 0;
+                    setFormData({ ...formData, sell_price });
+                    setFieldErrors(prev => prev.sell_price
+                      ? { ...prev, sell_price: validateProductForm({ ...formData, sell_price }).sell_price }
+                      : prev);
+                  }}
+                  error={Boolean(fieldErrors.sell_price)}
+                  helperText={fieldErrors.sell_price}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">¥</InputAdornment>

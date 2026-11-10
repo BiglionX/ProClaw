@@ -34,6 +34,7 @@ import {
   CreateCustomerInput,
   createCustomer,
 } from '../lib/salesService';
+import { validateCreditLimit } from '../lib/validation/creditLimit';
 import {
   useCustomers,
   useInvalidateSales,
@@ -77,6 +78,7 @@ export default function SalesPage() {
 
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [creditError, setCreditError] = useState<string | undefined>();
   const [formData, setFormData] = useState<CreateCustomerInput>({
     name: '',
     contact_person: '',
@@ -100,6 +102,11 @@ export default function SalesPage() {
     try {
       if (!formData.name) {
         setError('客户名称不能为空');
+        return;
+      }
+      const nextCreditError = validateCreditLimit(formData.credit_limit);
+      if (nextCreditError) {
+        setCreditError(nextCreditError);
         return;
       }
       setMutating(true);
@@ -128,6 +135,7 @@ export default function SalesPage() {
       credit_limit: 0,
       notes: '',
     });
+    setCreditError(undefined);
   };
 
   return (
@@ -217,7 +225,7 @@ export default function SalesPage() {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setDialogOpen(true)}
+              onClick={() => { setCreditError(undefined); setDialogOpen(true); }}
               disabled={loading}
             >
               添加客户
@@ -568,12 +576,15 @@ export default function SalesPage() {
               label="信用额度"
               type="number"
               value={formData.credit_limit}
-              onChange={e =>
-                setFormData({
-                  ...formData,
-                  credit_limit: parseFloat(e.target.value) || 0,
-                })
-              }
+              onChange={e => {
+                const parsed = Number.parseFloat(e.target.value);
+                const credit_limit = Number.isFinite(parsed) ? parsed : 0;
+                setFormData({ ...formData, credit_limit });
+                setCreditError(prev => prev ? validateCreditLimit(credit_limit) : prev);
+              }}
+              error={Boolean(creditError)}
+              helperText={creditError}
+              inputProps={{ min: 0 }}
               fullWidth
             />
             <TextField
