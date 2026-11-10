@@ -44,6 +44,19 @@ pub(crate) fn create_purchase_return_on_conn(
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
+    let order_status: String = tx
+        .query_row(
+            "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",
+            params![purchase_order_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| format!("采购单不存在: {purchase_order_id}"))?;
+    if order_status != "received" {
+        return Err(format!(
+            "采购单状态为 '{order_status}'，只有已入库的采购单可以退货"
+        ));
+    }
+
     tx.execute(
         "INSERT INTO purchase_returns (id, pr_number, purchase_order_id, supplier_id, return_date, status, total_amount, refund_amount, reason, notes, created_by, sync_status)
          VALUES (?1, ?2, ?3, ?4, ?5, 'draft', 0, 0, ?6, ?7, ?8, 'pending')",
@@ -60,18 +73,7 @@ pub(crate) fn create_purchase_return_on_conn(
             let item_id = uuid::Uuid::new_v4().to_string();
             let product_id = item["product_id"].as_str().ok_or("Product ID required")?;
             let quantity = item["quantity"].as_i64().ok_or("Quantity required")? as i32;
-            // 后端校验：退货数量不超过原采购订单数量
-            let orig_qty: i32 = tx.query_row(
-                "SELECT quantity FROM purchase_order_items WHERE purchase_order_id = ?1 AND product_id = ?2",
-                params![purchase_order_id, product_id],
-                |row| row.get(0),
-            ).map_err(|e| format!("获取原订单商品数量失败: {}", e))?;
-            if quantity > orig_qty {
-                return Err(format!(
-                    "商品「{}」退货数量({})超过原订单数量({})",
-                    product_id, quantity, orig_qty
-                ));
-            }
+            ensure_purchase_return_qty(&tx, purchase_order_id, product_id, quantity)?;
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
             let total_price = quantity as f64 * unit_price;
 
@@ -319,6 +321,10 @@ pub(crate) fn confirm_purchase_return_on_conn(
         )
         .ok();
 
+    // TODO(退货冲账): 退款流水挂在退货单上，不回写原采购单 paid_amount / payment_status。
+    // payment_status 只允许 unpaid/partial/paid。把已付款原单改回 unpaid 会让同一笔货款再付一次。
+    // 退货之后仍然要能走「付」，所以这里也不拦截「已有未取消退货单再付款」。
+    // 原单与退款的净额需要单独的冲账设计，不能靠清零或新增 refunded 状态（那会改表结构）。
     let refund_id = uuid::Uuid::new_v4().to_string();
     tx.execute(
         "INSERT INTO payment_transactions (id, order_type, order_id, transaction_type, amount,
@@ -407,21 +413,31 @@ pub fn update_purchase_return(
         ],
     ).map_err(|e| e.to_string())?;
 
-    // 重建明细
+    // 重建明细。先删掉本单旧行，累计上限才不会把正在修改的数量算进去。
     tx.execute(
         "DELETE FROM purchase_return_items WHERE purchase_return_id = ?1",
         params![return_id],
     )
     .map_err(|e| e.to_string())?;
 
+    let purchase_order_id: String = tx
+        .query_row(
+            "SELECT purchase_order_id FROM purchase_returns WHERE id = ?1",
+            params![return_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
     if let Some(items) = r#return.get("items").and_then(|v| v.as_array()) {
         for item in items {
             let item_id = uuid::Uuid::new_v4().to_string();
+            let product_id = item["product_id"].as_str().unwrap_or("");
             let q = item["quantity"].as_i64().unwrap_or(0) as i32;
+            ensure_purchase_return_qty(&tx, &purchase_order_id, product_id, q)?;
             let up = item["unit_price"].as_f64().unwrap_or(0.0);
             tx.execute(
                 "INSERT INTO purchase_return_items (id, purchase_return_id, product_id, quantity, unit_price, total_price, reason) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![item_id, return_id, item["product_id"].as_str().unwrap_or(""), q, up, q as f64 * up, item.get("reason").and_then(|v| v.as_str())],
+                params![item_id, return_id, product_id, q, up, q as f64 * up, item.get("reason").and_then(|v| v.as_str())],
             ).map_err(|e| e.to_string())?;
         }
     }
@@ -440,6 +456,45 @@ pub fn update_purchase_return(
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({"id": return_id, "message": "Purchase return updated"}))
+}
+
+/// 退货数量必须是正整数，并且不超过原单数量减去未取消退货。
+fn ensure_purchase_return_qty(
+    conn: &Connection,
+    purchase_order_id: &str,
+    product_id: &str,
+    quantity: i32,
+) -> Result<(), String> {
+    if quantity <= 0 {
+        return Err(format!("退货数量必须是大于 0 的整数，当前为 {quantity}"));
+    }
+    let orig_qty: i32 = conn
+        .query_row(
+            "SELECT quantity FROM purchase_order_items WHERE purchase_order_id = ?1 AND product_id = ?2",
+            params![purchase_order_id, product_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("获取原订单商品数量失败: {e}"))?;
+    let returned: i32 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(pri.quantity), 0)
+             FROM purchase_return_items pri
+             JOIN purchase_returns pr ON pr.id = pri.purchase_return_id
+             WHERE pr.purchase_order_id = ?1
+               AND pri.product_id = ?2
+               AND pr.status != 'cancelled'
+               AND pr.deleted_at IS NULL",
+            params![purchase_order_id, product_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    let remaining = orig_qty - returned;
+    if quantity > remaining {
+        return Err(format!(
+            "商品「{product_id}」退货数量({quantity})超过可退数量({remaining})"
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

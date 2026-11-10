@@ -110,6 +110,16 @@ pub fn get_customers(
     Ok(customers)
 }
 
+fn require_active(conn: &Connection, sql: &str, id: &str, message: &str) -> Result<(), String> {
+    let found: i64 = conn
+        .query_row(sql, params![id], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if found == 0 {
+        return Err(message.to_string());
+    }
+    Ok(())
+}
+
 /// 创建销售订单
 #[tauri::command]
 pub fn create_sales_order(
@@ -117,8 +127,13 @@ pub fn create_sales_order(
     order: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    create_sales_order_on_conn(db.connection(), order)
+}
 
+pub(crate) fn create_sales_order_on_conn(
+    conn: &Connection,
+    order: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let id = Uuid::new_v4().to_string();
     let so_number = order
         .get("so_number")
@@ -138,6 +153,13 @@ pub fn create_sales_order(
         .to_string();
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    require_active(
+        &tx,
+        "SELECT COUNT(*) FROM customers WHERE id = ?1 AND deleted_at IS NULL",
+        &customer_id,
+        &format!("客户不存在或已删除: {customer_id}"),
+    )?;
 
     tx.execute(
         "INSERT INTO sales_orders (id, so_number, customer_id, order_date, expected_delivery_date, status, total_amount, paid_amount, payment_status, shipping_address, notes, created_by, sync_status)
@@ -160,6 +182,12 @@ pub fn create_sales_order(
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
             crate::api::quantity_price::validate_order_item_qty_price_str(
                 idx, quantity, unit_price,
+            )?;
+            require_active(
+                &tx,
+                "SELECT COUNT(*) FROM products WHERE id = ?1 AND deleted_at IS NULL",
+                product_id,
+                &format!("商品不存在或已删除: {product_id}"),
             )?;
             let total_price = quantity as f64 * unit_price;
 
@@ -565,8 +593,13 @@ pub fn mark_sales_shipped_cmd(
     order_id: String,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    mark_sales_shipped_on_conn(db.connection(), &order_id)
+}
 
+pub(crate) fn mark_sales_shipped_on_conn(
+    conn: &Connection,
+    order_id: &str,
+) -> Result<serde_json::Value, String> {
     let status: String = conn
         .query_row(
             "SELECT status FROM sales_orders WHERE id = ?1 AND deleted_at IS NULL",

@@ -127,8 +127,8 @@ fn submit_sets_shipped_quantity_and_deducts_default_sku() {
     assert_eq!(sku_stock(conn, "sku-p-other-default"), 8);
     assert_eq!(
         product_stock(conn, "p-sell"),
-        1,
-        "products.current_stock 不是出库写入目标"
+        7,
+        "出库后商品库存必须与默认 SKU 一致"
     );
     let status: String = conn
         .query_row(

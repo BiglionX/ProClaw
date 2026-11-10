@@ -1,9 +1,10 @@
-//! 阶段二：库存真相源是 `product_skus.current_stock`。
+//! 库存计算落在默认 `product_skus.current_stock` 上，同一条语句路径再把结果镜像到
+//! `products.current_stock`。两边必须一起成功，调用方的事务负责一起回滚。
 //!
 //! 销售明细、采购明细、库存流水的 `product_id` 仍外键到 `products(id)`。
 //! 阶段一双写保证新建商品的 `products.id = product_spus.id`，前端提交的也是这个 SPU id。
 //! 因此用 `product_id` 当作 `spu_id`，在启用的 SKU 里按 `is_default` 取默认行。
-//! 不写遗留的单数表 `product_sku`。
+//! 不写遗留的单数表 `product_sku`。多规格时商品表跟随被改到的那一行默认 SKU。
 
 use rusqlite::{params, Connection};
 
@@ -83,7 +84,7 @@ pub fn deduct_default_sku(
             required: quantity,
         });
     }
-    Ok(())
+    mirror_product_stock(conn, product_id, &sku_id)
 }
 
 /// 带符号增量。采购收货、退货入库、调整走这里；出库的非负保护走 `deduct_default_sku`。
@@ -103,6 +104,33 @@ pub fn apply_default_sku_delta(
         .map_err(|e| SkuStockError::Db(e.to_string()))?;
     if updated == 0 {
         return Err(SkuStockError::NoSku);
+    }
+    mirror_product_stock(conn, product_id, &sku_id)
+}
+
+/// 默认 SKU 写完后，把同一数字写到商品表。不带 `updated_at`，方便最小表结构的单测。
+fn mirror_product_stock(
+    conn: &Connection,
+    product_id: &str,
+    sku_id: &str,
+) -> Result<(), SkuStockError> {
+    let stock: i32 = conn
+        .query_row(
+            "SELECT COALESCE(current_stock, 0) FROM product_skus WHERE id = ?1",
+            params![sku_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| SkuStockError::Db(e.to_string()))?;
+    let updated = conn
+        .execute(
+            "UPDATE products SET current_stock = ?1 WHERE id = ?2",
+            params![stock, product_id],
+        )
+        .map_err(|e| SkuStockError::Db(e.to_string()))?;
+    if updated == 0 {
+        return Err(SkuStockError::Db(format!(
+            "商品 {product_id} 不存在，无法同步库存"
+        )));
     }
     Ok(())
 }
@@ -253,7 +281,6 @@ mod tests {
             12,
             true,
         );
-        // 扣减只改 SKU。products 起点写成 12，才能断言它没有跟着变成 10。
         conn.execute(
             "UPDATE products SET current_stock = 12 WHERE id = 'p-test-1'",
             [],
@@ -287,7 +314,7 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(products_stock, 12, "products 只保留外键锚点，不再跟着扣");
+        assert_eq!(products_stock, 10, "扣减后商品库存必须与默认 SKU 一致");
     }
 
     fn sku_stock_of(conn: &Connection, sku_id: &str) -> i32 {

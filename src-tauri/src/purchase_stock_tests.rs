@@ -129,8 +129,8 @@ fn assert_only_buy_default_changed(conn: &Connection, buy_default: i32) {
     );
     assert_eq!(
         product_stock(conn, "p-buy"),
-        1,
-        "products.current_stock 不是入库写入目标"
+        buy_default,
+        "products.current_stock 必须与默认 SKU 一致"
     );
 }
 
@@ -168,6 +168,11 @@ fn ordered_default_sku_stock_decreases_on_purchase_return() {
     let conn = db.connection();
     seed_catalog(conn);
     insert_purchase_order(conn, "po-ret", "p-buy", 10);
+    conn.execute(
+        "UPDATE purchase_orders SET status = 'received' WHERE id = 'po-ret'",
+        [],
+    )
+    .unwrap();
 
     let created = create_purchase_return_on_conn(
         conn,

@@ -42,7 +42,7 @@ fn insert_confirmed_order_with_shipped(
     insert_order_parents(conn, order_id, product_id);
     conn.execute(
         "INSERT INTO sales_orders (id, so_number, customer_id, order_date, status, total_amount)
-         VALUES (?1, ?2, ?3, '2026-11-07', 'confirmed', ?4)",
+         VALUES (?1, ?2, ?3, '2026-11-07', 'shipped', ?4)",
         params![
             order_id,
             format!("SO-{order_id}"),
@@ -157,7 +157,7 @@ fn test_sales_return_draft_order_fails() {
 fn test_sales_return_historical_order_succeeds() {
     let db = open_db();
     let conn = db.connection();
-    // shipped_quantity = 0 的已确认单走 CASE 回退，不靠迁移改写。
+    // shipped_quantity = 0 的已发货单走 CASE 回退，不靠迁移改写。
     insert_confirmed_order_with_shipped(
         conn,
         "so-hist-case",

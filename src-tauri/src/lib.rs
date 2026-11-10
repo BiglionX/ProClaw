@@ -42,6 +42,8 @@ pub mod reconciliation_commands;
 pub mod sales_commands;
 #[cfg(feature = "inventory")]
 pub mod sales_return_commands;
+#[cfg(all(test, feature = "inventory"))]
+mod inventory_consistency_tests;
 pub mod sku_stock;
 #[cfg(feature = "inventory")]
 pub mod supplier_history_commands;

@@ -107,6 +107,16 @@ pub fn get_suppliers(
     Ok(suppliers)
 }
 
+fn require_active(conn: &Connection, sql: &str, id: &str, message: &str) -> Result<(), String> {
+    let found: i64 = conn
+        .query_row(sql, params![id], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if found == 0 {
+        return Err(message.to_string());
+    }
+    Ok(())
+}
+
 /// 创建采购订单
 #[tauri::command]
 pub fn create_purchase_order(
@@ -114,8 +124,13 @@ pub fn create_purchase_order(
     order: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    create_purchase_order_on_conn(db.connection(), order)
+}
 
+pub(crate) fn create_purchase_order_on_conn(
+    conn: &Connection,
+    order: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let id = Uuid::new_v4().to_string();
 
     // 自动生成 PO 编号
@@ -138,6 +153,13 @@ pub fn create_purchase_order(
 
     // 开启事务
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+
+    require_active(
+        &tx,
+        "SELECT COUNT(*) FROM suppliers WHERE id = ?1 AND deleted_at IS NULL",
+        &supplier_id,
+        &format!("供应商不存在或已删除: {supplier_id}"),
+    )?;
 
     // 插入采购订单主表
     tx.execute(
@@ -173,6 +195,12 @@ pub fn create_purchase_order(
                 .ok_or("Unit price required in items")?;
             crate::api::quantity_price::validate_order_item_qty_price_str(
                 idx, quantity, unit_price,
+            )?;
+            require_active(
+                &tx,
+                "SELECT COUNT(*) FROM products WHERE id = ?1 AND deleted_at IS NULL",
+                product_id,
+                &format!("商品不存在或已删除: {product_id}"),
             )?;
             let total_price = quantity as f64 * unit_price;
 

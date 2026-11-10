@@ -465,6 +465,6 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(products_stock, 10, "products 不再是库存真相源");
+        assert_eq!(products_stock, 12, "入库后商品库存必须与默认 SKU 一致");
     }
 }

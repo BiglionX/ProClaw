@@ -45,7 +45,7 @@ pub fn create_sales_return_on_conn(
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
-    // 状态校验：草稿或已取消不能退货
+    // 只有已发货、已送达的销售单可以退货。confirmed 只是提交出库，物流尚未发出。
     let status: String = tx
         .query_row(
             "SELECT status FROM sales_orders WHERE id = ?1",
@@ -53,7 +53,7 @@ pub fn create_sales_return_on_conn(
             |row| row.get(0),
         )
         .map_err(|e| format!("获取订单状态失败: {}", e))?;
-    if status == "draft" || status == "cancelled" {
+    if status != "shipped" && status != "delivered" && status != "completed" {
         return Err(format!("订单状态为 '{}'，尚未出库，不能退货", status));
     }
 
@@ -73,19 +73,44 @@ pub fn create_sales_return_on_conn(
             let item_id = uuid::Uuid::new_v4().to_string();
             let product_id = item["product_id"].as_str().ok_or("Product ID required")?;
             let quantity = item["quantity"].as_i64().ok_or("Quantity required")? as i32;
+            if quantity <= 0 {
+                return Err(format!(
+                    "退货数量必须是大于 0 的整数，当前为 {quantity}"
+                ));
+            }
             // 数量校验：shipped_quantity > 0 用它，否则回退 quantity（历史数据兼容）
-            let shipped_qty: i32 = tx
+            let (ordered_qty, shipped_qty): (i32, i32) = tx
                 .query_row(
-                    "SELECT CASE WHEN shipped_quantity > 0 THEN shipped_quantity ELSE quantity END
-                 FROM sales_order_items WHERE sales_order_id = ?1 AND product_id = ?2",
+                    "SELECT quantity,
+                            CASE WHEN shipped_quantity > 0 THEN shipped_quantity ELSE quantity END
+                     FROM sales_order_items WHERE sales_order_id = ?1 AND product_id = ?2",
                     params![sales_order_id, product_id],
-                    |row| row.get(0),
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .map_err(|e| format!("获取原订单发货数量失败: {}", e))?;
             if quantity > shipped_qty {
                 return Err(format!(
                     "退货数量({})超过已出库数量({})",
                     quantity, shipped_qty
+                ));
+            }
+            let returned: i32 = tx
+                .query_row(
+                    "SELECT COALESCE(SUM(sri.quantity), 0)
+                     FROM sales_return_items sri
+                     JOIN sales_returns sr ON sr.id = sri.sales_return_id
+                     WHERE sr.sales_order_id = ?1
+                       AND sri.product_id = ?2
+                       AND sr.status != 'cancelled'
+                       AND sr.deleted_at IS NULL",
+                    params![sales_order_id, product_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            let remaining = ordered_qty - returned;
+            if quantity > remaining {
+                return Err(format!(
+                    "退货数量({quantity})超过可退数量({remaining})"
                 ));
             }
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
@@ -254,8 +279,13 @@ pub fn confirm_sales_return(
     return_id: String,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    confirm_sales_return_on_conn(db.connection(), return_id)
+}
 
+pub(crate) fn confirm_sales_return_on_conn(
+    conn: &Connection,
+    return_id: String,
+) -> Result<serde_json::Value, String> {
     let status: String = conn
         .query_row(
             "SELECT status FROM sales_returns WHERE id = ?1 AND deleted_at IS NULL",
@@ -316,6 +346,10 @@ pub fn confirm_sales_return(
         )
         .ok();
 
+    // TODO(退货冲账): 退款流水挂在退货单上，不回写原销售单 paid_amount / payment_status。
+    // payment_status 只允许 unpaid/partial/paid。把已付款原单改回 unpaid 会让同一笔货款再收一次。
+    // 退货之后仍然要能走「付」，所以这里也不拦截「已有未取消退货单再收款」。
+    // 原单与退款的净额需要单独的冲账设计，不能靠清零或新增 refunded 状态（那会改表结构）。
     let refund_id = uuid::Uuid::new_v4().to_string();
     tx.execute(
         "INSERT INTO payment_transactions (id, order_type, order_id, transaction_type, amount,

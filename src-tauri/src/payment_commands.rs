@@ -15,23 +15,47 @@ pub fn record_payment_cmd(
     created_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    record_payment_on_conn(
+        db.connection(),
+        &order_id,
+        amount,
+        &transaction_date,
+        payment_method,
+        voucher_no,
+        notes,
+        created_by,
+    )
+}
 
+pub(crate) fn record_payment_on_conn(
+    conn: &Connection,
+    order_id: &str,
+    amount: f64,
+    transaction_date: &str,
+    payment_method: Option<String>,
+    voucher_no: Option<String>,
+    notes: Option<String>,
+    created_by: Option<String>,
+) -> Result<serde_json::Value, String> {
     if amount <= 0.0 {
         return Err("付款金额必须大于0".to_string());
     }
 
     // 查询采购订单信息
-    let (total_amount, supplier_id, supplier_name): (f64, String, Option<String>) = conn
-        .query_row(
-            "SELECT po.total_amount, po.supplier_id, s.name
+    let (status, total_amount, supplier_id, supplier_name): (String, f64, String, Option<String>) =
+        conn.query_row(
+            "SELECT po.status, po.total_amount, po.supplier_id, s.name
          FROM purchase_orders po
          LEFT JOIN suppliers s ON po.supplier_id = s.id
          WHERE po.id = ?1 AND po.deleted_at IS NULL",
             params![order_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .map_err(|_| "采购订单不存在".to_string())?;
+
+    if status == "cancelled" {
+        return Err("已取消的订单不能付款".to_string());
+    }
 
     // 获取当前已付金额
     let current_paid: f64 = conn
@@ -111,23 +135,47 @@ pub fn record_receipt_cmd(
     created_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    record_receipt_on_conn(
+        db.connection(),
+        &order_id,
+        amount,
+        &transaction_date,
+        payment_method,
+        voucher_no,
+        notes,
+        created_by,
+    )
+}
 
+pub(crate) fn record_receipt_on_conn(
+    conn: &Connection,
+    order_id: &str,
+    amount: f64,
+    transaction_date: &str,
+    payment_method: Option<String>,
+    voucher_no: Option<String>,
+    notes: Option<String>,
+    created_by: Option<String>,
+) -> Result<serde_json::Value, String> {
     if amount <= 0.0 {
         return Err("收款金额必须大于0".to_string());
     }
 
     // 查询销售订单信息
-    let (total_amount, customer_id, customer_name): (f64, String, Option<String>) = conn
-        .query_row(
-            "SELECT so.total_amount, so.customer_id, c.name
+    let (status, total_amount, customer_id, customer_name): (String, f64, String, Option<String>) =
+        conn.query_row(
+            "SELECT so.status, so.total_amount, so.customer_id, c.name
          FROM sales_orders so
          LEFT JOIN customers c ON so.customer_id = c.id
          WHERE so.id = ?1 AND so.deleted_at IS NULL",
             params![order_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .map_err(|_| "销售订单不存在".to_string())?;
+
+    if status == "cancelled" {
+        return Err("已取消的订单不能收款".to_string());
+    }
 
     // 获取当前已收金额
     let current_paid: f64 = conn
