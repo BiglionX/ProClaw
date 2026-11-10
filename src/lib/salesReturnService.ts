@@ -1,15 +1,14 @@
 import { ipcInvoke as invoke } from './tauri';
 import { isTauri } from './tauri';
+import { formatReturnNumber } from './returnOrderForm';
 
 /**
  * 生成销售退货单编号
- * 格式: SR-YYYYMMDD-XXXX
+ * 格式: SR-YYYYMMDD-XXXX，日期按本地日历。
  */
-export function generateSRNumber(): string {
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+export function generateSRNumber(now = new Date()): string {
   const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `SR-${dateStr}-${randomStr}`;
+  return formatReturnNumber('SR', now, randomStr);
 }
 
 export interface SalesReturn {
