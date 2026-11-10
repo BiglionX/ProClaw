@@ -1,6 +1,6 @@
 use crate::database::Database;
 use crate::types::{DatabaseStats, Product};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -410,8 +410,15 @@ pub fn create_product_spu(
     images_data: Vec<String>,
 ) -> Result<ProductSPU, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    let conn = db.connection();
+    create_product_spu_on_conn(db.connection(), spu_data, skus_data, images_data)
+}
 
+pub(crate) fn create_product_spu_on_conn(
+    conn: &Connection,
+    spu_data: serde_json::Value,
+    skus_data: Vec<serde_json::Value>,
+    images_data: Vec<String>,
+) -> Result<ProductSPU, String> {
     let id = Uuid::new_v4().to_string();
     let spu_code = spu_data["spu_code"]
         .as_str()
@@ -456,6 +463,7 @@ pub fn create_product_spu(
             other => serde_json::to_string(other).map_err(|e| e.to_string())?,
         };
 
+        crate::sku_stock::ensure_sku_code_available(&tx, sku_code)?;
         tx.execute(
             "INSERT INTO product_skus (id, spu_id, sku_code, specifications, spec_text, cost_price, sell_price, current_stock, min_stock, max_stock, barcode, weight, volume, is_default, sort_order, is_active, sync_status)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 'pending')",
@@ -1324,6 +1332,7 @@ pub fn migrate_to_ecommerce_mode(
         let sku_code = format!("SKU-{}", &spu_id[..8]);
         let specifications = serde_json::json!({"默认": "标准"}).to_string();
 
+        crate::sku_stock::ensure_sku_code_available(&tx, &sku_code)?;
         tx.execute(
             "INSERT INTO product_skus (id, spu_id, sku_code, specifications, spec_text, cost_price, sell_price, current_stock, min_stock, max_stock, barcode, is_default, sort_order, is_active, sync_status)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 'synced')",

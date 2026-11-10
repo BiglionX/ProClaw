@@ -15,6 +15,21 @@ pub enum SkuStockError {
     Db(String),
 }
 
+/// `sku_code` 在全部未删除 SKU 中必须唯一，不能只在同一个 SPU 里唯一。
+pub fn ensure_sku_code_available(conn: &Connection, sku_code: &str) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(1) FROM product_skus WHERE sku_code = ?1 AND deleted_at IS NULL",
+            params![sku_code],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if count > 0 {
+        return Err("SKU编码已存在".to_string());
+    }
+    Ok(())
+}
+
 impl std::fmt::Display for SkuStockError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

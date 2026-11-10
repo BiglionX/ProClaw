@@ -3,6 +3,7 @@
 use crate::database::Database;
 use crate::inventory_commands::create_inventory_transaction_inner;
 use crate::payment_commands::{record_payment_on_conn, record_receipt_on_conn};
+use crate::product_commands::create_product_spu_on_conn;
 use crate::purchase_commands::{create_purchase_order_on_conn, receive_purchase_order_on_conn};
 use crate::purchase_return_commands::{
     confirm_purchase_return_on_conn, create_purchase_return_on_conn,
@@ -11,7 +12,11 @@ use crate::sales_commands::{
     create_sales_order_on_conn, mark_sales_shipped_on_conn, submit_sales_order_on_conn,
 };
 use crate::sales_return_commands::{confirm_sales_return_on_conn, create_sales_return_on_conn};
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use rusqlite::{params, Connection};
+use std::sync::{Arc, Mutex};
 
 fn open_db() -> Database {
     let db = Database::new_in_memory().expect("memory db");
@@ -485,4 +490,110 @@ fn tenth_times_three_stores_two_decimals_and_partial_payments_still_add_up() {
         .unwrap();
     assert_eq!(format!("{:.2}", paid), "0.30");
     assert_eq!(status, "paid");
+}
+
+fn sku_rows(code: &str) -> Vec<serde_json::Value> {
+    vec![serde_json::json!({
+        "sku_code": code,
+        "specifications": "{}",
+        "is_default": true
+    })]
+}
+
+#[test]
+fn sku_code_must_be_unique_across_different_products() {
+    let db = open_db();
+    let conn = db.connection();
+    create_product_spu_on_conn(
+        conn,
+        serde_json::json!({"spu_code": "SPU-A", "name": "商品甲"}),
+        sku_rows("SKU-SHARED"),
+        vec![],
+    )
+    .expect("第一个商品可以使用这个编码");
+
+    let err = create_product_spu_on_conn(
+        conn,
+        serde_json::json!({"spu_code": "SPU-B", "name": "商品乙"}),
+        sku_rows("SKU-SHARED"),
+        vec![],
+    )
+    .unwrap_err();
+    assert!(err.contains("SKU编码已存在"), "{err}");
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM product_skus WHERE sku_code = 'SKU-SHARED'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 1, "重复编码不能落库");
+
+    conn.execute(
+        "UPDATE product_skus SET deleted_at = CURRENT_TIMESTAMP WHERE sku_code = 'SKU-SHARED'",
+        [],
+    )
+    .unwrap();
+    create_product_spu_on_conn(
+        conn,
+        serde_json::json!({"spu_code": "SPU-C", "name": "商品丙"}),
+        sku_rows("SKU-SHARED"),
+        vec![],
+    )
+    .expect("软删后的编码可以再用");
+}
+
+fn http_app_state(db: Arc<Mutex<Database>>) -> crate::api::AppState {
+    let key = [7u8; 32];
+    let backup = Database::new_in_memory().expect("backup db");
+    crate::api::AppState {
+        db,
+        cipher: Arc::new(crate::utils::crypto::Aes256GcmCipher::new(&key).expect("cipher")),
+        ws_manager: Arc::new(crate::api::websocket::WebSocketManager::new()),
+        cloud_backup: Arc::new(
+            crate::services::cloud_backup_service::CloudBackupService::new(backup, &key),
+        ),
+        jwt_secret: Arc::new(vec![1u8; 32]),
+    }
+}
+
+#[test]
+fn http_submit_matches_desktop_shipped_quantity_and_stock() {
+    let db = Arc::new(Mutex::new(open_db()));
+    let so_id = {
+        let guard = db.lock().unwrap();
+        let conn = guard.connection();
+        seed_parties(conn);
+        seed_product(conn, "p-http", 10, 0);
+        sales_order(conn, "p-http", 3, 10.0)
+    };
+
+    let app = http_app_state(Arc::clone(&db));
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let (status, body) = rt.block_on(async move {
+        let response = crate::api::sales_orders::submit_sales_order(State(app), Path(so_id))
+            .await
+            .into_response();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), 8192)
+            .await
+            .unwrap_or_default();
+        (status, String::from_utf8_lossy(&bytes).into_owned())
+    });
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let guard = db.lock().unwrap();
+    let conn = guard.connection();
+    assert_eq!(stocks(conn, "p-http"), (7, 7));
+    let shipped: i32 = conn
+        .query_row(
+            "SELECT shipped_quantity FROM sales_order_items WHERE product_id = 'p-http'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(shipped, 3);
 }

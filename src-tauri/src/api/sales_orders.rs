@@ -606,11 +606,8 @@ pub async fn update_sales_order(
     )
 }
 
-/// 提交销售订单（确认 + 自动扣减库存）
-// TODO(P0-1): 桌面端走 submit_sales_order_cmd。本 HTTP 路径 POST /api/sales_orders/:id/submit
-// 在仓库内没有前端或其它调用方，这一轮不补写 shipped_quantity。
-// 若外部客户端开始调用，需在 status 更新之后同样执行
-// UPDATE sales_order_items SET shipped_quantity = quantity WHERE sales_order_id = ?。
+/// 提交销售订单。与桌面端 `submit_sales_order_on_conn` 同一条路径：
+/// 扣默认 SKU、同步商品库存，并把 `shipped_quantity` 写成 `quantity`。
 pub async fn submit_sales_order(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -624,138 +621,24 @@ pub async fn submit_sales_order(
             )
         }
     };
-    let conn = db.connection();
 
-    let status: String = match conn.query_row(
-        "SELECT status FROM sales_orders WHERE id = ?1 AND deleted_at IS NULL",
-        params![id],
-        |row| row.get(0),
-    ) {
-        Ok(s) => s,
-        Err(_) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "Sales order not found"})),
-            )
-        }
-    };
-
-    if status != "draft" {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(
-                serde_json::json!({"error": format!("Cannot submit order with status '{}'", status)}),
-            ),
-        );
-    }
-
-    let tx = match conn.unchecked_transaction() {
-        Ok(tx) => tx,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Transaction error: {}", e)})),
-            )
-        }
-    };
-
-    // 先在闭包中收集明细，避免借用 tx
-    let items: Vec<(String, i32)> = {
-        let mut stmt = match tx
-            .prepare("SELECT product_id, quantity FROM sales_order_items WHERE sales_order_id = ?1")
-        {
-            Ok(s) => s,
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("Query error: {}", e)})),
-                );
-            }
-        };
-        let rows = match stmt.query_map(params![id], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
-        }) {
-            Ok(r) => r,
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("Query error: {}", e)})),
-                );
-            }
-        };
-        rows.filter_map(|r| r.ok()).collect()
-    }; // stmt 在这里被 drop，tx 可以重新使用了
-
-    for (product_id, quantity) in &items {
-        // P0-06 第三层：条件更新，禁止先查后改导致的并发超卖
-        match try_deduct_product_stock(&tx, product_id, *quantity) {
-            Ok(()) => {}
-            Err(DeductStockError::NotFound) => {
-                let _ = tx.rollback();
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(serde_json::json!({"error": format!("Product {} not found", product_id)})),
-                );
-            }
-            Err(DeductStockError::Insufficient { current, required }) => {
-                let _ = tx.rollback();
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(serde_json::json!({
-                        "error": format!(
-                            "库存不足 for product {}. Current: {}, Required: {}",
-                            product_id, current, required
-                        )
-                    })),
-                );
-            }
-            Err(DeductStockError::Db(e)) => {
-                let _ = tx.rollback();
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(
-                        serde_json::json!({"error": format!("Failed to deduct inventory: {}", e)}),
-                    ),
-                );
-            }
-        }
-
-        let txn_id = Uuid::new_v4().to_string();
-        if let Err(e) = tx.execute(
-            "INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity, \
-             reference_no, reason, notes) VALUES (?1, ?2, 'outbound', ?3, ?4, 'sales_order', '销售出库')",
-            params![txn_id, product_id, quantity, id],
-        ) {
-            let _ = tx.rollback();
-            return (StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Failed to record inventory transaction: {}", e)})));
+    match crate::sales_commands::submit_sales_order_on_conn(db.connection(), &id) {
+        Ok(body) => (StatusCode::OK, Json(body)),
+        Err(message) => {
+            let status = if message == "Sales order not found" {
+                StatusCode::NOT_FOUND
+            } else if message.starts_with("Cannot submit")
+                || message.contains("Insufficient stock")
+                || message.contains("没有启用的默认 SKU")
+                || message.contains("not found")
+            {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(serde_json::json!({"error": message})))
         }
     }
-
-    if let Err(e) = tx.execute(
-        "UPDATE sales_orders SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-        params![id],
-    ) {
-        let _ = tx.rollback();
-        return (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update status: {}", e)})));
-    }
-
-    if let Err(e) = tx.commit() {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Commit error: {}", e)})),
-        );
-    }
-
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "id": id,
-            "status": "confirmed",
-            "message": "Sales order submitted successfully. Inventory deducted."
-        })),
-    )
 }
 
 #[cfg(test)]
