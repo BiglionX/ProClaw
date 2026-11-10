@@ -30,6 +30,8 @@ pub mod inventory_aging_commands; // PRD v12.0 灵活库存老化
 pub mod inventory_calibration_commands; // PRD v12.0 灵活库存微盘点/置信度
 #[cfg(feature = "inventory")]
 pub mod inventory_commands;
+#[cfg(all(test, feature = "inventory"))]
+mod inventory_consistency_tests;
 #[cfg(feature = "inventory")]
 pub mod payment_commands;
 #[cfg(feature = "inventory")]
@@ -42,8 +44,6 @@ pub mod reconciliation_commands;
 pub mod sales_commands;
 #[cfg(feature = "inventory")]
 pub mod sales_return_commands;
-#[cfg(all(test, feature = "inventory"))]
-mod inventory_consistency_tests;
 pub mod sku_stock;
 #[cfg(feature = "inventory")]
 pub mod supplier_history_commands;

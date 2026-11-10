@@ -80,7 +80,11 @@ pub(crate) fn record_payment_on_conn(
     }
 
     let new_paid = new_cents as f64 / 100.0;
-    let payment_status = if new_cents == total_cents { "paid" } else { "partial" };
+    let payment_status = if new_cents == total_cents {
+        "paid"
+    } else {
+        "partial"
+    };
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
@@ -200,7 +204,11 @@ pub(crate) fn record_receipt_on_conn(
     }
 
     let new_paid = new_cents as f64 / 100.0;
-    let payment_status = if new_cents == total_cents { "paid" } else { "partial" };
+    let payment_status = if new_cents == total_cents {
+        "paid"
+    } else {
+        "partial"
+    };
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 

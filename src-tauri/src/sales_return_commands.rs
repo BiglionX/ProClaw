@@ -75,9 +75,7 @@ pub fn create_sales_return_on_conn(
             let product_id = item["product_id"].as_str().ok_or("Product ID required")?;
             let quantity = item["quantity"].as_i64().ok_or("Quantity required")? as i32;
             if quantity <= 0 {
-                return Err(format!(
-                    "退货数量必须是大于 0 的整数，当前为 {quantity}"
-                ));
+                return Err(format!("退货数量必须是大于 0 的整数，当前为 {quantity}"));
             }
             // 数量校验：shipped_quantity > 0 用它，否则回退 quantity（历史数据兼容）
             let (ordered_qty, shipped_qty): (i32, i32) = tx
@@ -110,9 +108,7 @@ pub fn create_sales_return_on_conn(
                 .map_err(|e| e.to_string())?;
             let remaining = ordered_qty - returned;
             if quantity > remaining {
-                return Err(format!(
-                    "退货数量({quantity})超过可退数量({remaining})"
-                ));
+                return Err(format!("退货数量({quantity})超过可退数量({remaining})"));
             }
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
             let total_price = line_amount(quantity, unit_price);

@@ -107,7 +107,12 @@ fn sales_order(conn: &Connection, product_id: &str, qty: i32, price: f64) -> Str
     created["id"].as_str().unwrap().to_string()
 }
 
-fn purchase_return(conn: &Connection, order_id: &str, product_id: &str, qty: i32) -> Result<String, String> {
+fn purchase_return(
+    conn: &Connection,
+    order_id: &str,
+    product_id: &str,
+    qty: i32,
+) -> Result<String, String> {
     create_purchase_return_on_conn(
         conn,
         serde_json::json!({
@@ -120,7 +125,12 @@ fn purchase_return(conn: &Connection, order_id: &str, product_id: &str, qty: i32
     .map(|v| v["id"].as_str().unwrap().to_string())
 }
 
-fn sales_return(conn: &Connection, order_id: &str, product_id: &str, qty: i32) -> Result<String, String> {
+fn sales_return(
+    conn: &Connection,
+    order_id: &str,
+    product_id: &str,
+    qty: i32,
+) -> Result<String, String> {
     create_sales_return_on_conn(
         conn,
         serde_json::json!({
@@ -157,28 +167,10 @@ fn buy_sell_return_keeps_product_and_sku_stock_equal() {
         "入库 10、销售 3、退货 2 后两边库存都必须是 9"
     );
 
-    record_receipt_on_conn(
-        conn,
-        &so_id,
-        30.0,
-        "2026-11-10",
-        None,
-        None,
-        None,
-        None,
-    )
-    .expect("退货后原销售单仍可收款");
-    record_payment_on_conn(
-        conn,
-        &po_id,
-        100.0,
-        "2026-11-10",
-        None,
-        None,
-        None,
-        None,
-    )
-    .expect("退货后原采购单仍可付款");
+    record_receipt_on_conn(conn, &so_id, 30.0, "2026-11-10", None, None, None, None)
+        .expect("退货后原销售单仍可收款");
+    record_payment_on_conn(conn, &po_id, 100.0, "2026-11-10", None, None, None, None)
+        .expect("退货后原采购单仍可付款");
 
     let (paid, payment_status): (f64, String) = conn
         .query_row(
@@ -317,12 +309,29 @@ fn cancelled_orders_cannot_take_payment_or_receipt() {
     )
     .unwrap();
 
-    let pay = record_payment_on_conn(conn, "po-cancel", 10.0, "2026-11-10", None, None, None, None)
-        .unwrap_err();
+    let pay = record_payment_on_conn(
+        conn,
+        "po-cancel",
+        10.0,
+        "2026-11-10",
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap_err();
     assert_eq!(pay, "已取消的订单不能付款");
-    let receipt =
-        record_receipt_on_conn(conn, "so-cancel", 10.0, "2026-11-10", None, None, None, None)
-            .unwrap_err();
+    let receipt = record_receipt_on_conn(
+        conn,
+        "so-cancel",
+        10.0,
+        "2026-11-10",
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap_err();
     assert_eq!(receipt, "已取消的订单不能收款");
 
     record_payment_on_conn(conn, "po-open", 100.0, "2026-11-10", None, None, None, None)
@@ -402,10 +411,7 @@ fn soft_deleted_customer_supplier_and_product_cannot_open_new_orders() {
         }),
     )
     .unwrap_err();
-    assert!(
-        product_err.contains("商品不存在或已删除"),
-        "{product_err}"
-    );
+    assert!(product_err.contains("商品不存在或已删除"), "{product_err}");
 
     conn.execute(
         "UPDATE suppliers SET deleted_at = CURRENT_TIMESTAMP WHERE id = 'sup-1'",
