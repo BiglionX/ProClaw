@@ -1,7 +1,7 @@
 export interface ProductFormInput {
   name: string;
-  cost_price: number;
-  sell_price: number;
+  cost_price?: number;
+  sell_price?: number;
 }
 
 export interface ProductFormErrors {
@@ -15,10 +15,10 @@ export function validateProductForm(input: ProductFormInput): ProductFormErrors 
   if (!input.name.trim()) {
     errors.name = '产品名称不能为空';
   }
-  if (!(input.cost_price >= 0)) {
+  if (input.cost_price != null && !(input.cost_price >= 0)) {
     errors.cost_price = '成本价不能为负数';
   }
-  if (!(input.sell_price >= 0)) {
+  if (input.sell_price != null && !(input.sell_price >= 0)) {
     errors.sell_price = '销售价不能为负数';
   }
   return errors;

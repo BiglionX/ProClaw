@@ -14,5 +14,6 @@ describe('validateProductForm', () => {
     const errors = validateProductForm({ name: ' 电池 ', cost_price: 0, sell_price: 12 });
     expect(errors).toEqual({});
     expect(hasProductFormErrors(errors)).toBe(false);
+    expect(hasProductFormErrors(validateProductForm({ name: '电池' }))).toBe(false);
   });
 });
