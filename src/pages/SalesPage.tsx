@@ -36,6 +36,12 @@ import {
 } from '../lib/salesService';
 import { validateCreditLimit } from '../lib/validation/creditLimit';
 import {
+  hasSupplierContactErrors,
+  validateSupplierContact,
+  type SupplierContactErrors,
+} from '../lib/validation/supplierContact';
+import PartyContactFields from '../components/SupplyChain/PartyContactFields';
+import {
   useCustomers,
   useInvalidateSales,
   useSalesOrders,
@@ -79,6 +85,7 @@ export default function SalesPage() {
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creditError, setCreditError] = useState<string | undefined>();
+  const [contactErrors, setContactErrors] = useState<SupplierContactErrors>({});
   const [formData, setFormData] = useState<CreateCustomerInput>({
     name: '',
     contact_person: '',
@@ -104,6 +111,9 @@ export default function SalesPage() {
         setError('客户名称不能为空');
         return;
       }
+      const nextErrors = validateSupplierContact(formData);
+      setContactErrors(nextErrors);
+      if (hasSupplierContactErrors(nextErrors)) return;
       const nextCreditError = validateCreditLimit(formData.credit_limit);
       if (nextCreditError) {
         setCreditError(nextCreditError);
@@ -136,6 +146,7 @@ export default function SalesPage() {
       notes: '',
     });
     setCreditError(undefined);
+    setContactErrors({});
   };
 
   return (
@@ -225,7 +236,7 @@ export default function SalesPage() {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => { setCreditError(undefined); setDialogOpen(true); }}
+              onClick={() => { setCreditError(undefined); setContactErrors({}); setDialogOpen(true); }}
               disabled={loading}
             >
               添加客户
@@ -521,27 +532,14 @@ export default function SalesPage() {
               }
               fullWidth
             />
-            <Box
-              sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}
-            >
-              <TextField
-                label="电话"
-                value={formData.phone}
-                onChange={e =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                fullWidth
-              />
-              <TextField
-                label="邮箱"
-                type="email"
-                value={formData.email}
-                onChange={e =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                fullWidth
-              />
-            </Box>
+            <PartyContactFields
+              phone={formData.phone}
+              email={formData.email}
+              website={formData.website}
+              errors={contactErrors}
+              onChange={patch => setFormData({ ...formData, ...patch })}
+              onErrors={setContactErrors}
+            />
             <TextField
               label="地址"
               value={formData.address}
@@ -555,14 +553,6 @@ export default function SalesPage() {
             <Box
               sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}
             >
-              <TextField
-                label="网站"
-                value={formData.website}
-                onChange={e =>
-                  setFormData({ ...formData, website: e.target.value })
-                }
-                fullWidth
-              />
               <TextField
                 label="税号"
                 value={formData.tax_number}

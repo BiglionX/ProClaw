@@ -28,6 +28,12 @@ import {
   Typography,
 } from '@mui/material';
 import { useState } from 'react';
+import PartyContactFields from '../components/SupplyChain/PartyContactFields';
+import {
+  hasSupplierContactErrors,
+  validateSupplierContact,
+  type SupplierContactErrors,
+} from '../lib/validation/supplierContact';
 import {
   CreateSupplierInput,
   createSupplier,
@@ -66,6 +72,7 @@ export default function PurchasePage() {
 
   // 对话框状态
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [contactErrors, setContactErrors] = useState<SupplierContactErrors>({});
   const [formData, setFormData] = useState<CreateSupplierInput>({
     name: '',
     contact_person: '',
@@ -89,6 +96,9 @@ export default function PurchasePage() {
         setError('供应商名称不能为空');
         return;
       }
+      const nextErrors = validateSupplierContact(formData);
+      setContactErrors(nextErrors);
+      if (hasSupplierContactErrors(nextErrors)) return;
 
       setMutating(true);
       await createSupplier(formData);
@@ -115,6 +125,7 @@ export default function PurchasePage() {
       tax_number: '',
       notes: '',
     });
+    setContactErrors({});
   };
 
   const handleOpenDialog = () => {
@@ -310,27 +321,14 @@ export default function PurchasePage() {
               fullWidth
             />
 
-            <Box
-              sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}
-            >
-              <TextField
-                label="电话"
-                value={formData.phone}
-                onChange={e =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                fullWidth
-              />
-              <TextField
-                label="邮箱"
-                type="email"
-                value={formData.email}
-                onChange={e =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                fullWidth
-              />
-            </Box>
+            <PartyContactFields
+              phone={formData.phone}
+              email={formData.email}
+              website={formData.website}
+              errors={contactErrors}
+              onChange={patch => setFormData({ ...formData, ...patch })}
+              onErrors={setContactErrors}
+            />
 
             <TextField
               label="地址"
@@ -346,15 +344,6 @@ export default function PurchasePage() {
             <Box
               sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}
             >
-              <TextField
-                label="网站"
-                value={formData.website}
-                onChange={e =>
-                  setFormData({ ...formData, website: e.target.value })
-                }
-                placeholder="https://example.com"
-                fullWidth
-              />
               <TextField
                 label="税号"
                 value={formData.tax_number}

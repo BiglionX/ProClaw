@@ -65,7 +65,7 @@ export async function createSupplier(
 ): Promise<{ id: string; name: string; code: string }> {
   const contactErrors = validateSupplierContact(input);
   if (hasSupplierContactErrors(contactErrors)) {
-    throw new Error(contactErrors.phone || contactErrors.email || '供应商联系方式格式不正确');
+    throw new Error(contactErrors.phone || contactErrors.email || contactErrors.website || '供应商联系方式格式不正确');
   }
   // 如果未提供编码，自动生成
   const finalInput = {

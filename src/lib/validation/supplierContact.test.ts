@@ -35,4 +35,19 @@ describe('validateSupplierContact', () => {
     expect(hasSupplierContactErrors(validateSupplierContact({ phone: 'abc', email: 'buyer@example.com' }))).toBe(true);
     expect(hasSupplierContactErrors(validateSupplierContact({ phone: '13800138000', email: 'buyer@example.com' }))).toBe(false);
   });
+
+  it('网站可空，接受 http(s) 或域名', () => {
+    expect(validateSupplierContact({ website: '' }).website).toBeUndefined();
+    expect(validateSupplierContact({ website: '   ' }).website).toBeUndefined();
+    for (const website of ['https://example.com', 'http://example.com/path', 'www.xxx.com', 'Example.com']) {
+      expect(validateSupplierContact({ website }).website, website).toBeUndefined();
+    }
+  });
+
+  it('拒绝没有协议的句子、错误协议和不完整域名', () => {
+    for (const website of ['ftp://example.com', 'example', 'http://', 'www', 'not a url', 'http:/example.com']) {
+      expect(validateSupplierContact({ website }).website, website).toBeTruthy();
+    }
+    expect(hasSupplierContactErrors(validateSupplierContact({ website: 'ftp://example.com' }))).toBe(true);
+  });
 });

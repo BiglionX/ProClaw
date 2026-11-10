@@ -45,6 +45,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import PartyContactFields from '../components/SupplyChain/PartyContactFields';
 import PurchaseProductPickerDialog from '../components/SupplyChain/PurchaseProductPickerDialog';
 import PaymentDialog from '../components/PaymentDialog';
 import MicroStocktakingPrompt from '../components/Inventory/MicroStocktakingPrompt';
@@ -1016,50 +1017,16 @@ function PurchaseTab({
               <Button variant="outlined" size="small" onClick={() => setFormData({ ...formData, code: generateSupplierCode() })} sx={{ whiteSpace: 'nowrap' }}>重新生成</Button>
             </Box>
             <TextField label="联系人" value={formData.contact_person} onChange={e => setFormData({ ...formData, contact_person: e.target.value })} fullWidth />
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField
-                label="电话"
-                value={formData.phone}
-                onChange={e => {
-                  const phone = e.target.value;
-                  setFormData({ ...formData, phone });
-                  setContactErrors(prev => prev.phone
-                    ? { ...prev, phone: validateSupplierContact({ phone, email: formData.email }).phone }
-                    : prev);
-                }}
-                onBlur={e => {
-                  const phone = e.target.value;
-                  setContactErrors(prev => ({ ...prev, phone: validateSupplierContact({ phone, email: formData.email }).phone }));
-                }}
-                error={Boolean(contactErrors.phone)}
-                helperText={contactErrors.phone || '仅数字、+、-，6 到 15 位数字'}
-                fullWidth
-              />
-              <TextField
-                label="邮箱"
-                type="email"
-                value={formData.email}
-                onChange={e => {
-                  const email = e.target.value;
-                  setFormData({ ...formData, email });
-                  setContactErrors(prev => prev.email
-                    ? { ...prev, email: validateSupplierContact({ phone: formData.phone, email }).email }
-                    : prev);
-                }}
-                onBlur={e => {
-                  const email = e.target.value;
-                  setContactErrors(prev => ({ ...prev, email: validateSupplierContact({ phone: formData.phone, email }).email }));
-                }}
-                error={Boolean(contactErrors.email)}
-                helperText={contactErrors.email || ' '}
-                fullWidth
-              />
-            </Box>
+            <PartyContactFields
+              phone={formData.phone}
+              email={formData.email}
+              website={formData.website}
+              errors={contactErrors}
+              onChange={patch => setFormData({ ...formData, ...patch })}
+              onErrors={setContactErrors}
+            />
             <TextField label="地址" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} fullWidth />
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField label="网站" value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} placeholder="https://example.com" fullWidth />
-              <TextField label="税号" value={formData.tax_number} onChange={e => setFormData({ ...formData, tax_number: e.target.value })} fullWidth />
-            </Box>
+            <TextField label="税号" value={formData.tax_number} onChange={e => setFormData({ ...formData, tax_number: e.target.value })} fullWidth />
             <TextField label="付款条件" value={formData.payment_terms} onChange={e => setFormData({ ...formData, payment_terms: e.target.value })} placeholder="例如: Net 30, COD" fullWidth />
             <TextField label="备注" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} multiline rows={3} fullWidth />
           </Box>
@@ -1748,6 +1715,7 @@ function SalesTab({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creditError, setCreditError] = useState<string | undefined>();
+  const [contactErrors, setContactErrors] = useState<SupplierContactErrors>({});
   const [formData, setFormData] = useState<CreateCustomerInput>({
     name: '', code: generateCustomerCode(), contact_person: '', phone: '', email: '',
     address: '', website: '', customer_type: 'company', tax_number: '', credit_limit: 0, notes: '', is_active: true,
@@ -1755,6 +1723,9 @@ function SalesTab({
 
   const handleSubmit = async () => {
     if (!formData.name) { setError('客户名称不能为空'); return; }
+    const nextErrors = validateSupplierContact(formData);
+    setContactErrors(nextErrors);
+    if (hasSupplierContactErrors(nextErrors)) return;
     const nextCreditError = validateCreditLimit(formData.credit_limit);
     if (nextCreditError) { setCreditError(nextCreditError); return; }
     try {
@@ -1773,6 +1744,7 @@ function SalesTab({
     setFormData({ name: '', code: generateCustomerCode(), contact_person: '', phone: '', email: '',
       address: '', website: '', customer_type: 'company', tax_number: '', credit_limit: 0, notes: '', is_active: true });
     setCreditError(undefined);
+    setContactErrors({});
     setDialogOpen(true);
   };
 
@@ -2145,15 +2117,16 @@ function SalesTab({
               <Button variant="outlined" size="small" onClick={() => setFormData({ ...formData, code: generateCustomerCode() })} sx={{ whiteSpace: 'nowrap' }}>重新生成</Button>
             </Box>
             <TextField label="联系人" value={formData.contact_person} onChange={e => setFormData({ ...formData, contact_person: e.target.value })} fullWidth />
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField label="电话" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} fullWidth />
-              <TextField label="邮箱" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} fullWidth />
-            </Box>
+            <PartyContactFields
+              phone={formData.phone}
+              email={formData.email}
+              website={formData.website}
+              errors={contactErrors}
+              onChange={patch => setFormData({ ...formData, ...patch })}
+              onErrors={setContactErrors}
+            />
             <TextField label="地址" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} fullWidth />
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField label="网站" value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} fullWidth />
-              <TextField label="税号" value={formData.tax_number} onChange={e => setFormData({ ...formData, tax_number: e.target.value })} fullWidth />
-            </Box>
+            <TextField label="税号" value={formData.tax_number} onChange={e => setFormData({ ...formData, tax_number: e.target.value })} fullWidth />
             <TextField label="信用额度" type="number" value={formData.credit_limit}
               onChange={e => {
                 const parsed = Number.parseFloat(e.target.value);

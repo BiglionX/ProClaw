@@ -49,6 +49,12 @@ import { StockConfidenceInfo } from '../lib/inventoryCalibrationService';
 import StockCalibrationDialog from '../components/Inventory/StockCalibrationDialog';
 // v1.2 P1: 批量导入按钮
 import ImportButton from '../components/ImportCenter/ImportButton';
+import PartyContactFields from '../components/SupplyChain/PartyContactFields';
+import {
+  hasSupplierContactErrors,
+  validateSupplierContact,
+  type SupplierContactErrors,
+} from '../lib/validation/supplierContact';
 import {
   CreateSupplierInput,
   Supplier,
@@ -114,6 +120,8 @@ export default function InventoryPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierSearch, setSupplierSearch] = useState('');
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
+  const [supplierContactErrors, setSupplierContactErrors] = useState<SupplierContactErrors>({});
+  const [customerContactErrors, setCustomerContactErrors] = useState<SupplierContactErrors>({});
   const [supplierForm, setSupplierForm] = useState<CreateSupplierInput>({
     name: '',
     code: '',
@@ -283,6 +291,7 @@ export default function InventoryPage() {
       notes: '',
       is_active: true,
     });
+    setSupplierContactErrors({});
     setSupplierDialogOpen(true);
   };
 
@@ -302,6 +311,7 @@ export default function InventoryPage() {
       notes: '',
       is_active: true,
     });
+    setCustomerContactErrors({});
     setCustomerDialogOpen(true);
   };
 
@@ -312,6 +322,9 @@ export default function InventoryPage() {
         setError('请输入供应商名称');
         return;
       }
+      const nextErrors = validateSupplierContact(supplierForm);
+      setSupplierContactErrors(nextErrors);
+      if (hasSupplierContactErrors(nextErrors)) return;
 
       setLoading(true);
       await createSupplier(supplierForm);
@@ -349,6 +362,9 @@ export default function InventoryPage() {
         setError('请输入客户名称');
         return;
       }
+      const nextErrors = validateSupplierContact(customerForm);
+      setCustomerContactErrors(nextErrors);
+      if (hasSupplierContactErrors(nextErrors)) return;
 
       setLoading(true);
       await createCustomer(customerForm);
@@ -1161,22 +1177,16 @@ export default function InventoryPage() {
               }
               fullWidth
             />
-            <TextField
-              label="电话"
-              value={supplierForm.phone}
-              onChange={e =>
-                setSupplierForm({ ...supplierForm, phone: e.target.value })
-              }
-              fullWidth
-            />
-            <TextField
-              label="邮箱"
-              value={supplierForm.email}
-              onChange={e =>
-                setSupplierForm({ ...supplierForm, email: e.target.value })
-              }
-              fullWidth
-            />
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <PartyContactFields
+                phone={supplierForm.phone}
+                email={supplierForm.email}
+                website={supplierForm.website}
+                errors={supplierContactErrors}
+                onChange={patch => setSupplierForm({ ...supplierForm, ...patch })}
+                onErrors={setSupplierContactErrors}
+              />
+            </Box>
             <TextField
               label="税号"
               value={supplierForm.tax_number}
@@ -1193,14 +1203,6 @@ export default function InventoryPage() {
               }
               fullWidth
               sx={{ gridColumn: 'span 2' }}
-            />
-            <TextField
-              label="网站"
-              value={supplierForm.website}
-              onChange={e =>
-                setSupplierForm({ ...supplierForm, website: e.target.value })
-              }
-              fullWidth
             />
             <TextField
               label="税号"
@@ -1310,22 +1312,16 @@ export default function InventoryPage() {
               }
               fullWidth
             />
-            <TextField
-              label="电话"
-              value={customerForm.phone}
-              onChange={e =>
-                setCustomerForm({ ...customerForm, phone: e.target.value })
-              }
-              fullWidth
-            />
-            <TextField
-              label="邮箱"
-              value={customerForm.email}
-              onChange={e =>
-                setCustomerForm({ ...customerForm, email: e.target.value })
-              }
-              fullWidth
-            />
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <PartyContactFields
+                phone={customerForm.phone}
+                email={customerForm.email}
+                website={customerForm.website}
+                errors={customerContactErrors}
+                onChange={patch => setCustomerForm({ ...customerForm, ...patch })}
+                onErrors={setCustomerContactErrors}
+              />
+            </Box>
             <TextField
               label="税号"
               value={customerForm.tax_number}
@@ -1342,14 +1338,6 @@ export default function InventoryPage() {
               }
               fullWidth
               sx={{ gridColumn: 'span 2' }}
-            />
-            <TextField
-              label="网站"
-              value={customerForm.website}
-              onChange={e =>
-                setCustomerForm({ ...customerForm, website: e.target.value })
-              }
-              fullWidth
             />
             <TextField
               label="税号"
