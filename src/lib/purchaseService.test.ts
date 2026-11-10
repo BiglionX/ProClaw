@@ -82,6 +82,12 @@ describe('purchaseService', () => {
       (invoke as any).mockRejectedValue(new Error('API Error'));
       await expect(createSupplier({ name: 'Test' })).rejects.toThrow('API Error');
     });
+
+    it('电话或邮箱格式不合法时不调用接口', async () => {
+      await expect(createSupplier({ name: 'Bad Phone', phone: 'abc' })).rejects.toThrow(/电话/);
+      await expect(createSupplier({ name: 'Bad Email', email: 'not-an-email' })).rejects.toThrow(/邮箱/);
+      expect(invoke).not.toHaveBeenCalled();
+    });
   });
 
   describe('getSuppliers', () => {

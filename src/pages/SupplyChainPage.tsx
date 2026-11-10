@@ -88,6 +88,11 @@ import {
   cancelPurchaseOrder,
 } from '../lib/purchaseService';
 import {
+  hasSupplierContactErrors,
+  validateSupplierContact,
+  type SupplierContactErrors,
+} from '../lib/validation/supplierContact';
+import {
   CreateCustomerInput,
   SalesOrderDetail,
   createCustomer,
@@ -589,29 +594,34 @@ function PurchaseTab({
   const loadSuppliers = () => setSupplierSearchQuery(searchTerm);
   const loadOrders = () => setOrderSearchQuery(orderSearch);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<CreateSupplierInput>({
+  const emptySupplierForm = (): CreateSupplierInput => ({
     name: '', code: generateSupplierCode(), contact_person: '', phone: '', email: '',
     address: '', website: '', payment_terms: '月结30天', tax_number: '', notes: '', is_active: true,
   });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState<CreateSupplierInput>(emptySupplierForm);
+  const [contactErrors, setContactErrors] = useState<SupplierContactErrors>({});
 
   const handleSupplierSubmit = async () => {
-    if (!formData.name) { setError('供应商名称不能为空'); return; }
+    if (!formData.name.trim()) { setError('供应商名称不能为空'); return; }
+    const nextErrors = validateSupplierContact(formData);
+    setContactErrors(nextErrors);
+    if (hasSupplierContactErrors(nextErrors)) return;
     try {
       setMutating(true);
       await createSupplier(formData);
       setSuccessMessage('供应商创建成功!');
       setDialogOpen(false);
-      setFormData({ name: '', code: generateSupplierCode(), contact_person: '', phone: '', email: '',
-        address: '', website: '', payment_terms: '月结30天', tax_number: '', notes: '', is_active: true });
+      setFormData(emptySupplierForm());
+      setContactErrors({});
       invalidatePurchase();
     } catch (err) { setError(err instanceof Error ? err.message : '创建供应商失败'); }
     finally { setMutating(false); }
   };
 
   const openSupplierDialog = () => {
-    setFormData({ name: '', code: generateSupplierCode(), contact_person: '', phone: '', email: '',
-      address: '', website: '', payment_terms: '月结30天', tax_number: '', notes: '', is_active: true });
+    setFormData(emptySupplierForm());
+    setContactErrors({});
     setDialogOpen(true);
   };
 
@@ -966,8 +976,43 @@ function PurchaseTab({
             </Box>
             <TextField label="联系人" value={formData.contact_person} onChange={e => setFormData({ ...formData, contact_person: e.target.value })} fullWidth />
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField label="电话" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} fullWidth />
-              <TextField label="邮箱" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} fullWidth />
+              <TextField
+                label="电话"
+                value={formData.phone}
+                onChange={e => {
+                  const phone = e.target.value;
+                  setFormData({ ...formData, phone });
+                  setContactErrors(prev => prev.phone
+                    ? { ...prev, phone: validateSupplierContact({ phone, email: formData.email }).phone }
+                    : prev);
+                }}
+                onBlur={e => {
+                  const phone = e.target.value;
+                  setContactErrors(prev => ({ ...prev, phone: validateSupplierContact({ phone, email: formData.email }).phone }));
+                }}
+                error={Boolean(contactErrors.phone)}
+                helperText={contactErrors.phone || '仅数字、+、-，6 到 15 位数字'}
+                fullWidth
+              />
+              <TextField
+                label="邮箱"
+                type="email"
+                value={formData.email}
+                onChange={e => {
+                  const email = e.target.value;
+                  setFormData({ ...formData, email });
+                  setContactErrors(prev => prev.email
+                    ? { ...prev, email: validateSupplierContact({ phone: formData.phone, email }).email }
+                    : prev);
+                }}
+                onBlur={e => {
+                  const email = e.target.value;
+                  setContactErrors(prev => ({ ...prev, email: validateSupplierContact({ phone: formData.phone, email }).email }));
+                }}
+                error={Boolean(contactErrors.email)}
+                helperText={contactErrors.email || ' '}
+                fullWidth
+              />
             </Box>
             <TextField label="地址" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} fullWidth />
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>

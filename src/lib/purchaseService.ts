@@ -1,5 +1,6 @@
 import { ipcInvoke as invoke } from './tauri';
 import { isTauri } from './tauri';
+import { hasSupplierContactErrors, validateSupplierContact } from './validation/supplierContact';
 
 /**
  * 生成供应商编码
@@ -62,6 +63,10 @@ export interface CreateSupplierInput {
 export async function createSupplier(
   input: CreateSupplierInput
 ): Promise<{ id: string; name: string; code: string }> {
+  const contactErrors = validateSupplierContact(input);
+  if (hasSupplierContactErrors(contactErrors)) {
+    throw new Error(contactErrors.phone || contactErrors.email || '供应商联系方式格式不正确');
+  }
   // 如果未提供编码，自动生成
   const finalInput = {
     ...input,
