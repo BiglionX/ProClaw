@@ -93,6 +93,12 @@ import {
   type SupplierContactErrors,
 } from '../lib/validation/supplierContact';
 import {
+  changeExpectedDeliveryDate,
+  changeOrderDate,
+  createDeliveryDateState,
+  todayLocalIso,
+} from '../lib/purchaseDeliveryDate';
+import {
   CreateCustomerInput,
   SalesOrderDetail,
   createCustomer,
@@ -628,17 +634,11 @@ function PurchaseTab({
   // 采购订单创建
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [createOrderLoading, setCreateOrderLoading] = useState(false);
-  const [orderForm, setOrderForm] = useState<{
-    supplier_id: string;
-    order_date: string;
-    expected_delivery_date: string;
-    notes: string;
-  }>({
+  const [orderForm, setOrderForm] = useState({
     supplier_id: '',
-    order_date: new Date().toISOString().slice(0, 10),
-    expected_delivery_date: '',
     notes: '',
   });
+  const [deliveryDates, setDeliveryDates] = useState(() => createDeliveryDateState(todayLocalIso()));
   const [orderItems, setOrderItems] = useState<Array<{
     product_id: string;
     product_name: string;
@@ -672,12 +672,8 @@ function PurchaseTab({
   });
 
   const openCreateOrderDialog = () => {
-    setOrderForm({
-      supplier_id: '',
-      order_date: new Date().toISOString().slice(0, 10),
-      expected_delivery_date: '',
-      notes: '',
-    });
+    setOrderForm({ supplier_id: '', notes: '' });
+    setDeliveryDates(createDeliveryDateState(todayLocalIso()));
     setOrderItems([]);
     setOrderDialogOpen(true);
   };
@@ -702,8 +698,8 @@ function PurchaseTab({
       setCreateOrderLoading(true);
       const result = await createPurchaseOrder({
         supplier_id: orderForm.supplier_id,
-        order_date: orderForm.order_date,
-        expected_delivery_date: orderForm.expected_delivery_date || undefined,
+        order_date: deliveryDates.orderDate,
+        expected_delivery_date: deliveryDates.expectedDeliveryDate || undefined,
         notes: orderForm.notes || undefined,
         items: orderItems.map(item => ({
           product_id: item.product_id,
@@ -1043,11 +1039,12 @@ function PurchaseTab({
                 ))}
               </Select>
             </FormControl>
-            <TextField label="订单日期" type="date" value={orderForm.order_date}
-              onChange={e => setOrderForm({ ...orderForm, order_date: e.target.value })}
+            <TextField label="订单日期" type="date" value={deliveryDates.orderDate}
+              onChange={e => setDeliveryDates(prev => changeOrderDate(prev, e.target.value))}
               InputLabelProps={{ shrink: true }} fullWidth />
-            <TextField label="预计交货日期" type="date" value={orderForm.expected_delivery_date}
-              onChange={e => setOrderForm({ ...orderForm, expected_delivery_date: e.target.value })}
+            <TextField label="预计交货日期" type="date" value={deliveryDates.expectedDeliveryDate}
+              onChange={e => setDeliveryDates(prev => changeExpectedDeliveryDate(prev, e.target.value))}
+              helperText={deliveryDates.expectedTouched ? '已手动指定，不再跟随订单日期。清空后恢复默认。' : '默认是订单日期的次日'}
               InputLabelProps={{ shrink: true }} fullWidth />
             <TextField label="备注" value={orderForm.notes}
               onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} multiline rows={2} fullWidth />
