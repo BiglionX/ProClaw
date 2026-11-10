@@ -69,6 +69,15 @@ import { useInvalidateProducts, useProductSPUs } from '../lib/hooks/useProducts'
 import { createProduct, generateSimpleSKU } from '../lib/productService';
 import { mergePickedProducts, spuToPickerProduct } from '../lib/purchaseProductPicker';
 import {
+  buildPurchaseDraftUpdate,
+  buildSalesDraftUpdate,
+  canEditDraftOrder,
+  draftOrderTotal,
+  linesFromOrderItems,
+  validateDraftOrderLines,
+  type DraftOrderLine,
+} from '../lib/draftOrderEdit';
+import {
   shouldTriggerPostSalesCalibration,
   shouldTriggerPostPurchaseCalibration,
   type PostSalesCheckResult,
@@ -84,6 +93,7 @@ import {
   createSupplier,
   createPurchaseOrder,
   getPurchaseOrderDetail,
+  updatePurchaseOrder,
   generateSupplierCode,
   receivePurchaseOrder,
   deletePurchaseOrder,
@@ -108,6 +118,7 @@ import {
   createSalesOrder,
   getCustomerHistoryProducts,
   getSalesOrderDetail,
+  updateSalesOrder,
   generateCustomerCode,
   submitSalesOrder,
   deleteSalesOrder,
@@ -601,6 +612,8 @@ function PurchaseTab({
   const { data: products = [] } = useProductSPUs(200, subTab === 1);
   const invalidateProducts = useInvalidateProducts();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftPickerOpen, setDraftPickerOpen] = useState(false);
+  const [draftItems, setDraftItems] = useState<DraftOrderLine[]>([]);
   const pickerCatalog = useMemo(() => products.map(product => spuToPickerProduct(product)), [products]);
 
   const loading = loadingSuppliers || loadingOrders || detailLoading || mutating;
@@ -731,6 +744,8 @@ function PurchaseTab({
       setDetailLoading(true);
       const detail = await getPurchaseOrderDetail(orderId);
       setSelectedOrderDetail(detail);
+      setDraftItems(canEditDraftOrder(detail.order.status) ? linesFromOrderItems(detail.items) : []);
+      setDraftPickerOpen(false);
       // 加载付款历史
       const { getPaymentHistory } = await import('../lib/paymentService');
       const history = await getPaymentHistory(orderId);
@@ -813,6 +828,26 @@ function PurchaseTab({
       invalidatePurchase();
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除订单失败');
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const handleSaveDraftOrder = async () => {
+    if (!selectedOrderDetail || !canEditDraftOrder(selectedOrderDetail.order.status)) return;
+    const message = validateDraftOrderLines(draftItems);
+    if (message) { setError(message); return; }
+    try {
+      setMutating(true);
+      await updatePurchaseOrder(
+        selectedOrderDetail.order.id,
+        buildPurchaseDraftUpdate(selectedOrderDetail.order, draftItems),
+      );
+      setSuccessMessage('草稿采购单已保存');
+      invalidatePurchase();
+      await loadOrderDetail(selectedOrderDetail.order.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存草稿失败');
     } finally {
       setMutating(false);
     }
@@ -1130,6 +1165,34 @@ function PurchaseTab({
         }}
       />
 
+      <PurchaseProductPickerDialog
+        open={draftPickerOpen}
+        supplierId={selectedOrderDetail?.order.supplier_id}
+        supplierName={selectedOrderDetail?.order.supplier_name}
+        catalog={pickerCatalog}
+        onClose={() => setDraftPickerOpen(false)}
+        onConfirm={picked => {
+          setDraftItems(prev => mergePickedProducts(prev, picked));
+          setDraftPickerOpen(false);
+        }}
+        onQuickCreate={async input => {
+          const created = await createProduct({
+            name: input.name,
+            sku: generateSimpleSKU(),
+            cost_price: input.costPrice,
+            sell_price: input.costPrice,
+            unit: '件',
+          });
+          invalidateProducts();
+          return spuToPickerProduct({
+            id: created.id,
+            name: created.name,
+            spu_code: created.sku,
+            skus: [{ is_default: true, cost_price: created.cost_price }],
+          });
+        }}
+      />
+
       {/* 采购订单详情对话框 */}
       <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
@@ -1149,12 +1212,49 @@ function PurchaseTab({
                 <Typography variant="body2"><b>供应商：</b>{selectedOrderDetail.order.supplier_name || '-'}</Typography>
                 <Typography variant="body2"><b>订单日期：</b>{selectedOrderDetail.order.order_date}</Typography>
                 <Typography variant="body2"><b>预计交货：</b>{selectedOrderDetail.order.expected_delivery_date || '-'}</Typography>
-                <Typography variant="body2"><b>总金额：</b>¥{selectedOrderDetail.order.total_amount.toFixed(2)}</Typography>
+                <Typography variant="body2"><b>总金额：</b>¥{(canEditDraftOrder(selectedOrderDetail.order.status) ? draftOrderTotal(draftItems) : selectedOrderDetail.order.total_amount).toFixed(2)}</Typography>
                 <Typography variant="body2"><b>付款状态：</b>{getPaymentStatusText(selectedOrderDetail.order.payment_status)}</Typography>
               </Box>
               <Typography variant="body2"><b>备注：</b>{selectedOrderDetail.order.notes || '无'}</Typography>
 
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>明细列表</Typography>
+              {canEditDraftOrder(selectedOrderDetail.order.status) ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {draftItems.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">还没有商品。点击「添加商品」补上明细。</Typography>
+                  )}
+                  {draftItems.map((item, idx) => (
+                    <Box key={`${item.product_id}-${idx}`} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Typography sx={{ flex: 1, minWidth: 160 }}>{item.product_name || item.product_id}</Typography>
+                      <TextField label="数量" type="number" size="small" sx={{ width: 100 }}
+                        value={item.quantity}
+                        onChange={e => {
+                          const quantity = Number.parseInt(e.target.value, 10);
+                          setDraftItems(prev => prev.map((line, lineIndex) => lineIndex === idx
+                            ? { ...line, quantity: Number.isFinite(quantity) ? quantity : 0 }
+                            : line));
+                        }}
+                        inputProps={{ min: 1 }} />
+                      <TextField label="单价" type="number" size="small" sx={{ width: 120 }}
+                        value={item.unit_price}
+                        onChange={e => {
+                          const unitPrice = Number.parseFloat(e.target.value);
+                          setDraftItems(prev => prev.map((line, lineIndex) => lineIndex === idx
+                            ? { ...line, unit_price: Number.isFinite(unitPrice) ? unitPrice : 0 }
+                            : line));
+                        }}
+                        inputProps={{ min: 0, step: 0.01 }} />
+                      <Typography sx={{ minWidth: 80, textAlign: 'right', fontWeight: 600 }}>
+                        ¥{(item.quantity * item.unit_price).toFixed(2)}
+                      </Typography>
+                      <IconButton size="small" color="error" onClick={() => setDraftItems(prev => prev.filter((_, lineIndex) => lineIndex !== idx))}>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  <Button variant="outlined" startIcon={<AddIcon />} size="small" onClick={() => setDraftPickerOpen(true)} sx={{ alignSelf: 'flex-start' }}>添加商品</Button>
+                </Box>
+              ) : (
               <TableContainer component={Paper} variant="outlined">
                 <Table size="small">
                   <TableHead>
@@ -1177,6 +1277,7 @@ function PurchaseTab({
                   </TableBody>
                 </Table>
               </TableContainer>
+              )}
 
               {/* 付款记录 */}
               {paymentHistory.length > 0 && (
@@ -1216,6 +1317,8 @@ function PurchaseTab({
             <Box sx={{ display: 'flex', gap: 1 }}>
               {selectedOrderDetail && selectedOrderDetail.order.status === 'draft' && (
                 <>
+                  <Button variant="contained" color="secondary" onClick={handleSaveDraftOrder}
+                    disabled={loading}>保存草稿</Button>
                   <Button variant="contained" color="primary" onClick={() => handleConfirmOrder(selectedOrderDetail.order.id)}
                     disabled={loading}>确认订单</Button>
                   <Button variant="outlined" color="error" onClick={() => handleDeleteOrder(selectedOrderDetail.order.id)}
@@ -1631,6 +1734,8 @@ function SalesTab({
   const { data: products = [] } = useProductSPUs(200, subTab === 1);
   const invalidateProducts = useInvalidateProducts();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftPickerOpen, setDraftPickerOpen] = useState(false);
+  const [draftItems, setDraftItems] = useState<DraftOrderLine[]>([]);
   const pickerCatalog = useMemo(
     () => products.map(product => spuToPickerProduct(product, 'sell')),
     [products],
@@ -1760,6 +1865,8 @@ function SalesTab({
       setDetailLoading(true);
       const detail = await getSalesOrderDetail(orderId);
       setSelectedOrderDetail(detail);
+      setDraftItems(canEditDraftOrder(detail.order.status) ? linesFromOrderItems(detail.items) : []);
+      setDraftPickerOpen(false);
       // 加载收款历史
       const { getPaymentHistory } = await import('../lib/paymentService');
       const history = await getPaymentHistory(orderId);
@@ -1849,6 +1956,26 @@ function SalesTab({
       invalidateSales();
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除订单失败');
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const handleSaveDraftOrder = async () => {
+    if (!selectedOrderDetail || !canEditDraftOrder(selectedOrderDetail.order.status)) return;
+    const message = validateDraftOrderLines(draftItems);
+    if (message) { setError(message); return; }
+    try {
+      setMutating(true);
+      await updateSalesOrder(
+        selectedOrderDetail.order.id,
+        buildSalesDraftUpdate(selectedOrderDetail.order, draftItems),
+      );
+      setSuccessMessage('草稿销售单已保存');
+      invalidateSales();
+      await loadOrderDetail(selectedOrderDetail.order.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存草稿失败');
     } finally {
       setMutating(false);
     }
@@ -2131,6 +2258,36 @@ function SalesTab({
         }}
       />
 
+      <PurchaseProductPickerDialog
+        open={draftPickerOpen}
+        historyPartyId={selectedOrderDetail?.order.customer_id}
+        historyPartyName={selectedOrderDetail?.order.customer_name}
+        historyAudience="customer"
+        loadHistory={getCustomerHistoryProducts}
+        catalog={pickerCatalog}
+        onClose={() => setDraftPickerOpen(false)}
+        onConfirm={picked => {
+          setDraftItems(prev => mergePickedProducts(prev, picked));
+          setDraftPickerOpen(false);
+        }}
+        onQuickCreate={async input => {
+          const created = await createProduct({
+            name: input.name,
+            sku: generateSimpleSKU(),
+            cost_price: input.costPrice,
+            sell_price: input.costPrice,
+            unit: '件',
+          });
+          invalidateProducts();
+          return spuToPickerProduct({
+            id: created.id,
+            name: created.name,
+            spu_code: created.sku,
+            skus: [{ is_default: true, cost_price: created.cost_price, sell_price: created.sell_price }],
+          }, 'sell');
+        }}
+      />
+
       {/* 销售订单详情对话框 */}
       <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
@@ -2150,13 +2307,50 @@ function SalesTab({
                 <Typography variant="body2"><b>客户：</b>{selectedOrderDetail.order.customer_name || '-'}</Typography>
                 <Typography variant="body2"><b>订单日期：</b>{selectedOrderDetail.order.order_date}</Typography>
                 <Typography variant="body2"><b>预计交货：</b>{selectedOrderDetail.order.expected_delivery_date || '-'}</Typography>
-                <Typography variant="body2"><b>总金额：</b>¥{selectedOrderDetail.order.total_amount.toFixed(2)}</Typography>
+                <Typography variant="body2"><b>总金额：</b>¥{(canEditDraftOrder(selectedOrderDetail.order.status) ? draftOrderTotal(draftItems) : selectedOrderDetail.order.total_amount).toFixed(2)}</Typography>
                 <Typography variant="body2"><b>付款状态：</b>{getPaymentStatusText(selectedOrderDetail.order.payment_status)}</Typography>
                 <Typography variant="body2" sx={{ gridColumn: '1 / -1' }}><b>收货地址：</b>{selectedOrderDetail.order.shipping_address || '无'}</Typography>
               </Box>
               <Typography variant="body2"><b>备注：</b>{selectedOrderDetail.order.notes || '无'}</Typography>
 
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>明细列表</Typography>
+              {canEditDraftOrder(selectedOrderDetail.order.status) ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {draftItems.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">还没有商品。点击「添加商品」补上明细。</Typography>
+                  )}
+                  {draftItems.map((item, idx) => (
+                    <Box key={`${item.product_id}-${idx}`} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Typography sx={{ flex: 1, minWidth: 160 }}>{item.product_name || item.product_id}</Typography>
+                      <TextField label="数量" type="number" size="small" sx={{ width: 100 }}
+                        value={item.quantity}
+                        onChange={e => {
+                          const quantity = Number.parseInt(e.target.value, 10);
+                          setDraftItems(prev => prev.map((line, lineIndex) => lineIndex === idx
+                            ? { ...line, quantity: Number.isFinite(quantity) ? quantity : 0 }
+                            : line));
+                        }}
+                        inputProps={{ min: 1 }} />
+                      <TextField label="单价" type="number" size="small" sx={{ width: 120 }}
+                        value={item.unit_price}
+                        onChange={e => {
+                          const unitPrice = Number.parseFloat(e.target.value);
+                          setDraftItems(prev => prev.map((line, lineIndex) => lineIndex === idx
+                            ? { ...line, unit_price: Number.isFinite(unitPrice) ? unitPrice : 0 }
+                            : line));
+                        }}
+                        inputProps={{ min: 0, step: 0.01 }} />
+                      <Typography sx={{ minWidth: 80, textAlign: 'right', fontWeight: 600 }}>
+                        ¥{(item.quantity * item.unit_price).toFixed(2)}
+                      </Typography>
+                      <IconButton size="small" color="error" onClick={() => setDraftItems(prev => prev.filter((_, lineIndex) => lineIndex !== idx))}>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  <Button variant="outlined" startIcon={<AddIcon />} size="small" onClick={() => setDraftPickerOpen(true)} sx={{ alignSelf: 'flex-start' }}>添加商品</Button>
+                </Box>
+              ) : (
               <TableContainer component={Paper} variant="outlined">
                 <Table size="small">
                   <TableHead>
@@ -2179,6 +2373,7 @@ function SalesTab({
                   </TableBody>
                 </Table>
               </TableContainer>
+              )}
 
               {/* 收款记录 */}
               {paymentHistory.length > 0 && (
@@ -2218,6 +2413,8 @@ function SalesTab({
             <Box sx={{ display: 'flex', gap: 1 }}>
               {selectedOrderDetail && selectedOrderDetail.order.status === 'draft' && (
                 <>
+                  <Button variant="contained" color="secondary" onClick={handleSaveDraftOrder}
+                    disabled={loading}>保存草稿</Button>
                   <Button variant="contained" color="primary" onClick={() => handleSubmitOrder(selectedOrderDetail.order.id)}
                     disabled={loading}>确认出库</Button>
                   <Button variant="outlined" color="error" onClick={() => handleDeleteOrder(selectedOrderDetail.order.id)}
