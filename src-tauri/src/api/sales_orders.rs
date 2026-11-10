@@ -1,6 +1,7 @@
 // 销售订单管理 API 处理器
 // 提供销售订单 CRUD、提交（自动扣减库存）等 RESTful API
 
+use super::quantity_price::{line_amount, round_money};
 use super::AppState;
 use axum::{
     extract::{Json, Path, Query, State},
@@ -403,7 +404,7 @@ pub async fn create_sales_order(
 
     for item in &payload.items {
         let item_id = Uuid::new_v4().to_string();
-        let total_price = item.quantity as f64 * item.unit_price;
+        let total_price = line_amount(item.quantity, item.unit_price);
 
         if let Err(e) = tx.execute(
             "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, \
@@ -432,7 +433,7 @@ pub async fn create_sales_order(
         params![id],
         |row| row.get(0),
     ) {
-        Ok(t) => t,
+        Ok(t) => round_money(t),
         Err(e) => {
             let _ = tx.rollback();
             return (
@@ -558,7 +559,7 @@ pub async fn update_sales_order(
 
     for item in &payload.items {
         let item_id = Uuid::new_v4().to_string();
-        let total_price = item.quantity as f64 * item.unit_price;
+        let total_price = line_amount(item.quantity, item.unit_price);
         if let Err(e) = tx.execute(
             "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity, notes) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
@@ -575,6 +576,7 @@ pub async fn update_sales_order(
         params![id],
         |row| row.get(0),
     ).unwrap_or(0.0);
+    let total_amount = round_money(total_amount);
 
     if let Err(e) = tx.execute(
         "UPDATE sales_orders SET total_amount = ?1 WHERE id = ?2",

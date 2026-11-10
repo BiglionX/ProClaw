@@ -14,6 +14,10 @@ export function formatReturnNumber(prefix: string, date: Date, suffix: string): 
   return `${prefix}-${year}${month}${day}-${suffix}`;
 }
 
+function roundMoney(value: number): number {
+  return Number((Math.round(value * 100) / 100).toFixed(2));
+}
+
 export function summarizeReturnLines(lines: Array<{ quantity: number; unit_price: number }>): {
   quantity: number;
   amount: number;
@@ -22,7 +26,7 @@ export function summarizeReturnLines(lines: Array<{ quantity: number; unit_price
     if (!(line.quantity > 0)) return sum;
     return {
       quantity: sum.quantity + line.quantity,
-      amount: sum.amount + line.quantity * line.unit_price,
+      amount: roundMoney(sum.amount + line.quantity * line.unit_price),
     };
   }, { quantity: 0, amount: 0 });
 }

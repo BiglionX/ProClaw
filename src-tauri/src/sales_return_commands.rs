@@ -1,3 +1,4 @@
+use crate::api::quantity_price::{line_amount, round_money};
 use crate::database::Database;
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
@@ -114,7 +115,7 @@ pub fn create_sales_return_on_conn(
                 ));
             }
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
-            let total_price = quantity as f64 * unit_price;
+            let total_price = line_amount(quantity, unit_price);
 
             tx.execute(
                 "INSERT INTO sales_return_items (id, sales_return_id, product_id, quantity, unit_price, total_price, reason)
@@ -129,6 +130,7 @@ pub fn create_sales_return_on_conn(
         params![id],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
+    let total_amount = round_money(total_amount);
 
     tx.execute(
         "UPDATE sales_returns SET total_amount = ?1 WHERE id = ?2",
@@ -330,13 +332,14 @@ pub(crate) fn confirm_sales_return_on_conn(
     ).map_err(|e| e.to_string())?;
 
     // PRD v1.1: 退货确认时自动记录退款交易
-    let (total_amount, customer_id): (f64, String) = tx
+    let (raw_total, customer_id): (f64, String) = tx
         .query_row(
             "SELECT total_amount, customer_id FROM sales_returns WHERE id = ?1",
             params![return_id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|e| e.to_string())?;
+    let total_amount = round_money(raw_total);
 
     let customer_name: Option<String> = tx
         .query_row(

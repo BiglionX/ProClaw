@@ -435,3 +435,48 @@ fn soft_deleted_customer_supplier_and_product_cannot_open_new_orders() {
     assert_eq!(sales_count, 0);
     assert_eq!(purchase_count, 0);
 }
+
+#[test]
+fn tenth_times_three_stores_two_decimals_and_partial_payments_still_add_up() {
+    let db = open_db();
+    let conn = db.connection();
+    seed_parties(conn);
+    seed_product(conn, "p-cent", 0, 0);
+
+    let po_id = purchase_order(conn, "p-cent", 3, 0.1);
+    let (line_total, order_total): (f64, f64) = conn
+        .query_row(
+            "SELECT poi.total_price, po.total_amount
+             FROM purchase_order_items poi
+             JOIN purchase_orders po ON po.id = poi.purchase_order_id
+             WHERE po.id = ?1",
+            params![po_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(format!("{:.2}", line_total), "0.30");
+    assert_eq!(format!("{:.2}", order_total), "0.30");
+    assert!(
+        !format!("{:?}", line_total).contains("0000000000004"),
+        "行金额不应留下 0.1 * 3 的长尾，实际 {:?}",
+        line_total
+    );
+
+    record_payment_on_conn(conn, &po_id, 0.1, "2026-11-10", None, None, None, None)
+        .expect("先付 0.1");
+    record_payment_on_conn(conn, &po_id, 0.2, "2026-11-10", None, None, None, None)
+        .expect("再付 0.2 应结清，不能被长尾当成超额");
+    let over = record_payment_on_conn(conn, &po_id, 0.01, "2026-11-10", None, None, None, None)
+        .unwrap_err();
+    assert!(over.contains("超过订单总额"), "{over}");
+
+    let (paid, status): (f64, String) = conn
+        .query_row(
+            "SELECT paid_amount, payment_status FROM purchase_orders WHERE id = ?1",
+            params![po_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(format!("{:.2}", paid), "0.30");
+    assert_eq!(status, "paid");
+}

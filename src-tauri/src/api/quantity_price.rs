@@ -78,6 +78,30 @@ pub fn validate_inventory_quantity_str(quantity: i32) -> Result<(), String> {
     Ok(())
 }
 
+/// 金额保留两位小数。`0.1 * 3` 的二进制长尾在这里收成 `0.30`。
+pub fn round_money(value: f64) -> f64 {
+    if !value.is_finite() {
+        return 0.0;
+    }
+    format!("{:.2}", value).parse::<f64>().unwrap_or(0.0)
+}
+
+/// 行金额：数量乘单价后再保留两位，供订单、退货和导入共用。
+pub fn line_amount(quantity: i32, unit_price: f64) -> f64 {
+    round_money(quantity as f64 * unit_price)
+}
+
+/// 用「分」比较收付款，避免两位小数相加后又比出长尾。
+pub fn money_cents(value: f64) -> i64 {
+    if !value.is_finite() {
+        return 0;
+    }
+    format!("{:.2}", value)
+        .replace('.', "")
+        .parse::<i64>()
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,5 +135,20 @@ mod tests {
         let err = validate_inventory_quantity(0).unwrap_err();
         assert_eq!(err.0, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(err.1 .0["field"].as_str().unwrap(), "quantity");
+    }
+
+    #[test]
+    fn tenth_times_three_rounds_to_two_decimals() {
+        let raw = 0.1_f64 * 3.0;
+        assert!(
+            format!("{:?}", raw).contains("0000000000004"),
+            "未舍入的乘积应带有二进制长尾，实际 {:?}",
+            raw
+        );
+        assert_eq!(format!("{:.2}", line_amount(3, 0.1)), "0.30");
+        assert_eq!(money_cents(line_amount(3, 0.1)), 30);
+        assert_eq!(money_cents(0.1) + money_cents(0.2), money_cents(0.3));
+        assert_eq!(round_money(100.0), 100.0);
+        assert_eq!(round_money(30.0) + round_money(70.0), 100.0);
     }
 }

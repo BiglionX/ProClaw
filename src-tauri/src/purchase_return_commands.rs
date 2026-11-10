@@ -1,3 +1,4 @@
+use crate::api::quantity_price::{line_amount, round_money};
 use crate::database::Database;
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
@@ -75,7 +76,7 @@ pub(crate) fn create_purchase_return_on_conn(
             let quantity = item["quantity"].as_i64().ok_or("Quantity required")? as i32;
             ensure_purchase_return_qty(&tx, purchase_order_id, product_id, quantity)?;
             let unit_price = item["unit_price"].as_f64().ok_or("Unit price required")?;
-            let total_price = quantity as f64 * unit_price;
+            let total_price = line_amount(quantity, unit_price);
 
             tx.execute(
                 "INSERT INTO purchase_return_items (id, purchase_return_id, product_id, quantity, unit_price, total_price, reason)
@@ -90,6 +91,7 @@ pub(crate) fn create_purchase_return_on_conn(
         params![id],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
+    let total_amount = round_money(total_amount);
 
     tx.execute(
         "UPDATE purchase_returns SET total_amount = ?1 WHERE id = ?2",
@@ -305,13 +307,14 @@ pub(crate) fn confirm_purchase_return_on_conn(
     ).map_err(|e| e.to_string())?;
 
     // PRD v1.1: 退货确认时自动记录退款交易
-    let (total_amount, supplier_id): (f64, String) = tx
+    let (raw_total, supplier_id): (f64, String) = tx
         .query_row(
             "SELECT total_amount, supplier_id FROM purchase_returns WHERE id = ?1",
             params![return_id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|e| e.to_string())?;
+    let total_amount = round_money(raw_total);
 
     let supplier_name: Option<String> = tx
         .query_row(
@@ -437,7 +440,7 @@ pub fn update_purchase_return(
             let up = item["unit_price"].as_f64().unwrap_or(0.0);
             tx.execute(
                 "INSERT INTO purchase_return_items (id, purchase_return_id, product_id, quantity, unit_price, total_price, reason) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![item_id, return_id, product_id, q, up, q as f64 * up, item.get("reason").and_then(|v| v.as_str())],
+                params![item_id, return_id, product_id, q, up, line_amount(q, up), item.get("reason").and_then(|v| v.as_str())],
             ).map_err(|e| e.to_string())?;
         }
     }
@@ -447,6 +450,7 @@ pub fn update_purchase_return(
         params![return_id],
         |row| row.get(0),
     ).unwrap_or(0.0);
+    let total = round_money(total);
 
     tx.execute(
         "UPDATE purchase_returns SET total_amount = ?1 WHERE id = ?2",

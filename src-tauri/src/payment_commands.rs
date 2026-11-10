@@ -1,3 +1,4 @@
+use crate::api::quantity_price::{money_cents, round_money};
 use crate::database::Database;
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
@@ -37,6 +38,7 @@ pub(crate) fn record_payment_on_conn(
     notes: Option<String>,
     created_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
+    let amount = round_money(amount);
     if amount <= 0.0 {
         return Err("付款金额必须大于0".to_string());
     }
@@ -66,20 +68,19 @@ pub(crate) fn record_payment_on_conn(
         )
         .map_err(|_| "获取已付金额失败".to_string())?;
 
-    let new_paid = current_paid + amount;
-    if new_paid > total_amount {
+    let new_cents = money_cents(current_paid) + money_cents(amount);
+    let total_cents = money_cents(total_amount);
+    if new_cents > total_cents {
         return Err(format!(
             "付款金额({})加上已付金额({})超过订单总额({})",
-            amount, current_paid, total_amount
+            amount,
+            round_money(current_paid),
+            round_money(total_amount)
         ));
     }
 
-    let payment_status =
-        if (new_paid - total_amount).abs() < f64::EPSILON || new_paid >= total_amount {
-            "paid"
-        } else {
-            "partial"
-        };
+    let new_paid = new_cents as f64 / 100.0;
+    let payment_status = if new_cents == total_cents { "paid" } else { "partial" };
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
@@ -157,6 +158,7 @@ pub(crate) fn record_receipt_on_conn(
     notes: Option<String>,
     created_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
+    let amount = round_money(amount);
     if amount <= 0.0 {
         return Err("收款金额必须大于0".to_string());
     }
@@ -186,20 +188,19 @@ pub(crate) fn record_receipt_on_conn(
         )
         .map_err(|_| "获取已收金额失败".to_string())?;
 
-    let new_paid = current_paid + amount;
-    if new_paid > total_amount {
+    let new_cents = money_cents(current_paid) + money_cents(amount);
+    let total_cents = money_cents(total_amount);
+    if new_cents > total_cents {
         return Err(format!(
             "收款金额({})加上已收金额({})超过订单总额({})",
-            amount, current_paid, total_amount
+            amount,
+            round_money(current_paid),
+            round_money(total_amount)
         ));
     }
 
-    let payment_status =
-        if (new_paid - total_amount).abs() < f64::EPSILON || new_paid >= total_amount {
-            "paid"
-        } else {
-            "partial"
-        };
+    let new_paid = new_cents as f64 / 100.0;
+    let payment_status = if new_cents == total_cents { "paid" } else { "partial" };
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 

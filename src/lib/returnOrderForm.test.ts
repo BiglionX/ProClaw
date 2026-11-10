@@ -14,5 +14,6 @@ describe('returnOrderForm', () => {
       { quantity: 2, unit_price: 10.5 },
       { quantity: 1, unit_price: 3 },
     ])).toEqual({ quantity: 3, amount: 24 });
+    expect(summarizeReturnLines([{ quantity: 3, unit_price: 0.1 }]).amount).toBe(0.3);
   });
 });

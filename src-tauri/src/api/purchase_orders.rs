@@ -1,6 +1,7 @@
 // 采购订单管理 API 处理器
 // 提供采购订单 CRUD、收货确认（自动增加库存）等 RESTful API
 
+use super::quantity_price::{line_amount, round_money};
 use super::AppState;
 use axum::{
     extract::{Json, Path, Query, State},
@@ -354,7 +355,7 @@ pub async fn create_purchase_order(
 
     for item in &payload.items {
         let item_id = Uuid::new_v4().to_string();
-        let total_price = item.quantity as f64 * item.unit_price;
+        let total_price = line_amount(item.quantity, item.unit_price);
 
         if let Err(e) = tx.execute(
             "INSERT INTO purchase_order_items (id, purchase_order_id, product_id, quantity, \
@@ -383,7 +384,7 @@ pub async fn create_purchase_order(
         params![id],
         |row| row.get(0),
     ) {
-        Ok(t) => t,
+        Ok(t) => round_money(t),
         Err(e) => {
             let _ = tx.rollback();
             return (StatusCode::INTERNAL_SERVER_ERROR,
@@ -515,7 +516,7 @@ pub async fn update_purchase_order(
 
     for item in &payload.items {
         let item_id = Uuid::new_v4().to_string();
-        let total_price = item.quantity as f64 * item.unit_price;
+        let total_price = line_amount(item.quantity, item.unit_price);
         if let Err(e) = tx.execute(
             "INSERT INTO purchase_order_items (id, purchase_order_id, product_id, quantity, unit_price, total_price, received_quantity, notes) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
@@ -532,6 +533,7 @@ pub async fn update_purchase_order(
         params![id],
         |row| row.get(0),
     ).unwrap_or(0.0);
+    let total_amount = round_money(total_amount);
 
     if let Err(e) = tx.execute(
         "UPDATE purchase_orders SET total_amount = ?1 WHERE id = ?2",

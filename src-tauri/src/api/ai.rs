@@ -2,6 +2,7 @@
 // 处理图片上传、OCR识别、订单草稿管理。
 // Phase 2: 真实 AI/OCR 集成，替换模拟数据
 
+use super::quantity_price::round_money;
 use super::AppState;
 use axum::{
     extract::{Json, Path, State},
@@ -694,7 +695,7 @@ pub async fn submit_order_draft(
     let so_id = Uuid::new_v4().to_string();
     let so_number = format!("SO-{}", &so_id[..8]);
     let now = Utc::now().to_rfc3339();
-    let total_amount: f64 = items.iter().map(|item| item.total_price).sum();
+    let total_amount = round_money(items.iter().map(|item| item.total_price).sum());
 
     // ---- 预检查: 验证所有商品存在且库存充足 ----
     for item in items.iter() {
@@ -990,7 +991,7 @@ async fn call_cloud_ai(
     // 尝试从响应中提取 JSON（AI 可能返回带 markdown 代码块的 JSON）
     let items = extract_items_from_ai_response(&content)?;
 
-    let total_amount: f64 = items.iter().map(|i| i.total_price).sum();
+    let total_amount = round_money(items.iter().map(|i| i.total_price).sum());
     let tokens_used = deepseek_resp.usage.as_ref().and_then(|u| u.total_tokens);
 
     Ok(RecognizeOrderResponse {
@@ -1084,7 +1085,7 @@ async fn call_local_ocr(
         ));
     }
 
-    let total_amount: f64 = items.iter().map(|i| i.total_price).sum();
+    let total_amount = round_money(items.iter().map(|i| i.total_price).sum());
     let confidence = if let Some(results) = &ocr_resp.results {
         if !results.is_empty() {
             results.iter().map(|r| r.confidence).sum::<f32>() / results.len() as f32
@@ -1199,10 +1200,12 @@ fn parse_order_items(items: &[serde_json::Value]) -> Result<Vec<OrderItem>, Stri
             .get("unit_price")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
-        let total_price = item_val
-            .get("total_price")
-            .and_then(|v| v.as_f64())
-            .unwrap_or_else(|| quantity * unit_price);
+        let total_price = round_money(
+            item_val
+                .get("total_price")
+                .and_then(|v| v.as_f64())
+                .unwrap_or_else(|| quantity * unit_price),
+        );
 
         result.push(OrderItem {
             product_name,

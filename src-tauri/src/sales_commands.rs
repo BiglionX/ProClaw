@@ -1,3 +1,4 @@
+use crate::api::quantity_price::{line_amount, round_money};
 use crate::database::Database;
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
@@ -189,7 +190,7 @@ pub(crate) fn create_sales_order_on_conn(
                 product_id,
                 &format!("商品不存在或已删除: {product_id}"),
             )?;
-            let total_price = quantity as f64 * unit_price;
+            let total_price = line_amount(quantity, unit_price);
 
             tx.execute(
                 "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity, notes)
@@ -204,6 +205,7 @@ pub(crate) fn create_sales_order_on_conn(
         params![id],
         |row| row.get(0),
     ).map_err(|e| e.to_string())?;
+    let total_amount = round_money(total_amount);
 
     tx.execute(
         "UPDATE sales_orders SET total_amount = ?1 WHERE id = ?2",
@@ -390,12 +392,13 @@ pub fn update_sales_order_cmd(
             crate::api::quantity_price::validate_order_item_qty_price_str(idx, q, up)?;
             tx.execute(
                 "INSERT INTO sales_order_items (id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity, notes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
-                params![item_id, order_id, item["product_id"].as_str().unwrap_or(""), q, up, q as f64 * up, item.get("notes").and_then(|v| v.as_str())],
+                params![item_id, order_id, item["product_id"].as_str().unwrap_or(""), q, up, line_amount(q, up), item.get("notes").and_then(|v| v.as_str())],
             ).map_err(|e| e.to_string())?;
         }
     }
 
     let total: f64 = tx.query_row("SELECT COALESCE(SUM(total_price),0.0) FROM sales_order_items WHERE sales_order_id = ?1", params![order_id], |row| row.get(0)).unwrap_or(0.0);
+    let total = round_money(total);
     tx.execute(
         "UPDATE sales_orders SET total_amount = ?1 WHERE id = ?2",
         params![total, order_id],

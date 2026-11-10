@@ -12,6 +12,7 @@
 //! - `process_supplier`    → `suppliers` 表（按 name 或 code upsert）
 //! - `process_customer`    → `customers` 表（按 name 或 code upsert）
 
+use crate::api::quantity_price::round_money;
 use crate::database::Database;
 use crate::import::aggregator::persist_product_with_skus;
 use crate::import::category_resolver::ensure_category as ensure_category_v13;
@@ -513,7 +514,7 @@ fn process_purchase(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<()
         .get("unit_price")
         .map(|s| s.parse().unwrap_or(0.0))
         .unwrap_or(0.0);
-    let total_price = unit_price * quantity as f64;
+    let total_price = round_money(unit_price * quantity as f64);
     let status = fields
         .get("status")
         .cloned()
@@ -601,7 +602,7 @@ fn process_sales(conn: &rusqlite::Connection, fields: &FieldMap) -> Result<(), S
         .get("unit_price")
         .map(|s| s.parse().unwrap_or(0.0))
         .unwrap_or(0.0);
-    let total_price = unit_price * quantity as f64;
+    let total_price = round_money(unit_price * quantity as f64);
     let status = fields
         .get("status")
         .cloned()
