@@ -45,6 +45,8 @@ use crate::purchase_commands::*;
 #[cfg(feature = "inventory")]
 use crate::purchase_return_commands::*;
 #[cfg(feature = "inventory")]
+use crate::supplier_history_commands::*;
+#[cfg(feature = "inventory")]
 use crate::reconciliation_commands::*;
 #[cfg(feature = "inventory")]
 use crate::sales_commands::*;
@@ -149,6 +151,8 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         get_purchase_orders,
         #[cfg(feature = "inventory")]
         get_purchase_order_detail,
+        #[cfg(feature = "inventory")]
+        get_supplier_history_products,
         // 销售管理 (进销存版)
         #[cfg(feature = "inventory")]
         create_customer,

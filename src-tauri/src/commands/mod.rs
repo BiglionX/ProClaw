@@ -652,6 +652,11 @@ pub mod inventory {
                     description: "获取采购订单详情",
                 },
                 CommandDef {
+                    name: "get_supplier_history_products",
+                    module: "purchase",
+                    description: "查询供应商历史采购商品",
+                },
+                CommandDef {
                     name: "update_purchase_order_cmd",
                     module: "purchase",
                     description: "更新采购订单",

@@ -44,7 +44,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import PurchaseProductPickerDialog from '../components/SupplyChain/PurchaseProductPickerDialog';
 import PaymentDialog from '../components/PaymentDialog';
 import MicroStocktakingPrompt from '../components/Inventory/MicroStocktakingPrompt';
 import {
@@ -64,7 +65,9 @@ import {
   useSalesReturns,
   useShippedSalesOrders,
 } from '../lib/hooks/useSales';
-import { useProductSPUs } from '../lib/hooks/useProducts';
+import { useInvalidateProducts, useProductSPUs } from '../lib/hooks/useProducts';
+import { createProduct, generateSimpleSKU } from '../lib/productService';
+import { mergePickedProducts, spuToPickerProduct } from '../lib/purchaseProductPicker';
 import {
   shouldTriggerPostSalesCalibration,
   shouldTriggerPostPurchaseCalibration,
@@ -594,7 +597,10 @@ function PurchaseTab({
     subTab === 1
   );
   const { data: paymentOrderSource = [] } = usePurchaseOrders(undefined, subTab === 1);
-  const { data: products = [] } = useProductSPUs(100, subTab === 1);
+  const { data: products = [] } = useProductSPUs(200, subTab === 1);
+  const invalidateProducts = useInvalidateProducts();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerCatalog = useMemo(() => products.map(spuToPickerProduct), [products]);
 
   const loading = loadingSuppliers || loadingOrders || detailLoading || mutating;
   const loadSuppliers = () => setSupplierSearchQuery(searchTerm);
@@ -675,11 +681,13 @@ function PurchaseTab({
     setOrderForm({ supplier_id: '', notes: '' });
     setDeliveryDates(createDeliveryDateState(todayLocalIso()));
     setOrderItems([]);
+    setPickerOpen(false);
     setOrderDialogOpen(true);
   };
 
-  const addOrderItem = () => {
-    setOrderItems([...orderItems, { product_id: '', product_name: '', quantity: 1, unit_price: 0 }]);
+  const openProductPicker = () => {
+    if (!orderForm.supplier_id) { setError('请选择供应商'); return; }
+    setPickerOpen(true);
   };
 
   const removeOrderItem = (index: number) => {
@@ -1050,23 +1058,14 @@ function PurchaseTab({
               onChange={e => setOrderForm({ ...orderForm, notes: e.target.value })} multiline rows={2} fullWidth />
 
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>订单明细</Typography>
+            {orderItems.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                还没有商品。点击「添加商品」，默认从该供应商的历史采购里勾选。
+              </Typography>
+            )}
             {orderItems.map((item, idx) => (
-              <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel>商品</InputLabel>
-                  <Select value={item.product_id} label="商品"
-                    onChange={e => {
-                      const prod = products.find(p => p.id === e.target.value);
-                      const newItems = [...orderItems];
-                      newItems[idx].product_id = e.target.value;
-                      newItems[idx].product_name = prod ? prod.name : '';
-                      setOrderItems(newItems);
-                    }}>
-                    {products.map(p => (
-                      <MenuItem key={p.id} value={p.id}>{p.name} (SPU: {p.spu_code})</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+              <Box key={item.product_id || idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Typography sx={{ flex: 1, minWidth: 160 }}>{item.product_name || item.product_id}</Typography>
                 <TextField label="数量" type="number" size="small" sx={{ width: 100 }}
                   value={item.quantity}
                   onChange={e => {
@@ -1086,12 +1085,12 @@ function PurchaseTab({
                 <Typography sx={{ minWidth: 80, textAlign: 'right', fontWeight: 600 }}>
                   ¥{(item.quantity * item.unit_price).toFixed(2)}
                 </Typography>
-                <IconButton size="small" color="error" onClick={() => removeOrderItem(idx)} disabled={orderItems.length <= 1}>
+                <IconButton size="small" color="error" onClick={() => removeOrderItem(idx)}>
                   <CloseIcon fontSize="small" />
                 </IconButton>
               </Box>
             ))}
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={addOrderItem} size="small">添加商品行</Button>
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={openProductPicker} size="small">添加商品</Button>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1101,6 +1100,34 @@ function PurchaseTab({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <PurchaseProductPickerDialog
+        open={pickerOpen}
+        supplierId={orderForm.supplier_id}
+        supplierName={suppliers.find(supplier => supplier.id === orderForm.supplier_id)?.name}
+        catalog={pickerCatalog}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={picked => {
+          setOrderItems(prev => mergePickedProducts(prev, picked));
+          setPickerOpen(false);
+        }}
+        onQuickCreate={async input => {
+          const created = await createProduct({
+            name: input.name,
+            sku: generateSimpleSKU(),
+            cost_price: input.costPrice,
+            sell_price: input.costPrice,
+            unit: '件',
+          });
+          invalidateProducts();
+          return spuToPickerProduct({
+            id: created.id,
+            name: created.name,
+            spu_code: created.sku,
+            skus: [{ is_default: true, cost_price: created.cost_price }],
+          });
+        }}
+      />
 
       {/* 采购订单详情对话框 */}
       <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>

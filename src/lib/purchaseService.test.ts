@@ -5,6 +5,7 @@ import {
   createPurchaseOrder,
   getPurchaseOrders,
   getPurchaseOrderDetail,
+  getSupplierHistoryProducts,
   generateSupplierCode,
   generatePurchaseOrderNumber,
 } from '../lib/purchaseService';
@@ -183,6 +184,23 @@ describe('purchaseService', () => {
       const result = await getPurchaseOrderDetail('1');
       expect(result).toEqual(mockDetail);
       expect(invoke).toHaveBeenCalledWith('get_purchase_order_detail', { orderId: '1' });
+    });
+  });
+
+  describe('getSupplierHistoryProducts', () => {
+    it('应该按供应商查询历史采购商品', async () => {
+      const rows = [{
+        id: 'p1', name: '电池', code: 'SPU-BAT', last_unit_price: 12,
+        last_order_date: '2026-03-01', order_count: 2, total_quantity: 6,
+      }];
+      (invoke as any).mockResolvedValue(rows);
+      await expect(getSupplierHistoryProducts('sup-1')).resolves.toEqual(rows);
+      expect(invoke).toHaveBeenCalledWith('get_supplier_history_products', { supplierId: 'sup-1' });
+    });
+
+    it('没有供应商时不发起查询', async () => {
+      await expect(getSupplierHistoryProducts('  ')).resolves.toEqual([]);
+      expect(invoke).not.toHaveBeenCalled();
     });
   });
 });

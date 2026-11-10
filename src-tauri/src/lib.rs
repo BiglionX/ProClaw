@@ -37,6 +37,8 @@ pub mod purchase_commands;
 #[cfg(feature = "inventory")]
 pub mod purchase_return_commands;
 #[cfg(feature = "inventory")]
+pub mod supplier_history_commands;
+#[cfg(feature = "inventory")]
 pub mod reconciliation_commands;
 #[cfg(feature = "inventory")]
 pub mod sales_commands;

@@ -173,6 +173,29 @@ export async function getPurchaseOrderDetail(
   return await invoke('get_purchase_order_detail', { orderId });
 }
 
+export interface SupplierHistoryProduct {
+  id: string;
+  name: string;
+  code: string;
+  last_unit_price: number;
+  last_order_date: string;
+  order_count: number;
+  total_quantity: number;
+}
+
+/**
+ * 某供应商历史上采购过的商品，按最近一笔订单倒序。
+ */
+export async function getSupplierHistoryProducts(
+  supplierId: string
+): Promise<SupplierHistoryProduct[]> {
+  if (!supplierId.trim() || !isTauri()) return [];
+  const rows = await invoke<SupplierHistoryProduct[]>('get_supplier_history_products', {
+    supplierId,
+  });
+  return Array.isArray(rows) ? rows : [];
+}
+
 /**
  * 确认收货 → 自动入库 + 记录库存交易
  */
