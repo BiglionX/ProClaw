@@ -55,7 +55,7 @@ import ConfirmationCard, { ConfirmationData } from '../components/CEO/Confirmati
 import DecisionHistoryPanel from '../components/CEO/DecisionHistoryPanel';
 import { proclawDecision } from '../lib/ceoController';
 import { replyToCeoChat } from '../lib/ceoChatReply';
-import { isAbortError } from '../lib/fetchWithTimeout';
+import { isAbortError, OUTBOUND_ERROR_MESSAGE } from '../lib/fetchWithTimeout';
 import { safeNumber } from '../lib/format';
 
 const CEO_AGENT_ID = 'ceo-agent';

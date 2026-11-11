@@ -1,7 +1,7 @@
 use crate::api::quantity_price::{line_amount, round_money};
 use crate::database::Database;
 use crate::finance_ledger::post_purchase_inbound_entries;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use uuid::Uuid;
 

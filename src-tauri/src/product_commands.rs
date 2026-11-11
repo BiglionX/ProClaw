@@ -377,6 +377,10 @@ pub fn get_database_stats(db: tauri::State<Mutex<Database>>) -> Result<DatabaseS
         })
         .map_err(|e| e.to_string())?;
 
+    let customers: i64 = conn
+        .query_row("SELECT COUNT(*) FROM customers", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
     let pending_sync: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM products WHERE sync_status = 'pending'
@@ -392,6 +396,7 @@ pub fn get_database_stats(db: tauri::State<Mutex<Database>>) -> Result<DatabaseS
         categories,
         transactions,
         pending_sync,
+        customers,
     })
 }
 

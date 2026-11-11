@@ -8,9 +8,13 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    // 测试环境变量
+    // 测试环境变量。本地 .env.local 里的模型密钥不能进入单测，
+    // 否则「未配置模型」会改走真实端点并一直等到超时。
     env: {
       VITE_MOCK_PASSWORD: 'IamBigBoss',
+      VITE_LLM_API_KEY: '',
+      VITE_LLM_API_BASE: '',
+      VITE_LLM_MODEL: '',
     },
     coverage: {
       provider: 'v8',
