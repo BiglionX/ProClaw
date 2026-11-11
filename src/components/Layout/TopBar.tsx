@@ -10,7 +10,6 @@ import {
   AppBar,
   Avatar,
   Box,
-  Button,
   IconButton,
   Menu,
   MenuItem,
@@ -25,6 +24,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../lib/authStore';
 import { useNotificationStore } from '../../lib/notificationStore';
+import { isBoss } from '../Auth/accountShared';
 import NotificationPanel from './NotificationPanel';
 import TokenDisplay from './TokenDisplay';
 import GlobalSearchDialog, { useGlobalSearch } from '../GlobalSearch/GlobalSearchDialog';
@@ -72,36 +72,32 @@ function useBreadcrumbs(pathname: string): string[] {
 }
 
 export default function TopBar() {
-  const { user, logout, openLoginDialog } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const breadcrumbs = useBreadcrumbs(location.pathname);
   const unreadCount = useNotificationStore(s => s.notifications.filter(n => !n.isRead).length);
   const togglePanel = useNotificationStore(s => s.togglePanel);
-  const startMockAutoPush = useNotificationStore(s => s.startMockAutoPush);
-  const stopMockAutoPush = useNotificationStore(s => s.stopMockAutoPush);
   const startWebSocketListener = useNotificationStore(s => s.startWebSocketListener);
   const stopWebSocketListener = useNotificationStore(s => s.stopWebSocketListener);
   // PRD v11.0 §4.2.2：全局搜索（⌘K 快捷键 + 命令面板）
   const globalSearch = useGlobalSearch();
 
-  // 启动模拟自动推送（Phase 1 演示用）和 WebSocket 监听（Phase 2）
+  // 启动 WebSocket 实时推送（PRD v11.0 Phase 2）
   useEffect(() => {
-    // Phase 1: 模拟推送（演示用，可选）
-    // startMockAutoPush();
-    // Phase 2: WebSocket 实时推送
     startWebSocketListener();
     return () => {
-      stopMockAutoPush();
       stopWebSocketListener();
     };
-  }, [startMockAutoPush, stopMockAutoPush, startWebSocketListener, stopWebSocketListener]);
+  }, [startWebSocketListener, stopWebSocketListener]);
 
+  // v13.1.1 本地账号无登录模式：登出后清空 activeAccountId，跳转首页
+  // ProtectedRoute 检测到 user 为空会渲染 NoUserWelcome 引导页
   const handleLogout = async () => {
     setAnchorEl(null);
     await logout();
-    openLoginDialog();
+    navigate('/');
   };
 
   const handleUserMenu = () => {
@@ -112,10 +108,6 @@ export default function TopBar() {
   const handleSettingsMenu = () => {
     setAnchorEl(null);
     navigate('/settings');
-  };
-
-  const handleLogin = () => {
-    openLoginDialog();
   };
 
   return (
@@ -331,7 +323,7 @@ export default function TopBar() {
 
         {/* 用户头像下拉（仅保留头像，文字信息移入 Sidebar） */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {user ? (
+          {user && (
             <>
               {/* 头像 + 状态（垂直排列） */}
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.3 }}>
@@ -348,7 +340,7 @@ export default function TopBar() {
                     sx={{
                       width: 30,
                       height: 30,
-                      bgcolor: user?.id?.startsWith('mock-') ? '#888' : '#6366F1',
+                      bgcolor: isBoss(user.role) ? '#FF3B30' : '#6366F1',
                       fontSize: '0.8rem',
                     }}
                   >
@@ -370,7 +362,7 @@ export default function TopBar() {
                     variant="caption"
                     sx={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.6rem', lineHeight: 1 }}
                   >
-                    在线 · 标准版
+                    在线
                   </Typography>
                 </Box>
               </Box>
@@ -397,24 +389,8 @@ export default function TopBar() {
                 </MenuItem>
               </Menu>
             </>
-          ) : (
-            <Button
-              variant="contained"
-              size="small"
-              disableElevation
-              onClick={handleLogin}
-              sx={{
-                bgcolor: '#FF3B30',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: '0.8rem',
-                '&:hover': { bgcolor: '#D32F2F' },
-                textTransform: 'none',
-              }}
-            >
-              登录
-            </Button>
           )}
+          {/* v13.1.1：未登录状态由 ProtectedRoute 渲染 NoUserWelcome 引导页，不渲染"登录"按钮 */}
         </Box>
       </Toolbar>
       <NotificationPanel />

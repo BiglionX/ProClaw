@@ -2,10 +2,11 @@
 // 处理图片上传、OCR识别、订单草稿管理。
 // Phase 2: 真实 AI/OCR 集成，替换模拟数据
 
+use super::auth::Claims;
 use super::quantity_price::round_money;
 use super::AppState;
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Extension, Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -147,6 +148,7 @@ struct OCRResponse {
 /// 接收 Base64 图片，调用 AI 模型识别订单内容
 pub async fn recognize_order(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Json(payload): Json<RecognizeOrderRequest>,
 ) -> impl IntoResponse {
     let provider = payload
@@ -155,10 +157,12 @@ pub async fn recognize_order(
         .unwrap_or("cloud")
         .to_lowercase();
     let image_type = payload.image_type.as_deref().unwrap_or("jpg");
-    let user_id = payload
-        .user_id
-        .clone()
-        .unwrap_or_else(|| "system".to_string());
+    if let Some(ref requested) = payload.user_id {
+        if requested != &claims.sub {
+            return (StatusCode::FORBIDDEN, Json(json!({"error": "Forbidden"})));
+        }
+    }
+    let user_id = claims.sub.clone();
 
     // 解码 base64 图片为字节数据
     let image_bytes = match base64_decode(&payload.image_base64) {

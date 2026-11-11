@@ -34,6 +34,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { LoadTimeoutNotice, useTimeoutLoading } from '../lib/useTimeoutLoading';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isDemoAccount } from '../lib/aiTeamTokenService';
 import { Brand, getBrands } from '../lib/brandService';
@@ -67,6 +68,7 @@ import {
 } from '../components/Products';
 // v1.2 P1: 批量导入按钮
 import ImportButton from '../components/ImportCenter/ImportButton';
+import { buildProductsCsv, downloadProductsCsv, isProductActive } from '../lib/productExport';
 
 export default function ProductsPage() {
   // ==================== 商品库模式状态 ====================
@@ -88,7 +90,11 @@ export default function ProductsPage() {
       category_id: selectedCategory || undefined,
       brand_id: selectedBrand || undefined,
     }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
+  const { timedOut: productsTimedOut, retry: retryProductsTimer } = useTimeoutLoading(loading);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -409,55 +415,9 @@ export default function ProductsPage() {
       return;
     }
 
-    // CSV 表头
-    const headers = [
-      'SKU',
-      '产品名称',
-      '成本价',
-      '销售价',
-      '当前库存',
-      '最低库存',
-      '最高库存',
-      '单位',
-      '状态',
-    ];
-
-    // CSV 数据行
-    const rows = products.map(product => [
-      product.sku,
-      product.name,
-      product.cost_price.toFixed(2),
-      product.sell_price.toFixed(2),
-      product.current_stock,
-      product.min_stock,
-      product.max_stock,
-      product.unit,
-      product.status === 'active' ? '活跃' : '停用',
-    ]);
-
-    // 组合 CSV 内容
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
-    ].join('\n');
-
-    // 创建 Blob 并下载
-    const blob = new Blob([`\ufeff${csvContent}`], {
-      type: 'text/csv;charset=utf-8;',
-    });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute(
-      'download',
-      `products_${new Date().toISOString().split('T')[0]}.csv`
-    );
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setSuccessMessage(`成功导出 ${products.length} 个产品`);
+    const file = buildProductsCsv(products);
+    downloadProductsCsv(file);
+    setSuccessMessage(`成功导出 ${file.rowCount} 个产品`);
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
@@ -657,8 +617,19 @@ export default function ProductsPage() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                  <CircularProgress size={24} />
-                  <Typography sx={{ mt: 1 }}>加载中...</Typography>
+                  {productsTimedOut ? (
+                    <LoadTimeoutNotice
+                      onRetry={() => {
+                        retryProductsTimer();
+                        void refetchProducts();
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <CircularProgress size={24} />
+                      <Typography sx={{ mt: 1 }}>加载中...</Typography>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ) : products.length === 0 ? (
@@ -695,10 +666,8 @@ export default function ProductsPage() {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={product.status === 'active' ? '活跃' : '停用'}
-                      color={
-                        product.status === 'active' ? 'success' : 'default'
-                      }
+                      label={isProductActive(product) ? '活跃' : '停用'}
+                      color={isProductActive(product) ? 'success' : 'default'}
                       size="small"
                     />
                   </TableCell>

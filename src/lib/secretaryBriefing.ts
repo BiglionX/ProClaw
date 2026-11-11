@@ -6,20 +6,29 @@
  */
 
 import { loadBap, getBapSummary } from './secretaryBap';
+import { getInventoryStats } from './inventoryService';
+import { summarizeSalesForPeriod, type SalesPeriod } from './salesService';
 import { isTauri } from './tauri';
 
 // ==================== 简报生成 ====================
+
+export interface BriefingFigures {
+  inventoryText: string;
+  salesText: string;
+}
 
 /**
  * 生成简报文本
  * @param secretaryName 秘书名称
  * @param topKpis 关注的前 N 个 KPI
  * @param type 简报类型
+ * @param figures 已取到的库存和销售数字；没有则只保留问候
  */
 export function generateBriefing(
   secretaryName: string,
   topKpis: string[],
   type: 'daily' | 'weekly' | 'monthly' = 'daily',
+  figures?: BriefingFigures,
 ): string {
   const now = new Date();
   const hour = now.getHours();
@@ -47,6 +56,11 @@ export function generateBriefing(
     body += '\n';
   }
 
+  if (figures) {
+    body += `📦 **库存**\n${figures.inventoryText}\n\n`;
+    body += `💰 **销售**\n${figures.salesText}\n\n`;
+  }
+
   body += '💡 **温馨提示**\n';
   body += `- 右键我的头像可以调整关注设置\n`;
   body += `- 如需深入分析，可以直接问我\n\n`;
@@ -54,6 +68,56 @@ export function generateBriefing(
   body += `祝您今天工作顺利！😊`;
 
   return body;
+}
+
+function salesPeriodForBriefing(type: 'daily' | 'weekly' | 'monthly'): SalesPeriod {
+  if (type === 'weekly') return 'week';
+  if (type === 'monthly') return 'month';
+  return 'today';
+}
+
+/**
+ * 用库存统计、低库存和销售订单拼出简报。某一路取不到就标明，不补假数字。
+ */
+export async function buildOperatingBriefing(
+  secretaryName: string,
+  type: 'daily' | 'weekly' | 'monthly' = 'daily',
+): Promise<string> {
+  const { topKpis } = await getBapSummary().catch(() => ({ topKpis: [] as string[] }));
+
+  let inventoryText = '库存统计暂时无法获取。';
+  try {
+    const stats = await getInventoryStats();
+    if (!stats || typeof stats.total_products !== 'number') {
+      throw new Error('库存统计为空');
+    }
+    const lines = [
+      `总产品数: ${stats.total_products}`,
+      `低库存: ${stats.low_stock_count}`,
+      `零库存: ${stats.zero_stock_count}`,
+      `今日交易: ${stats.today_transactions}`,
+      `库存总值: ¥${Number(stats.total_value || 0).toFixed(2)}`,
+    ];
+    const lows = stats.low_stock_products ?? [];
+    if (lows.length > 0) {
+      lines.push('低库存：');
+      lows.slice(0, 8).forEach((product) => {
+        const stock = product.total_stock ?? 0;
+        const code = product.spu_code ? `（${product.spu_code}）` : '';
+        lines.push(`- ${product.name}${code} 库存 ${stock}`);
+      });
+    }
+    inventoryText = lines.join('\n');
+  } catch {
+    inventoryText = '库存统计暂时无法获取。';
+  }
+
+  const sales = await summarizeSalesForPeriod(salesPeriodForBriefing(type));
+  const salesText = sales
+    ? `订单 ${sales.count} 笔，金额 ¥${sales.amount.toFixed(2)}。`
+    : '销售数据暂时无法获取。';
+
+  return generateBriefing(secretaryName, topKpis, type, { inventoryText, salesText });
 }
 
 // ==================== 简报调度 ====================
@@ -143,8 +207,7 @@ export async function checkBriefingDue(secretaryName: string): Promise<string | 
           Math.abs(currentMinutes - targetMinutes) <= 5) {
         schedule.lastDailyBriefing = today;
         saveScheduleState(schedule);
-        const { topKpis } = await getBapSummary();
-        return generateBriefing(secretaryName, topKpis, 'daily');
+        return buildOperatingBriefing(secretaryName, 'daily');
       }
     }
 
@@ -156,8 +219,7 @@ export async function checkBriefingDue(secretaryName: string): Promise<string | 
         if (currentMinutes >= 17 * 60 && currentMinutes <= 17 * 60 + 5) {
           schedule.lastWeeklyBriefing = weekNum;
           saveScheduleState(schedule);
-          const { topKpis } = await getBapSummary();
-          return generateBriefing(secretaryName, topKpis, 'weekly');
+          return buildOperatingBriefing(secretaryName, 'weekly');
         }
       }
     }
@@ -170,8 +232,7 @@ export async function checkBriefingDue(secretaryName: string): Promise<string | 
         if (currentMinutes >= 9 * 60 && currentMinutes <= 9 * 60 + 5) {
           schedule.lastMonthlyBriefing = monthKey;
           saveScheduleState(schedule);
-          const { topKpis } = await getBapSummary();
-          return generateBriefing(secretaryName, topKpis, 'monthly');
+          return buildOperatingBriefing(secretaryName, 'monthly');
         }
       }
     }

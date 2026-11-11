@@ -530,6 +530,8 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
     description TEXT NOT NULL,
     transaction_type TEXT NOT NULL CHECK(transaction_type IN ('income', 'expense', 'transfer')),
     amount REAL NOT NULL,
+    debit_amount REAL NOT NULL DEFAULT 0,
+    credit_amount REAL NOT NULL DEFAULT 0,
     account_id TEXT NOT NULL REFERENCES accounts(id),
     reference_type TEXT, -- 关联类型
     reference_id TEXT, -- 关联ID

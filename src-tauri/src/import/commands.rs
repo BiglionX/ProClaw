@@ -1229,14 +1229,15 @@ pub fn import_execute_legacy_inner(
             }
             // 云店 / 库存视图读 product_spus.spu_code，老导入写的是 products.sku。
             // 用 products.id 作为 product_spus.id，和阶段一双写约定一致，才能 JOIN 回 product_sku.product_id。
-            // category_id / brand_id 留空：老类别在 categories 表，不是 product_categories / brands 的外键。
+            // 商品类别已写进 products.category_id（product_categories）。这里同步到 product_spus。
             conn.execute(
                 "INSERT OR IGNORE INTO product_spus
-                    (id, spu_code, name, description, unit, is_on_sale, status, sync_status)
+                    (id, spu_code, name, description, category_id, unit, is_on_sale, status, sync_status)
                  SELECT p.id,
                         p.sku,
                         CASE WHEN TRIM(IFNULL(p.name, '')) = '' THEN p.sku ELSE p.name END,
                         p.description,
+                        p.category_id,
                         COALESCE(NULLIF(TRIM(p.unit), ''), '件'),
                         1,
                         'on_sale',
@@ -1251,6 +1252,19 @@ pub fn import_execute_legacy_inner(
                 rusqlite::params![batch_id],
             )
             .map_err(|e| format!("写入 product_spus 失败: {}", e))?;
+            conn.execute(
+                "UPDATE product_spus
+                 SET category_id = (
+                     SELECT p.category_id FROM products p WHERE p.id = product_spus.id
+                 )
+                 WHERE id IN (SELECT product_id FROM product_sku WHERE batch_id = ?1)
+                   AND EXISTS (
+                     SELECT 1 FROM products p
+                     WHERE p.id = product_spus.id AND p.category_id IS NOT NULL
+                   )",
+                rusqlite::params![batch_id],
+            )
+            .map_err(|e| format!("回填 product_spus.category_id 失败: {}", e))?;
         }
         crate::import::types::ImportTarget::Suppliers => {
             // 类别批量建档

@@ -17,6 +17,13 @@ use rand::Rng;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::sync::OnceLock;
+
+pub const TOKEN_TYPE_ACCESS: &str = "access";
+pub const TOKEN_TYPE_REFRESH: &str = "refresh";
+
+/// 超过该 TTL 且没有 token_type 的旧令牌，按 refresh 处理（历史上 refresh 为 30 天，access 为 1 小时）。
+const LEGACY_REFRESH_TTL_SECS: usize = 2 * 3600;
 
 /// JWT Claims
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -27,6 +34,20 @@ pub struct Claims {
     pub device_id: String,
     pub role: String,
     pub permissions: Vec<String>, // Phase 6: 嵌入权限列表
+    /// `access` 或 `refresh`。旧令牌没有该字段时为空字符串。
+    #[serde(default)]
+    pub token_type: String,
+}
+
+/// refresh 令牌不能当 access 用。显式 `token_type=refresh`，或旧令牌 TTL 超过 2 小时。
+pub fn is_refresh_token(claims: &Claims) -> bool {
+    if claims.token_type == TOKEN_TYPE_REFRESH {
+        return true;
+    }
+    if claims.token_type.is_empty() {
+        return claims.exp.saturating_sub(claims.iat) > LEGACY_REFRESH_TTL_SECS;
+    }
+    false
 }
 
 /// 配对请求
@@ -138,6 +159,7 @@ pub async fn pair_device(
         &permissions,
         &state.jwt_secret,
         3600,
+        TOKEN_TYPE_ACCESS,
     ) {
         Ok(token) => token,
         Err(e) => {
@@ -155,6 +177,7 @@ pub async fn pair_device(
         &permissions,
         &state.jwt_secret,
         86400 * 30,
+        TOKEN_TYPE_REFRESH,
     ) {
         Ok(token) => token,
         Err(e) => {
@@ -201,6 +224,13 @@ pub async fn refresh_token(
         }
     };
 
+    if !is_refresh_token(&claims) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "Invalid refresh token"})),
+        );
+    }
+
     // 生成新的access token
     let access_token = match generate_token(
         &claims.sub,
@@ -209,6 +239,7 @@ pub async fn refresh_token(
         &claims.permissions,
         &state.jwt_secret,
         3600,
+        TOKEN_TYPE_ACCESS,
     ) {
         Ok(token) => token,
         Err(e) => {
@@ -264,10 +295,12 @@ pub async fn login(
     let (user_id, name, email, password_hash) = match result {
         Ok(data) => data,
         Err(_) => {
+            // 用户不存在时仍跑一次 argon2，避免用响应时间枚举用户名
+            let _ = verify_password(&payload.password, None);
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": "Invalid username or password"})),
-            )
+                Json(serde_json::json!({"error": "用户名或密码错误"})),
+            );
         }
     };
 
@@ -275,7 +308,7 @@ pub async fn login(
     if !verify_password(&payload.password, password_hash.as_deref()) {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"error": "Invalid username or password"})),
+            Json(serde_json::json!({"error": "用户名或密码错误"})),
         );
     }
 
@@ -302,6 +335,7 @@ pub async fn login(
         &permissions,
         &state.jwt_secret,
         3600,
+        TOKEN_TYPE_ACCESS,
     ) {
         Ok(token) => token,
         Err(e) => {
@@ -319,6 +353,7 @@ pub async fn login(
         &permissions,
         &state.jwt_secret,
         86400 * 30,
+        TOKEN_TYPE_REFRESH,
     ) {
         Ok(token) => token,
         Err(e) => {
@@ -355,6 +390,7 @@ pub fn generate_token(
     permissions: &[String],
     jwt_secret: &[u8],
     expires_in: i64,
+    token_type: &str,
 ) -> Result<String, String> {
     let now = Utc::now();
     let expires_at = now + Duration::seconds(expires_in);
@@ -366,6 +402,7 @@ pub fn generate_token(
         device_id: device_id.to_string(),
         role: role.to_string(),
         permissions: permissions.to_vec(),
+        token_type: token_type.to_string(),
     };
 
     let key = jsonwebtoken::EncodingKey::from_secret(jwt_secret);
@@ -437,18 +474,38 @@ pub fn hash_password(password: &str) -> Result<String, String> {
     Ok(hash.to_string())
 }
 
+/// 用户不存在或哈希无效时仍执行一次 argon2，拉平与真实校验的耗时差。
+fn burn_password_verify(password: &str) {
+    static DUMMY_HASH: OnceLock<String> = OnceLock::new();
+    let hash =
+        DUMMY_HASH.get_or_init(|| hash_password("proclaw-login-timing-pad").unwrap_or_default());
+    if hash.is_empty() {
+        return;
+    }
+    let parsed = match PasswordHash::new(hash) {
+        Ok(h) => h,
+        Err(_) => return,
+    };
+    let _ = Argon2::default().verify_password(password.as_bytes(), &parsed);
+}
+
 /// 验证密码与 argon2 哈希
 pub fn verify_password(password: &str, hash: Option<&str>) -> bool {
     let Some(hash_str) = hash else {
+        burn_password_verify(password);
         return false;
     };
     if hash_str.is_empty() {
+        burn_password_verify(password);
         return false;
     }
 
     let parsed_hash = match PasswordHash::new(hash_str) {
         Ok(h) => h,
-        Err(_) => return false,
+        Err(_) => {
+            burn_password_verify(password);
+            return false;
+        }
     };
 
     Argon2::default()

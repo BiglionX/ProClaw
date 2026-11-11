@@ -1,0 +1,46 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Hermes/Overview" />
+
+# Hermes Skills 组件库
+
+> ProClaw AI 助理的 Hermes-Agent 化升级组件集 · P0-A ~ P3 阶段产出
+
+## 组件清单
+
+| 组件 | Story | 阶段 |
+|---|---|---|
+| `SkillTree` | [Hermes/SkillTree](/story/hermes-skilltree--default) | P0-A |
+| `SkillDetailDrawer` | [Hermes/SkillDetailDrawer](/story/hermes-skilldetaildrawer--active-preset) | P2 |
+| `SkillEvolveLog` | [Hermes/SkillEvolveLog](/story/hermes-skillevelog--mixed) | P2 |
+| `PendingReviewPanel` | [Hermes/PendingReviewPanel](/story/hermes-pendingreviewpanel--default) | P2 |
+| `MoAResultPanel` | [Hermes/MoAResultPanel](/story/hermes-moaresultpanel--success) | P2 |
+| `HermesSkillsPage` | [Hermes/Page](/story/hermes-page--default) | P2 |
+
+## 设计原则
+
+1. **零后端依赖**:所有 stories 通过 `HermesApiMockProvider` 注入内存版 HermesApi
+2. **真实交互**:每个 story 都可点击、可操作(用 `@storybook/test` 的 `play` 函数)
+3. **可访问性**:集成 `@storybook/addon-a11y` 自动检测 ARIA 问题
+4. **TypeScript 严格模式**:所有 props 通过 `Meta<typeof Component>` 推断,argTypes 自动生成
+
+## 常见使用
+
+```tsx
+import { SkillTree } from '@/components/hermes/SkillTree';
+
+<SkillTree
+  skills={data}
+  onSelectSkill={(s) => console.log(s)}
+  defaultCollapseArchived
+/>
+```
+
+## 数据 fixtures
+
+- **8 个预设技能**(库存预警 / 销售汇总 / CRM跟进 / 补货 / 财务 / 改期 / 发券 / 导出)
+- **3 个 AI 学习技能**(混合 status,展示进化链)
+- **2 个待审核技能**
+- **8 条混合进化日志**
+
+数据全部位于 `src/components/hermes/stories/fixtures.ts`。

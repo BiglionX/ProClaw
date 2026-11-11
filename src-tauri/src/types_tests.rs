@@ -131,6 +131,7 @@ mod tests {
             categories: 10,
             transactions: 500,
             pending_sync: 5,
+            customers: 6,
         };
 
         let json = serde_json::to_string(&stats).unwrap();

@@ -8,6 +8,9 @@ export function useProducts() {
   return useQuery<Product[]>({
     queryKey: productsQueryKey,
     queryFn: () => getProducts(),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -16,6 +19,9 @@ export function useProductSPUs(limit = 100, enabled = true) {
     queryKey: [...productSpusQueryKey, limit],
     queryFn: () => getProductSPUs({ limit }),
     enabled,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

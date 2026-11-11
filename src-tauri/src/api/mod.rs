@@ -74,6 +74,11 @@ pub fn create_router(state: AppState) -> axum::Router {
         .route("/api/auth/login", axum::routing::post(auth::login))
         .route("/api/auth/token", axum::routing::post(auth::refresh_token))
         .route("/api/health", axum::routing::get(health_check))
+        // 云商城订单回调：云端没有用户 JWT，只校验 HMAC（见 store::order_callback）
+        .route(
+            "/api/cloud-store/callback/order",
+            axum::routing::post(store::order_callback),
+        )
         // 邀请接受（无需认证，IP 限流在 handler 内部实现）
         .route(
             "/api/invitations/accept",
@@ -174,6 +179,10 @@ pub fn create_router(state: AppState) -> axum::Router {
         .route(
             "/api/finance/cash-flow",
             axum::routing::get(finance::get_cash_flow_report),
+        )
+        .route(
+            "/api/finance/report-lines",
+            axum::routing::get(finance::get_report_lines),
         )
         .route(
             "/api/finance/summary",
@@ -347,10 +356,6 @@ pub fn create_router(state: AppState) -> axum::Router {
             "/api/cloud-store/:id/orders",
             axum::routing::get(store::get_store_orders),
         )
-        .route(
-            "/api/cloud-store/callback/order",
-            axum::routing::post(store::order_callback),
-        )
         // 云商城商品查询 API
         .route(
             "/api/cloud-store/products",
@@ -408,15 +413,32 @@ pub fn create_router(state: AppState) -> axum::Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // 合并所有路由
+    // 合并所有路由。没有 nest/前缀；对不上的请求在这里留下方法与 URI。
     let app = public_routes
         .merge(protected_routes)
         .merge(websocket_route)
         .merge(sync_ws_route)
+        .fallback(log_unmatched)
         .layer(cors)
         .with_state(state);
 
     app
+}
+
+/// 未注册路由。鉴权中间件包在 protected_routes 上，到不了这里。
+async fn log_unmatched(request: Request<Body>) -> StatusCode {
+    let line = format!("[404] {} {}", request.method(), request.uri());
+    eprintln!("{line}");
+    let path = std::env::temp_dir().join("proclaw-http-404.log");
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        use std::io::Write;
+        let _ = writeln!(file, "{line}");
+    }
+    StatusCode::NOT_FOUND
 }
 
 /// 健康检查端点
@@ -425,7 +447,7 @@ async fn health_check() -> (StatusCode, Json<serde_json::Value>) {
         StatusCode::OK,
         Json(serde_json::json!({
             "status": "ok",
-            "version": "4.0.0",
+            "version": env!("CARGO_PKG_VERSION"),
             "timestamp": chrono::Utc::now().to_rfc3339()
         })),
     )
@@ -436,20 +458,13 @@ async fn health_check() -> (StatusCode, Json<serde_json::Value>) {
 /// 2. 提取 Claims（角色+权限）
 /// 3. 检查路径级权限
 pub async fn rbac_middleware(mut request: Request<Body>, next: Next) -> Response {
-    // 从 Authorization header 或 query 参数提取 token
+    // 只接受 Authorization: Bearer。拒绝 URL ?token=（会进访问日志、Referer 和浏览器历史）。
     let token = request
         .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
-        .map(|v| v.to_string())
-        .or_else(|| {
-            request.uri().query().and_then(|q| {
-                q.split('&')
-                    .find(|p| p.starts_with("token="))
-                    .map(|p| p[6..].to_string())
-            })
-        });
+        .map(|v| v.to_string());
 
     // 解析 JWT 密钥
     // 审计修复 #1: JWT_SECRET 未初始化时立即 panic（fail-fast），不再静默回退零密钥
@@ -462,6 +477,19 @@ pub async fn rbac_middleware(mut request: Request<Body>, next: Next) -> Response
         Some(token) => {
             match auth::verify_token(&token, &secret) {
                 Ok(claims) => {
+                    if auth::is_refresh_token(&claims) {
+                        let mut resp = Response::new(Body::from(
+                            serde_json::json!({
+                                "error": "Refresh token cannot be used for API access"
+                            })
+                            .to_string(),
+                        ));
+                        *resp.status_mut() = StatusCode::UNAUTHORIZED;
+                        resp.headers_mut()
+                            .insert("content-type", HeaderValue::from_static("application/json"));
+                        return resp;
+                    }
+
                     let method = request.method().as_str();
                     let path = request.uri().path().to_string();
 
@@ -512,7 +540,7 @@ pub async fn rbac_middleware(mut request: Request<Body>, next: Next) -> Response
     }
 }
 
-/// 从 HTTP 请求提取 JWT（Authorization Bearer 或 query token=）
+/// 从 HTTP 请求提取 JWT。只接受 Authorization: Bearer，不读 URL `?token=`。
 fn extract_ws_token(request: &Request<Body>) -> Option<String> {
     request
         .headers()
@@ -520,19 +548,12 @@ fn extract_ws_token(request: &Request<Body>) -> Option<String> {
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(|v| v.to_string())
-        .or_else(|| {
-            request.uri().query().and_then(|q| {
-                q.split('&')
-                    .find(|p| p.starts_with("token="))
-                    .map(|p| p[6..].to_string())
-            })
-        })
 }
 
 /// WebSocket 认证中间件（可选 JWT）
 /// - 无 token：允许升级，连接后首条 `auth` 消息认证（SEC-P1-08）
-/// - 有效 token（Header/query）：注入 Claims，兼容旧客户端
-/// - 无效 token：拒绝升级
+/// - 有效 access token（仅 Authorization: Bearer）：注入 Claims
+/// - URL `?token=` 忽略。无效 token：拒绝升级
 pub async fn auth_middleware_ws_optional(mut request: Request<Body>, next: Next) -> Response {
     let secret = JWT_SECRET
         .get()
@@ -542,6 +563,18 @@ pub async fn auth_middleware_ws_optional(mut request: Request<Body>, next: Next)
     match extract_ws_token(&request) {
         Some(t) => match auth::verify_token(&t, &secret) {
             Ok(claims) => {
+                if auth::is_refresh_token(&claims) {
+                    let mut resp = Response::new(Body::from(
+                        serde_json::json!({
+                            "error": "Refresh token cannot be used for API access"
+                        })
+                        .to_string(),
+                    ));
+                    *resp.status_mut() = StatusCode::UNAUTHORIZED;
+                    resp.headers_mut()
+                        .insert("content-type", HeaderValue::from_static("application/json"));
+                    return resp;
+                }
                 request.extensions_mut().insert(claims);
                 next.run(request).await
             }
@@ -570,6 +603,18 @@ pub async fn auth_middleware_ws(mut request: Request<Body>, next: Next) -> Respo
     match extract_ws_token(&request) {
         Some(t) => match auth::verify_token(&t, &secret) {
             Ok(claims) => {
+                if auth::is_refresh_token(&claims) {
+                    let mut resp = Response::new(Body::from(
+                        serde_json::json!({
+                            "error": "Refresh token cannot be used for API access"
+                        })
+                        .to_string(),
+                    ));
+                    *resp.status_mut() = StatusCode::UNAUTHORIZED;
+                    resp.headers_mut()
+                        .insert("content-type", HeaderValue::from_static("application/json"));
+                    return resp;
+                }
                 request.extensions_mut().insert(claims);
                 next.run(request).await
             }

@@ -17,6 +17,7 @@ import { getProductsFromSimpleTable } from './productService';
 import { AgentMarketService } from './agentMarketService';
 import { markAsDemoData, clearDemoData, isDemoDataInitialized, readDemoFlag } from './demoFlag';
 import { registerForeignCounterPlugin } from './manifestRegistry';
+import { registerVirtualCompanyPlugin } from './manifestRegistry';
 import { ensureDemoProductImages } from './demoProductImageSeed';
 
 // =============== 类型定义 ===============
@@ -153,6 +154,29 @@ export async function bootstrapDemoData(opts?: { force?: boolean; silent?: boole
   } catch (err) {
     steps.push({
       name: 'register-plugin:ma_foreign_counter',
+      success: false,
+      message: String(err),
+      durationMs: 0,
+    });
+  }
+
+  // 1b) 注册「虚拟公司 · NvWaX」官方插件
+  // 让用户在本地浏览 / 导入 NvWaX 云端创建的虚拟公司团队。
+  // 该插件注册到 manifestRegistry 即可被 PluginPanel 识别；
+  // frontend/index.js 会在 App 路由层动态加载并注册 4 个路由。
+  try {
+    const t1b = performance.now();
+    await registerVirtualCompanyPlugin();
+    registeredPlugins.push('virtual-company');
+    steps.push({
+      name: 'register-plugin:virtual-company',
+      success: true,
+      message: '虚拟公司 · NvWaX 已注册',
+      durationMs: performance.now() - t1b,
+    });
+  } catch (err) {
+    steps.push({
+      name: 'register-plugin:virtual-company',
       success: false,
       message: String(err),
       durationMs: 0,

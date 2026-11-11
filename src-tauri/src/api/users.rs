@@ -1,10 +1,10 @@
 // 用户管理 API (Phase 6)
 // 提供用户 CRUD、角色分配、密码管理
 
-use super::auth::hash_password;
+use super::auth::{hash_password, Claims};
 use super::AppState;
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Extension, Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -105,6 +105,20 @@ pub async fn list_users(
         params_vec.push(Box::new(r.clone()));
     }
 
+    let total = {
+        let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+        match crate::database::count_unpaged(conn, &sql, count_refs.as_slice()) {
+            Ok(n) => n,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": e.to_string()})),
+                )
+            }
+        }
+    };
+
     sql.push_str(" ORDER BY u.created_at DESC LIMIT 200");
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
@@ -149,7 +163,7 @@ pub async fn list_users(
     let users: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
     (
         StatusCode::OK,
-        Json(serde_json::json!({ "data": users, "total": users.len() })),
+        Json(serde_json::json!({ "data": users, "total": total })),
     )
 }
 
@@ -449,12 +463,35 @@ pub async fn assign_role(
     }
 }
 
-/// 修改密码
+/// 修改密码：只能改自己的，且必须提供旧密码
 pub async fn change_password(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(id): Path<String>,
     Json(payload): Json<ChangePasswordRequest>,
 ) -> impl IntoResponse {
+    if id != claims.sub {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "只能修改自己的密码"})),
+        );
+    }
+
+    let old_pwd = match payload
+        .old_password
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(p) => p.to_string(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "必须提供旧密码"})),
+            );
+        }
+    };
+
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
@@ -466,37 +503,35 @@ pub async fn change_password(
     };
     let conn = db.connection();
 
-    // 如果是修改自己的密码，需要验证旧密码
-    if let Some(ref old_pwd) = payload.old_password {
-        let current_hash: Option<String> = match conn.query_row(
-            "SELECT password_hash FROM users WHERE id = ?1",
-            params![id],
-            |row| row.get(0),
-        ) {
-            Ok(h) => h,
-            Err(_) => {
-                return (
-                    StatusCode::NOT_FOUND,
-                    Json(serde_json::json!({"error": "User not found"})),
-                )
-            }
-        };
-
-        if !super::auth::verify_password(old_pwd, current_hash.as_deref()) {
+    let current_hash: Option<String> = match conn.query_row(
+        "SELECT password_hash FROM users WHERE id = ?1",
+        params![id],
+        |row| row.get(0),
+    ) {
+        Ok(h) => h,
+        Err(_) => {
             return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "Old password is incorrect"})),
-            );
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "User not found"})),
+            )
         }
+    };
+
+    if !super::auth::verify_password(&old_pwd, current_hash.as_deref()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "旧密码不正确"})),
+        );
     }
 
     let new_hash = match hash_password(&payload.new_password) {
         Ok(h) => h,
         Err(e) => {
+            eprintln!("[Users] password hash failed: {}", e);
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e})),
-            )
+                Json(serde_json::json!({"error": "Password update failed"})),
+            );
         }
     };
 
@@ -504,9 +539,10 @@ pub async fn change_password(
         "UPDATE users SET password_hash = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
         params![new_hash, id],
     ) {
+        eprintln!("[Users] change_password failed: {}", e);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
+            Json(serde_json::json!({"error": "Password update failed"})),
         );
     }
 

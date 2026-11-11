@@ -1,11 +1,7 @@
-//! TODO(lib化): 下列模块已完成 lib 化但未进 git，等 main.rs 切到 proclaw_desktop::run() 时一起提交：
-//! - hermes_commands / finance_ledger / sku_stock / password_storage_commands
-//! - tauri-plugin-single-instance 插件初始化
-//! 当前瘦身版本只为让 tests/e2e_import.rs 能独立编译。
-
 mod api;
 mod auth;
 pub mod database;
+mod hermes_commands; // Hermes Skills 数据库代理
 pub mod import; // v1.2 P1: 批量导入中心
 mod services;
 mod sync_engine;
@@ -24,6 +20,7 @@ pub mod store_commands;
 // 进销存版模块
 #[cfg(feature = "inventory")]
 pub mod finance_commands;
+pub mod finance_ledger;
 #[cfg(feature = "inventory")]
 pub mod inventory_aging_commands; // PRD v12.0 灵活库存老化
 #[cfg(feature = "inventory")]
@@ -63,6 +60,7 @@ pub mod tray_commands;
 pub mod user_commands;
 
 // 本地账号密码托管（v13.1.1：使用 OS keyring）
+pub mod password_storage_commands;
 
 // 云备份模块（Cloud 版）
 pub mod agent_profile_commands;
@@ -366,12 +364,12 @@ pub async fn run() {
     println!("Database initialized successfully");
 
     // Hermes Skills: 主动建好 schema 表,避免 JS 端 exec 异步 race
-    // TODO(lib化) if let Err(e) = crate::hermes_commands::hermes_bootstrap_internal(&db) {
-    //     eprintln!("⚠️ Hermes schema bootstrap 失败: {}", e);
-    //     diag_log(&format!("WARN: hermes_bootstrap 失败: {}", e));
-    // } else {
-    //     println!("✓ Hermes schema ready");
-    // }
+    if let Err(e) = crate::hermes_commands::hermes_bootstrap_internal(&db) {
+        eprintln!("⚠️ Hermes schema bootstrap 失败: {}", e);
+        diag_log(&format!("WARN: hermes_bootstrap 失败: {}", e));
+    } else {
+        println!("✓ Hermes schema ready");
+    }
 
     // Phase 6: 初始化 JWT 密钥管理器（必须在云备份之前，用于派生密钥）
     let key_manager = KeyManager::from_env_or_default();
@@ -541,9 +539,9 @@ pub async fn run() {
     // 启动 Tauri 应用
     // 闪退修复 #2: Tauri run 绑定到 _run_result，异常时调用 fatal_exit 写日志再退出
     let _run_result = invoke_handler::apply(tauri::Builder::default())
-        // TODO(lib化) .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-        //     focus_already_running(app);
-        // }))
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            focus_already_running(app);
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())

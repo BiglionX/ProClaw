@@ -1,4 +1,4 @@
-# Proclaw Desktop Release Build Script
+﻿﻿# Proclaw Desktop Release Build Script
 # For Windows PowerShell
 # Version: v1.0.0-beta.2
 
@@ -111,8 +111,8 @@ Write-Host ""
 
 Write-Host "Step 6/6: Verifying generated files..." -ForegroundColor Yellow
 
-$msiPath = "src-tauri\target\release\bundle\msi\ProClaw_1.3.0_x64_en-US.msi"
-$nsisPath = "src-tauri\target\release\bundle\nsis\ProClaw_1.3.0_x64-setup.exe"
+$msiPath = "src-tauri\target\release\bundle\msi\ProClaw_1.3.1_x64_en-US.msi"
+$nsisPath = "src-tauri\target\release\bundle\nsis\ProClaw_1.3.1_x64-setup.exe"
 
 $foundFiles = @()
 

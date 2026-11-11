@@ -515,3 +515,80 @@ Week 6 (Day 26-27): Phase 10 — 文档 + 最终交付
 ---
 
 **文档维护**: 此计划应根据实际进度每周更新，记录完成情况和偏差。
+
+---
+
+## 📌 已交付：Sprint 2.13 / 2.14 / 2.15（v1.3.2）
+
+> **状态**: ✅ 三个 Sprint 已全部交付，对应 ProClaw v1.3.2 / NvWaX v2.2.0+
+> **详细架构规范**: [`MULTI_PROJECT_INTEGRATION_SPEC.md` 第 11 节](MULTI_PROJECT_INTEGRATION_SPEC.md#11-虚拟公司闭环sprint-213215-已交付-)
+
+### Sprint 2.13 — 最小闭环（v1.3.0 引入）
+
+**目标**：让"云端创建虚拟公司 → 本地运行"跑通。
+
+| 任务 | 状态 | 工时 |
+|------|------|------|
+| 共享 JSON Schema `VirtualCompanyPackage v1.0.0` | ✅ | 2h |
+| NvWaX `integrateToProClaw` controller + service 实现 | ✅ | 4h |
+| NvWaX `GET /packages/:id/download` 端点 | ✅ | 1h |
+| 数据库迁移 `012_virtual_company_local_state.sql` | ✅ | 1h |
+| ProClaw Rust `nvwax_search_vc_templates` / `nvwax_import_virtual_company_from_url` / `bootstrap_virtual_company_tables` | ✅ | 6h |
+| ProClaw 内置 `virtual-company` 插件 + 4 个 React 路由 | ✅ | 8h |
+| 修复 plugin frontend 不加载 bug（`pluginFrontend.ts`） | ✅ | 3h |
+| 单元测试（schema parse / bootstrap / persist） | ✅ | 3h |
+| **Sprint 2.13 合计** | ✅ | **28h** |
+
+### Sprint 2.14 — 4 项增强（v1.3.1 引入）
+
+**目标**：让"本地壳"用起来体验优秀。
+
+| 任务 | 状态 | 工时 |
+|------|------|------|
+| CEO Agent Skill `sk_preset_open_virtual_company_wizard` + `assistantAgent.classifyAssistantIntent` | ✅ | 4h |
+| Tauri command `open_virtual_company_page` | ✅ | 1h |
+| 本地→云回写：`PUT /sessions/:id/local-state` + `nvwax_push_virtual_company_state` + Companies 页 UI | ✅ | 6h |
+| 本地 SSE 流式：`nvwax_stream_session` + wizard 页完整重写 | ✅ | 6h |
+| 开发者文档 `NVWAX_INTEGRATION.md`（220+ 行） | ✅ | 3h |
+| 单元测试（assistantAgent + pluginFrontend + virtualCompany） | ✅ | 4h |
+| **Sprint 2.14 合计** | ✅ | **24h** |
+
+### Sprint 2.15 — 多设备同步（v1.3.2 引入）
+
+**目标**：让"MacBook 上启用的 Agent 自动同步到 Windows 桌面端"。
+
+| 任务 | 状态 | 工时 |
+|------|------|------|
+| NvWaX `GET /sessions/:id/local-state` + `GET /sessions` 列表响应增加 `local_state` | ✅ | 3h |
+| ProClaw `nvwax_fetch_local_state` + `nvwax_list_sessions_with_state` Tauri 命令 | ✅ | 4h |
+| `virtualCompanySync.ts` 纯函数合并引擎（`mergeAgentState` + `reconcileSync` + `startBackgroundSync`） | ✅ | 6h |
+| Companies 页"🔄 立即同步"按钮 + 同步报告卡片 | ✅ | 4h |
+| App 启动 5 秒后台同步 hook（`main.tsx`） | ✅ | 1h |
+| 单元测试（14 个 `virtualCompanySync.test.ts`） | ✅ | 4h |
+| **Sprint 2.15 合计** | ✅ | **22h** |
+
+### 三 Sprint 累计
+
+| 维度 | 累计 |
+|------|------|
+| Tauri 命令（虚拟公司专用） | 8 个 |
+| TS 类型 | 10 个 |
+| Rust Serde struct | 8 个 |
+| HTTP 端点 | 5 个（POST/GET/PUT） |
+| 数据库迁移 | 1 个 |
+| React 路由 | 4 个（`/vc/{templates,wizard,import,companies}`） |
+| Hermes Skill | 1 个 |
+| 单元测试 | 47 个新（ProClaw 39 + NvWaX 4 + Rust 4） |
+| 文档 | 3 个（`schema.json` + `NVWAX_INTEGRATION.md` + 本计划条目） |
+| **总工时** | **~74h** |
+
+### 后续 Sprint 计划（非本轮范围）
+
+| Sprint | 主题 | 目标版本 |
+|--------|------|---------|
+| **2.16** | 真实 SSE 流式 + Agent 启停状态持久化 | v1.4.0 |
+| **2.17** | 虚拟公司模板市场反向发布 + CRDT 合并 | v1.5.0 |
+| **3.0** | 主版本升级（ADR 流程 + NvWaX 2.x） | v2.0.0 |
+
+---
+

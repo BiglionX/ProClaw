@@ -1,9 +1,10 @@
 // 通话记录 API 处理器
 // v4.1: 音视频通话功能 - 通话记录查询、创建、更新
 
+use crate::api::auth::Claims;
 use crate::api::AppState;
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -69,8 +70,15 @@ pub struct CreateCallRecordRequest {
 // ============================================================
 pub async fn create_call_record(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Json(req): Json<CreateCallRecordRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    if req.caller_id != claims.sub && req.callee_id != claims.sub {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "Forbidden"})),
+        ));
+    }
     let db = state.db.lock().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -113,6 +121,7 @@ pub async fn create_call_record(
 // ============================================================
 pub async fn get_call_records(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(params): Query<CallHistoryQuery>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let db = state.db.lock().map_err(|e| {
@@ -123,7 +132,7 @@ pub async fn get_call_records(
     })?;
     let conn = db.connection();
 
-    let limit = params.limit.unwrap_or(50).min(200);
+    let limit = crate::database::clamp_page_size(params.limit, 50);
     let offset = params.offset.unwrap_or(0);
 
     let mut sql = String::from(
@@ -138,38 +147,33 @@ pub async fn get_call_records(
     let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
     let mut param_idx = 1;
 
-    if let Some(ref user_id) = params.user_id {
-        sql.push_str(&format!(
-            " AND (cr.caller_id = ?{} OR cr.callee_id = ?{})",
-            param_idx,
-            param_idx + 1
-        ));
-        param_values.push(Box::new(user_id.clone()));
-        param_values.push(Box::new(user_id.clone()));
-        param_idx += 2;
+    if let Some(ref requested) = params.user_id {
+        if requested != &claims.sub {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({"error": "Forbidden"})),
+            ));
+        }
     }
+
+    sql.push_str(&format!(
+        " AND (cr.caller_id = ?{} OR cr.callee_id = ?{})",
+        param_idx,
+        param_idx + 1
+    ));
+    param_values.push(Box::new(claims.sub.clone()));
+    param_values.push(Box::new(claims.sub.clone()));
+    param_idx += 2;
 
     if let Some(ref contact_id) = params.contact_id {
         sql.push_str(&format!(
-            " AND (cr.caller_id = ?{} OR cr.callee_id = ?{})",
+            " AND ((cr.caller_id = ?{0} AND cr.callee_id = ?{1}) OR (cr.caller_id = ?{1} AND cr.callee_id = ?{0}))",
             param_idx,
             param_idx + 1
         ));
-        // Filter to only calls between the caller and this specific contact
-        sql.push_str(&format!(" AND ((cr.caller_id = ?{0} AND cr.callee_id = ?{1}) OR (cr.caller_id = ?{1} AND cr.callee_id = ?{0}))", 
-            param_idx, param_idx + 1));
-        // Actually redo this more simply
-        sql.pop(); // remove last char and rebuild
-                   // simpler approach: both caller and callee must be in {user_id, contact_id}
-        if let Some(ref uid) = params.user_id {
-            sql.push_str(&format!(
-                " AND ((cr.caller_id = ?{0} AND cr.callee_id = ?{1}) OR (cr.caller_id = ?{1} AND cr.callee_id = ?{0}))",
-                param_idx, param_idx + 1
-            ));
-            param_values.push(Box::new(uid.clone()));
-            param_values.push(Box::new(contact_id.clone()));
-            param_idx += 2;
-        }
+        param_values.push(Box::new(claims.sub.clone()));
+        param_values.push(Box::new(contact_id.clone()));
+        param_idx += 2;
     }
 
     if let Some(ref ct) = params.call_type {
@@ -183,6 +187,17 @@ pub async fn get_call_records(
         param_values.push(Box::new(st.clone()));
         // Last param, no further use for param_idx
     }
+
+    let total = {
+        let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+            param_values.iter().map(|p| p.as_ref()).collect();
+        crate::database::count_unpaged(conn, &sql, count_refs.as_slice()).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+        })?
+    };
 
     sql.push_str(" ORDER BY cr.created_at DESC");
     param_values.push(Box::new(limit));
@@ -230,9 +245,7 @@ pub async fn get_call_records(
         .filter_map(|r| r.ok())
         .collect();
 
-    Ok(Json(
-        serde_json::json!({ "data": records, "total": records.len() }),
-    ))
+    Ok(Json(serde_json::json!({ "data": records, "total": total })))
 }
 
 // ============================================================
@@ -240,6 +253,7 @@ pub async fn get_call_records(
 // ============================================================
 pub async fn get_call_record(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let db = state.db.lock().map_err(|e| {
@@ -258,8 +272,8 @@ pub async fn get_call_record(
          FROM call_records cr
          LEFT JOIN users u1 ON cr.caller_id = u1.id
          LEFT JOIN users u2 ON cr.callee_id = u2.id
-         WHERE cr.id = ?1",
-            rusqlite::params![id],
+         WHERE cr.id = ?1 AND (cr.caller_id = ?2 OR cr.callee_id = ?3)",
+            rusqlite::params![id, claims.sub, claims.sub],
             |row| {
                 Ok(serde_json::json!({
                     "id": row.get::<_, String>(0)?,
@@ -293,6 +307,7 @@ pub async fn get_call_record(
 // ============================================================
 pub async fn update_call_record(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(session_id): Path<String>,
     Json(req): Json<UpdateCallRecordRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
@@ -338,10 +353,14 @@ pub async fn update_call_record(
     }
 
     params.push(Box::new(session_id.clone()));
+    params.push(Box::new(claims.sub.clone()));
+    params.push(Box::new(claims.sub.clone()));
     let sql = format!(
-        "UPDATE call_records SET {} WHERE session_id = ?{}",
+        "UPDATE call_records SET {} WHERE session_id = ?{} AND (caller_id = ?{} OR callee_id = ?{})",
         sets.join(", "),
-        idx
+        idx,
+        idx + 1,
+        idx + 2
     );
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
@@ -355,6 +374,13 @@ pub async fn update_call_record(
             )
         })?;
 
+    if updated == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Call record not found"})),
+        ));
+    }
+
     Ok(Json(serde_json::json!({
         "success": true,
         "rows_updated": updated,
@@ -366,6 +392,7 @@ pub async fn update_call_record(
 // ============================================================
 pub async fn end_call(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(session_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let db = state.db.lock().map_err(|e| {
@@ -381,15 +408,20 @@ pub async fn end_call(
     // 计算通话时长
     let duration: i64 = conn
         .query_row(
-            "SELECT COALESCE((?1 - started_at) / 1000, 0) FROM call_records WHERE session_id = ?2",
-            rusqlite::params![now, session_id],
+            "SELECT COALESCE((?1 - started_at) / 1000, 0) FROM call_records WHERE session_id = ?2 AND (caller_id = ?3 OR callee_id = ?4)",
+            rusqlite::params![now, session_id, claims.sub, claims.sub],
             |row| row.get(0),
         )
-        .unwrap_or(0);
+        .map_err(|_| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Call record not found"})),
+            )
+        })?;
 
     conn.execute(
-        "UPDATE call_records SET status = 'ended', ended_at = ?1, duration_seconds = ?2 WHERE session_id = ?3",
-        rusqlite::params![now, duration.max(0), session_id],
+        "UPDATE call_records SET status = 'ended', ended_at = ?1, duration_seconds = ?2 WHERE session_id = ?3 AND (caller_id = ?4 OR callee_id = ?5)",
+        rusqlite::params![now, duration.max(0), session_id, claims.sub, claims.sub],
     ).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()})))
     })?;

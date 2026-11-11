@@ -71,12 +71,13 @@ CREATE TABLE IF NOT EXISTS products (
     description TEXT,
     category_id TEXT REFERENCES product_categories(id),
     brand_id TEXT REFERENCES brands(id),
-    unit TEXT DEFAULT '件',
-    cost_price REAL DEFAULT 0,
+    unit TEXT NOT NULL DEFAULT '件',
+    cost_price REAL NOT NULL DEFAULT 0,
     sell_price REAL DEFAULT 0,
     min_stock INTEGER DEFAULT 0,
     max_stock INTEGER DEFAULT 0,
-    current_stock INTEGER DEFAULT 0,
+    -- P0-06: 灵活库存允许负库存，设下限 -999999 兜底（非禁止负库存）
+    current_stock INTEGER DEFAULT 0 CHECK(current_stock >= -999999),
     image_url TEXT,
     barcode TEXT,
     is_active BOOLEAN DEFAULT TRUE,
@@ -95,7 +96,8 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
     id TEXT PRIMARY KEY,
     product_id TEXT NOT NULL REFERENCES products(id),
     transaction_type TEXT NOT NULL CHECK(transaction_type IN ('inbound', 'outbound', 'adjustment', 'transfer')),
-    quantity INTEGER NOT NULL,
+    -- P0-06: 禁止 0；正负由业务写入绝对值 + transaction_type 表达方向
+    quantity INTEGER NOT NULL CHECK(quantity != 0),
     reference_no TEXT, -- 参考单号
     reason TEXT,
     performed_by TEXT REFERENCES users(id),
@@ -242,8 +244,8 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
     id TEXT PRIMARY KEY,
     purchase_order_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
     product_id TEXT NOT NULL REFERENCES products(id),
-    quantity INTEGER NOT NULL,
-    unit_price REAL NOT NULL, -- 单价
+    quantity INTEGER NOT NULL CHECK(quantity > 0),
+    unit_price REAL NOT NULL CHECK(unit_price >= 0), -- 单价（允许 0，禁止负数）
     total_price REAL NOT NULL, -- 总价 = quantity * unit_price
     received_quantity INTEGER DEFAULT 0, -- 已收货数量
     notes TEXT,
@@ -315,8 +317,8 @@ CREATE TABLE IF NOT EXISTS sales_order_items (
     id TEXT PRIMARY KEY,
     sales_order_id TEXT NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
     product_id TEXT NOT NULL REFERENCES products(id),
-    quantity INTEGER NOT NULL,
-    unit_price REAL NOT NULL, -- 单价
+    quantity INTEGER NOT NULL CHECK(quantity > 0),
+    unit_price REAL NOT NULL CHECK(unit_price >= 0), -- 单价（允许 0，禁止负数）
     total_price REAL NOT NULL, -- 总价 = quantity * unit_price
     shipped_quantity INTEGER DEFAULT 0, -- 已发货数量
     notes TEXT,
@@ -354,6 +356,8 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
     description TEXT NOT NULL,
     transaction_type TEXT NOT NULL CHECK(transaction_type IN ('income', 'expense', 'transfer')),
     amount REAL NOT NULL,
+    debit_amount REAL NOT NULL DEFAULT 0, -- 借方。确认出库等权责分录使用，现金流水保持 0
+    credit_amount REAL NOT NULL DEFAULT 0, -- 贷方
     account_id TEXT NOT NULL REFERENCES accounts(id),
     reference_type TEXT, -- 关联类型 (e.g., 'sales_order', 'purchase_order')
     reference_id TEXT, -- 关联ID

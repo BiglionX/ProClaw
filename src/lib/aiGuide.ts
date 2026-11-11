@@ -174,6 +174,15 @@ export function detectIntent(userInput: string): IntentResult {
     }
   }
   
+  // 导出/导入和库存、产品同分时，数据操作优先，避免教程被业务查询吞掉
+  if (
+    scores.data_operation > 0 &&
+    scores.data_operation === maxScore &&
+    detectedIntent === 'business_query'
+  ) {
+    detectedIntent = 'data_operation';
+  }
+
   // 如果分数太低，认为是未知意图
   if (maxScore < 1) {
     detectedIntent = 'unknown';

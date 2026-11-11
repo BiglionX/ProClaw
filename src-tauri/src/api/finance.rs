@@ -7,7 +7,6 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use rusqlite::params;
 use serde::Deserialize;
 
 /// 财务报表查询参数
@@ -36,57 +35,13 @@ pub async fn get_profit_loss_report(
     let start_date = query.start_date.as_deref().unwrap_or("2000-01-01");
     let end_date = query.end_date.as_deref().unwrap_or("2099-12-31");
 
-    let revenue: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders \
-         WHERE order_date >= ?1 AND order_date <= ?2 \
-         AND status != 'cancelled' AND deleted_at IS NULL",
-            params![start_date, end_date],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    let cogs: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders \
-         WHERE order_date >= ?1 AND order_date <= ?2 \
-         AND status != 'cancelled' AND deleted_at IS NULL",
-            params![start_date, end_date],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    let gross_profit = revenue - cogs;
-
-    let expenses: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions \
-         WHERE transaction_date >= ?1 AND transaction_date <= ?2 \
-         AND transaction_type = 'expense' AND deleted_at IS NULL",
-            params![start_date, end_date],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    let net_profit = gross_profit - expenses;
-    let margin = if revenue > 0.0 {
-        (net_profit / revenue) * 100.0
-    } else {
-        0.0
-    };
-
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "period": { "start": start_date, "end": end_date },
-            "revenue": (revenue * 100.0).round() / 100.0,
-            "cost_of_goods_sold": (cogs * 100.0).round() / 100.0,
-            "gross_profit": (gross_profit * 100.0).round() / 100.0,
-            "operating_expenses": (expenses * 100.0).round() / 100.0,
-            "net_profit": (net_profit * 100.0).round() / 100.0,
-            "profit_margin": (margin * 100.0).round() / 100.0,
-        })),
-    )
+    match crate::finance_ledger::profit_loss_report(conn, start_date, end_date) {
+        Ok(report) => (StatusCode::OK, Json(report)),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e})),
+        ),
+    }
 }
 
 /// 获取现金流量表
@@ -108,42 +63,54 @@ pub async fn get_cash_flow_report(
     let start_date = query.start_date.as_deref().unwrap_or("2000-01-01");
     let end_date = query.end_date.as_deref().unwrap_or("2099-12-31");
 
-    let inflow: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions \
-         WHERE transaction_date >= ?1 AND transaction_date <= ?2 \
-         AND transaction_type = 'income' AND deleted_at IS NULL",
-            params![start_date, end_date],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
+    match crate::finance_ledger::cash_flow_report(conn, start_date, end_date) {
+        Ok(report) => (StatusCode::OK, Json(report)),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e})),
+        ),
+    }
+}
 
-    let outflow: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(amount), 0.0) FROM financial_transactions \
-         WHERE transaction_date >= ?1 AND transaction_date <= ?2 \
-         AND transaction_type = 'expense' AND deleted_at IS NULL",
-            params![start_date, end_date],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
+/// 报表行明细查询参数
+#[derive(Debug, Deserialize)]
+pub struct ReportLinesQuery {
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub line: Option<String>,
+}
 
-    let net = inflow - outflow;
+/// 获取报表行明细
+pub async fn get_report_lines(
+    State(state): State<AppState>,
+    Query(query): Query<ReportLinesQuery>,
+) -> impl IntoResponse {
+    let Some(line) = query.line.as_deref().filter(|line| !line.is_empty()) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "missing line"})),
+        );
+    };
+    let db = match state.db.lock() {
+        Ok(db) => db,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database lock error"})),
+            )
+        }
+    };
+    let conn = db.connection();
+    let start_date = query.start_date.as_deref().unwrap_or("2000-01-01");
+    let end_date = query.end_date.as_deref().unwrap_or("2099-12-31");
 
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "period": { "start": start_date, "end": end_date },
-            "operating_activities": {
-                "inflow": (inflow * 100.0).round() / 100.0,
-                "outflow": (outflow * 100.0).round() / 100.0,
-                "net": (net * 100.0).round() / 100.0,
-            },
-            "investing_activities": 0.0,
-            "financing_activities": 0.0,
-            "net_cash_flow": (net * 100.0).round() / 100.0,
-        })),
-    )
+    match crate::finance_ledger::report_lines(conn, start_date, end_date, line) {
+        Ok(lines) => (StatusCode::OK, Json(serde_json::json!(lines))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e})),
+        ),
+    }
 }
 
 /// 获取财务汇总
@@ -159,65 +126,13 @@ pub async fn get_financial_summary(State(state): State<AppState>) -> impl IntoRe
     };
     let conn = db.connection();
 
-    let monthly_revenue: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_amount), 0.0) FROM sales_orders \
-         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now') \
-         AND status != 'cancelled' AND deleted_at IS NULL",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    let monthly_expense: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_amount), 0.0) FROM purchase_orders \
-         WHERE strftime('%Y-%m', order_date) = strftime('%Y-%m', 'now') \
-         AND status != 'cancelled' AND deleted_at IS NULL",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    let receivable: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM sales_orders \
-         WHERE payment_status != 'paid' AND status != 'cancelled' AND deleted_at IS NULL",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    let payable: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(total_amount - paid_amount), 0.0) FROM purchase_orders \
-         WHERE payment_status != 'paid' AND status != 'cancelled' AND deleted_at IS NULL",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    let inventory_value: f64 = conn
-        .query_row(
-            "SELECT COALESCE(SUM(current_stock * cost_price), 0.0) FROM products \
-         WHERE deleted_at IS NULL",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0.0);
-
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "monthly_revenue": (monthly_revenue * 100.0).round() / 100.0,
-            "monthly_expense": (monthly_expense * 100.0).round() / 100.0,
-            "monthly_profit": ((monthly_revenue - monthly_expense) * 100.0).round() / 100.0,
-            "accounts_receivable": (receivable * 100.0).round() / 100.0,
-            "accounts_payable": (payable * 100.0).round() / 100.0,
-            "inventory_value": (inventory_value * 100.0).round() / 100.0,
-            "working_capital": ((receivable - payable + inventory_value) * 100.0).round() / 100.0,
-        })),
-    )
+    match crate::finance_ledger::financial_summary(conn) {
+        Ok(summary) => (StatusCode::OK, Json(summary)),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e})),
+        ),
+    }
 }
 
 #[cfg(test)]

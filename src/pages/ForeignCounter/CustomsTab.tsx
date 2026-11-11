@@ -123,11 +123,12 @@ export default function CustomsTab() {
             />
             <Button
               variant="contained"
-              startIcon={loading ? <CircularProgress size={16} /> : <SearchIcon />}
               onClick={handleSearchHS}
               disabled={loading}
+              aria-label="查询"
+              sx={{ minWidth: 48, px: 1.5 }}
             >
-              查询
+              {loading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
             </Button>
           </Stack>
           {aiSuggestion && (

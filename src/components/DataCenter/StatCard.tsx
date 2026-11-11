@@ -54,7 +54,7 @@ export default function StatCard({
         borderColor: alert ? 'rgba(255,59,48,0.3)' : 'divider',
         borderRadius: 2,
         position: 'relative',
-        overflow: 'visible',
+        overflow: 'hidden',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         '&:hover': {
           transform: 'translateY(-4px)',
@@ -80,33 +80,53 @@ export default function StatCard({
           right: 0,
           height: 3,
           background: `linear-gradient(90deg, ${mainColor} 0%, transparent 100%)`,
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
         }}
       />
 
       <CardContent sx={{ pt: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
-          {/* 左侧图标 */}
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              borderRadius: 1.5,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: `${mainColor}12`,
-              color: mainColor,
-              flexShrink: 0,
-            }}
-          >
-            {icon}
+        <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1.25, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: `${mainColor}12`,
+                color: mainColor,
+                flexShrink: 0,
+              }}
+            >
+              {icon}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, pb: '1px' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
+                {title}
+              </Typography>
+              {change && (
+                <Chip
+                  label={change}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.65rem',
+                    fontWeight: 600,
+                    backgroundColor: change.startsWith('+') || change.startsWith('↑')
+                      ? 'rgba(16,185,129,0.1)'
+                      : 'rgba(239,68,68,0.1)',
+                    color: change.startsWith('+') || change.startsWith('↑')
+                      ? '#10B981'
+                      : '#EF4444',
+                  }}
+                />
+              )}
+            </Box>
           </Box>
 
-          {/* 右侧迷你趋势线 */}
           {sparklineData && sparklineData.length > 1 && (
-            <Box sx={{ width: 80, height: 32, ml: 1, flexShrink: 0 }}>
+            <Box sx={{ width: 72, height: 32, flexShrink: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={sparklineData}>
                   <defs>
@@ -130,13 +150,11 @@ export default function StatCard({
           )}
         </Box>
 
-        {/* 数字值 */}
         <Typography
           variant="h4"
           sx={{
             fontWeight: 800,
             fontSize: '1.75rem',
-            mb: 0.25,
             color: '#1A1A2E',
             fontVariantNumeric: 'tabular-nums',
             transition: 'all 0.3s',
@@ -144,30 +162,6 @@ export default function StatCard({
         >
           {displayValue}
         </Typography>
-
-        {/* 标题 + 变化 */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-            {title}
-          </Typography>
-          {change && (
-            <Chip
-              label={change}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: '0.65rem',
-                fontWeight: 600,
-                backgroundColor: change.startsWith('+') || change.startsWith('↑')
-                  ? 'rgba(16,185,129,0.1)'
-                  : 'rgba(239,68,68,0.1)',
-                color: change.startsWith('+') || change.startsWith('↑')
-                  ? '#10B981'
-                  : '#EF4444',
-              }}
-            />
-          )}
-        </Box>
 
         {subtitle && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25, display: 'block' }}>

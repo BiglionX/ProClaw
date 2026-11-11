@@ -1,12 +1,18 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useRef } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { Navigate, Route, useLocation } from 'react-router-dom';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import AppLayout from '../components/Layout/AppLayout';
 import { useAuthStore } from '../lib/authStore';
 import { SetupWizard } from '../components/SetupWizard';
+import NoUserWelcome from '../components/Auth/NoUserWelcome';
 
 export function LazyPage({ loader }: { loader: () => Promise<{ default: React.ComponentType }> }) {
-  const Component = React.lazy(loader);
+  const ComponentRef = useRef<React.LazyExoticComponent<React.ComponentType> | null>(null);
+  if (!ComponentRef.current) {
+    ComponentRef.current = React.lazy(loader);
+  }
+  const Component = ComponentRef.current;
   return (
     <Suspense fallback={
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
@@ -18,26 +24,60 @@ export function LazyPage({ loader }: { loader: () => Promise<{ default: React.Co
   );
 }
 
+/**
+ * v13.1.1 本地账号无登录模式：未登录不再强弹窗
+ * - 启动时 checkAuth() 会从 localStorage 恢复 activeAccountId → user 自动填充
+ * - 若真没用户（首次启动），渲染轻量引导页（NoUserWelcome）
+ */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, checkAuth, openLoginDialog } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
   React.useEffect(() => {
-    if (user?.id?.startsWith('mock-')) return;
-    checkAuth();
-  }, [checkAuth, user]);
+    const { hasInitialized, user: currentUser, checkAuth } = useAuthStore.getState();
+    if (hasInitialized) return;
 
-  React.useEffect(() => {
-    if (!user) {
-      const timer = setTimeout(() => openLoginDialog(), 100);
-      return () => clearTimeout(timer);
+    // E2E 旁路:URL 带 ?e2e=1 时,只用一个临时 user 跳过 ProtectedRoute,
+    // 仅用于浏览器内 Playwright 自检,生产构建中 import.meta.env.DEV 仍为 true。
+    if (
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('e2e') === '1' &&
+      !currentUser
+    ) {
+      const fakeUser = {
+        id: 'e2e-fake-user',
+        email: 'e2e@proclaw.local',
+        displayName: 'E2E Tester',
+        role: 'boss',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      useAuthStore.setState({
+        user: fakeUser as any,
+        session: {
+          access_token: 'e2e-token',
+          refresh_token: 'e2e-refresh',
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          expires_in: 3600,
+          token_type: 'bearer',
+          user: fakeUser as any,
+        },
+        hasInitialized: true,
+      });
+      return;
     }
-  }, [user, openLoginDialog]);
+    void checkAuth();
+    // 只在挂载时跑一次。user 每次 initialize 都是新对象，放进 deps 会无限循环。
+  }, []);
 
   if (!user) {
-    return <Box sx={{ minHeight: '100vh', bgcolor: '#1a1a1a' }} />;
+    return <NoUserWelcome />;
   }
 
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <AppLayout>
+      <ErrorBoundary>{children}</ErrorBoundary>
+    </AppLayout>
+  );
 }
 
 type RouteLoader = () => Promise<{ default: React.ComponentType }>;
@@ -67,6 +107,8 @@ export const PUBLIC_ROUTES: Array<{ path: string; loader: RouteLoader }> = [
   { path: '/setup-page', loader: () => import('../pages/SetupPage') },
   { path: '/login', loader: () => import('../pages/LoginPage') },
   { path: '/register', loader: () => import('../pages/RegisterPage') },
+  // v13.1.1：/welcome 复用 NoUserWelcome，作为 LoginPage 跳转到的"创建新本地账号"页
+  { path: '/welcome', loader: () => import('../components/Auth/NoUserWelcome') },
 ];
 
 export const PROTECTED_ROUTES: Array<{ path: string; loader: RouteLoader }> = [
@@ -131,6 +173,7 @@ export const PROTECTED_ROUTES: Array<{ path: string; loader: RouteLoader }> = [
   { path: '/import-center', loader: () => import('../components/ImportCenter/ImportCenterPage') },
   { path: '/import-center/new', loader: () => import('../components/ImportCenter/ImportWizardPage') },
   { path: '/import-center/:batchId', loader: () => import('../components/ImportCenter/ImportWizardPage') },
+  { path: '/hermes-skills', loader: () => import('../pages/HermesSkillsPage') },
   { path: '/test', loader: () => import('../pages/TestPage') },
 ];
 

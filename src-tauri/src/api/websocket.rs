@@ -448,6 +448,10 @@ fn complete_ws_auth(
     let claims = crate::api::auth::verify_token(token, &secret)
         .map_err(|_| "Invalid or expired token".to_string())?;
 
+    if crate::api::auth::is_refresh_token(&claims) {
+        return Err("Refresh token cannot be used for API access".to_string());
+    }
+
     if claims.sub != claimed_user_id {
         return Err(format!(
             "user_id mismatch: token subject '{}' != claimed '{}'",
@@ -940,7 +944,16 @@ mod ws_auth_tests {
     #[test]
     fn complete_ws_auth_accepts_valid_token() {
         let secret = init_jwt_secret();
-        let token = auth::generate_token("user-abc", "dev1", "user", &[], &secret, 3600).unwrap();
+        let token = auth::generate_token(
+            "user-abc",
+            "dev1",
+            "user",
+            &[],
+            &secret,
+            3600,
+            auth::TOKEN_TYPE_ACCESS,
+        )
+        .unwrap();
         let (tx, _rx) = mpsc::unbounded_channel();
         let state = dummy_state(secret);
         let req = auth_request("user-abc", Some(&token));
@@ -959,7 +972,16 @@ mod ws_auth_tests {
     #[test]
     fn complete_ws_auth_rejects_user_id_mismatch() {
         let secret = init_jwt_secret();
-        let token = auth::generate_token("user-a", "dev1", "user", &[], &secret, 3600).unwrap();
+        let token = auth::generate_token(
+            "user-a",
+            "dev1",
+            "user",
+            &[],
+            &secret,
+            3600,
+            auth::TOKEN_TYPE_ACCESS,
+        )
+        .unwrap();
         let (tx, _rx) = mpsc::unbounded_channel();
         let state = dummy_state(secret);
         let req = auth_request("user-b", Some(&token));

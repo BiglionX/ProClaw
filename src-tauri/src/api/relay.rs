@@ -1,8 +1,13 @@
 // Relay API - 云中继通信端点
 // 处理中继消息收发、同步触发、连接状态查询
 
+use crate::api::auth::Claims;
 use crate::api::AppState;
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Extension, State},
+    http::StatusCode,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -130,6 +135,7 @@ pub async fn relay_send(
 /// 拉取通过云中继到达的消息（Pro版功能）
 pub async fn relay_get_messages(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     axum::extract::Query(query): axum::extract::Query<RelayMessagesQuery>,
 ) -> (StatusCode, Json<Value>) {
     let db = state.db.lock().map_err(|e| {
@@ -146,7 +152,8 @@ pub async fn relay_get_messages(
 
     let limit = query.limit.unwrap_or(50).min(200) as i64;
 
-    let messages: Vec<Value> = query_relay_messages(db.connection(), &query.since, limit);
+    let messages: Vec<Value> =
+        query_relay_messages(db.connection(), &query.since, limit, &claims.sub);
     let is_err = matches!(messages.first(), Some(v) if v.get("_error").is_some());
     if is_err {
         let err_msg = messages
@@ -176,8 +183,8 @@ pub async fn relay_get_messages(
 
         for id in &ids {
             if let Err(e) = db.connection().execute(
-                "UPDATE relay_messages SET status = 'delivered' WHERE id = ?1 AND direction = 'incoming'",
-                rusqlite::params![id],
+                "UPDATE relay_messages SET status = 'delivered' WHERE id = ?1 AND direction = 'incoming' AND receiver_id = ?2",
+                rusqlite::params![id, claims.sub],
             ) {
                 eprintln!("[Relay] Failed to mark message {} as delivered: {}", id, e);
             }
@@ -558,11 +565,12 @@ fn query_relay_messages(
     conn: &rusqlite::Connection,
     since: &Option<String>,
     limit: i64,
+    user_id: &str,
 ) -> Vec<Value> {
     let result = if let Some(since_val) = since {
-        query_messages_with_since(conn, since_val, limit)
+        query_messages_with_since(conn, since_val, limit, user_id)
     } else {
-        query_messages_all(conn, limit)
+        query_messages_all(conn, limit, user_id)
     };
 
     result.unwrap_or_default()
@@ -572,36 +580,42 @@ fn query_messages_with_since(
     conn: &rusqlite::Connection,
     since_val: &str,
     limit: i64,
+    user_id: &str,
 ) -> Result<Vec<Value>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, receiver_id, message_type, content, priority, status, direction, created_at
          FROM relay_messages
-         WHERE created_at > ?1
+         WHERE receiver_id = ?1 AND created_at > ?2
          ORDER BY created_at ASC
-         LIMIT ?2",
+         LIMIT ?3",
         )
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
-        .query_map(rusqlite::params![since_val, limit], row_to_value)
+        .query_map(rusqlite::params![user_id, since_val, limit], row_to_value)
         .map_err(|e| e.to_string())?;
 
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
-fn query_messages_all(conn: &rusqlite::Connection, limit: i64) -> Result<Vec<Value>, String> {
+fn query_messages_all(
+    conn: &rusqlite::Connection,
+    limit: i64,
+    user_id: &str,
+) -> Result<Vec<Value>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, receiver_id, message_type, content, priority, status, direction, created_at
          FROM relay_messages
+         WHERE receiver_id = ?1
          ORDER BY created_at DESC
-         LIMIT ?1",
+         LIMIT ?2",
         )
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
-        .query_map(rusqlite::params![limit], row_to_value)
+        .query_map(rusqlite::params![user_id, limit], row_to_value)
         .map_err(|e| e.to_string())?;
 
     Ok(rows.filter_map(|r| r.ok()).collect())

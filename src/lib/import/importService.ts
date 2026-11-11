@@ -28,7 +28,7 @@ import type {
 export interface CreateBatchRequest {
   target_type: ImportTarget;
   source_filename: string;
-  source_format: 'csv' | 'json' | 'xlsx';
+  source_format: 'csv' | 'json' | 'xlsx' | 'xls';
   source_base64: string;
   performed_by?: string | null;
   notes?: string | null;
@@ -49,17 +49,27 @@ export async function fileToBase64(file: File): Promise<string> {
   });
 }
 
+export type SourceFormat = CreateBatchRequest['source_format'];
+
+/**
+ * 按文件名后缀判断导入格式。xlsx 必须先于 xls 判断。
+ * 调用方把返回值放进 import_create_batch 的 source_format，后端按这个字段分发解析器。
+ */
+export function detectFormat(filename: string): SourceFormat {
+  const lowerName = filename.toLowerCase();
+  if (lowerName.endsWith('.json')) return 'json';
+  if (lowerName.endsWith('.xlsx')) return 'xlsx';
+  if (lowerName.endsWith('.xls')) return 'xls';
+  return 'csv';
+}
+
 export async function createBatch(
   target: ImportTarget,
   file: File,
   options?: { performed_by?: string; notes?: string },
 ): Promise<ImportCreateResponse> {
   const base64 = await fileToBase64(file);
-  const format = file.name.toLowerCase().endsWith('.json')
-    ? 'json'
-    : file.name.toLowerCase().endsWith('.xlsx')
-      ? 'xlsx'
-      : 'csv';
+  const format = detectFormat(file.name);
   return ipcInvoke<ImportCreateResponse>('import_create_batch', {
     request: {
       target_type: target,
@@ -229,9 +239,26 @@ export async function previewLegacy(
   sourcePath: string,
   target: ImportTarget,
 ): Promise<LegacyParseResult> {
-  return ipcInvoke<LegacyParseResult>('import_preview_legacy', {
-    request: { source_path: sourcePath, target_type: target } satisfies LegacyPreviewRequest,
-  });
+  console.log('[ImportDiag] previewLegacy CALLED', { sourcePath, target });
+  try {
+    const result = await ipcInvoke<LegacyParseResult>('import_preview_legacy', {
+      request: { source_path: sourcePath, target_type: target } satisfies LegacyPreviewRequest,
+    });
+    console.log('[ImportDiag] previewLegacy RESULT', {
+      format: result.format,
+      detected_format: result.detected_format,
+      total_data_rows: result.total_data_rows,
+      field_names_len: result.field_names?.length,
+      field_names: result.field_names?.slice(0, 8),
+      segment_titles_len: result.segment_titles?.length,
+      product_groups_len: result.product_groups?.length,
+      customer_groups_len: result.customer_groups?.length,
+    });
+    return result;
+  } catch (e) {
+    console.error('[ImportDiag] previewLegacy ERROR', e);
+    throw e;
+  }
 }
 
 /**

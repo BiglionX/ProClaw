@@ -186,7 +186,7 @@ export class LLMProviderManager {
 
     // 根据任务类型选择模型
     const preferredModel = this.config?.defaultModelForTask?.[taskType];
-    
+
     if (preferredModel && this.providers.has(preferredModel)) {
       const provider = this.providers.get(preferredModel);
       if (provider) return provider;
@@ -204,6 +204,28 @@ export class LLMProviderManager {
     if (firstProvider) return firstProvider;
 
     throw new Error('No available LLM provider');
+  }
+
+  /**
+   * 按 providerId 直接获取(P1-A 接入:SelfHealing fallback chain 用)。
+   * providerId 必须在已注册的 providers 中存在,否则抛错。
+   */
+  async getProviderById(providerId: string): Promise<BaseChatModel> {
+    if (this.providers.size === 0) {
+      throw new Error('No LLM providers initialized. Call initialize() first.');
+    }
+    const provider = this.providers.get(providerId);
+    if (!provider) {
+      throw new Error(
+        `Provider ${providerId} not registered. Available: ${Array.from(this.providers.keys()).join(', ')}`,
+      );
+    }
+    return provider;
+  }
+
+  /** 列出已注册的 provider id(用于调试与 fallback chain 自动筛选) */
+  listRegisteredProviderIds(): string[] {
+    return Array.from(this.providers.keys());
   }
 
   /**

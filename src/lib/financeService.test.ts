@@ -3,6 +3,7 @@ import {
   getProfitLossReport,
   getCashFlowReport,
   getFinancialSummary,
+  getReportLines,
 } from '../lib/financeService';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -134,6 +135,33 @@ describe('financeService', () => {
     it('应该在 API 调用失败时抛出错误', async () => {
       (invoke as any).mockRejectedValue(new Error('API Error'));
       await expect(getFinancialSummary()).rejects.toThrow('API Error');
+    });
+  });
+
+  describe('getReportLines', () => {
+    it('应该按行类型和期间获取明细', async () => {
+      const mockLines = [
+        {
+          id: 'exp1',
+          date: '2024-01-02',
+          doc_no: '',
+          party: '销售费用',
+          summary: '运费',
+          amount: 25,
+          source: '费用',
+          reference_type: null,
+          reference_id: null,
+        },
+      ];
+      (invoke as any).mockResolvedValue(mockLines);
+
+      const result = await getReportLines('2024-01-01', '2024-01-31', 'operating_expense');
+      expect(result).toEqual(mockLines);
+      expect(invoke).toHaveBeenCalledWith('get_report_lines', {
+        startDate: '2024-01-01',
+        endDate: '2024-01-31',
+        line: 'operating_expense',
+      });
     });
   });
 });

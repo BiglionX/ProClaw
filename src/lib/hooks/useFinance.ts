@@ -3,9 +3,12 @@ import {
   CashFlowReport,
   FinancialSummary,
   ProfitLossReport,
+  ReportLineItem,
+  ReportLineKind,
   getCashFlowReport,
   getFinancialSummary,
   getProfitLossReport,
+  getReportLines,
 } from '../financeService';
 import {
   ARAPDetailItem,
@@ -22,11 +25,44 @@ import {
 
 export const financeQueryKey = ['finance'] as const;
 
-export function currentMonthRange() {
-  const now = new Date();
+export type ReportPreset = 'month' | 'lastMonth' | 'quarter' | 'year' | 'custom';
+
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function currentMonthRange(now = new Date()) {
+  return rangeForPreset('month', now);
+}
+
+export function rangeForPreset(preset: Exclude<ReportPreset, 'custom'>, now = new Date()) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  if (preset === 'month') {
+    return {
+      startDate: formatLocalDate(new Date(year, month, 1)),
+      endDate: formatLocalDate(now),
+    };
+  }
+  if (preset === 'lastMonth') {
+    return {
+      startDate: formatLocalDate(new Date(year, month - 1, 1)),
+      endDate: formatLocalDate(new Date(year, month, 0)),
+    };
+  }
+  if (preset === 'quarter') {
+    const quarterStart = Math.floor(month / 3) * 3;
+    return {
+      startDate: formatLocalDate(new Date(year, quarterStart, 1)),
+      endDate: formatLocalDate(now),
+    };
+  }
   return {
-    startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
-    endDate: now.toISOString().split('T')[0],
+    startDate: formatLocalDate(new Date(year, 0, 1)),
+    endDate: formatLocalDate(now),
   };
 }
 
@@ -57,6 +93,19 @@ export function useCashFlowReport(startDate?: string, endDate?: string, enabled 
     queryKey: [...financeQueryKey, 'cashFlow', start, end],
     queryFn: () => getCashFlowReport(start, end),
     enabled,
+  });
+}
+
+export function useReportLines(
+  line: ReportLineKind | null,
+  startDate: string,
+  endDate: string,
+  enabled = true,
+) {
+  return useQuery<ReportLineItem[]>({
+    queryKey: [...financeQueryKey, 'reportLines', line, startDate, endDate],
+    queryFn: () => getReportLines(startDate, endDate, line!),
+    enabled: enabled && !!line,
   });
 }
 

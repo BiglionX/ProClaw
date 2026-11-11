@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS import_batches (
     )),
     -- 原始文件名（仅展示用，不用于读取）
     source_filename TEXT NOT NULL,
-    -- 文件格式：csv / xlsx / json
-    source_format TEXT NOT NULL CHECK(source_format IN ('csv', 'xlsx', 'json')),
+    -- 文件格式：csv / xlsx / xls / json
+    source_format TEXT NOT NULL CHECK(source_format IN ('csv', 'xlsx', 'xls', 'json')),
     -- 文件大小（字节）
     source_size INTEGER,
     -- 文件持久化路径（APPDATA/proclaw/desktop/import_uploads/<batch_id>/<file>）

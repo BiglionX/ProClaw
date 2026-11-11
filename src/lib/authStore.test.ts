@@ -1,189 +1,353 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act } from '@testing-library/react';
-import { useAuthStore } from '../lib/authStore';
+import {
+  useAuthStore,
+  deleteLocalAccount,
+  ACTIVE_ACCOUNT_KEY,
+} from '../lib/authStore';
+// setup.ts 已全局 mock ../lib/tauri:ipcInvoke 是 vi.fn()
+import { ipcInvoke } from '../lib/tauri';
 
-// Mock Supabase
-vi.mock('../lib/supabase', () => ({
-  isSupabaseConfigured: true,
-  supabase: {
-    auth: {
-      signInWithPassword: vi.fn().mockResolvedValue({ data: null, error: null }),
-      signUp: vi.fn().mockResolvedValue({ data: { user: null, session: null }, error: null }),
-      signOut: vi.fn().mockResolvedValue({ error: null }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-    },
-  },
-}));
+const mockIpc = ipcInvoke as unknown as ReturnType<typeof vi.fn>;
 
-import { supabase } from '../lib/supabase';
+/**
+ * authStore v13.1.1 单测 — 本地账号无登录模式
+ *
+ * 覆盖:
+ * - initialize:无账号访客态 / 活跃账号恢复 / 失效 id 清理 / IPC 失败
+ * - registerLocal:注册即激活 / 失败抛错 / isLoading 时序
+ * - switchAccount / refreshLocalUsers
+ * - 兼容旧 API:login(存在→切换,不存在→注册)、register、logout、checkAuth
+ * - deleteLocalAccount(含 keyring 清理)
+ */
+describe('authStore (v13.1.1 本地账号无登录模式)', () => {
+  const alice = {
+    id: 'u-1',
+    name: 'Alice',
+    email: 'alice@test.com',
+    role: 'admin',
+  };
+  const bob = {
+    id: 'u-2',
+    name: 'Bob',
+    email: 'bob@test.com',
+    role: 'user',
+  };
 
-describe('authStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // 重置 store 状态
+    localStorage.clear();
     act(() => {
       useAuthStore.setState({
         user: null,
         session: null,
+        localUsers: [],
+        hasInitialized: false,
         isLoading: false,
         error: null,
       });
     });
   });
 
-  describe('login', () => {
-    it('应该使用模拟账号成功登录 (boss/IamBigBoss)', async () => {
+  describe('initialize', () => {
+    it('无活跃账号时进入访客态(用户为空,列表已加载)', async () => {
+      mockIpc.mockResolvedValueOnce({ data: [alice, bob] });
+
       await act(async () => {
-        await useAuthStore.getState().login('boss', 'IamBigBoss');
+        await useAuthStore.getState().initialize();
       });
 
-      const state = useAuthStore.getState();
-      expect(state.user).not.toBeNull();
-      expect(state.user?.email).toBe('boss@proclaw.demo');
-      expect((state.user as any)?.role).toBe('admin');
-      expect(state.session).not.toBeNull();
-      expect(state.isLoading).toBe(false);
-      expect(state.error).toBeNull();
+      const s = useAuthStore.getState();
+      expect(s.hasInitialized).toBe(true);
+      expect(s.user).toBeNull();
+      expect(s.session).toBeNull();
+      expect(s.localUsers).toEqual([alice, bob]);
+      expect(s.isLoading).toBe(false);
+      expect(s.error).toBeNull();
     });
 
-    it('模拟账号登录失败应抛出错误', async () => {
-      const mockError = new Error('Invalid credentials');
-      (supabase.auth.signInWithPassword as any).mockRejectedValue(mockError);
+    it('有活跃账号时恢复会话', async () => {
+      localStorage.setItem(ACTIVE_ACCOUNT_KEY, alice.id);
+      mockIpc.mockResolvedValueOnce({ data: [alice, bob] });
+
+      await act(async () => {
+        await useAuthStore.getState().initialize();
+      });
+
+      const s = useAuthStore.getState();
+      expect(s.user?.id).toBe(alice.id);
+      expect(s.user?.email).toBe(alice.email);
+      expect(s.session?.access_token).toBe(`local-access-${alice.id}`);
+      expect(s.localUsers.length).toBe(2);
+    });
+
+    it('活跃账号 id 已失效时清空记录并保持访客态', async () => {
+      localStorage.setItem(ACTIVE_ACCOUNT_KEY, 'stale-id');
+      mockIpc.mockResolvedValueOnce({ data: [alice] });
+
+      await act(async () => {
+        await useAuthStore.getState().initialize();
+      });
+
+      expect(useAuthStore.getState().user).toBeNull();
+      expect(localStorage.getItem(ACTIVE_ACCOUNT_KEY)).toBeNull();
+    });
+
+    it('IPC 失败时设置 error 且不崩溃', async () => {
+      mockIpc.mockRejectedValueOnce(new Error('db locked'));
+
+      await act(async () => {
+        await useAuthStore.getState().initialize();
+      });
+
+      const s = useAuthStore.getState();
+      expect(s.hasInitialized).toBe(true);
+      expect(s.error).toBe('db locked');
+      expect(s.isLoading).toBe(false);
+    });
+  });
+
+  describe('registerLocal', () => {
+    it('注册成功自动激活账号并持久化活跃记录', async () => {
+      mockIpc.mockResolvedValueOnce({
+        id: alice.id,
+        email: alice.email,
+        name: alice.name,
+        role: alice.role,
+        is_first_user: false,
+      });
+      // register_local_cmd 之后的 list_local_users_cmd
+      mockIpc.mockResolvedValueOnce({ data: [alice, bob] });
+
+      const returned = await act(async () => {
+        return useAuthStore.getState().registerLocal('alice@test.com', 'secret', 'Alice');
+      });
+
+      const s = useAuthStore.getState();
+      expect(returned.id).toBe(alice.id);
+      expect(s.user?.id).toBe(alice.id);
+      expect(s.user?.email).toBe(alice.email);
+      expect(s.user?.permissions).toEqual(['*']);
+      expect(s.session).not.toBeNull();
+      expect(s.localUsers).toEqual([alice, bob]);
+      expect(localStorage.getItem(ACTIVE_ACCOUNT_KEY)).toBe(alice.id);
+      expect(s.isLoading).toBe(false);
+      expect(s.error).toBeNull();
+    });
+
+    it('注册失败设置 error 并抛出', async () => {
+      mockIpc.mockRejectedValueOnce(new Error('email already taken'));
 
       await act(async () => {
         try {
-          await useAuthStore.getState().login('wrong', 'wrong');
-        } catch (e) {}
+          await useAuthStore.getState().registerLocal('x@test.com', 'pw');
+        } catch (e) {
+          expect((e as Error).message).toBe('email already taken');
+        }
       });
 
-      const state = useAuthStore.getState();
-      expect(state.user).toBeNull();
-      expect(state.error).toBeTruthy();
+      const s = useAuthStore.getState();
+      expect(s.error).toBe('email already taken');
+      expect(s.user).toBeNull();
+      expect(s.isLoading).toBe(false);
     });
 
-    it('登录时应设置 isLoading 为 true', async () => {
+    it('注册过程中 isLoading 为 true', async () => {
       let loadingDuringCall = false;
-      (supabase.auth.signInWithPassword as any).mockImplementation(async () => {
+      mockIpc.mockImplementationOnce(async () => {
         loadingDuringCall = useAuthStore.getState().isLoading;
-        return { data: { user: null, session: null }, error: new Error('fail') };
+        return { id: 'u-x', email: 'x@test.com', name: 'X', role: 'user', is_first_user: false };
       });
 
       await act(async () => {
-        try {
-          await useAuthStore.getState().login('test@test.com', 'password');
-        } catch (e) {}
+        await useAuthStore.getState().registerLocal('x@test.com', 'pw');
       });
 
       expect(loadingDuringCall).toBe(true);
     });
   });
 
-  describe('register', () => {
-    it('应该成功注册', async () => {
-      const mockUser = {
-        id: 'new-user-1',
-        email: 'new@test.com',
-        role: 'user',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      const mockSession = { access_token: 'token-new', refresh_token: 'refresh' };
-      (supabase.auth.signUp as any).mockResolvedValue({
-        data: { user: mockUser, session: mockSession },
-        error: null,
-      });
+  describe('switchAccount', () => {
+    it('切换成功激活目标账号(无密码)', async () => {
+      mockIpc.mockResolvedValueOnce(bob);
 
       await act(async () => {
-        await useAuthStore.getState().register('new@test.com', 'password');
+        await useAuthStore.getState().switchAccount(bob.id);
       });
 
-      const state = useAuthStore.getState();
-      expect(state.user).toEqual(mockUser);
-      expect(state.isLoading).toBe(false);
+      const s = useAuthStore.getState();
+      expect(s.user?.id).toBe(bob.id);
+      expect(s.session?.refresh_token).toBe(`local-refresh-${bob.id}`);
+      expect(localStorage.getItem(ACTIVE_ACCOUNT_KEY)).toBe(bob.id);
     });
 
-    it('注册失败时应设置 error', async () => {
-      (supabase.auth.signUp as any).mockResolvedValue({
-        data: { user: null, session: null },
-        error: new Error('Registration failed'),
-      });
+    it('切换失败设置 error 并抛出', async () => {
+      mockIpc.mockRejectedValueOnce(new Error('account not found'));
 
       await act(async () => {
         try {
-          await useAuthStore.getState().register('existing@test.com', 'password');
-        } catch (e) {}
+          await useAuthStore.getState().switchAccount('ghost');
+        } catch (e) {
+          expect((e as Error).message).toBe('account not found');
+        }
       });
 
-      const state = useAuthStore.getState();
-      expect(state.error).toBe('Registration failed');
+      expect(useAuthStore.getState().error).toBe('account not found');
+      expect(useAuthStore.getState().isLoading).toBe(false);
+    });
+  });
+
+  describe('refreshLocalUsers', () => {
+    it('刷新本地账号列表', async () => {
+      mockIpc.mockResolvedValueOnce({ data: [alice] });
+
+      await act(async () => {
+        await useAuthStore.getState().refreshLocalUsers();
+      });
+
+      expect(useAuthStore.getState().localUsers).toEqual([alice]);
+    });
+
+    it('IPC 失败时保留原列表不抛错', async () => {
+      mockIpc.mockRejectedValueOnce(new Error('boom'));
+      act(() => {
+        useAuthStore.setState({ localUsers: [alice] });
+      });
+
+      await act(async () => {
+        await useAuthStore.getState().refreshLocalUsers();
+      });
+
+      expect(useAuthStore.getState().localUsers).toEqual([alice]);
+    });
+  });
+
+  describe('login (兼容旧 API)', () => {
+    it('账号不存在时走注册并激活', async () => {
+      mockIpc.mockResolvedValueOnce({
+        id: alice.id,
+        email: alice.email,
+        name: alice.name,
+        role: alice.role,
+        is_first_user: false,
+      });
+      mockIpc.mockResolvedValueOnce({ data: [alice] });
+
+      await act(async () => {
+        await useAuthStore.getState().login('alice@test.com', 'secret');
+      });
+
+      const s = useAuthStore.getState();
+      expect(s.user?.email).toBe(alice.email);
+      expect(s.error).toBeNull();
+    });
+
+    it('账号已存在时切换(忽略密码参数)', async () => {
+      act(() => {
+        useAuthStore.setState({ localUsers: [alice] });
+      });
+      mockIpc.mockResolvedValueOnce(alice); // switch_local_account_cmd
+
+      await act(async () => {
+        await useAuthStore.getState().login('alice@test.com', 'any-password');
+      });
+
+      expect(useAuthStore.getState().user?.id).toBe(alice.id);
+    });
+  });
+
+  describe('register (兼容旧 API)', () => {
+    it('委托给 registerLocal', async () => {
+      mockIpc.mockResolvedValueOnce({
+        id: alice.id,
+        email: alice.email,
+        name: alice.name,
+        role: 'user',
+        is_first_user: false,
+      });
+      mockIpc.mockResolvedValueOnce({ data: [alice] });
+
+      await act(async () => {
+        await useAuthStore.getState().register('alice@test.com', 'pw');
+      });
+
+      expect(useAuthStore.getState().user?.id).toBe(alice.id);
     });
   });
 
   describe('logout', () => {
-    it('应该成功登出', async () => {
-      // 先登录
-      await act(async () => {
-        await useAuthStore.getState().login('boss', 'IamBigBoss');
+    it('退出后回到离线访客态并清空活跃记录', async () => {
+      localStorage.setItem(ACTIVE_ACCOUNT_KEY, alice.id);
+      act(() => {
+        useAuthStore.setState({
+          user: { ...alice, created_at: '', updated_at: '' },
+          session: { access_token: 't', refresh_token: 'r', user: { ...alice, created_at: '', updated_at: '' } },
+        });
       });
-
-      (supabase.auth.signOut as any).mockResolvedValue({ error: null });
 
       await act(async () => {
         await useAuthStore.getState().logout();
       });
 
-      const state = useAuthStore.getState();
-      expect(state.user).toBeNull();
-      expect(state.session).toBeNull();
-    });
-
-    it('登出失败时应设置 error', async () => {
-      (supabase.auth.signOut as any).mockResolvedValue({
-        error: new Error('Network error'),
-      });
-
-      await act(async () => {
-        try {
-          await useAuthStore.getState().logout();
-        } catch (e) {}
-      });
-
-      const state = useAuthStore.getState();
-      expect(state.error).toBeTruthy();
+      const s = useAuthStore.getState();
+      expect(s.user).toBeNull();
+      expect(s.session).toBeNull();
+      expect(localStorage.getItem(ACTIVE_ACCOUNT_KEY)).toBeNull();
+      expect(s.error).toBeNull();
     });
   });
 
-  describe('checkAuth', () => {
-    it('应该检查认证状态', async () => {
-      const mockUser = { id: '1', email: 'test@test.com', role: 'user' };
-      (supabase.auth.getSession as any).mockResolvedValue({
-        data: { session: { user: mockUser } },
-      });
+  describe('checkAuth (兼容旧 API)', () => {
+    it('委托给 initialize 恢复会话', async () => {
+      localStorage.setItem(ACTIVE_ACCOUNT_KEY, alice.id);
+      mockIpc.mockResolvedValueOnce({ data: [alice] });
 
       await act(async () => {
         await useAuthStore.getState().checkAuth();
       });
 
-      const state = useAuthStore.getState();
-      expect(state.user).toEqual(mockUser);
+      expect(useAuthStore.getState().user?.email).toBe(alice.email);
     });
 
-    it('未登录时应设置 user 为 null', async () => {
-      (supabase.auth.getSession as any).mockResolvedValue({
-        data: { session: null },
-      });
+    it('未登录时 user 为 null', async () => {
+      mockIpc.mockResolvedValueOnce({ data: [] });
 
       await act(async () => {
         await useAuthStore.getState().checkAuth();
       });
 
-      const state = useAuthStore.getState();
-      expect(state.user).toBeNull();
+      expect(useAuthStore.getState().user).toBeNull();
+    });
+  });
+
+  describe('deleteLocalAccount', () => {
+    it('删除账号并清理活跃记录与 keyring', async () => {
+      localStorage.setItem(ACTIVE_ACCOUNT_KEY, alice.id);
+      act(() => {
+        useAuthStore.setState({
+          user: { ...alice, created_at: '', updated_at: '' },
+          session: { access_token: 't', refresh_token: 'r', user: { ...alice, created_at: '', updated_at: '' } },
+        });
+      });
+
+      mockIpc.mockResolvedValueOnce(undefined); // delete_user_cmd
+      mockIpc.mockResolvedValueOnce(undefined); // keyring_delete
+      mockIpc.mockResolvedValueOnce({ data: [] }); // list_local_users_cmd
+
+      await act(async () => {
+        await deleteLocalAccount(alice.id);
+      });
+
+      const s = useAuthStore.getState();
+      expect(s.user).toBeNull();
+      expect(s.session).toBeNull();
+      expect(s.localUsers).toEqual([]);
+      expect(localStorage.getItem(ACTIVE_ACCOUNT_KEY)).toBeNull();
     });
   });
 
   describe('clearError', () => {
-    it('应该清除错误状态', () => {
+    it('清除错误状态', () => {
       act(() => {
         useAuthStore.setState({ error: 'some error' });
       });

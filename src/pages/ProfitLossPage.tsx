@@ -9,12 +9,26 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import { useState } from 'react';
+import ReportLineDrawer from '../components/DataCenter/ReportLineDrawer';
+import type { ReportLineKind } from '../lib/financeService';
 import { useProfitLossReport } from '../lib/hooks/useFinance';
 
 const formatCurrency = (value: number) => `¥${value.toFixed(2)}`;
 
-export default function ProfitLossPage() {
-  const { data: profitLoss, isLoading: loading } = useProfitLossReport();
+interface ProfitLossPageProps {
+  startDate: string;
+  endDate: string;
+}
+
+interface DrillState {
+  line: ReportLineKind;
+  expectedAmount: number;
+}
+
+export default function ProfitLossPage({ startDate, endDate }: ProfitLossPageProps) {
+  const { data: profitLoss, isLoading: loading } = useProfitLossReport(startDate, endDate);
+  const [drill, setDrill] = useState<DrillState | null>(null);
 
   if (loading) {
     return (
@@ -23,6 +37,10 @@ export default function ProfitLossPage() {
       </Box>
     );
   }
+
+  const openDrill = (line: ReportLineKind, expectedAmount: number) => {
+    setDrill({ line, expectedAmount });
+  };
 
   return (
     <Box>
@@ -37,46 +55,47 @@ export default function ProfitLossPage() {
           <TableContainer>
             <Table>
               <TableBody>
-                <TableRow>
-                  <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>销售收入</Typography></TableCell>
-                  <TableCell align="right">
-                    <Typography sx={{ color: '#10B981', fontWeight: 600, fontSize: '0.875rem' }}>{formatCurrency(profitLoss.revenue)}</Typography>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>销售成本</Typography></TableCell>
-                  <TableCell align="right">
-                    <Typography sx={{ color: '#EF4444', fontWeight: 600, fontSize: '0.875rem' }}>-{formatCurrency(profitLoss.cost_of_goods_sold)}</Typography>
-                  </TableCell>
-                </TableRow>
-                <TableRow sx={{ bgcolor: 'action.hover' }}>
-                  <TableCell><Typography sx={{ fontWeight: 700, fontSize: '0.875rem' }}>毛利润</Typography></TableCell>
-                  <TableCell align="right">
-                    <Typography sx={{
-                      fontWeight: 700, fontSize: '0.875rem',
-                      color: profitLoss.gross_profit >= 0 ? '#10B981' : '#EF4444'
-                    }}>
-                      {formatCurrency(profitLoss.gross_profit)}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>运营费用</Typography></TableCell>
-                  <TableCell align="right">
-                    <Typography sx={{ color: '#EF4444', fontWeight: 600, fontSize: '0.875rem' }}>-{formatCurrency(profitLoss.operating_expenses)}</Typography>
-                  </TableCell>
-                </TableRow>
-                <TableRow sx={{ bgcolor: 'action.hover' }}>
-                  <TableCell><Typography sx={{ fontWeight: 700, fontSize: '0.875rem' }}>净利润</Typography></TableCell>
-                  <TableCell align="right">
-                    <Typography sx={{
-                      fontWeight: 700, fontSize: '0.875rem',
-                      color: profitLoss.net_profit >= 0 ? '#10B981' : '#EF4444'
-                    }}>
-                      {formatCurrency(profitLoss.net_profit)}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                <DrillRow
+                  label="销售收入"
+                  display={formatCurrency(profitLoss.revenue)}
+                  color="#10B981"
+                  onDrill={() => openDrill('revenue', profitLoss.revenue)}
+                />
+                <DrillRow
+                  label="销售成本"
+                  display={`-${formatCurrency(profitLoss.cost_of_goods_sold)}`}
+                  color="#EF4444"
+                  onDrill={() => openDrill('cogs', profitLoss.cost_of_goods_sold)}
+                />
+                <DrillRow
+                  label="毛利润"
+                  display={formatCurrency(profitLoss.gross_profit)}
+                  color={profitLoss.gross_profit >= 0 ? '#10B981' : '#EF4444'}
+                  emphasize
+                />
+                <DrillRow
+                  label="运营费用"
+                  display={`-${formatCurrency(profitLoss.operating_expenses)}`}
+                  color="#EF4444"
+                  onDrill={() => openDrill('operating_expense', profitLoss.operating_expenses)}
+                />
+                <DrillRow
+                  label="净利润"
+                  display={formatCurrency(profitLoss.net_profit)}
+                  color={profitLoss.net_profit >= 0 ? '#10B981' : '#EF4444'}
+                  emphasize
+                />
+                <DrillRow
+                  label="利润率"
+                  display={`${profitLoss.profit_margin.toFixed(2)}%`}
+                  color={
+                    profitLoss.profit_margin >= 20
+                      ? '#10B981'
+                      : profitLoss.profit_margin >= 10
+                        ? '#F59E0B'
+                        : '#EF4444'
+                  }
+                />
               </TableBody>
             </Table>
           </TableContainer>
@@ -84,6 +103,48 @@ export default function ProfitLossPage() {
       ) : (
         <Typography color="text.secondary">暂无数据</Typography>
       )}
+      <ReportLineDrawer
+        line={drill?.line ?? null}
+        startDate={startDate}
+        endDate={endDate}
+        expectedAmount={drill?.expectedAmount ?? 0}
+        onClose={() => setDrill(null)}
+      />
     </Box>
+  );
+}
+
+function DrillRow({
+  label,
+  display,
+  color,
+  emphasize,
+  onDrill,
+}: {
+  label: string;
+  display: string;
+  color: string;
+  emphasize?: boolean;
+  onDrill?: () => void;
+}) {
+  return (
+    <TableRow
+      hover={!!onDrill}
+      onClick={onDrill}
+      sx={{
+        bgcolor: emphasize ? 'action.hover' : undefined,
+        cursor: onDrill ? 'pointer' : 'default',
+      }}
+    >
+      <TableCell>
+        <Typography sx={{ fontWeight: emphasize ? 700 : 600, fontSize: '0.875rem' }}>{label}</Typography>
+      </TableCell>
+      <TableCell align="right">
+        <Typography sx={{ color, fontWeight: emphasize ? 700 : 600, fontSize: '0.875rem' }}>{display}</Typography>
+      </TableCell>
+      <TableCell align="right" sx={{ width: 72, color: '#FF3B30', fontSize: '0.75rem', fontWeight: 600 }}>
+        {onDrill ? '明细' : ''}
+      </TableCell>
+    </TableRow>
   );
 }

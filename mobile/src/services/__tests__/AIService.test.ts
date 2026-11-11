@@ -330,7 +330,7 @@ describe('AIService', () => {
   });
 
   describe('Agent 系统提示词', () => {
-    it('secretary agent 应有正确的系统提示', async () => {
+    it('secretary agent 应为统一全能助理（秘书 + CEO 能力）', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
@@ -345,7 +345,9 @@ describe('AIService', () => {
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
+      expect(body.messages[0].content).toContain('全能助理');
       expect(body.messages[0].content).toContain('商务秘书');
+      expect(body.messages[0].content).toContain('经营决策建议');
     });
 
     it('ceo agent 应有正确的系统提示', async () => {

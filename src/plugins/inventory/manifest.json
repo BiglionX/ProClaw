@@ -19,11 +19,10 @@
       { "text": "AI团队", "icon": "users", "path": "/teams", "group": "AI" },
       { "text": "AI 知识库", "icon": "book-open", "path": "/ai-knowledge", "group": "AI" },
       { "text": "联系人", "icon": "phone", "path": "/contacts", "group": "通讯" },
-      { "text": "消息", "icon": "message-square", "path": "/messages", "group": "通讯" },
-      { "text": "云商城", "icon": "shopping-bag", "path": "/shop", "group": "扩展" }
+      { "text": "消息", "icon": "message-square", "path": "/messages", "group": "通讯" }
     ],
     "remove": [],
-    "reorder": ["/ucenter", "/datacenter", "/products", "/supplychain", "/teams", "/ai-knowledge", "/contacts", "/messages", "/shop"]
+    "reorder": ["/ucenter", "/datacenter", "/products", "/supplychain", "/teams", "/ai-knowledge", "/contacts", "/messages"]
   },
   "ui": {
     "theme": {

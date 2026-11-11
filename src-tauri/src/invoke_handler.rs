@@ -20,6 +20,7 @@ use crate::finance_agent_commands::*;
 use crate::finance_commands::*;
 use crate::fresh_food_commands::*;
 use crate::hardware_commands::*;
+use crate::hermes_commands::*;
 use crate::import::commands::*; // v1.2 P1: 批量导入中心
 #[cfg(feature = "inventory")]
 use crate::inventory_aging_commands::*;
@@ -32,6 +33,7 @@ use crate::liquor_commands::*;
 #[cfg(feature = "virtual_company")]
 use crate::market_commands::*;
 use crate::message_commands::*;
+use crate::password_storage_commands::*; // v13.1.1: 本地账号密码托管（OS keyring）
 #[cfg(feature = "inventory")]
 use crate::payment_commands::*;
 use crate::pet_commands::*;
@@ -144,6 +146,8 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         #[cfg(feature = "inventory")]
         create_supplier,
         #[cfg(feature = "inventory")]
+        update_supplier,
+        #[cfg(feature = "inventory")]
         get_suppliers,
         #[cfg(feature = "inventory")]
         create_purchase_order,
@@ -156,6 +160,8 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         // 销售管理 (进销存版)
         #[cfg(feature = "inventory")]
         create_customer,
+        #[cfg(feature = "inventory")]
+        update_customer,
         #[cfg(feature = "inventory")]
         get_customers,
         #[cfg(feature = "inventory")]
@@ -171,6 +177,8 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         get_profit_loss_report,
         #[cfg(feature = "inventory")]
         get_cash_flow_report,
+        #[cfg(feature = "inventory")]
+        get_report_lines,
         #[cfg(feature = "inventory")]
         get_financial_summary,
         // 文件上传
@@ -236,6 +244,10 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         get_roles_cmd,
         get_current_user_cmd,
         get_ws_session_cmd,
+        // 本地账号无登录模式 (v13.1.1)
+        register_local_cmd,
+        list_local_users_cmd,
+        switch_local_account_cmd,
         // 审批工作流 (Phase 6)
         create_approval_cmd,
         get_approvals_cmd,
@@ -644,8 +656,33 @@ pub fn apply(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> 
         save_nvwax_api_key,
         clear_nvwax_api_key,
         test_nvwax_connection,
+        // 虚拟公司（virtual-company 插件调用）
+        nvwax_search_vc_templates,
+        nvwax_import_virtual_company_from_url,
+        bootstrap_virtual_company_tables,
+        open_virtual_company_page,
+        nvwax_push_virtual_company_state,
+        nvwax_stream_session,
+        nvwax_stream_session_v2,
+        nvwax_fetch_local_state,
+        nvwax_list_sessions_with_state,
+        nvwax_set_agent_local_state,
+        nvwax_list_agent_state_history,
+        nvwax_undo_agent_state_change,
+        nvwax_publish_to_marketplace,
         // 系统托盘与桌面通知 (v1.1.0)
         send_desktop_notification,
         update_tray_tooltip,
+        // 本地账号密码托管（v13.1.1，使用 OS keyring）
+        keyring_set,
+        keyring_get,
+        keyring_delete,
+        keyring_exists,
+        // Hermes Skills 数据库代理（P2：让 JS 端 SkillStore 走 Tauri RPC）
+        hermes_bootstrap,
+        hermes_db_exec,
+        hermes_db_run,
+        hermes_db_all,
+        hermes_db_get,
     ])
 }

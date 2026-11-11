@@ -8,6 +8,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
+  resetKey: number;
 }
 
 /**
@@ -21,8 +22,17 @@ interface ErrorBoundaryState {
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null, errorInfo: null, resetKey: 0 };
   }
+
+  private retry = (): void => {
+    this.setState((prev) => ({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      resetKey: prev.resetKey + 1,
+    }));
+  };
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true, error };
@@ -51,8 +61,23 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             ⚠️ ProClaw 渲染错误
           </h1>
           <p style={{ color: '#666', margin: '0 0 16px 0' }}>
-            应用遇到了一个未处理的错误，请将以下信息反馈给开发团队。
+            加载失败。可以重试，或把下面的错误信息反馈给开发团队。
           </p>
+          <button
+            type="button"
+            onClick={this.retry}
+            style={{
+              background: '#c62828',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            重试
+          </button>
           <h2 style={{ color: '#c62828', fontSize: '14px', margin: '16px 0 8px 0' }}>
             错误信息
           </h2>
@@ -120,6 +145,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       );
     }
 
-    return this.props.children;
+    return <React.Fragment key={this.state.resetKey}>{this.props.children}</React.Fragment>;
   }
 }

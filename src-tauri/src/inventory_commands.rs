@@ -167,7 +167,6 @@ pub fn get_inventory_transactions(
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
     if let Some(opts) = &options {
-        // 按产品筛选
         if let Some(product_id) = opts.get("product_id").and_then(|v| v.as_str()) {
             if !product_id.is_empty() {
                 sql.push_str(" AND product_id = ?");
@@ -175,7 +174,6 @@ pub fn get_inventory_transactions(
             }
         }
 
-        // 按交易类型筛选
         if let Some(transaction_type) = opts.get("transaction_type").and_then(|v| v.as_str()) {
             if !transaction_type.is_empty() {
                 sql.push_str(" AND transaction_type = ?");
@@ -183,7 +181,6 @@ pub fn get_inventory_transactions(
             }
         }
 
-        // 日期范围筛选
         if let Some(start_date) = opts.get("start_date").and_then(|v| v.as_str()) {
             sql.push_str(" AND created_at >= ?");
             params_vec.push(Box::new(start_date.to_string()));
@@ -218,8 +215,8 @@ pub fn get_inventory_transactions(
             })
         })
         .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(transactions)
 }
@@ -230,7 +227,6 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
-    // 总产品数
     let total_products: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL",
@@ -239,7 +235,6 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
         )
         .map_err(|e| e.to_string())?;
 
-    // 低库存产品数 (current_stock < min_stock)
     let low_stock_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND current_stock < min_stock AND min_stock > 0",
@@ -248,7 +243,6 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
         )
         .map_err(|e| e.to_string())?;
 
-    // 零库存产品数
     let zero_stock_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND current_stock = 0",
@@ -257,7 +251,6 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
         )
         .map_err(|e| e.to_string())?;
 
-    // 今日交易数
     let today_transactions: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM inventory_transactions WHERE DATE(created_at) = DATE('now')",
@@ -266,7 +259,6 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
         )
         .map_err(|e| e.to_string())?;
 
-    // 库存总价值 (按成本价计算)
     let total_value: f64 = conn
         .query_row(
             "SELECT COALESCE(SUM(current_stock * cost_price), 0) FROM products WHERE deleted_at IS NULL",
@@ -275,7 +267,6 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
         )
         .map_err(|e| e.to_string())?;
 
-    // 低库存产品列表
     let mut low_stock_stmt = conn
         .prepare(
             "SELECT id, name, sku, current_stock, min_stock
@@ -297,8 +288,8 @@ pub fn get_inventory_stats(db: tauri::State<Mutex<Database>>) -> Result<serde_js
             }))
         })
         .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({
         "total_products": total_products,

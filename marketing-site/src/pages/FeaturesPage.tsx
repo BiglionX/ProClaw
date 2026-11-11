@@ -187,6 +187,61 @@ const FeaturesPage: React.FC = () => {
         secondaryButtonLink="/pricing"
       />
 
+      {/* 新增（v1.3.2）：NvWaX 虚拟公司闭环 */}
+      <section className="py-16 bg-gradient-to-br from-purple-50 to-violet-50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              🌐 与 NvWaX 协同：一句话组建 AI 虚拟公司
+            </h2>
+            <p className="text-lg text-gray-700">
+              ProClaw 是 <a href="https://nvwax.proclaw.cc" target="_blank" rel="noopener" className="text-purple-700 font-semibold underline">NvWaX</a> 官方推荐的"本地壳"。
+              在 NvWaX 云端用对话式 AI 5-10 分钟设计好虚拟公司，一键导出 <code className="bg-purple-100 px-1 rounded">.nvwax-vc.json</code>，回到 ProClaw 桌面端本地运行整个 AI 团队。多设备之间自动同步。
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100">
+              <div className="text-3xl mb-2">🏢</div>
+              <h3 className="text-lg font-bold mb-2">云端 AI 设计</h3>
+              <p className="text-sm text-gray-600">
+                在 NvWaX Web 与 AI 助手对话，描述你的业务（咖啡店、跨境电商、AI 写作服务…），
+                自动匹配最优 Agent、设计工作流、配置权限。
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100">
+              <div className="text-3xl mb-2">📥</div>
+              <h3 className="text-lg font-bold mb-2">一键导入本地</h3>
+              <p className="text-sm text-gray-600">
+                NvWaX 完成后自动下载 <code className="bg-purple-100 px-1 rounded">.nvwax-vc.json</code>。
+                ProClaw 粘贴下载链接，1 秒钟写入本地 SQLite，立即可用。
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6 border border-purple-100">
+              <div className="text-3xl mb-2">🔄</div>
+              <h3 className="text-lg font-bold mb-2">多设备自动同步</h3>
+              <p className="text-sm text-gray-600">
+                MacBook 上启用的 Agent，Windows 桌面端自动同步。
+                字段级 last-write-wins 智能合并，避免误覆盖。
+              </p>
+            </div>
+          </div>
+
+          <div className="text-center mt-10">
+            <a
+              href="https://nvwax.proclaw.cc"
+              target="_blank"
+              rel="noopener"
+              className="inline-block px-8 py-3 bg-purple-700 text-white rounded-lg font-semibold hover:bg-purple-800 transition-colors"
+            >
+              体验 NvWaX →
+            </a>
+          </div>
+        </div>
+      </section>
+
       <Footer />
     </div>
   );

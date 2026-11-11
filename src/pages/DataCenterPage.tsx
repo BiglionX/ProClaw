@@ -3,7 +3,6 @@ import {
   Assignment as AssignmentIcon,
   AttachMoney as MoneyIcon,
   BarChart as BarChartIcon,
-  Close as CloseIcon,
   Dashboard as DashboardIcon,
   Inventory as InventoryIcon,
   Refresh as RefreshIcon,
@@ -15,12 +14,8 @@ import {
   Button,
   Card,
   CardContent,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   FormControl,
   Grid,
-  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -37,6 +32,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LoadTimeoutNotice, useTimeoutLoading } from '../lib/useTimeoutLoading';
 
 import AIInsights, { type AIInsightItem } from '../components/DataCenter/AIInsights';
 import AIStatusBar from '../components/DataCenter/AIStatusBar';
@@ -49,6 +46,9 @@ import { useDashboardOverview, useInvalidateDashboard } from '../lib/hooks/useDa
 import ProfitLossPage from './ProfitLossPage';
 import CashFlowPage from './CashFlowPage';
 import AITaskOverview from '../components/DataCenter/AITaskOverview';
+import ReportPeriodBar from '../components/DataCenter/ReportPeriodBar';
+import { currentMonthRange, rangeForPreset, type ReportPreset } from '../lib/hooks/useFinance';
+import { exportCashFlowCsv, exportProfitLossCsv } from '../lib/reportExport';
 
 /* ========== 工具函数 ========== */
 
@@ -60,9 +60,40 @@ const formatCurrency = (value: number) => {
 /* ========== 主页面 ========== */
 
 export default function DataCenterPage() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [tabValue, setTabValue] = useState(0);
-  const [reportOpen, setReportOpen] = useState(false);
+  const initialReportRange = currentMonthRange();
+  const [reportPreset, setReportPreset] = useState<ReportPreset>('month');
+  const [reportStart, setReportStart] = useState(initialReportRange.startDate);
+  const [reportEnd, setReportEnd] = useState(initialReportRange.endDate);
+  const [reportExporting, setReportExporting] = useState(false);
+  const [reportExportError, setReportExportError] = useState<string | null>(null);
+
+  const selectReportPreset = (next: ReportPreset) => {
+    setReportPreset(next);
+    if (next !== 'custom') {
+      const range = rangeForPreset(next);
+      setReportStart(range.startDate);
+      setReportEnd(range.endDate);
+    }
+  };
+
+  const exportCurrentReport = async () => {
+    setReportExporting(true);
+    setReportExportError(null);
+    try {
+      if (tabValue === 2) {
+        await exportCashFlowCsv(reportStart, reportEnd);
+      } else {
+        await exportProfitLossCsv(reportStart, reportEnd);
+      }
+    } catch (err) {
+      setReportExportError(err instanceof Error ? err.message : '导出失败');
+    } finally {
+      setReportExporting(false);
+    }
+  };
 
   const {
     data: overview,
@@ -82,6 +113,7 @@ export default function DataCenterPage() {
   const invalidateDashboard = useInvalidateDashboard();
 
   const loading = overviewLoading;
+  const { timedOut: overviewTimedOut, retry: retryOverviewTimer } = useTimeoutLoading(loading);
   const error = overviewError instanceof Error ? overviewError.message : null;
   const inventoryStats = overview?.invStats ?? null;
   const financialSummary = overview?.finSummary ?? null;
@@ -113,6 +145,9 @@ export default function DataCenterPage() {
   };
 
   const finSummary = financialSummary;
+  const productCount = dbStats?.products ?? dbStats?.spu_count ?? 0;
+  const customerCount = dbStats?.customers ?? 0;
+  const masterDataEmpty = !loading && dbStats != null && productCount === 0 && customerCount === 0;
 
   // 构造 sparkline 数据（PRD v11.0 §4.1.3：StatCard 右上角 32px 迷你趋势线）
   // 优先从 analyticsTrend.data 提取近期数据；为 table 各 metric 构建独立序列
@@ -139,53 +174,31 @@ export default function DataCenterPage() {
     { name: '缺货', value: inventoryStats.zero_stock_count || 0, color: '#EF4444' },
   ].filter(item => item.value > 0) : [];
 
+  const openSupply = (tab: string, focus: string) => navigate(`/supplychain?tab=${tab}&focus=${focus}`);
+  const openProfit = () => {
+    selectReportPreset('month');
+    setTabValue(1);
+  };
+
+  const clickableCardSx = {
+    cursor: 'pointer',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 20px rgba(0,0,0,0.08)' },
+  };
+
   return (
     <Box>
-      {/* 页面标题行 + AI小如按钮在右侧 */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-            数据中心
-          </Typography>
-        </Box>
-        {/* AI 小如 —— 紧凑按钮 */}
-        <Box
-          onClick={() => setReportOpen(true)}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.75,
-            px: 1.5,
-            py: 0.5,
-            borderRadius: 1.5,
-            cursor: 'pointer',
-            border: '1px solid',
-            borderColor: 'rgba(255,59,48,0.15)',
-            bgcolor: 'rgba(255,59,48,0.04)',
-            transition: 'all 0.2s',
-            '&:hover': {
-              bgcolor: 'rgba(255,59,48,0.1)',
-              borderColor: 'rgba(255,59,48,0.3)',
-              transform: 'translateY(-1px)',
-            },
-          }}
-        >
-          <Box sx={{
-            width: 24, height: 24, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #FF3B30 0%, #6366F1 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
-          }}>如</Box>
-          <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#FF3B30' }}>
-            AI 分析
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+          数据中心
+        </Typography>
       </Box>
 
       {/* 分列导航：业务分析 | 利润表 | 现金流量表 */}
       <AIStatusBar
         insight={insights[0]?.message}
         dailyReport={insights.slice(0, 5).map(i => i.message)}
+        onRefresh={loadDashboardData}
       />
       <Paper
         elevation={0}
@@ -234,13 +247,22 @@ export default function DataCenterPage() {
         <>
           {/* ========== 经营概览卡片 ========== */}
           {loading ? (
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {[1, 2, 3, 4].map(i => (
-                <Grid item xs={12} sm={6} md={3} key={i}>
-                  <Skeleton variant="rounded" height={120} />
-                </Grid>
-              ))}
-            </Grid>
+            overviewTimedOut ? (
+              <LoadTimeoutNotice
+                onRetry={() => {
+                  retryOverviewTimer();
+                  void refetchOverview();
+                }}
+              />
+            ) : (
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[1, 2, 3, 4].map(i => (
+                  <Grid item xs={12} sm={6} md={3} key={i}>
+                    <Skeleton variant="rounded" height={120} />
+                  </Grid>
+                ))}
+              </Grid>
+            )
           ) : error ? (
             <Paper elevation={0} sx={{ p: 3, mb: 3, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 2 }}>
               <Typography>{error}</Typography>
@@ -298,16 +320,22 @@ export default function DataCenterPage() {
                 )}
               </Grid>
 
-              {/* PRD v11.0 §4.1.2：快捷操作区（含 AI 推荐 + 呼吸光晕） */}
+              {/* 快捷操作：仅图标，悬停显示中文说明 */}
               <Box sx={{ mb: 3 }}>
-                <QuickActions onSalesAnalysis={() => setTabValue(0)} />
+                <QuickActions
+                  onSalesAnalysis={() => setTabValue(0)}
+                  importFirst={masterDataEmpty}
+                />
               </Box>
 
               {/* 财务概览卡片 */}
               {finSummary && (
                 <Grid container spacing={3} sx={{ mb: 3 }}>
                   <Grid item xs={12} sm={6} md={3}>
-                  <Card sx={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.02) 100%)', color: '#065F46' }}>
+                  <Card
+                    onClick={() => openSupply('sales', 'month-revenue')}
+                    sx={{ ...clickableCardSx, background: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.02) 100%)', color: '#065F46' }}
+                  >
                       <CardContent>
                         <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>本月收入</Typography>
                         <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.monthly_revenue)}</Typography>
@@ -315,7 +343,10 @@ export default function DataCenterPage() {
                     </Card>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.02) 100%)', color: '#991B1B' }}>
+                    <Card
+                      onClick={() => openSupply('purchase', 'month-expense')}
+                      sx={{ ...clickableCardSx, background: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.02) 100%)', color: '#991B1B' }}
+                    >
                       <CardContent>
                         <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>本月支出</Typography>
                         <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.monthly_expense)}</Typography>
@@ -323,12 +354,16 @@ export default function DataCenterPage() {
                     </Card>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{
-                      background: finSummary.monthly_profit >= 0
-                        ? 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(99,102,241,0.02) 100%)'
-                        : 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.02) 100%)',
-                      color: finSummary.monthly_profit >= 0 ? '#4338CA' : '#92400E',
-                    }}>
+                    <Card
+                      onClick={openProfit}
+                      sx={{
+                        ...clickableCardSx,
+                        background: finSummary.monthly_profit >= 0
+                          ? 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(99,102,241,0.02) 100%)'
+                          : 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.02) 100%)',
+                        color: finSummary.monthly_profit >= 0 ? '#4338CA' : '#92400E',
+                      }}
+                    >
                       <CardContent>
                         <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>本月利润</Typography>
                         <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.monthly_profit)}</Typography>
@@ -336,7 +371,10 @@ export default function DataCenterPage() {
                     </Card>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(99,102,241,0.02) 100%)', color: '#4338CA' }}>
+                    <Card
+                      onClick={() => openSupply('inventory', 'working-capital')}
+                      sx={{ ...clickableCardSx, background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(99,102,241,0.02) 100%)', color: '#4338CA' }}
+                    >
                       <CardContent>
                         <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>营运资金</Typography>
                         <Typography sx={{ fontWeight: 800, fontSize: '1.75rem' }}>{formatCurrency(finSummary.working_capital)}</Typography>
@@ -348,19 +386,19 @@ export default function DataCenterPage() {
                       <TableContainer>
                         <Table>
                           <TableBody>
-                            <TableRow>
+                            <TableRow hover sx={{ cursor: 'pointer' }} onClick={() => openSupply('sales', 'receivable')}>
                               <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>应收账款</Typography></TableCell>
                               <TableCell align="right">
                                 <Typography sx={{ color: '#F59E0B', fontWeight: 600, fontSize: '0.875rem' }}>{formatCurrency(finSummary.accounts_receivable)}</Typography>
                               </TableCell>
                             </TableRow>
-                            <TableRow>
+                            <TableRow hover sx={{ cursor: 'pointer' }} onClick={() => openSupply('purchase', 'payable')}>
                               <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>应付账款</Typography></TableCell>
                               <TableCell align="right">
                                 <Typography sx={{ color: '#EF4444', fontWeight: 600, fontSize: '0.875rem' }}>{formatCurrency(finSummary.accounts_payable)}</Typography>
                               </TableCell>
                             </TableRow>
-                            <TableRow>
+                            <TableRow hover sx={{ cursor: 'pointer' }} onClick={() => openSupply('inventory', 'inventory-value')}>
                               <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>库存价值</Typography></TableCell>
                               <TableCell align="right">
                                 <Typography sx={{ color: '#FF3B30', fontWeight: 600, fontSize: '0.875rem' }}>{formatCurrency(finSummary.inventory_value)}</Typography>
@@ -533,58 +571,28 @@ export default function DataCenterPage() {
         </>
       )}
 
+      {(tabValue === 1 || tabValue === 2) && (
+        <ReportPeriodBar
+          preset={reportPreset}
+          startDate={reportStart}
+          endDate={reportEnd}
+          onPreset={selectReportPreset}
+          onStartDate={setReportStart}
+          onEndDate={setReportEnd}
+          exporting={reportExporting}
+          exportError={reportExportError}
+          onExport={() => { void exportCurrentReport(); }}
+        />
+      )}
+
       {/* Tab 1: 利润表 */}
-      {tabValue === 1 && <ProfitLossPage />}
+      {tabValue === 1 && <ProfitLossPage startDate={reportStart} endDate={reportEnd} />}
 
       {/* Tab 2: 现金流量表 */}
-      {tabValue === 2 && <CashFlowPage />}
+      {tabValue === 2 && <CashFlowPage startDate={reportStart} endDate={reportEnd} />}
 
       {/* Tab 3: AI 任务概览 */}
       {tabValue === 3 && <AITaskOverview />}
-
-      {/* AI 小如 —— 简报弹窗 */}
-      <Dialog
-        open={reportOpen}
-        onClose={() => setReportOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3, p: 0 } }}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-            📋 AI 今日简报
-          </Typography>
-          <IconButton size="small" onClick={() => setReportOpen(false)}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 1 }}>
-          {insights.length > 0 ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {insights.map((item, idx) => (
-                <Box
-                  key={idx}
-                  sx={{
-                    p: 1.5,
-                    borderRadius: 1.5,
-                    backgroundColor: idx % 2 === 0 ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.05)',
-                    border: '1px solid',
-                    borderColor: idx % 2 === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontSize: '0.8rem', color: '#4B5563' }}>
-                    {item.message}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          ) : (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-              暂无分析数据，录入更多交易后 AI 将自动生成简报
-            </Typography>
-          )}
-        </DialogContent>
-      </Dialog>
 
     </Box>
   );

@@ -67,9 +67,15 @@ function cleanQuery(name: string, description?: string): string {
 // ========== Openverse API（免费、无需 Key）==========
 
 async function searchOpenverse(query: string, count: number): Promise<ImageSearchResult[]> {
+  // 审计修复 #16: 给 fetch 加 AbortController + 5 秒超时
+  // 背景：v1.3 demo bootstrap 会调 20 次 Openverse，无超时在断网环境会让
+  //       bootstrapDemoData 挂 10+ 分钟，整个 AppLayout 永远初始化不完。
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
   try {
     const resp = await fetch(
       `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=${Math.min(count, 20)}&license_type=commercial,modification`,
+      { signal: controller.signal },
     );
     if (!resp.ok) return [];
 
@@ -86,8 +92,14 @@ async function searchOpenverse(query: string, count: number): Promise<ImageSearc
         source: 'openverse' as const,
       }));
   } catch (err) {
-    console.error('[ImageSearch] Openverse error:', err);
+    if ((err as { name?: string })?.name === 'AbortError') {
+      console.warn('[ImageSearch] Openverse timeout (5s), using fallback');
+    } else {
+      console.error('[ImageSearch] Openverse error:', err);
+    }
     return [];
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

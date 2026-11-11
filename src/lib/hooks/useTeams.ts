@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isTauri, safeInvoke } from '../tauri';
 import { syncAITeamGroups } from '../contactService';
@@ -117,5 +118,8 @@ export function useTeams() {
 
 export function useInvalidateTeams() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: teamsQueryKey });
+  return useCallback(
+    () => queryClient.invalidateQueries({ queryKey: teamsQueryKey }),
+    [queryClient],
+  );
 }

@@ -1,4 +1,4 @@
-﻿# 需求文档：ProClaw 手机端消息链路对齐补充需求（PRD v11.2）
+# 需求文档：ProClaw 手机端消息链路对齐补充需求（PRD v11.2）
 
 ## 实施状态
 
@@ -344,5 +344,5 @@
 - [ProClaw 手机独立版 PRD v11.0](./产品需求文档：ProClaw 手机独立版（PRD v11.0）.md)
 - [ProClaw 手机端底部导航重构 v11.1](./产品需求文档：ProClaw 手机端底部导航重构（v11.1）.md)
 - [AI Team 群聊 LLM 接入与演示账号 Token PRD v6.4](./需求文档：AI Team 群聊 LLM 接入与演示账号 Token（PRD v6.4）.md)
-- [内置商务秘书 Agent PRD v8.5](./需求文档：ProClaw 内置商务秘书 Agent（PRD v8.5）.md)
+- [ProClaw 统一助理 Agent PRD v8.6](../marketing/需求文档：ProClaw%20统一助理%20Agent（PRD%20v8.6）.md)
 - [桌面端 UI 全面升级 PRD v11.0](./需求文档：ProClaw 桌面端 UI 全面升级（PRD v11.0）.md)

@@ -1,211 +1,143 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Link,
-  TextField,
-  Typography,
-} from '@mui/material';
-import { useState } from 'react';
+/**
+ * v13.1.1 RegisterPage：本地账号管理页
+ * - 已存在本地账号 → 显示账号列表 + 创建新账号表单
+ * - 无账号 → 引导用户创建第一个本地账号
+ * 入口：SidebarAccount 菜单 / SettingsAccountTab / /register 路由
+ */
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Avatar, Box, Button, Card, CardContent, Divider, Typography,
+} from '@mui/material';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuthStore } from '../lib/authStore';
+import {
+  AccountListCard,
+  CreateAccountForm,
+  roleLabel,
+  isBoss,
+  handleDeleteAccount,
+} from '../components/Auth/accountShared';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { register, isLoading, error, clearError } = useAuthStore();
+  const { user, localUsers, isLoading, refreshLocalUsers, switchAccount, logout } = useAuthStore();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  useEffect(() => {
+    refreshLocalUsers().catch(() => {});
+  }, [refreshLocalUsers]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearError();
-
-    // 验证密码
-    if (password !== confirmPassword) {
-      alert('两次输入的密码不一致');
-      return;
-    }
-
-    if (password.length < 6) {
-      alert('密码长度至少为6位');
-      return;
-    }
-
+  const handleSwitch = async (accountId: string) => {
     try {
-      await register(email, password);
-      // 注册成功后显示提示
-      alert('注册成功！请登录');
-      navigate('/login');
+      await switchAccount(accountId);
+      navigate('/');
     } catch (err: any) {
-      console.error('Register failed:', err);
-      // 错误信息已在 authStore 中设置，会通过 Alert 显示
+      console.error('切换账号失败:', err);
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-      }}
-    >
-      <Card sx={{ maxWidth: 400, width: '100%', mx: 2 }}>
-        <CardContent sx={{ p: 4 }}>
-          <Typography variant="h5" component="h1" gutterBottom align="center">
-            创建账号
+    <Box sx={{ minHeight: '100vh', bgcolor: '#0f0f0f', py: 6, px: 2 }}>
+      <Box sx={{ maxWidth: 720, mx: 'auto' }}>
+        {/* 标题 */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 4 }}>
+          <Box
+            component="img"
+            src="/proclaw-logo.png"
+            alt="ProClaw Logo"
+            sx={{ width: 40, height: 40, mr: 1.5 }}
+          />
+          <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff' }}>
+            ProClaw 本地账号
           </Typography>
+        </Box>
 
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            align="center"
-            sx={{ mb: 3 }}
-          >
-            开始使用 Pro
-            <Typography
-              component="span"
-              sx={{
-                color: '#ff3b30',
-                fontWeight: 700,
-              }}
-            >
-              claw
+        {/* 当前账号 + 退出 */}
+        {user && (
+          <Card sx={{ mb: 3, bgcolor: '#1e1e1e', border: '1px solid #333' }}>
+            <CardContent>
+              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                当前账号
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1.5 }}>
+                <Avatar
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    bgcolor: isBoss(user.role) ? '#FF3B30' : '#6366F1',
+                    fontWeight: 700,
+                    mr: 2,
+                  }}
+                >
+                  {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body1" sx={{ color: '#fff', fontWeight: 600 }}>
+                    {user.name || '(未命名)'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {roleLabel(user.role)}
+                    {user.email && ` · ${user.email}`}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleLogout}
+                  startIcon={<LogoutIcon />}
+                  sx={{
+                    borderColor: '#ef4444',
+                    color: '#ef4444',
+                    '&:hover': { borderColor: '#ef4444', bgcolor: 'rgba(239,68,68,0.08)' },
+                    textTransform: 'none',
+                  }}
+                >
+                  退出
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 已有账号列表（含删除入口） */}
+        {localUsers.length > 0 && (
+          <AccountListCard
+            currentUserId={user?.id ?? null}
+            accounts={localUsers}
+            isLoading={isLoading}
+            onSwitch={handleSwitch}
+            onDelete={handleDeleteAccount}
+            showHeader
+          />
+        )}
+
+        {/* 创建新账号 */}
+        <Card sx={{ bgcolor: '#1e1e1e', border: '1px solid #333' }}>
+          <CardContent>
+            <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+              {localUsers.length === 0 ? '🚀 创建你的第一个本地账号' : '➕ 创建新本地账号'}
             </Typography>
-          </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 1, mb: 2 }}>
+              密码由系统原生凭据存储保护（Windows Credential Manager / macOS Keychain）。
+            </Typography>
+            <CreateAccountForm theme="dark" showDisplayName />
+          </CardContent>
+        </Card>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={clearError}>
-              {error}
-            </Alert>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                邮箱
-              </Typography>
-              <TextField
-                fullWidth
-                placeholder="请输入邮箱"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'white',
-                    '& fieldset': {
-                      borderColor: '#ddd',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#999',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#666',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#333',
-                    fontSize: '15px',
-                  },
-                }}
-              />
-            </Box>
-
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                密码
-              </Typography>
-              <TextField
-                fullWidth
-                placeholder="请输入密码"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'white',
-                    '& fieldset': {
-                      borderColor: '#ddd',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#999',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#666',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#333',
-                    fontSize: '15px',
-                  },
-                }}
-              />
-            </Box>
-
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                确认密码
-              </Typography>
-              <TextField
-                fullWidth
-                placeholder="请再次输入密码"
-                type="password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                required
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'white',
-                    '& fieldset': {
-                      borderColor: '#ddd',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#999',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#666',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#333',
-                    fontSize: '15px',
-                  },
-                }}
-              />
-            </Box>
-
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              type="submit"
-              disabled={isLoading}
-              sx={{ mb: 2 }}
-            >
-              {isLoading ? <CircularProgress size={24} /> : '注册'}
-            </Button>
-
-            <Box sx={{ textAlign: 'center' }}>
-              <Link href="/login" variant="body2" underline="hover">
-                已有账号? 立即登录
-              </Link>
-            </Box>
-          </form>
-        </CardContent>
-      </Card>
+        <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.06)' }} />
+        <Typography
+          variant="caption"
+          align="center"
+          sx={{ display: 'block', color: 'rgba(255,255,255,0.35)' }}
+        >
+          v13.1.1 本地账号无登录模式 · 数据仅存储于本机
+        </Typography>
+      </Box>
     </Box>
   );
 }

@@ -9,6 +9,26 @@ use uuid::Uuid;
 
 // ========== 商城管理命令 ==========
 
+const CLOUD_STORE_COLUMNS: &str =
+    "id, user_id, subdomain, custom_domain, api_key, status, plan_type, expires_at, created_at, updated_at";
+
+/// `created_at` / `updated_at` 是毫秒 INTEGER；`expires_at` 是可空毫秒 INTEGER。
+/// 读成 i64 后复用 `api::store::epoch_ms_to_iso`，响应里是 ISO 字符串或 null。
+fn map_cloud_store_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
+    Ok(serde_json::json!({
+        "id": row.get::<_, String>(0)?,
+        "user_id": row.get::<_, String>(1)?,
+        "subdomain": row.get::<_, String>(2)?,
+        "custom_domain": row.get::<_, Option<String>>(3).ok(),
+        "api_key": row.get::<_, String>(4)?,
+        "status": row.get::<_, String>(5)?,
+        "plan_type": row.get::<_, String>(6)?,
+        "expires_at": crate::api::store::epoch_ms_to_iso(row.get::<_, Option<i64>>(7)?),
+        "created_at": crate::api::store::epoch_ms_to_iso(Some(row.get::<_, i64>(8)?)),
+        "updated_at": crate::api::store::epoch_ms_to_iso(Some(row.get::<_, i64>(9)?)),
+    }))
+}
+
 /// 获取当前用户的云商城配置
 #[tauri::command]
 pub fn get_cloud_store(db: tauri::State<Mutex<Database>>) -> Result<Value, String> {
@@ -16,24 +36,9 @@ pub fn get_cloud_store(db: tauri::State<Mutex<Database>>) -> Result<Value, Strin
     let conn = db.connection();
 
     match conn.query_row(
-        "SELECT id, user_id, subdomain, custom_domain, api_key, status, plan_type, 
-                expires_at, created_at, updated_at
-         FROM cloud_stores LIMIT 1",
+        &format!("SELECT {CLOUD_STORE_COLUMNS} FROM cloud_stores LIMIT 1"),
         [],
-        |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "user_id": row.get::<_, String>(1)?,
-                "subdomain": row.get::<_, String>(2)?,
-                "custom_domain": row.get::<_, Option<String>>(3).ok(),
-                "api_key": row.get::<_, String>(4)?,
-                "status": row.get::<_, String>(5)?,
-                "plan_type": row.get::<_, String>(6)?,
-                "expires_at": row.get::<_, Option<i64>>(7).ok(),
-                "created_at": row.get::<_, String>(8)?,
-                "updated_at": row.get::<_, String>(9)?,
-            }))
-        },
+        map_cloud_store_row,
     ) {
         Ok(store) => Ok(store),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(serde_json::Value::Null),
@@ -161,24 +166,9 @@ pub fn update_cloud_store(
         .map_err(|e| e.to_string())?;
 
     conn.query_row(
-        "SELECT id, user_id, subdomain, custom_domain, api_key, status, plan_type,
-                expires_at, created_at, updated_at
-         FROM cloud_stores WHERE id = ?1",
+        &format!("SELECT {CLOUD_STORE_COLUMNS} FROM cloud_stores WHERE id = ?1"),
         params![store_id],
-        |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "user_id": row.get::<_, String>(1)?,
-                "subdomain": row.get::<_, String>(2)?,
-                "custom_domain": row.get::<_, Option<String>>(3).ok(),
-                "api_key": row.get::<_, String>(4)?,
-                "status": row.get::<_, String>(5)?,
-                "plan_type": row.get::<_, String>(6)?,
-                "expires_at": row.get::<_, Option<i64>>(7).ok(),
-                "created_at": row.get::<_, String>(8)?,
-                "updated_at": row.get::<_, String>(9)?,
-            }))
-        },
+        map_cloud_store_row,
     )
     .map_err(|e| e.to_string())
 }
@@ -577,6 +567,8 @@ pub fn get_cloud_sync_logs(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
+    let page = page.max(1);
+    let page_size = crate::database::clamp_page_size(Some(i64::from(page_size)), 20) as i32;
     let offset = (page - 1) * page_size;
     let mut stmt = conn
         .prepare(
@@ -779,6 +771,8 @@ pub fn get_store_orders(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
+    let page = page.max(1);
+    let page_size = crate::database::clamp_page_size(Some(i64::from(page_size)), 20) as i32;
     let offset = (page - 1) * page_size;
 
     let (query, _params_vec): (String, Vec<String>) = if let Some(ref s) = status {
@@ -1304,6 +1298,8 @@ pub fn get_product_reviews(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
+    let page = page.max(1);
+    let page_size = crate::database::clamp_page_size(Some(i64::from(page_size)), 20) as i32;
     let offset = (page - 1) * page_size;
     let mut stmt = conn
         .prepare(
@@ -1461,6 +1457,8 @@ pub fn get_coupons(
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
+    let page = page.max(1);
+    let page_size = crate::database::clamp_page_size(Some(i64::from(page_size)), 20) as i32;
     let offset = (page - 1) * page_size;
     let status_ref = status.as_deref();
 
@@ -1705,4 +1703,104 @@ pub fn use_coupon(
         "discount_value": discount_value,
         "message": "使用成功"
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{map_cloud_store_row, CLOUD_STORE_COLUMNS};
+    use rusqlite::params;
+
+    const CREATED_MS: i64 = 1_782_122_001_000;
+    const UPDATED_MS: i64 = 1_782_122_002_000;
+    const EXPIRES_MS: i64 = 1_782_122_003_000;
+
+    fn memory_store() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE cloud_stores (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                subdomain TEXT UNIQUE NOT NULL,
+                custom_domain TEXT,
+                api_key TEXT NOT NULL,
+                status TEXT DEFAULT 'active',
+                plan_type TEXT DEFAULT 'free',
+                expires_at INTEGER,
+                created_at INTEGER DEFAULT (strftime('%s','now') * 1000),
+                updated_at INTEGER DEFAULT (strftime('%s','now') * 1000)
+            );",
+        )
+        .unwrap();
+        conn
+    }
+
+    fn insert_store(
+        conn: &rusqlite::Connection,
+        id: &str,
+        subdomain: &str,
+        expires_at: Option<i64>,
+    ) {
+        conn.execute(
+            "INSERT INTO cloud_stores
+                (id, user_id, subdomain, api_key, status, plan_type, expires_at, created_at, updated_at)
+             VALUES (?1, 'u_test001', ?2, 'pk_test', 'active', 'free', ?3, ?4, ?5)",
+            params![id, subdomain, expires_at, CREATED_MS, UPDATED_MS],
+        )
+        .unwrap();
+    }
+
+    fn assert_iso_millis(value: &serde_json::Value, expected_ms: i64) {
+        let text = value
+            .as_str()
+            .unwrap_or_else(|| panic!("expected ISO string, got {value}"));
+        let parsed = chrono::DateTime::parse_from_rfc3339(text)
+            .unwrap_or_else(|err| panic!("parse {text}: {err}"));
+        assert_eq!(parsed.timestamp_millis(), expected_ms, "{text}");
+    }
+
+    fn read_limit_one(conn: &rusqlite::Connection) -> serde_json::Value {
+        conn.query_row(
+            &format!("SELECT {CLOUD_STORE_COLUMNS} FROM cloud_stores LIMIT 1"),
+            [],
+            map_cloud_store_row,
+        )
+        .unwrap()
+    }
+
+    fn read_by_id(conn: &rusqlite::Connection, id: &str) -> serde_json::Value {
+        conn.query_row(
+            &format!("SELECT {CLOUD_STORE_COLUMNS} FROM cloud_stores WHERE id = ?1"),
+            params![id],
+            map_cloud_store_row,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_get_cloud_store_converts_timestamps() {
+        let conn = memory_store();
+        insert_store(&conn, "store-1", "demo", None);
+        let store = read_limit_one(&conn);
+        assert_iso_millis(&store["created_at"], CREATED_MS);
+        assert_iso_millis(&store["updated_at"], UPDATED_MS);
+        assert!(store["expires_at"].is_null());
+    }
+
+    #[test]
+    fn test_get_cloud_store_with_expires_at() {
+        let conn = memory_store();
+        insert_store(&conn, "store-2", "shop", Some(EXPIRES_MS));
+        let store = read_limit_one(&conn);
+        assert_iso_millis(&store["expires_at"], EXPIRES_MS);
+    }
+
+    #[test]
+    fn test_update_cloud_store_converts_timestamps() {
+        let conn = memory_store();
+        insert_store(&conn, "store-3", "update", None);
+        let store = read_by_id(&conn, "store-3");
+        assert_iso_millis(&store["created_at"], CREATED_MS);
+        assert_iso_millis(&store["updated_at"], UPDATED_MS);
+        assert!(store["expires_at"].is_null());
+    }
 }

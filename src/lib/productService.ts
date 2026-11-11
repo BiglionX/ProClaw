@@ -67,6 +67,8 @@ export interface ProductSPU {
   status: 'draft' | 'on_sale' | 'off_sale' | 'deleted';
   images?: ProductImage[];
   skus?: ProductSKU[];
+  /** v_spu_inventory.total_stock，商品库当前库存读这个数 */
+  total_stock?: number;
   attributes?: SPUAttributeValue[];
   created_at: string;
   updated_at: string;
@@ -318,6 +320,10 @@ export async function getDatabaseStats(): Promise<{
   categories_count: number;
   transactions_count: number;
   pending_sync: number;
+  /** get_database_stats 实际返回的商品行数 */
+  products: number;
+  /** 未删除的客户数 */
+  customers: number;
 }> {
   if (!isTauri()) {
     return {
@@ -326,6 +332,8 @@ export async function getDatabaseStats(): Promise<{
       categories_count: 0,
       transactions_count: 0,
       pending_sync: 0,
+      products: 0,
+      customers: 0,
     };
   }
   return await invoke<any>('get_database_stats');
@@ -353,7 +361,11 @@ export async function getProductsFromSimpleTable(options?: {
   if (!isTauri()) return [];
   try {
     const rows = await invoke<Product[]>('get_products', { options });
-    return Array.isArray(rows) ? rows : [];
+    if (!Array.isArray(rows)) return [];
+    return rows.map((row) => ({
+      ...row,
+      status: row.status ?? (row.is_active ? 'active' : 'inactive'),
+    }));
   } catch (err) {
     console.error('getProductsFromSimpleTable error:', err);
     return [];
@@ -420,10 +432,11 @@ function convertSPUToProduct(spu: ProductSPU): Product {
     sell_price: firstSku?.sell_price || 0,
     min_stock: minStock,
     max_stock: maxStock,
-    current_stock: totalStock,
+    current_stock: spu.total_stock ?? totalStock,
     image_url: spu.images?.[0]?.image_url,
     barcode: firstSku?.barcode,
     is_active: spu.status === 'on_sale',
+    status: spu.status === 'on_sale' ? 'active' : 'inactive',
     created_at: spu.created_at,
     updated_at: spu.updated_at,
   };
@@ -493,7 +506,7 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
     spec_text: finalInput.sku,
     cost_price: finalInput.cost_price || 0,
     sell_price: finalInput.sell_price || 0,
-    current_stock: 0,
+    current_stock: finalInput.current_stock ?? 0,
     min_stock: finalInput.min_stock || 0,
     max_stock: finalInput.max_stock || 999999,
     barcode: finalInput.barcode,

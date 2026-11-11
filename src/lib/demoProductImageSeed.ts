@@ -36,7 +36,13 @@ export async function ensureDemoProductImages(opts?: { force?: boolean }): Promi
       }
 
       const query = buildImageSearchQuery(product.name);
-      const results = await searchProductImages(query, undefined, 10);
+      // 审计修复 #16: 给每个 demo 产品搜索加 8s 超时，
+      // 避免 searchProductImages 内部哪个 API 挂住让整个 bootstrap 超时。
+      const searchPromise = searchProductImages(query, undefined, 10);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('demo image search timeout (8s)')), 8000),
+      );
+      const results = await Promise.race([searchPromise, timeoutPromise]).catch(() => []);
       const pick = results.find((r) => r.source !== 'fallback' && (r.large || r.medium));
       if (!pick) {
         console.warn('[demoImages] no image for:', product.name);

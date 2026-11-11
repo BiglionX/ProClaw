@@ -36,6 +36,10 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   LinearProgress,
@@ -78,6 +82,7 @@ import type {
   FieldMappingRow,
   ImportCreateResponse,
   ImportTarget,
+  LegacyExecuteResponse,
   LegacyParseResult,
   ValidateResponse,
 } from '../../types/import';
@@ -92,6 +97,110 @@ const STEPS = [
   '结果报告',
   '完成',
 ];
+
+/**
+ * 从 unknown 类型中提取错误消息（兼容 Tauri 2.x 各种错误形态）
+ *
+ * Tauri 2.x 的 invoke reject 值可能形态：
+ *  - 字符串（直接是 Rust 端返回的 Err<String>）
+ *  - Error 对象（包装过，.message 是 Rust 端 string）
+ *  - 普通对象 { message: string }（IPC 通道特殊场景）
+ *
+ * 旧版 `(e as Error).message || fallback` 在 Tauri 2.x 会拿到 undefined，
+ * 导致用户看到无意义的"执行失败"。这里统一兼容。
+ */
+function extractErrorMessage(e: unknown, fallback: string): string {
+  if (typeof e === 'string') {
+    return e.trim() || fallback;
+  }
+  if (e instanceof Error) {
+    return e.message || e.name || fallback;
+  }
+  if (e && typeof e === 'object') {
+    const obj = e as { message?: unknown; reason?: unknown; error?: unknown };
+    if (typeof obj.message === 'string' && obj.message.trim()) {
+      return obj.message;
+    }
+    if (typeof obj.reason === 'string' && obj.reason.trim()) {
+      return obj.reason;
+    }
+    if (typeof obj.error === 'string' && obj.error.trim()) {
+      return obj.error;
+    }
+    // 兑底：JSON 序列化整个对象
+    try {
+      const j = JSON.stringify(e);
+      if (j && j !== '{}') return j;
+    } catch {
+      // ignore
+    }
+    // 极罕见场景：Tauri 2.x invoke reject 是无法序列化的特殊对象。
+    // 调试模式：拼出原型链上能读到的所有属性名 + 枚举所有键，
+    // 避免出现"上传失败"这种无语义信息。
+    try {
+      const allProps = new Set<string>();
+      let cur: object | null = e as object;
+      while (cur && cur !== Object.prototype) {
+        for (const k of Object.getOwnPropertyNames(cur)) allProps.add(k);
+        cur = Object.getPrototypeOf(cur);
+      }
+      const parts: string[] = [];
+      for (const k of allProps) {
+        try {
+          const v = (e as Record<string, unknown>)[k];
+          const t = typeof v;
+          if (t === 'function' || t === 'undefined') continue;
+          parts.push(`${k}=${typeof v === 'string' ? `"${v}"` : String(v)}`);
+        } catch { /* ignore */ }
+      }
+      if (parts.length > 0) {
+        return `${fallback} [调试: ${parts.slice(0, 8).join(', ')}]`;
+      }
+    } catch { /* ignore */ }
+  }
+  return fallback;
+}
+
+/** 确认框只讲当前导入对象，避免客户导入里出现商品 / SKU。 */
+function legacyConfirmCopy(
+  target: ImportTarget,
+  summary: {
+    totals: ReturnType<typeof countAggregationTotals>;
+    multiCustomers: number;
+    multiProducts: number;
+    categories: number;
+  },
+  skipCategoryAutoCreate: boolean,
+): { lead: string; detail: string } {
+  const categoryName =
+    target === 'customers' ? '客户类别' : target === 'products' ? '商品类别' : target === 'suppliers' ? '供应商类别' : '类别';
+  const category = `${categoryName}自动建档：${skipCategoryAutoCreate ? '关闭' : '开启'}（${summary.categories} 项）。`;
+  if (target === 'customers') {
+    return {
+      lead:
+        summary.multiCustomers > 0
+          ? `${summary.multiCustomers} 个客户有多个联系人，将按预览里标记的首要联系人导入。`
+          : '将按预览里的客户和联系人导入。',
+      detail: `共 ${summary.totals.customer_groups} 个客户、${summary.totals.customer_contacts} 个联系人。${category}`,
+    };
+  }
+  if (target === 'products') {
+    return {
+      lead:
+        summary.multiProducts > 0
+          ? `${summary.multiProducts} 个商品有多个 SKU，将按预览里的 SPU 规则导入。`
+          : '将按预览里的商品和 SKU 导入。',
+      detail: `共 ${summary.totals.product_groups} 个商品、${summary.totals.product_skus} 个 SKU。${category}`,
+    };
+  }
+  if (target === 'suppliers') {
+    return {
+      lead: '将按当前预览导入供应商。',
+      detail: category,
+    };
+  }
+  return { lead: '按当前预览导入。', detail: category };
+}
 
 const TARGETS: ImportTarget[] = [
   'products',
@@ -135,6 +244,9 @@ export default function ImportWizardPage() {
   const [legacyBatchId, setLegacyBatchId] = useState<string>('');
   /** 是否跳过类别自动建档（用户在 Step 4 编辑） */
   const [skipCategoryAutoCreate, setSkipCategoryAutoCreate] = useState(false);
+  /** 多联系人 / 多 SKU 时用页面内确认框，避免 WebView 吃掉 window.confirm */
+  const [legacyConfirmOpen, setLegacyConfirmOpen] = useState(false);
+  const [legacyResult, setLegacyResult] = useState<LegacyExecuteResponse | null>(null);
 
   // 已有 batchId → 重新加载
   const { data: existingBatch, isLoading: loadingBatch } = useQuery({
@@ -183,7 +295,9 @@ export default function ImportWizardPage() {
       // 自动做字段映射
       setMapping(autoMapColumns(resp.headers, target));
     } catch (e: unknown) {
-      setError((e as Error).message || '上传失败');
+      const msg = extractErrorMessage(e, '上传失败');
+      console.error('[ImportWizard] handleUpload failed:', e, msg);
+      setError(msg);
     } finally {
       setUploading(false);
     }
@@ -203,6 +317,10 @@ export default function ImportWizardPage() {
     try {
       // 1) 先用 createBatch 创建 import_batches 行（与 v1.2 P1 保持一致）
       const resp = await createBatch(target, f);
+      // 修复：同时设置 createResp，老格式分支的渲染条件是
+      //     {activeStep === 1 && createResp && legacyMode && legacyPreview}，
+      //     createResp 为 null 会导致整个 step 2 块不渲染 → 用户看到空白。
+      setCreateResp(resp);
       setLegacyBatchId(resp.batch_id);
       // 2) 获取文件实际路径（在 import_uploads/<batch_id>/）
       const filePath = `${resp.source_path ?? ''}`;
@@ -212,55 +330,65 @@ export default function ImportWizardPage() {
       setLegacyPreview(preview);
       setActiveStep(1); // 直接跳到"解析预览"步骤展示老格式预览
     } catch (e: unknown) {
-      setError((e as Error).message || '老格式预览失败');
+      const msg = extractErrorMessage(e, '老格式预览失败');
+      console.error('[ImportWizard] handleLegacyUpload failed:', e, msg);
+      setError(msg);
       throw e;
     }
   };
 
-  /** v1.3 类别审核 → 执行 */
-  const handleLegacyExecute = async () => {
-    if (!legacyBatchId) return;
+  const legacyConfirmSummary = useMemo(() => {
+    if (!legacyPreview) return null;
+    const totals = countAggregationTotals(legacyPreview);
+    return {
+      totals,
+      multiCustomers: legacyPreview.customer_groups.filter((g) => g.contacts.length > 1).length,
+      multiProducts: legacyPreview.product_groups.filter((g) => g.variants.length > 1).length,
+      categories: buildCategoryReviewList(legacyPreview.categories_to_create).filter((item) => {
+        if (target === 'customers') return item.category_type === 'customer';
+        if (target === 'products') return item.category_type === 'product';
+        if (target === 'suppliers') return item.category_type === 'supplier';
+        return true;
+      }).length,
+    };
+  }, [legacyPreview, target]);
 
-    // P1-C1：如果有聚合待确认，弹 confirm dialog 强制用户确认
-    if (legacyPreview && needsAggregationReview(legacyPreview)) {
-      const totals = countAggregationTotals(legacyPreview);
-      const multiCustomers = legacyPreview.customer_groups.filter(
-        (g) => g.contacts.length > 1,
-      ).length;
-      const multiProducts = legacyPreview.product_groups.filter(
-        (g) => g.variants.length > 1,
-      ).length;
-      const msg =
-        `检测到待确认的聚合规则：\n\n` +
-        `· ${multiCustomers} 个客户有多个联系人（自动选首要 + 备用）\n` +
-        `· ${multiProducts} 个商品有多个 SKU（自动按 SPU 聚合）\n` +
-        `总计：${totals.customer_groups} 个客户 / ${totals.customer_contacts} 个联系人 / ` +
-        `${totals.product_groups} 个 SPU / ${totals.product_skus} 个 SKU\n\n` +
-        `${skipCategoryAutoCreate ? '类别自动建档：关闭\n' : '类别自动建档：开启\n'}` +
-        `类别审核：${buildCategoryReviewList(legacyPreview.categories_to_create).length} 项\n\n` +
-        `确认执行导入？`;
-      if (!window.confirm(msg)) {
-        return;
-      }
+  /** v1.3 类别审核 → 执行。确认框必须画在页面里，WebView 不弹出 window.confirm。 */
+  const requestLegacyExecute = () => {
+    if (!legacyBatchId) {
+      setError('导入批次还没建好，请返回重选文件');
+      return;
     }
+    if (legacyPreview && needsAggregationReview(legacyPreview)) {
+      setLegacyConfirmOpen(true);
+      return;
+    }
+    void runLegacyExecute();
+  };
 
+  const runLegacyExecute = async () => {
+    if (!legacyBatchId) return;
+    setLegacyConfirmOpen(false);
     setUploading(true);
     setError(null);
+    setActiveStep(4);
     try {
-      // 执行结果直接丢掉（v1.3 老格式结果未挂载到 UI；后续 Step 7 显示成功统计时再保留）
-      await executeLegacy({
+      const result = await executeLegacy({
         batch_id: legacyBatchId,
-        column_mapping: {}, // 老格式不依赖 v1.2 P1 的字段映射（后端按列名直接推断）
+        column_mapping: {},
         default_values: defaultValues,
         skip_errors: true,
-        // v1.3 决策：默认自动推断聚合规则 + 用户可手动编辑
-        // 当前 UI 未提供编辑界面，传 undefined 由后端自动推断
         aggregation_rules: undefined,
         skip_category_auto_create: skipCategoryAutoCreate,
       });
+      setLegacyResult(result);
+      setActiveStep(5);
       qc.invalidateQueries({ queryKey: ['import-batches'] });
     } catch (e: unknown) {
-      setError((e as Error).message || '执行失败');
+      const msg = extractErrorMessage(e, '执行失败');
+      console.error('[ImportWizard] handleLegacyExecute failed:', e, msg);
+      setError(msg);
+      setActiveStep(1);
     } finally {
       setUploading(false);
     }
@@ -281,7 +409,9 @@ export default function ImportWizardPage() {
       setValidateResp(v);
       setActiveStep(3);
     } catch (e: unknown) {
-      setError((e as Error).message || '校验失败');
+      const msg = extractErrorMessage(e, '校验失败');
+      console.error('[ImportWizard] handleValidate failed:', e, msg);
+      setError(msg);
     }
   };
 
@@ -303,7 +433,9 @@ export default function ImportWizardPage() {
       setActiveStep(5);
       qc.invalidateQueries({ queryKey: ['import-batches'] });
     } catch (e: unknown) {
-      setError((e as Error).message || '执行失败');
+      const msg = extractErrorMessage(e, '执行失败');
+      console.error('[ImportWizard] handleExecute failed:', e, msg);
+      setError(msg);
       // 失败也跳到 step 5 展示错误
       setActiveStep(5);
     }
@@ -404,7 +536,9 @@ export default function ImportWizardPage() {
             </Box>
 
             <Alert severity="info">
-              支持 CSV 与 JSON 文件。XLSX 请先在 Excel 中「另存为 CSV (UTF-8)」。
+              {target === 'customers' || target === 'products' || target === 'suppliers'
+                ? `导入${TARGET_LABELS[target]}：可以直接选择 CSV、JSON，或老系统导出的 XLS / XLSX。`
+                : `导入${TARGET_LABELS[target]}：请使用 CSV 或 JSON。Excel 文件请先另存为 CSV（UTF-8）。`}
             </Alert>
 
             <Stack direction="row" justifyContent="flex-end" spacing={1}>
@@ -427,14 +561,44 @@ export default function ImportWizardPage() {
             {legacyMode && legacyPreview ? (
               <>
                 <Alert severity="info">
-                  检测到老系统数据（.xls / .xlsx）：共 <strong>{legacyPreview.total_data_rows}</strong> 行，
-                  已自动按客户编号 / 商品编号聚合。
-                  {needsAggregationReview(legacyPreview) && '有客户多联系人 / 商品多 SKU，请确认聚合规则。'}
+                  {target === 'customers' && (
+                    <>
+                      检测到老系统客户数据（.xls / .xlsx）：共 <strong>{legacyPreview.total_data_rows}</strong> 行，
+                      已按客户编号聚合。
+                      {legacyConfirmSummary &&
+                        legacyConfirmSummary.multiCustomers > 0 &&
+                        '有客户包含多个联系人，执行前会再确认一次。'}
+                    </>
+                  )}
+                  {target === 'products' && (
+                    <>
+                      检测到老系统商品数据（.xls / .xlsx）：共 <strong>{legacyPreview.total_data_rows}</strong> 行，
+                      已按商品编号聚合。
+                      {legacyConfirmSummary &&
+                        legacyConfirmSummary.multiProducts > 0 &&
+                        '有商品包含多个 SKU，执行前会再确认一次。'}
+                    </>
+                  )}
+                  {target !== 'customers' && target !== 'products' && (
+                    <>
+                      检测到老系统{TARGET_LABELS[target]}数据（.xls / .xlsx）：共{' '}
+                      <strong>{legacyPreview.total_data_rows}</strong> 行。
+                    </>
+                  )}
                 </Alert>
-                <Step0LegacyPreview preview={legacyPreview} compact />
+                <Step0LegacyPreview preview={legacyPreview} target={target} compact />
                 {/* 类别自动建档开关（v1.3 决策：默认全开） */}
                 <Stack direction="row" spacing={2} alignItems="center">
-                  <Typography variant="body2">类别自动建档：</Typography>
+                  <Typography variant="body2">
+                    {target === 'customers'
+                      ? '客户类别自动建档'
+                      : target === 'products'
+                        ? '商品类别自动建档'
+                        : target === 'suppliers'
+                          ? '供应商类别自动建档'
+                          : '类别自动建档'}
+                    ：
+                  </Typography>
                   <Chip
                     label={skipCategoryAutoCreate ? '已关闭' : '已开启'}
                     color={skipCategoryAutoCreate ? 'default' : 'success'}
@@ -442,7 +606,13 @@ export default function ImportWizardPage() {
                     sx={{ cursor: 'pointer' }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    关闭后，已存在的类别仍可复用，新类别不会自动创建
+                    {target === 'customers'
+                      ? '关闭后，已有的客户类别仍可复用，新的客户类别不会自动创建'
+                      : target === 'products'
+                        ? '关闭后，已有的商品类别仍可复用，新的商品类别不会自动创建'
+                        : target === 'suppliers'
+                          ? '关闭后，已有的供应商类别仍可复用，新的供应商类别不会自动创建'
+                          : '关闭后，已有的类别仍可复用，新类别不会自动创建'}
                   </Typography>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
@@ -459,11 +629,11 @@ export default function ImportWizardPage() {
                   </Button>
                   <Button
                     variant="contained"
-                    onClick={handleLegacyExecute}
+                    onClick={requestLegacyExecute}
                     disabled={uploading}
-                    endIcon={<ArrowForwardIcon />}
+                    endIcon={uploading ? <CircularProgress size={16} /> : <ArrowForwardIcon />}
                   >
-                    下一步：执行导入
+                    {uploading ? '导入中…' : '下一步：执行导入'}
                   </Button>
                 </Stack>
               </>
@@ -794,7 +964,129 @@ export default function ImportWizardPage() {
             </Stack>
           </Stack>
         )}
+
+        {activeStep === 5 && legacyResult && (
+          <Stack spacing={2}>
+            <Alert
+              severity={
+                legacyResult.status === 'success'
+                  ? 'success'
+                  : legacyResult.status === 'partial'
+                    ? 'warning'
+                    : 'error'
+              }
+              icon={legacyResult.status === 'success' ? <CheckIcon /> : <ErrorIcon />}
+            >
+              导入完成 · {STATUS_LABELS[legacyResult.status]}
+            </Alert>
+            <Grid container spacing={2}>
+              {(target === 'customers'
+                ? [
+                    ['客户', legacyResult.customers_created],
+                    ['联系人', legacyResult.customer_contacts_created],
+                  ]
+                : target === 'products'
+                  ? [
+                      ['商品', legacyResult.products_created],
+                      ['SKU', legacyResult.product_skus_created],
+                    ]
+                  : target === 'suppliers'
+                    ? [['供应商', legacyResult.suppliers_created]]
+                    : [
+                        ['客户', legacyResult.customers_created],
+                        ['联系人', legacyResult.customer_contacts_created],
+                        ['供应商', legacyResult.suppliers_created],
+                        ['商品', legacyResult.products_created],
+                        ['SKU', legacyResult.product_skus_created],
+                      ].filter(([, count]) => Number(count) > 0)
+              ).map(([label, count]) => (
+                <Grid item xs={6} sm={4} md={2} key={label}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="overline" color="text.secondary">
+                        {label}
+                      </Typography>
+                      <Typography variant="h4">{count}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+            <Typography variant="body2" color="text.secondary">
+              {target === 'products' &&
+                `商品类别新建 ${legacyResult.categories_summary.product_created} 项`}
+              {target === 'suppliers' &&
+                `供应商类别新建 ${legacyResult.categories_summary.supplier_created} 项`}
+              {target === 'customers' &&
+                `客户类别新建 ${legacyResult.categories_summary.customer_created} 项`}
+              {target !== 'products' && target !== 'suppliers' && target !== 'customers' && (
+                <>
+                  {[
+                    legacyResult.categories_summary.product_created > 0
+                      ? `商品类别新建 ${legacyResult.categories_summary.product_created} 项`
+                      : '',
+                    legacyResult.categories_summary.supplier_created > 0
+                      ? `供应商类别新建 ${legacyResult.categories_summary.supplier_created} 项`
+                      : '',
+                    legacyResult.categories_summary.customer_created > 0
+                      ? `客户类别新建 ${legacyResult.categories_summary.customer_created} 项`
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join('，')}
+                </>
+              )}
+            </Typography>
+            <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
+              <Button onClick={() => navigate('/import-center')} startIcon={<RefreshIcon />}>
+                返回中心
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setActiveStep(0);
+                  setFile(null);
+                  setCreateResp(null);
+                  setMapping([]);
+                  setValidateResp(null);
+                  setExecuteResp(null);
+                  setLegacyResult(null);
+                  setLegacyPreview(null);
+                  setLegacyMode(false);
+                  setLegacyBatchId('');
+                  setError(null);
+                }}
+              >
+                继续导入
+              </Button>
+            </Stack>
+          </Stack>
+        )}
       </Paper>
+
+      <Dialog open={legacyConfirmOpen} onClose={() => setLegacyConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>确认导入{TARGET_LABELS[target]}</DialogTitle>
+        <DialogContent>
+          {legacyConfirmSummary ? (
+            <>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                {legacyConfirmCopy(target, legacyConfirmSummary, skipCategoryAutoCreate).lead}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {legacyConfirmCopy(target, legacyConfirmSummary, skipCategoryAutoCreate).detail}
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body2">按当前预览导入。</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLegacyConfirmOpen(false)}>取消</Button>
+          <Button variant="contained" onClick={() => void runLegacyExecute()}>
+            确认执行
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -32,10 +32,10 @@ test.describe('CEO Agent 主控官功能 (PRD v6.2)', () => {
     // 应显示上下文指示器（浅黄色背景的活跃项目目标条）
     await expect(page.locator('text=活跃项目目标').or(page.locator('text=暂无活跃项目目标'))).toBeVisible();
 
-    // 应显示 CEO 快捷命令建议
-    await expect(page.locator('text=/task list')).toBeVisible();
-    await expect(page.locator('text=/context show')).toBeVisible();
-    await expect(page.locator('text=/report daily')).toBeVisible();
+    // 应显示 CEO 快捷命令建议（中文标签，点击后仍填入原命令）
+    await expect(page.locator('text=任务列表')).toBeVisible();
+    await expect(page.locator('text=公司目标')).toBeVisible();
+    await expect(page.locator('text=今日简报')).toBeVisible();
 
     // 输入框应有 CEO 专属 placeholder
     await expect(page.locator('input[placeholder="向 CEO Agent 下达指令..."]').or(
@@ -103,8 +103,8 @@ test.describe('CEO Agent 主控官功能 (PRD v6.2)', () => {
     await page.goto('/chat/ceo-agent');
     await page.waitForTimeout(1000);
 
-    // 点击 /task list 快捷命令
-    const taskListChip = page.locator('text=/task list').first();
+    // 点击「任务列表」快捷命令
+    const taskListChip = page.locator('text=任务列表').first();
     await expect(taskListChip).toBeVisible({ timeout: 3000 });
     await taskListChip.click();
 

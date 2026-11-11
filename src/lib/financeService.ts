@@ -23,6 +23,20 @@ export interface CashFlowReport {
   net_cash_flow: number;
 }
 
+export type ReportLineKind = 'revenue' | 'cogs' | 'operating_expense' | 'cash_in' | 'cash_out';
+
+export interface ReportLineItem {
+  id: string;
+  date: string;
+  doc_no: string;
+  party: string;
+  summary: string;
+  amount: number;
+  source: string;
+  reference_type: string | null;
+  reference_id: string | null;
+}
+
 export interface FinancialSummary {
   monthly_revenue: number;
   monthly_expense: number;
@@ -69,6 +83,17 @@ export async function getCashFlowReport(
     };
   }
   return await invoke('get_cash_flow_report', { startDate, endDate });
+}
+
+export async function getReportLines(
+  startDate: string,
+  endDate: string,
+  line: ReportLineKind
+): Promise<ReportLineItem[]> {
+  if (!isTauri()) {
+    return [];
+  }
+  return await invoke('get_report_lines', { startDate, endDate, line });
 }
 
 export async function getFinancialSummary(): Promise<FinancialSummary> {

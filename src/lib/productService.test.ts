@@ -126,7 +126,13 @@ describe('productService', () => {
           name: 'Custom Product',
           is_on_sale: true,
         }),
-        skusData: expect.any(Array),
+        skusData: [
+          expect.objectContaining({
+            current_stock: 50,
+            specifications: {},
+            is_default: true,
+          }),
+        ],
         imagesData: expect.any(Array),
       }));
     });

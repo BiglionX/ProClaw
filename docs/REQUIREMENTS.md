@@ -1,8 +1,20 @@
 # ProClaw 产品需求总览
 
-> **最后更新**: 2026-06-21
-> **当前基线版本**: v1.0.0（2026-06-08 正式版）
+> **最后更新**: 2026-XX-XX（v1.4.1）
+> **当前基线版本**: v1.4.1（Sprint 2.13–2.17 全部交付：最小闭环 + 4 项增强 + 多设备同步 + 持久化/SSE/模板市场 + 真实 SSE 流式收尾）
+> **上一版本**: v1.0.0（2026-06-08 正式版）
 > **文档入口**: 本文档为需求体系的**唯一总览**；各模块详细 PRD 见 [prd/PRD_INDEX.md](prd/PRD_INDEX.md)
+
+### v1.3.2 关键变化
+
+| 维度 | v1.0.0 | v1.3.2 |
+|------|--------|--------|
+| 集成 | 单仓独立 | 与 [NvWaX](https://nvwax.proclaw.cc) 形成"虚拟公司"双向闭环 |
+| 部署 | 本地优先 | 本地优先 + NvWaX 云端 AI 团队创建 |
+| 多端 | 单桌面端 | Mac / Windows / Linux 桌面端 + 移动端，多设备自动同步 |
+| 插件 | 7 个行业插件 | 8 个（新增 `virtual-company` NvWaX 官方插件） |
+
+详细 PRD 见 [`prd/architecture/PROCLAW-NVWAX-API-INTEGRATION-REQUIREMENT.md`](prd/architecture/PROCLAW-NVWAX-API-INTEGRATION-REQUIREMENT.md)。
 
 ---
 

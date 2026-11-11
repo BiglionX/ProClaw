@@ -87,6 +87,7 @@
 - Light版修复验证文档 (PRD v13.0相关)
 - 仅保留最新版本: [mobile-audit-report-v14.md](mobile-audit-report-v14.md)
 - **PRD 历史归档**: [prd/_archive/](prd/_archive/) — 测试报告 (test-reports/) 与已闭环开发计划 (dev-plans/)
+- [老系统三文件导入验证（2026-11-06）](archive/legacy-import-e2e-2026-11-06.md) - 404、聚合数字、表头、幂等、SPU 桥接与未做项
 
 ### 🔗 根目录文档
 - [README](../README.md) - 项目主页

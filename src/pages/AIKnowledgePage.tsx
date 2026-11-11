@@ -15,6 +15,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { LoadTimeoutNotice, useTimeoutLoading } from '../lib/useTimeoutLoading';
 import { getMediaStats } from '../lib/mediaLibraryService';
 import { getQAStats } from '../lib/qaLibraryService';
 import { getKnowledgeStats } from '../lib/knowledgeBaseService';
@@ -40,6 +41,8 @@ const TABS: TabInfo[] = [
 export default function AIKnowledgePage() {
   const [activeTab, setActiveTab] = useState<KnowledgeTab>('media');
   const [counts, setCounts] = useState({ media: 0, qa: 0, knowledge: 0 });
+  const [countsReady, setCountsReady] = useState(false);
+  const { timedOut: countsTimedOut, retry: retryCountsTimer } = useTimeoutLoading(!countsReady);
 
   const refreshCounts = () => {
     setCounts({
@@ -51,11 +54,25 @@ export default function AIKnowledgePage() {
 
   useEffect(() => {
     refreshCounts();
+    setCountsReady(true);
   }, []);
 
   // 计算知识库健康度
   const totalItems = counts.media + counts.qa + counts.knowledge;
   const healthScore = Math.min(Math.round((totalItems / 50) * 100), 100);
+
+  if (countsTimedOut) {
+    return (
+      <LoadTimeoutNotice
+        onRetry={() => {
+          setCountsReady(false);
+          retryCountsTimer();
+          refreshCounts();
+          setCountsReady(true);
+        }}
+      />
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>

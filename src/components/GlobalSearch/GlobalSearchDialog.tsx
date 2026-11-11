@@ -107,7 +107,6 @@ export default function GlobalSearchDialog({
     { id: 'page-messages', title: '消息', subtitle: '聊天 / 通知', category: '页面', path: '/messages', keywords: ['message', 'chat'] },
     { id: 'page-user', title: '用户中心', subtitle: '个人资料 / 设备', category: '页面', path: '/user-center', keywords: ['user', 'profile'] },
     { id: 'page-settings', title: '设置', subtitle: '偏好 / 同步', category: '页面', path: '/settings', keywords: ['settings', 'config'] },
-    { id: 'page-shop', title: '云商城', subtitle: 'H5 商城', category: '页面', path: '/shop', keywords: ['shop', 'store', 'mall'] },
     { id: 'page-ai-sales', title: 'AI 订单识别', subtitle: '拍照识别订单', category: 'AI', path: '/ai-sales', keywords: ['ai', 'sales', 'ocr'] },
     { id: 'page-plugin-store', title: '插件商店', subtitle: '行业插件', category: '页面', path: '/plugin-store', keywords: ['plugin', 'store'] },
   ], []);

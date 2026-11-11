@@ -45,7 +45,7 @@ function syncVersion(version) {
   cargo = cargo.replace(/^version = "[^"]+"/m, `version = "${version}"`);
   fs.writeFileSync(files.cargoToml, cargo, "utf8");
 
-  const appVersionTs = `/** Desktop app version (synced by scripts/bump-version.mjs) */\nexport const APP_VERSION = '${version}';\n`;
+  const appVersionTs = `import { version } from '../../package.json';\n\n/** Desktop app version — kept in sync with package.json (scripts/bump-version.mjs). */\nexport const APP_VERSION: string = version;\n`;
   fs.writeFileSync(files.appVersion, appVersionTs, "utf8");
 
   console.log(`[bump-version] synced ${version}`);

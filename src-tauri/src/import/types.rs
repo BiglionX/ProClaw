@@ -168,7 +168,7 @@ pub struct ImportBatch {
     pub id: String,
     pub target_type: String,
     pub source_filename: String,
-    pub source_format: String, // csv / xlsx / json
+    pub source_format: String, // csv / xlsx / xls / json
     pub source_size: Option<i64>,
     pub source_path: Option<String>,
     pub row_count: Option<i64>,
@@ -208,7 +208,7 @@ pub struct ImportBatchError {
 pub struct ImportRequest {
     pub target_type: String,
     pub source_filename: String,
-    pub source_format: String,         // csv / xlsx / json
+    pub source_format: String,         // csv / xlsx / xls / json
     pub source_base64: Option<String>, // 文件内容 base64（避免依赖 fs 权限）
     pub performed_by: Option<String>,
     pub notes: Option<String>,

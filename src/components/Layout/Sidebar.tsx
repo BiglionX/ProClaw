@@ -45,9 +45,11 @@ import {
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppModeStore, PluginNavItem } from '../../config/appMode';
-// 注：用户信息已上移至 TopBar 右上角展示，Sidebar 不再直接消费 useAuthStore
+import { useAppVersion } from '../../lib/appVersion';
+import SidebarAccount from '../Auth/SidebarAccount';
+// 注：v13.1.1 用户信息回移至 Sidebar 底部（SidebarAccount 组件消费 useAuthStore）
 
-const DRAWER_WIDTH = 240;
+const DRAWER_WIDTH = 192;
 const DRAWER_COLLAPSED = 64;
 const TOPBAR_HEIGHT = 64;
 
@@ -98,13 +100,11 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 const DEFAULT_NAV_ITEMS: (NavItem & { _group: 'home' | 'ai' | 'account' | 'contact' })[] = [
   { text: '数据中心', icon: <DataCenterIcon />, path: '/datacenter', _group: 'home', isLive: true },
   { text: '商品库', icon: <ProductsIcon />, path: '/products', _group: 'home' },
-  { text: '云商城', icon: <StoreIcon />, path: '/shop', _group: 'home' },
   { text: '外贸柜台', icon: <PublicIcon />, path: '/foreign-counter', _group: 'home' },
   { text: '联系人', icon: <ContactsIcon />, path: '/contacts', _group: 'contact' },
   { text: '消息', icon: <ChatIcon />, path: '/messages', _group: 'contact' },
   { text: 'AI 团队', icon: <TeamsIcon />, path: '/teams', _group: 'ai', badge: 2 },
   { text: 'AI 知识库', icon: <KnowledgeIcon />, path: '/ai-knowledge', _group: 'ai' },
-  { text: '插件商店', icon: <ExtensionIcon />, path: '/plugin-store', _group: 'ai' },
 ];
 
 /** 从 localStorage / 跨页面事件读取 AI Team 数量（动态赋值给 sidebar badge） */
@@ -165,7 +165,7 @@ function useNavItems(): NavItem[] {
     if (pluginRemovePaths.length > 0) {
       items = items.filter(item => !pluginRemovePaths.includes(item.path));
     }
-    return items;
+    return items.filter(item => item.path !== '/shop' && item.path !== '/plugin-store' && item.path !== '/hermes-skills');
   }
 
   // 无插件时使用默认导航
@@ -174,10 +174,11 @@ function useNavItems(): NavItem[] {
   if (mode === 'inventory') {
     defaultItems.push(...PLUS_NAV_ITEMS);
   }
-  return defaultItems;
+  return defaultItems.filter(item => item.path !== '/shop' && item.path !== '/plugin-store' && item.path !== '/hermes-skills');
 }
 
 export default function Sidebar() {
+  const appVersion = useAppVersion();
   const navigate = useNavigate();
   const location = useLocation();
   const navItems = useNavItems();
@@ -362,12 +363,32 @@ export default function Sidebar() {
           );
         })}
 
-      {/* ---- 底部：折叠按钮（用户信息已上移至 TopBar 右上角，避免视觉重叠） ---- */}
+      {/* ---- 底部：账号卡片 + 折叠按钮 + 版本号（v13.1.1）---- */}
       <Box sx={{ mt: 'auto' }}>
+        {/* v13.1.1 本地账号模式：在侧边栏底部提供账号入口（PRD v11.0 §4.2.1 的设计回移） */}
+        <SidebarAccount collapsed={collapsed} />
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
 
+        {/* 版本号（v1.3.0+）：折叠态隐藏 / 展开态半透明显示 */}
+        {!collapsed && (
+          <Box sx={{ textAlign: 'center', py: 0.5 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'rgba(255,255,255,0.3)',
+                fontSize: '0.65rem',
+                letterSpacing: '0.5px',
+                userSelect: 'none',
+              }}
+              title={`ProClaw v${appVersion}`}
+            >
+              v{appVersion}
+            </Typography>
+          </Box>
+        )}
+
         {/* 折叠按钮 */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5 }}>
           <IconButton
             size="small"
             onClick={() => setCollapsed(!collapsed)}

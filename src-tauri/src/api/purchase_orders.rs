@@ -593,7 +593,7 @@ pub async fn receive_purchase_order(
         }
     };
 
-    if status != "confirmed" && status != "draft" {
+    if status != "confirmed" && status != "approved" {
         return (
             StatusCode::BAD_REQUEST,
             Json(
@@ -694,6 +694,14 @@ pub async fn receive_purchase_order(
         let _ = tx.rollback();
         return (StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("Failed to update status: {}", e)})));
+    }
+
+    if let Err(e) = crate::finance_ledger::post_purchase_inbound_entries(&tx, &id, None) {
+        let _ = tx.rollback();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e})),
+        );
     }
 
     if let Err(e) = tx.commit() {

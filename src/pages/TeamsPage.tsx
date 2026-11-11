@@ -56,6 +56,7 @@ import { safeInvoke } from '../lib/tauri';
 import { isDemoAccount } from '../lib/aiTeamTokenService';
 import { buildGroupId } from '../lib/contactService';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LoadTimeoutNotice, useTimeoutLoading } from '../lib/useTimeoutLoading';
 import { fetchTeams, useTeams, useInvalidateTeams } from '../lib/hooks/useTeams';
 
 /** 同步 AI Team 数量到 localStorage 并广播变更事件,供 Sidebar 动态 badge 订阅 */
@@ -86,11 +87,13 @@ import { NvwaXService } from '../lib/nvwaxClient';
 import BapSettingsPanel from '../components/Agent/BapSettingsPanel';
 import PreferenceSettings from '../components/CEO/PreferenceSettings';
 import AiPluginPanel from '../components/Teams/AiPluginPanel';
+import HermesSkillsPage from './HermesSkillsPage';
 
 export default function TeamsPage() {
   const navigate = useNavigate();
   const invalidateTeams = useInvalidateTeams();
-  const { data: teams = [], isLoading: loading } = useTeams();
+  const { data: teams = [], isLoading: loading, refetch: refetchTeams } = useTeams();
+  const { timedOut: teamsTimedOut, retry: retryTeamsTimer } = useTimeoutLoading(loading);
   const existingTeamNames = useMemo(() => teams.map((t) => t.name), [teams]);
   const [snackbar, setSnackbar] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -278,8 +281,11 @@ export default function TeamsPage() {
     }
   }, [invalidateTeams]);
 
+  const hasLoadedTeams = useRef(false);
   useEffect(() => {
-    loadTeams();
+    if (hasLoadedTeams.current) return;
+    hasLoadedTeams.current = true;
+    void loadTeams();
   }, [loadTeams]);
 
   // 同步团队数量到 Sidebar badge(通过 localStorage + 自定义事件)
@@ -458,14 +464,16 @@ export default function TeamsPage() {
       {/* 第一行：标题 + 创建团队按钮（始终显示） */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
         <Typography variant="h5" fontWeight={700}>AI 团队</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setCreateOpen(true)}
-          sx={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}
-        >
-          创建团队
-        </Button>
+        <Tooltip title="创建团队">
+          <Button
+            variant="contained"
+            onClick={() => setCreateOpen(true)}
+            aria-label="创建团队"
+            sx={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', minWidth: 48, px: 1.25 }}
+          >
+            <AddIcon />
+          </Button>
+        </Tooltip>
       </Box>
 
       {/* 第二行：MUI Tabs 分页（始终显示） */}
@@ -510,6 +518,15 @@ export default function TeamsPage() {
             '&.Mui-selected': { color: '#10B981' },
           }}
         />
+        <Tab
+          label="Hermes Skills"
+          icon={<AutoAwesomeIcon />}
+          iconPosition="start"
+          sx={{
+            color: activePageTab === 3 ? '#F59E0B' : 'text.secondary',
+            '&.Mui-selected': { color: '#F59E0B' },
+          }}
+        />
       </Tabs>
 
       {/* ---- Agent 管理分页 ---- */}
@@ -521,6 +538,8 @@ export default function TeamsPage() {
         />
       ) : activePageTab === 2 ? (
         <AiPluginPanel />
+      ) : activePageTab === 3 ? (
+        <HermesSkillsPage embedded />
       ) : (
         <>
 
@@ -632,9 +651,18 @@ export default function TeamsPage() {
 
       {/* 加载中 */}
       {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
-        </Box>
+        teamsTimedOut ? (
+          <LoadTimeoutNotice
+            onRetry={() => {
+              retryTeamsTimer();
+              void refetchTeams();
+            }}
+          />
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        )
       )}
 
       {/* 空状态 */}

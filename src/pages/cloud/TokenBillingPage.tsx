@@ -61,19 +61,23 @@ function TabPanel({ children, value, index }: TabPanelProps) {
   );
 }
 
-/** 生成示例消耗趋势数据（实际应从 API 获取） */
-function generateTrendData(days: number): { date: string; used: number }[] {
-  const data: { date: string; used: number }[] = [];
+/** 用本地用量记录按天汇总，没有记录的日期为 0。 */
+function usageTrend(entries: TokenUsageEntry[], days: number): { date: string; used: number }[] {
+  const buckets = new Map<string, number>();
   const now = new Date();
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    data.push({
-      date: `${d.getMonth() + 1}/${d.getDate()}`,
-      used: Math.floor(Math.random() * 100) + 20,
-    });
+    buckets.set(`${d.getMonth() + 1}/${d.getDate()}`, 0);
   }
-  return data;
+  for (const entry of entries) {
+    const d = new Date(entry.created_at);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = `${d.getMonth() + 1}/${d.getDate()}`;
+    if (!buckets.has(key)) continue;
+    buckets.set(key, (buckets.get(key) || 0) + entry.tokens_consumed);
+  }
+  return [...buckets.entries()].map(([date, used]) => ({ date, used }));
 }
 
 export default function TokenBillingPage() {
@@ -97,13 +101,13 @@ export default function TokenBillingPage() {
     Promise.all([
       getTokenBalance(userId).then(setBalance).catch(() => {}),
       getTokenPricing().then(setPricingRules).catch(() => {}),
-      getTokenUsage(userId, 50, 0).then(setUsageEntries).catch(() => {}),
+      getTokenUsage(userId, 500, 0).then(setUsageEntries).catch(() => {}),
       getInvoices(userId).then(setInvoices).catch(() => {}),
       getPlans().then(setPlans).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, [userId]);
 
-  const trendData = generateTrendData(trendDays);
+  const trendData = usageTrend(usageEntries, trendDays);
 
   const formatTokens = (val: number) => {
     if (val >= 1000000) return `${(val / 10000).toFixed(0)}万`;
@@ -289,13 +293,13 @@ export default function TokenBillingPage() {
                     <CardContent sx={{ flex: 1 }}>
                       <Typography variant="h6" gutterBottom>{plan.name}</Typography>
                       <Typography variant="h4" sx={{ fontWeight: 700, color: '#0ea5e9', mb: 1 }}>
-                        ¥{plan.monthly_price.toFixed(0)}
+                        ¥{plan.monthly_price?.toFixed(0) ?? '0'}
                         <Typography component="span" variant="body2" color="text.secondary"> /月</Typography>
                       </Typography>
                       <Divider sx={{ my: 1.5 }} />
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                         <TagIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />
-                        Token 配额: {plan.token_quota.toLocaleString()} PT
+                        Token 配额: {plan.token_quota?.toLocaleString() ?? '0'} PT
                       </Typography>
                       {plan.description && (
                         <Typography variant="body2" color="text.secondary">

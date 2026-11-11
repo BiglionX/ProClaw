@@ -1,9 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { parseCommand, executeCommand } from '../lib/commandParser';
+import { getProductSPUs, getProducts } from '../lib/productService';
+import { createInventoryTransaction } from '../lib/inventoryService';
+import { calibrateStock } from '../lib/inventoryCalibrationService';
 
 // Mock 依赖的模块
 vi.mock('../lib/productService', () => ({
   getProductSPUs: vi.fn().mockResolvedValue([]),
+  getProducts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../lib/inventoryService', () => ({
@@ -16,9 +20,23 @@ vi.mock('../lib/inventoryService', () => ({
     total_value: 0,
     low_stock_products: [],
   }),
+  getInventoryTransactions: vi.fn().mockResolvedValue([]),
+  createInventoryTransaction: vi.fn(),
+}));
+
+vi.mock('../lib/inventoryCalibrationService', () => ({
+  getLowConfidenceProducts: vi.fn().mockResolvedValue([]),
+  checkNegativeAging: vi.fn().mockResolvedValue([]),
+  calibrateStock: vi.fn(),
 }));
 
 describe('commandParser', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getProductSPUs).mockResolvedValue([]);
+    vi.mocked(getProducts).mockResolvedValue([]);
+  });
+
   describe('parseCommand', () => {
     it('应该识别添加产品命令', () => {
       const result = parseCommand('添加产品 iPhone 15');
@@ -146,6 +164,37 @@ describe('commandParser', () => {
       const result = parseCommand('  添加产品   Test  ');
       expect(result.action).toBe('create_product');
     });
+
+    it('导出库存表不会被当成出库', () => {
+      const result = parseCommand('帮我导出库存表，我要盘点');
+      expect(result.action).toBe('export_inventory');
+      expect(result.action).not.toBe('remove_stock');
+    });
+
+    it('出库命令仍然是出库', () => {
+      const result = parseCommand('出库 iPad 5件');
+      expect(result.action).toBe('remove_stock');
+      expect(result.params.quantity).toBe(5);
+      expect(result.params.productName).toBe('iPad');
+    });
+
+    it('出入库不写成入库', () => {
+      const result = parseCommand('出入库');
+      expect(result.action).toBe('clarify_stock_io');
+      expect(result.action).not.toBe('add_stock');
+    });
+
+    it('待盘点是查询，带实际数量才是写入', () => {
+      const listed = parseCommand('待盘点');
+      expect(listed.action).toBe('stocktake');
+      expect(listed.params.mode).toBe('list');
+
+      const written = parseCommand('盘点 iPad 实际 12件');
+      expect(written.action).toBe('stocktake');
+      expect(written.params.mode).toBe('write');
+      expect(written.params.productName).toBe('iPad');
+      expect(written.params.quantity).toBe(12);
+    });
   });
 
   describe('executeCommand', () => {
@@ -249,6 +298,57 @@ describe('commandParser', () => {
       };
       const result = await executeCommand(command);
       expect(result).toBe('抱歉,我无法理解您的指令');
+    });
+
+    it('多个 SPU 时不调用出入库和盘点写入', async () => {
+      vi.mocked(getProductSPUs).mockResolvedValue([
+        { id: '1', name: 'iPad', spu_code: 'A', unit: '件', skus: [{ id: 's1', sku_code: 'A1', current_stock: 10, is_default: true }] },
+        { id: '2', name: 'iPad Pro', spu_code: 'B', unit: '件', skus: [{ id: 's2', sku_code: 'B1', current_stock: 3, is_default: true }] },
+      ] as any);
+
+      const outbound = await executeCommand({
+        action: 'remove_stock',
+        params: { quantity: 1, productName: 'iPad' },
+        confidence: 0.9,
+        message: '',
+      });
+      expect(outbound).toContain('iPad Pro');
+      expect(createInventoryTransaction).not.toHaveBeenCalled();
+
+      const counted = await executeCommand({
+        action: 'stocktake',
+        params: { mode: 'write', quantity: 12, productName: 'iPad' },
+        confidence: 0.9,
+        message: '',
+      });
+      expect(counted).toContain('iPad Pro');
+      expect(calibrateStock).not.toHaveBeenCalled();
+    });
+
+    it('唯一匹配时才盘点写入', async () => {
+      vi.mocked(getProductSPUs).mockResolvedValue([
+        {
+          id: '1',
+          name: 'iPad',
+          spu_code: 'A',
+          unit: '件',
+          skus: [{ id: 's1', sku_code: 'A1', current_stock: 10, is_default: true }],
+        },
+      ] as any);
+      vi.mocked(calibrateStock).mockResolvedValue({ id: 'c1', message: 'ok', new_stock: 12 });
+
+      const result = await executeCommand({
+        action: 'stocktake',
+        params: { mode: 'write', quantity: 12, productName: 'iPad' },
+        confidence: 0.9,
+        message: '',
+      });
+      expect(calibrateStock).toHaveBeenCalledWith(expect.objectContaining({
+        product_id: 's1',
+        actual_stock: 12,
+        triggered_by: 'manual',
+      }));
+      expect(result).toContain('盘点已记录');
     });
   });
 });

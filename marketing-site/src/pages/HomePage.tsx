@@ -32,6 +32,15 @@ const modeCards = [
     badge: 'bg-cyan-100 text-cyan-700',
     link: '/features#cloud-store',
   },
+  {
+    id: 'nvwax',
+    title: 'ProClaw × NvWaX',
+    subtitle: '虚拟公司闭环（v1.3.2 新增）',
+    desc: '与 NvWaX 云端协同：在 NvWaX 用对话式 AI 设计虚拟公司，一键导出 .nvwax-vc.json，ProClaw 本地运行整个 AI 团队。多设备自动同步。',
+    color: 'bg-violet-50 border-violet-200 hover:border-violet-400',
+    badge: 'bg-violet-100 text-violet-700',
+    link: '/features#nvwax-integration',
+  },
 ];
 
 const featureCards = [

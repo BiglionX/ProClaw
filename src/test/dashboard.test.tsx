@@ -84,6 +84,8 @@ describe('DashboardPage', () => {
     spu_count: 50,
     sku_count: 100,
     products_count: 100,
+    products: 100,
+    customers: 8,
     categories_count: 10,
     transactions_count: 500,
     pending_sync: 5,

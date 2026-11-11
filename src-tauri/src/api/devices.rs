@@ -1,8 +1,9 @@
 // 设备授权管理 API 处理器
 
+use super::auth::Claims;
 use super::AppState;
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Extension, Json, Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -89,7 +90,10 @@ pub async fn generate_pairing_code(
 }
 
 /// 获取已授权设备列表
-pub async fn list_devices(State(state): State<AppState>) -> impl IntoResponse {
+pub async fn list_devices(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+) -> impl IntoResponse {
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
@@ -105,7 +109,7 @@ pub async fn list_devices(State(state): State<AppState>) -> impl IntoResponse {
     let mut stmt = match conn.prepare(
         "SELECT id, device_name, device_type, last_active_at, is_revoked 
          FROM devices 
-         WHERE is_revoked = 0 
+         WHERE is_revoked = 0 AND user_id = ?1
          ORDER BY last_active_at DESC",
     ) {
         Ok(stmt) => stmt,
@@ -117,7 +121,7 @@ pub async fn list_devices(State(state): State<AppState>) -> impl IntoResponse {
         }
     };
 
-    let devices_iter = stmt.query_map([], |row| {
+    let devices_iter = stmt.query_map(params![claims.sub], |row| {
         Ok(DeviceResponse {
             id: row.get(0)?,
             device_name: row.get(1)?,
@@ -151,6 +155,7 @@ pub async fn list_devices(State(state): State<AppState>) -> impl IntoResponse {
 /// 踢除设备
 pub async fn revoke_device(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     let db = match state.db.lock() {
@@ -166,8 +171,8 @@ pub async fn revoke_device(
     let conn = db.connection();
 
     let result = conn.execute(
-        "UPDATE devices SET is_revoked = 1 WHERE id = ?1",
-        params![id],
+        "UPDATE devices SET is_revoked = 1 WHERE id = ?1 AND user_id = ?2",
+        params![id, claims.sub],
     );
 
     match result {

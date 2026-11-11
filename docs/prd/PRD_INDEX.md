@@ -1,9 +1,9 @@
 # ProClaw PRD 总索引
 
-> **最后更新**: 2026-06-21
-> **覆盖版本**: v1.0.0 (2026-06-08)
+> **最后更新**: 2026-08-17
+> **覆盖版本**: v1.1.0 (2026-08-17)
 > **统计**: 42 份 PRD（34 已实现 / 6 部分实现 / 1 草案 / 1 已替代）
-> **整理事件**: 2026-06-21 按主题目录重组 docs/prd/ + 新建 REQUIREMENTS.md
+> **整理事件**: 2026-08-17 更新统一助理 PRD v8.6（小如 + CEO Agent 合并） | 2026-06-21 按主题目录重组 docs/prd/ + 新建 REQUIREMENTS.md
 
 ---
 
@@ -55,7 +55,7 @@
 | PRD | 版本 | 状态 | 关键差异 |
 |---|---|---|---|
 | [ProClaw 用户中心](marketing/需求文档：ProClaw%20用户中心（PRD%20v5.1）.md) | v5.1 | ✅ 已实现 v1.0+ | 个人/安全/设备/订阅全 Tab |
-| [ProClaw 内置商务秘书 Agent](marketing/需求文档：ProClaw%20内置商务秘书%20Agent（PRD%20v8.5）.md) | v8.5 | ✅ 已实现 v1.0+ | BAP 偏好/碰壁话术/浮动入口 |
+| [ProClaw 统一助理 Agent](marketing/需求文档：ProClaw%20统一助理%20Agent（PRD%20v8.6）.md) | v8.6 | ✅ 已实现 v1.1+ | 小如 + CEO Agent 合并；意图路由；决策确认；任务分派；老板画像 |
 | [ProClaw 安装向导（CEO Agent 对话式配置）](marketing/需求文档：ProClaw%20安装向导（CEO%20Agent%20对话式配置）PRD%20v6.1.md) | v6.1 | ✅ 已实现 v1.0+ | CEO Agent 对话式引导 |
 | [ProClaw AI 团队交互 & AI 知识库统一管理](marketing/需求文档：AI团队交互与AI知识库统一管理.md) | v1.0 | ✅ 已实现 v1.0+ | 三库合一上线 |
 | [ProClaw 网站运营 AI Team 与多区域社媒运营](marketing/需求文档：ProClaw%20网站运营%20AI%20Team%20与多区域社媒运营（PRD%20v7.0）.md) | v7.0 | 🔵 部分实现 ~70% | 3 区域 Agent 上线；多区域调度待 v1.x |
@@ -215,7 +215,7 @@ docs/prd/_archive/
 | 8 | 移动端 | AI Team 页面 UI 重构与交互体验优化（PRD v12.0） | ✅ |
 | 9 | 移动端 | ProClaw_PRD_v4.0 | 🔴 已替代 |
 | 10 | 营销/用户中心 | ProClaw 用户中心（PRD v5.1） | ✅ |
-| 11 | 营销/用户中心 | ProClaw 内置商务秘书 Agent（PRD v8.5） | ✅ |
+| 11 | 营销/用户中心 | ProClaw 统一助理 Agent（PRD v8.6） | ✅ |
 | 12 | 营销/用户中心 | ProClaw 安装向导（PRD v6.1） | ✅ |
 | 13 | 营销/用户中心 | AI 团队交互与 AI 知识库统一管理 | ✅ |
 | 14 | 营销/用户中心 | ProClaw 网站运营 AI Team 与多区域社媒运营（PRD v7.0） | 🔵 70% |

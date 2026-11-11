@@ -12,6 +12,39 @@ ProClaw 营销网站的用户中心和管理员后台系统，基于 React + Typ
 - 🚧 Admin 后台管理
 - 🚧 外部项目接口管理
 
+## 🌐 v1.3.2 新增：ProClaw × NvWaX 虚拟公司集成营销
+
+> 本营销网站为 ProClaw 桌面端 + NvWaX 云端联合推广的官方入口。
+
+### 已上线的营销入口
+
+| 页面 | URL | 作用 |
+|------|-----|------|
+| 首页 | `/` | 新增第 4 张产品卡 "ProClaw × NvWaX" |
+| 功能页 | `/features` | 新增独立区块 "🌐 与 NvWaX 协同：一句话组建 AI 虚拟公司" |
+
+### 引导文案（features 区块）
+
+> 🌐 **与 NvWaX 协同：一句话组建 AI 虚拟公司**
+>
+> ProClaw 是 [NvWaX](https://nvwax.proclaw.cc) 官方推荐的"本地壳"。
+> 在 NvWaX 云端用对话式 AI 5-10 分钟设计好虚拟公司，一键导出 `.nvwax-vc.json`，
+> 回到 ProClaw 桌面端本地运行整个 AI 团队。多设备之间自动同步。
+
+### 关联文档
+
+- **ProClaw 端**：[`ProClaw/docs/integration/NVWAX_INTEGRATION.md`](https://github.com/BiglionX/ProClaw/blob/main/docs/integration/NVWAX_INTEGRATION.md)（开发者指南，220+ 行）
+- **NvWaX 端**：[`NvWaX/README.md`](https://github.com/BiglionX/NvwaX)（"🌐 与 ProClaw 桌面端的集成"章节）
+- **跨包数据契约**：[`ProClaw/docs/integration/virtual-company-package.schema.json`](https://github.com/BiglionX/ProClaw/blob/main/docs/integration/virtual-company-package.schema.json)（schemaVersion 1.0.0）
+
+### Sprint 时间线（对应 README v1.3.2）
+
+| Sprint | 主题 | 状态 |
+|--------|------|------|
+| 2.13 | 最小闭环（Schema + 导出 + 导入） | ✅ |
+| 2.14 | 4 项增强（CEO Skill + 文档 + 回写 + SSE） | ✅ |
+| 2.15 | 多设备同步（字段级 LWW） | ✅ |
+
 ## 技术栈
 
 - **前端框架**: React 18 + TypeScript

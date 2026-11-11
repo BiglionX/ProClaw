@@ -11,7 +11,7 @@
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
-use crate::import::category_resolver::ensure_category;
+use crate::import::category_resolver::{clean_category_name, ensure_category};
 use crate::import::types::{CustomerAggregate, ProductAggregate};
 
 /// 持久化单个客户聚合（1 customer + N contacts）
@@ -134,18 +134,29 @@ pub fn persist_product_with_skus(
     skip_category: bool,
     batch_id: &str,
 ) -> Result<String, String> {
-    // 1) 类别（防御空字符串）
-    if !skip_category {
-        if let Some(cat) = &agg.category {
-            let trimmed = cat.trim();
-            if !trimmed.is_empty() {
-                ensure_category(conn, "product", trimmed)?;
-            }
+    // 1) 类别写两处：categories 供导入撤销；product_categories + products.category_id 供数据中心按类别统计。
+    let category_id = if skip_category {
+        None
+    } else if let Some(cat) = &agg.category {
+        let trimmed = cat.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            ensure_category(conn, "product", trimmed)?;
+            ensure_product_category_id(conn, trimmed)?
         }
-    }
+    } else {
+        None
+    };
 
     // 2) upsert product（按 sku）
-    let product_id = upsert_product(conn, &agg.sku, &agg.name, agg.spec.as_deref())?;
+    let product_id = upsert_product(
+        conn,
+        &agg.sku,
+        &agg.name,
+        agg.spec.as_deref(),
+        category_id.as_deref(),
+    )?;
 
     // 3) 写 N 条 product_sku（直接 INSERT，旧数据由调用方在事务顶端预清理）
     for variant in &agg.variants {
@@ -169,11 +180,45 @@ pub fn persist_product_with_skus(
     Ok(product_id)
 }
 
+/// 把老系统的类别名挂到 product_categories，返回 id。数据中心按这张表分组。
+fn ensure_product_category_id(
+    conn: &rusqlite::Connection,
+    raw_name: &str,
+) -> Result<Option<String>, String> {
+    let name = clean_category_name(raw_name);
+    if name.is_empty() {
+        return Ok(None);
+    }
+    if let Some(id) = conn
+        .query_row(
+            "SELECT id FROM product_categories
+             WHERE name = ?1 AND deleted_at IS NULL
+             LIMIT 1",
+            params![name],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+    {
+        return Ok(Some(id));
+    }
+    let id = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO product_categories
+            (id, name, sort_order, is_active, created_at, updated_at, sync_status)
+         VALUES (?1, ?2, 0, 1, datetime('now'), datetime('now'), 'pending')",
+        params![id, name],
+    )
+    .map_err(|e| format!("创建商品分类失败: {}", e))?;
+    Ok(Some(id))
+}
+
 fn upsert_product(
     conn: &rusqlite::Connection,
     sku: &str,
     name: &str,
     spec: Option<&str>,
+    category_id: Option<&str>,
 ) -> Result<String, String> {
     // 按 sku 找
     if let Some(id) = conn
@@ -189,9 +234,10 @@ fn upsert_product(
         conn.execute(
             "UPDATE products SET name = COALESCE(NULLIF(?1, ''), name),
                 description = COALESCE(NULLIF(?2, ''), description),
+                category_id = COALESCE(?3, category_id),
                 sync_status = 'pending', updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?3",
-            params![name, spec.unwrap_or(""), id],
+             WHERE id = ?4",
+            params![name, spec.unwrap_or(""), category_id, id],
         )
         .map_err(|e| e.to_string())?;
         return Ok(id);
@@ -200,10 +246,10 @@ fn upsert_product(
     let id = Uuid::new_v4().to_string();
     conn.execute(
         "INSERT INTO products
-            (id, sku, name, description, unit, cost_price, sell_price,
+            (id, sku, name, description, category_id, unit, cost_price, sell_price,
              min_stock, max_stock, current_stock, barcode, is_active, sync_status)
-         VALUES (?1, ?2, ?3, ?4, '件', 0, 0, 0, 999999, 0, '', 1, 'pending')",
-        params![id, sku, name, spec.unwrap_or("")],
+         VALUES (?1, ?2, ?3, ?4, ?5, '件', 0, 0, 0, 999999, 0, '', 1, 'pending')",
+        params![id, sku, name, spec.unwrap_or(""), category_id],
     )
     .map_err(|e| format!("创建商品失败: {}", e))?;
     Ok(id)

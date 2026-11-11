@@ -225,7 +225,7 @@ test_1.test.describe('商务秘书 Agent 功能 (PRD v8.5)', function () {
             }
         });
     }); });
-    (0, test_1.test)('向秘书发送决策类请求应触发碰壁话术', function (_a) { return __awaiter(void 0, [_a], void 0, function (_b) {
+    (0, test_1.test)('向秘书发送决策类请求应弹出决策确认', function (_a) { return __awaiter(void 0, [_a], void 0, function (_b) {
         var textarea;
         var page = _b.page;
         return __generator(this, function (_c) {
@@ -251,10 +251,12 @@ test_1.test.describe('商务秘书 Agent 功能 (PRD v8.5)', function () {
                 case 5:
                     // 等待响应
                     _c.sent();
-                    // 应显示碰壁话术（拒绝+引导）
-                    return [4 /*yield*/, (0, test_1.expect)(page.locator('text=决策权限')).toBeVisible()];
+                    // 合并后：决策类请求不再碰壁拒绝，而是弹出决策确认对话框
+                    return [4 /*yield*/, (0, test_1.expect)(page.locator('text=决策确认')).toBeVisible()];
                 case 6:
-                    // 应显示碰壁话术（拒绝+引导）
+                    _c.sent();
+                    return [4 /*yield*/, (0, test_1.expect)(page.locator('text=确认执行')).toBeVisible()];
+                case 7:
                     _c.sent();
                     return [2 /*return*/];
             }

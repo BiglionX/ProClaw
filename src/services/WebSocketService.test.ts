@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { desktopWsService } from './WebSocketService';
 
 class MockWebSocket {
+  static CONNECTING = 0;
   static OPEN = 1;
   static CLOSED = 3;
 
@@ -72,6 +73,37 @@ describe('DesktopWebSocketService auth flow', () => {
     desktopWsService.connect('http://localhost:8888', 'user123', 'token_abc');
     simulateOpenAndAuth('connection_status');
     expect(desktopWsService.connected).toBe(true);
+  });
+
+  it('queues a message while connecting and sends it after open', () => {
+    desktopWsService.connect('http://localhost:8888', 'user123', 'token_abc');
+    lastWs!.readyState = MockWebSocket.CONNECTING;
+    expect(desktopWsService.send('chat', { text: 'hi' })).toBe(true);
+    expect(lastWs!.send).not.toHaveBeenCalled();
+
+    lastWs!.readyState = MockWebSocket.OPEN;
+    lastWs!.onopen?.();
+
+    expect(lastWs!.send).toHaveBeenNthCalledWith(
+      1,
+      JSON.stringify({ type: 'auth', user_id: 'user123', token: 'token_abc' }),
+    );
+    expect(lastWs!.send).toHaveBeenNthCalledWith(
+      2,
+      JSON.stringify({ type: 'chat', payload: { text: 'hi' } }),
+    );
+  });
+
+  it('does not send after disconnect', () => {
+    desktopWsService.connect('http://localhost:8888', 'user123', 'token_abc');
+    const socket = lastWs!;
+    socket.readyState = MockWebSocket.CONNECTING;
+    desktopWsService.send('chat', { text: 'late' });
+    desktopWsService.disconnect();
+    socket.readyState = MockWebSocket.OPEN;
+    socket.onopen?.();
+    expect(socket.send).not.toHaveBeenCalled();
+    expect(socket.close).toHaveBeenCalled();
   });
 
   it('auth_error closes connection', () => {

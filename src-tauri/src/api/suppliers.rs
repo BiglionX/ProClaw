@@ -31,6 +31,19 @@ pub struct SupplierRequest {
 #[derive(Debug, Deserialize)]
 pub struct SupplierQuery {
     pub search: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+fn internal_db_error(
+    context: &str,
+    err: impl std::fmt::Display,
+) -> (StatusCode, Json<serde_json::Value>) {
+    eprintln!("[Suppliers] {}: {}", context, err);
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({"error": "Database error"})),
+    )
 }
 
 /// 获取供应商列表
@@ -59,7 +72,12 @@ pub async fn get_suppliers(
 
     if let Some(ref search) = query.search {
         if !search.is_empty() {
-            sql.push_str(" AND (name LIKE ?1 OR code LIKE ?2 OR contact_person LIKE ?3)");
+            let i1 = params_vec.len() + 1;
+            let i2 = params_vec.len() + 2;
+            let i3 = params_vec.len() + 3;
+            sql.push_str(&format!(
+                " AND (name LIKE ?{i1} OR code LIKE ?{i2} OR contact_person LIKE ?{i3})"
+            ));
             let pattern = format!("%{}%", search);
             params_vec.push(Box::new(pattern.clone()));
             params_vec.push(Box::new(pattern.clone()));
@@ -67,19 +85,31 @@ pub async fn get_suppliers(
         }
     }
 
+    let total = {
+        let count_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+        match crate::database::count_unpaged(conn, &sql, count_refs.as_slice()) {
+            Ok(n) => n,
+            Err(e) => return internal_db_error("count suppliers", e),
+        }
+    };
+
     sql.push_str(" ORDER BY name ASC");
+    let page_size = crate::database::clamp_page_size(query.page_size, 200);
+    let page = query.page.unwrap_or(1).max(1);
+    crate::database::append_limit_offset(
+        &mut sql,
+        &mut params_vec,
+        page_size,
+        (page - 1) * page_size,
+    );
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
         params_vec.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
-            )
-        }
+        Err(e) => return internal_db_error("query suppliers", e),
     };
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
@@ -101,18 +131,18 @@ pub async fn get_suppliers(
         }))
     }) {
         Ok(r) => r,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("Query error: {}", e)})),
-            )
-        }
+        Err(e) => return internal_db_error("query suppliers", e),
     };
 
     let result: Vec<serde_json::Value> = rows.filter_map(|r| r.ok()).collect();
     (
         StatusCode::OK,
-        Json(serde_json::json!({ "data": result, "total": result.len() })),
+        Json(serde_json::json!({
+            "data": result,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        })),
     )
 }
 
@@ -214,10 +244,13 @@ pub async fn create_supplier(
                 "message": "Supplier created successfully"
             })),
         ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to create supplier: {}", e)})),
-        ),
+        Err(e) => {
+            eprintln!("[Suppliers] write failed: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+        }
     }
 }
 
@@ -319,10 +352,13 @@ pub async fn update_supplier(
                 "message": "Supplier updated successfully"
             })),
         ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to update supplier: {}", e)})),
-        ),
+        Err(e) => {
+            eprintln!("[Suppliers] write failed: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+        }
     }
 }
 
@@ -353,7 +389,12 @@ pub async fn delete_supplier(
                 (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Supplier not found"})))
             }
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("Failed to delete supplier: {}", e)}))),
+        Err(e) => {
+            eprintln!("[Suppliers] delete failed: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Database error"})),
+            )
+        }
     }
 }

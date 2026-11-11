@@ -47,7 +47,7 @@ import {
 } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   cancelBatch,
   getBatchErrors,
@@ -76,8 +76,19 @@ const TARGETS: ImportTarget[] = [
   'customers',
 ];
 
+const MASTER_ENTRY_TARGETS: ImportTarget[] = [
+  'customers',
+  'suppliers',
+  'products',
+  'inventory',
+  'purchases',
+  'sales',
+];
+
 export default function ImportCenterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targets = searchParams.get('entry') === 'master' ? MASTER_ENTRY_TARGETS : TARGETS;
   const qc = useQueryClient();
   const [targetFilter, setTargetFilter] = useState<ImportTarget | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -136,7 +147,7 @@ export default function ImportCenterPage() {
         新建导入
       </Typography>
       <Grid container spacing={2} sx={{ mb: 4 }}>
-        {TARGETS.map((t) => (
+        {targets.map((t) => (
           <Grid item xs={6} sm={4} md={2} key={t}>
             <Card variant="outlined" sx={{ height: '100%' }}>
               <CardActionArea

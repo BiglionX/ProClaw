@@ -1,6 +1,7 @@
 use crate::api::quantity_price::{line_amount, round_money};
 use crate::database::Database;
-use rusqlite::{params, Connection};
+use crate::finance_ledger::post_purchase_inbound_entries;
+use rusqlite::params;
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -48,6 +49,52 @@ pub fn create_supplier(
         "code": code,
         "message": "Supplier created successfully"
     }))
+}
+
+/// 更新供应商基础资料
+#[tauri::command]
+pub fn update_supplier(
+    db: tauri::State<Mutex<Database>>,
+    id: String,
+    supplier: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let name = supplier["name"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("供应商名称不能为空")?;
+    let changed = conn
+        .execute(
+            "UPDATE suppliers SET
+                name = ?1, code = ?2, contact_person = ?3, phone = ?4, email = ?5,
+                address = ?6, website = ?7, payment_terms = ?8, tax_number = ?9,
+                notes = ?10, is_active = ?11, sync_status = 'pending',
+                updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?12 AND deleted_at IS NULL",
+            params![
+                name,
+                supplier.get("code").and_then(|v| v.as_str()).unwrap_or(""),
+                supplier.get("contact_person").and_then(|v| v.as_str()),
+                supplier.get("phone").and_then(|v| v.as_str()),
+                supplier.get("email").and_then(|v| v.as_str()),
+                supplier.get("address").and_then(|v| v.as_str()),
+                supplier.get("website").and_then(|v| v.as_str()),
+                supplier.get("payment_terms").and_then(|v| v.as_str()),
+                supplier.get("tax_number").and_then(|v| v.as_str()),
+                supplier.get("notes").and_then(|v| v.as_str()),
+                supplier
+                    .get("is_active")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true),
+                id,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err("供应商不存在".to_string());
+    }
+    Ok(serde_json::json!({ "id": id, "name": name }))
 }
 
 /// 获取供应商列表
@@ -492,13 +539,8 @@ pub fn receive_purchase_order_cmd(
     order_id: String,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
-    receive_purchase_order_on_conn(db.connection(), order_id)
-}
+    let conn = db.connection();
 
-pub(crate) fn receive_purchase_order_on_conn(
-    conn: &Connection,
-    order_id: String,
-) -> Result<serde_json::Value, String> {
     let status: String = conn
         .query_row(
             "SELECT status FROM purchase_orders WHERE id = ?1 AND deleted_at IS NULL",
@@ -507,7 +549,8 @@ pub(crate) fn receive_purchase_order_on_conn(
         )
         .map_err(|_| "Purchase order not found".to_string())?;
 
-    if status != "confirmed" && status != "draft" && status != "approved" {
+    // 草稿不可直接收货，须先确认/审批
+    if status != "confirmed" && status != "approved" {
         return Err(format!("Cannot receive order with status '{}'", status));
     }
 
@@ -587,6 +630,9 @@ pub(crate) fn receive_purchase_order_on_conn(
     }
 
     tx.execute("UPDATE purchase_orders SET status = 'received', updated_at = CURRENT_TIMESTAMP WHERE id = ?1", params![order_id]).map_err(|e| e.to_string())?;
+
+    post_purchase_inbound_entries(&tx, &order_id, None)?;
+
     tx.commit().map_err(|e| e.to_string())?;
 
     let mut response = serde_json::json!({

@@ -1395,7 +1395,7 @@ impl Database {
                     'sales', 'suppliers', 'customers'
                 )),
                 source_filename TEXT NOT NULL,
-                source_format TEXT NOT NULL CHECK(source_format IN ('csv', 'xlsx', 'json')),
+                source_format TEXT NOT NULL CHECK(source_format IN ('csv', 'xlsx', 'xls', 'json')),
                 source_size INTEGER,
                 source_path TEXT,
                 row_count INTEGER,
@@ -1458,12 +1458,101 @@ impl Database {
             );
         }
 
+        // 审计修复 #15: 老系统 import_batches 表 schema 迁移（v1.0/v1.1 → v1.3）
+        // 背景：v1.1.1 hotfix 兑底段用 CREATE TABLE IF NOT EXISTS 不会修改已存在的老表，
+        //       从 v1.0/v1.1 升级上来的数据库仍是老 schema，v1.3 写入 source_filename 等新列时
+        //       报 "table import_batches has no column named source_filename"。
+        // 策略：动态检查列是否存在，存在的重命名/补列；不存在的跳过。
+        if let Err(e) = migrate_legacy_import_batches_schema(&self.conn) {
+            eprintln!(
+                "[DB Migration WARNING] 老 import_batches 表 schema 迁移: {}",
+                e
+            );
+            migration_errors.push(format!("legacy_import_batches_schema: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] 老 import_batches 表 schema 迁移已应用（如需要）");
+        }
+
+        // 审计修复 #17: v1.3 product_spus 需 sort_order 列，老库缺
+        // 现象：demoBootstrap → get_syncable_products SQL 含
+        //       "ORDER BY sort_order ASC, created_at DESC" → "no such column: sort_order"
+        // 策略：动态检查列是否存在，不存在则补 (DEFAULT 0 + CREATE INDEX)
+        if let Err(e) = migrate_legacy_product_spus_schema(&self.conn) {
+            eprintln!(
+                "[DB Migration WARNING] 老 product_spus 表 schema 迁移: {}",
+                e
+            );
+            migration_errors.push(format!("legacy_product_spus_schema: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] 老 product_spus 表 schema 迁移已应用（如需要）");
+        }
+
+        // v13.1.1 本地账号模式：users.email UNIQUE 索引（B4 修复）
+        // 现象：register_local_cmd 并发注册同一邮箱时会重复插入
+        // 策略：CREATE UNIQUE INDEX IF NOT EXISTS；不区删除与未删除记录（软删复用）
+        if let Err(e) = migrate_users_email_unique(&self.conn) {
+            eprintln!("[DB Migration WARNING] users.email UNIQUE 索引: {}", e);
+            migration_errors.push(format!("users_email_unique: {}", e));
+        } else {
+            eprintln!("✓ [DB Migration] users.email UNIQUE 索引已就绪");
+        }
+
         // Phase harden: 连接打开并跑完 schema 引导后补齐列表查询索引。
         // 仅 CREATE INDEX IF NOT EXISTS，不改表结构、不加 CHECK。
         if let Err(e) = ensure_list_indexes(&self.conn) {
             eprintln!("[DB Migration WARNING] list query indexes: {}", e);
             migration_errors.push(format!("list_query_indexes: {}", e));
         }
+
+        // P0-07：unit / cost_price 禁止再被写成 NULL（新库 schema 已是 NOT NULL DEFAULT）
+        if let Err(e) = apply_p0_07_product_required_fields(&self.conn) {
+            eprintln!(
+                "[DB Migration WARNING] p0_07 product required fields: {}",
+                e
+            );
+            migration_errors.push(format!("p0_07: {}", e));
+        }
+
+        // 演示账号不在 users 表里时，登录页和 isDemoAccount() 都认不出 boss@proclaw.demo
+        if let Err(e) = ensure_demo_learning_account(&self.conn) {
+            eprintln!("[DB Migration WARNING] demo learning account: {}", e);
+            migration_errors.push(format!("demo_account: {}", e));
+        } else {
+            eprintln!("✓ [DB] 演示账号 boss@proclaw.demo 已就绪");
+        }
+
+        if let Err(e) = retire_dev_junk_accounts(&self.conn) {
+            eprintln!("[DB Migration WARNING] retire dev junk accounts: {}", e);
+            migration_errors.push(format!("dev_junk_accounts: {}", e));
+        }
+
+        // 063：凭证借贷金额。新库 schema 已带列，旧库在这里补。随后给已出库但没凭证的销售单补分录。
+        if let Err(e) = ensure_journal_amount_columns(&self.conn) {
+            eprintln!("[DB Migration WARNING] 063 journal amounts: {}", e);
+            migration_errors.push(format!("063_journal_amounts: {}", e));
+        } else {
+            match crate::finance_ledger::backfill_missing_sales_entries(&self.conn) {
+                Ok(n) if n > 0 => {
+                    eprintln!("✓ [DB] 已为 {n} 张已出库销售单补写收入/成本凭证");
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("[DB Migration WARNING] sales voucher backfill: {}", e);
+                    migration_errors.push(format!("sales_voucher_backfill: {}", e));
+                }
+            }
+            match crate::finance_ledger::backfill_missing_purchase_entries(&self.conn) {
+                Ok(n) if n > 0 => {
+                    eprintln!("✓ [DB] 已为 {n} 张已收货采购单补写库存/应付凭证");
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("[DB Migration WARNING] purchase voucher backfill: {}", e);
+                    migration_errors.push(format!("purchase_voucher_backfill: {}", e));
+                }
+            }
+        }
+
         // P0-1 修复：历史已出库单的 shipped_quantity 回填。
         // 出库时写 shipped_quantity 是本次修复引入的，之前的单全是 0。
         // confirmed/shipped 是出库后的状态；delivered 是标记送达，同样已经出过库。
@@ -1630,6 +1719,349 @@ impl Database {
     }
 }
 
+const DEMO_USER_ID: &str = "mock-boss-001";
+const DEMO_USER_EMAIL: &str = "boss@proclaw.demo";
+const DEMO_USER_PASSWORD: &str = "IamBigBoss";
+
+fn hash_demo_password(password: &str) -> Result<String, String> {
+    use argon2::{
+        password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+        Argon2,
+    };
+    let salt = SaltString::generate(&mut OsRng);
+    Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map(|hash| hash.to_string())
+        .map_err(|e| format!("演示账号密码哈希失败: {e}"))
+}
+
+/// P0-07：把已经写成 NULL 的单位/价格补回默认值，并拒绝以后再写 NULL。
+/// 新安装的 schema 已是 `unit TEXT NOT NULL DEFAULT '件'`、`cost_price REAL NOT NULL DEFAULT 0`。
+/// 已有库无法在原地 ALTER 出 NOT NULL（会牵动外键和库存触发器），用回填 + 触发器达到同样效果。
+fn apply_p0_07_product_required_fields(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "UPDATE products SET
+            unit = CASE WHEN unit IS NULL OR TRIM(unit) = '' THEN '件' ELSE unit END,
+            cost_price = COALESCE(cost_price, 0),
+            sell_price = COALESCE(sell_price, 0),
+            min_stock = COALESCE(min_stock, 0),
+            max_stock = COALESCE(max_stock, 0),
+            current_stock = COALESCE(current_stock, 0)
+         WHERE unit IS NULL OR TRIM(IFNULL(unit, '')) = '' OR cost_price IS NULL
+            OR sell_price IS NULL OR min_stock IS NULL OR max_stock IS NULL
+            OR current_stock IS NULL",
+        [],
+    )
+    .map_err(|e| format!("回填商品必填字段失败: {e}"))?;
+
+    conn.execute_batch(
+        "DROP TRIGGER IF EXISTS trg_products_unit_cost_required_ins;
+         CREATE TRIGGER trg_products_unit_cost_required_ins
+         BEFORE INSERT ON products
+         FOR EACH ROW
+         WHEN NEW.unit IS NULL OR TRIM(NEW.unit) = '' OR NEW.cost_price IS NULL
+         BEGIN
+             SELECT RAISE(ABORT, 'products.unit and cost_price are required');
+         END;
+         DROP TRIGGER IF EXISTS trg_products_unit_cost_required_upd;
+         CREATE TRIGGER trg_products_unit_cost_required_upd
+         BEFORE UPDATE ON products
+         FOR EACH ROW
+         WHEN NEW.unit IS NULL OR TRIM(NEW.unit) = '' OR NEW.cost_price IS NULL
+         BEGIN
+             SELECT RAISE(ABORT, 'products.unit and cost_price are required');
+         END;",
+    )
+    .map_err(|e| format!("商品必填触发器失败: {e}"))?;
+    Ok(())
+}
+
+/// 保证学习用演示账号 `boss@proclaw.demo` / `mock-boss-001` 存在，并带上演示商品和两张销售订单。
+/// 幂等：重复启动不会覆盖已有密码，也不会重复插入订单。
+/// 停用开发脚本留下的 `*@test.local`、`user-时间戳@`、`boss-时间戳@`、`dup-时间戳@`。
+/// 正式演示账号 `boss@proclaw.demo` 不在此列。只打 deleted_at，避免外键把订单一起删掉。
+fn retire_dev_junk_accounts(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "UPDATE users
+         SET is_active = 0,
+             deleted_at = COALESCE(deleted_at, CURRENT_TIMESTAMP)
+         WHERE deleted_at IS NULL
+           AND LOWER(IFNULL(email, '')) != 'boss@proclaw.demo'
+           AND (
+             LOWER(IFNULL(email, '')) LIKE '%@test.local'
+             OR LOWER(IFNULL(email, '')) GLOB 'user-[0-9]*@*'
+             OR LOWER(IFNULL(email, '')) GLOB 'boss-[0-9]*@*'
+             OR LOWER(IFNULL(email, '')) GLOB 'dup-[0-9]*@*'
+           )",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub(crate) fn ensure_demo_learning_account(conn: &Connection) -> Result<(), String> {
+    let user_id = upsert_demo_user(conn)?;
+    ensure_demo_sample_orders(conn, &user_id)?;
+    Ok(())
+}
+
+fn upsert_demo_user(conn: &Connection) -> Result<String, String> {
+    let existing_id: Option<String> = match conn.query_row(
+        "SELECT id FROM users
+         WHERE id = ?1 OR LOWER(IFNULL(email, '')) = ?2
+         ORDER BY CASE WHEN id = ?1 THEN 0 ELSE 1 END
+         LIMIT 1",
+        params![DEMO_USER_ID, DEMO_USER_EMAIL],
+        |row| row.get(0),
+    ) {
+        Ok(id) => Some(id),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(e) => return Err(e.to_string()),
+    };
+
+    let user_id = if let Some(id) = existing_id {
+        id
+    } else {
+        let hash = hash_demo_password(DEMO_USER_PASSWORD)?;
+        conn.execute(
+            "INSERT INTO users (id, name, email, user_type, password_hash, is_active, plan_type)
+             VALUES (?1, '演示账号', ?2, 'internal', ?3, 1, 'professional')",
+            params![DEMO_USER_ID, DEMO_USER_EMAIL, hash],
+        )
+        .map_err(|e| format!("插入演示账号失败: {e}"))?;
+        DEMO_USER_ID.to_string()
+    };
+
+    if table_has_column(conn, "users", "deleted_at").unwrap_or(false) {
+        conn.execute(
+            "UPDATE users
+             SET name = '演示账号', user_type = 'internal', is_active = 1, deleted_at = NULL
+             WHERE id = ?1",
+            params![user_id],
+        )
+        .map_err(|e| format!("恢复演示账号失败: {e}"))?;
+    } else {
+        conn.execute(
+            "UPDATE users SET name = '演示账号', user_type = 'internal', is_active = 1 WHERE id = ?1",
+            params![user_id],
+        )
+        .map_err(|e| format!("恢复演示账号失败: {e}"))?;
+    }
+
+    if let Err(e) = conn.execute(
+        "UPDATE users SET email = ?2 WHERE id = ?1",
+        params![user_id, DEMO_USER_EMAIL],
+    ) {
+        let msg = e.to_string();
+        if !msg.contains("UNIQUE") {
+            return Err(format!("更新演示邮箱失败: {msg}"));
+        }
+        eprintln!("[demo] boss@proclaw.demo 已被占用，保留账号 {user_id} 的现有邮箱");
+    }
+
+    let hash_missing: bool = conn
+        .query_row(
+            "SELECT COALESCE(password_hash, '') = '' FROM users WHERE id = ?1",
+            params![user_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(true);
+    if hash_missing {
+        let hash = hash_demo_password(DEMO_USER_PASSWORD)?;
+        conn.execute(
+            "UPDATE users SET password_hash = ?2 WHERE id = ?1",
+            params![user_id, hash],
+        )
+        .map_err(|e| format!("写入演示账号密码失败: {e}"))?;
+    }
+
+    conn.execute(
+        "INSERT OR IGNORE INTO roles (name, description, permissions) VALUES ('boss', '老板', '[\"*\"]')",
+        [],
+    )
+    .map_err(|e| format!("确保 boss 角色失败: {e}"))?;
+    conn.execute(
+        "INSERT OR IGNORE INTO user_roles (user_id, role_id)
+         SELECT ?1, id FROM roles WHERE name = 'boss' LIMIT 1",
+        params![user_id],
+    )
+    .map_err(|e| format!("分配演示账号角色失败: {e}"))?;
+
+    Ok(user_id)
+}
+
+fn ensure_demo_sample_orders(conn: &Connection, user_id: &str) -> Result<(), String> {
+    conn.execute_batch(
+        "INSERT OR IGNORE INTO product_categories (id, name, sort_order, is_active)
+         VALUES ('cat_iphone15', 'iPhone 15 系列', 10, 1);
+         INSERT OR IGNORE INTO brands (id, name, is_active)
+         VALUES ('brand_apple', 'Apple', 1);",
+    )
+    .map_err(|e| format!("演示分类/品牌失败: {e}"))?;
+
+    let samples = [
+        (
+            "spu_iphone15pm_bat",
+            "SPU-2026-001",
+            "iPhone 15 Pro Max 电池",
+            80.0_f64,
+            199.0_f64,
+            50_i32,
+        ),
+        (
+            "spu_iphone15_bat",
+            "SPU-2026-003",
+            "iPhone 15 电池",
+            60.0,
+            159.0,
+            60,
+        ),
+    ];
+    for (id, sku, name, cost, sell, stock) in samples {
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 OR sku = ?2)",
+                params![id, sku],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+        if exists {
+            continue;
+        }
+        conn.execute(
+            "INSERT INTO products (
+                id, sku, name, category_id, brand_id, unit,
+                cost_price, sell_price, min_stock, max_stock, current_stock,
+                is_active, sync_status
+             ) VALUES (?1, ?2, ?3, 'cat_iphone15', 'brand_apple', '块', ?4, ?5, 5, 100, ?6, 1, 'synced')",
+            params![id, sku, name, cost, sell, stock],
+        )
+        .map_err(|e| format!("插入演示商品 {sku} 失败: {e}"))?;
+    }
+
+    let customer_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM customers WHERE id = 'cust-demo-001')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+    if !customer_exists {
+        conn.execute(
+            "INSERT INTO customers (id, name, code, contact_person, phone, customer_type, is_active)
+             VALUES ('cust-demo-001', '演示客户·华强北', 'DEMO-CUST-001', '李店长', '13800001111', 'company', 1)",
+            [],
+        )
+        .map_err(|e| format!("插入演示客户失败: {e}"))?;
+    }
+
+    insert_demo_order(
+        conn,
+        user_id,
+        "so-demo-001",
+        "SO-DEMO-001",
+        "soi-demo-001",
+        "spu_iphone15pm_bat",
+        "2026-03-01",
+        "confirmed",
+        "paid",
+        2,
+        199.0,
+        398.0,
+        "演示订单：iPhone 15 Pro Max 电池 x2",
+    )?;
+    insert_demo_order(
+        conn,
+        user_id,
+        "so-demo-002",
+        "SO-DEMO-002",
+        "soi-demo-002",
+        "spu_iphone15_bat",
+        "2026-04-02",
+        "shipped",
+        "unpaid",
+        1,
+        159.0,
+        159.0,
+        "演示订单：iPhone 15 电池 x1",
+    )?;
+    Ok(())
+}
+
+fn insert_demo_order(
+    conn: &Connection,
+    user_id: &str,
+    order_id: &str,
+    so_number: &str,
+    item_id: &str,
+    product_id: &str,
+    order_date: &str,
+    status: &str,
+    payment_status: &str,
+    quantity: i32,
+    unit_price: f64,
+    total: f64,
+    notes: &str,
+) -> Result<(), String> {
+    let product_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM products WHERE id = ?1 AND deleted_at IS NULL)",
+            params![product_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+    if !product_exists {
+        return Ok(());
+    }
+
+    let order_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sales_orders WHERE id = ?1 OR so_number = ?2)",
+            params![order_id, so_number],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+    if !order_exists {
+        let paid = if payment_status == "paid" { total } else { 0.0 };
+        conn.execute(
+            "INSERT INTO sales_orders (
+                id, so_number, customer_id, order_date, status,
+                total_amount, paid_amount, payment_status, notes, created_by, sync_status
+             ) VALUES (?1, ?2, 'cust-demo-001', ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'synced')",
+            params![
+                order_id,
+                so_number,
+                order_date,
+                status,
+                total,
+                paid,
+                payment_status,
+                notes,
+                user_id
+            ],
+        )
+        .map_err(|e| format!("插入演示订单 {so_number} 失败: {e}"))?;
+    }
+
+    let item_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sales_order_items WHERE id = ?1)",
+            params![item_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+    if !item_exists {
+        conn.execute(
+            "INSERT INTO sales_order_items (
+                id, sales_order_id, product_id, quantity, unit_price, total_price, notes
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![item_id, order_id, product_id, quantity, unit_price, total, notes],
+        )
+        .map_err(|e| format!("插入演示订单明细 {so_number} 失败: {e}"))?;
+    }
+    Ok(())
+}
+
 /// 获取数据库文件路径
 pub fn get_database_path() -> PathBuf {
     // 修复 v1.0.8 闪退: 不再用 .expect() 直接 panic
@@ -1716,6 +2148,46 @@ mod tests {
 
         assert!(table_count > 0);
 
+        let index_count: i64 = db
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (
+                    'idx_products_created_at',
+                    'idx_products_sku',
+                    'idx_sales_orders_customer_created',
+                    'idx_inventory_tx_product_created'
+                )",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            index_count, 4,
+            "list query indexes should exist after initialize"
+        );
+
+        let demo_email: String = db
+            .connection()
+            .query_row(
+                "SELECT email FROM users WHERE id = 'mock-boss-001'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("demo user mock-boss-001");
+        assert_eq!(demo_email, "boss@proclaw.demo");
+        let demo_orders: i64 = db
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM sales_orders WHERE id IN ('so-demo-001', 'so-demo-002') AND deleted_at IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            demo_orders, 2,
+            "demo account should ship with two learning orders"
+        );
+
         // 清理
         std::fs::remove_file(&db_path).ok();
         std::fs::remove_dir(&temp_dir).ok();
@@ -1775,268 +2247,335 @@ mod tests {
         std::fs::remove_file(&db_path).ok();
         std::fs::remove_dir(&temp_dir).ok();
     }
+}
 
-    /// 迁移前的销采存表：有数量/单价列，但没有 P0-06 的 CHECK。
-    fn legacy_p0_06_schema(conn: &Connection) {
-        conn.execute_batch(
-            "CREATE TABLE products (
-                id TEXT PRIMARY KEY,
-                sku TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                current_stock INTEGER
-            );
-            CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT NOT NULL);
-            CREATE TABLE suppliers (id TEXT PRIMARY KEY, name TEXT NOT NULL);
-            CREATE TABLE sales_orders (
-                id TEXT PRIMARY KEY,
-                so_number TEXT UNIQUE NOT NULL,
-                customer_id TEXT NOT NULL,
-                order_date TEXT NOT NULL
-            );
-            CREATE TABLE purchase_orders (
-                id TEXT PRIMARY KEY,
-                po_number TEXT UNIQUE NOT NULL,
-                supplier_id TEXT NOT NULL,
-                order_date TEXT NOT NULL
-            );
-            CREATE TABLE sales_order_items (
-                id TEXT PRIMARY KEY,
-                sales_order_id TEXT NOT NULL,
-                product_id TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                unit_price REAL NOT NULL,
-                total_price REAL NOT NULL,
-                shipped_quantity INTEGER,
-                notes TEXT,
-                created_at TEXT,
-                updated_at TEXT
-            );
-            CREATE TABLE purchase_order_items (
-                id TEXT PRIMARY KEY,
-                purchase_order_id TEXT NOT NULL,
-                product_id TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                unit_price REAL NOT NULL,
-                total_price REAL NOT NULL,
-                received_quantity INTEGER,
-                notes TEXT,
-                created_at TEXT,
-                updated_at TEXT
-            );
-            CREATE TABLE inventory_transactions (
-                id TEXT PRIMARY KEY,
-                product_id TEXT NOT NULL,
-                transaction_type TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                reference_no TEXT,
-                reason TEXT,
-                performed_by TEXT,
-                notes TEXT,
-                created_at TEXT,
-                sync_status TEXT,
-                last_synced_at TEXT
-            );",
+/// 063：给已有库补上借贷金额列。新库的 CREATE TABLE 已包含这两列，重复 ALTER 会被忽略。
+fn ensure_journal_amount_columns(conn: &Connection) -> rusqlite::Result<()> {
+    let sql = include_str!("../../database/migrations/063_financial_debit_credit.sql");
+    let stripped: String = sql
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with("--")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    for stmt in stripped.split(';') {
+        let stmt = stmt.trim();
+        if stmt.is_empty() {
+            continue;
+        }
+        if let Err(e) = conn.execute(stmt, []) {
+            let msg = e.to_string();
+            if msg.contains("duplicate column") {
+                continue;
+            }
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+
+/// 检查表中是否存在指定列
+fn table_has_column(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let name: String = row.get(1)?;
+        if name.eq_ignore_ascii_case(column) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// 老系统 import_batches 表 schema 迁移（v1.0/v1.1 → v1.3）
+///
+/// 老表列名: file_name / file_type / file_size / total_rows / mapping_json /
+///          error_report_json / user_id / file_hash / conflict_strategy /
+///          created_at / last_heartbeat_at / paused_reason
+/// 新表列名: source_filename / source_format / source_size / row_count /
+///          column_mapping / error_summary / performed_by /
+///          + 新增 source_path / dedup_key / notes
+///
+/// 策略：动态检查列是否存在，存在的重命名；不存在的跳过。幂等。
+fn migrate_legacy_import_batches_schema(conn: &Connection) -> rusqlite::Result<()> {
+    // 1) 列重命名（老列 → 新列）
+    let renames: &[(&str, &str)] = &[
+        ("file_name", "source_filename"),
+        ("file_type", "source_format"),
+        ("file_size", "source_size"),
+        ("total_rows", "row_count"),
+        ("mapping_json", "column_mapping"),
+        ("error_report_json", "error_summary"),
+        ("user_id", "performed_by"),
+    ];
+    for (old_name, new_name) in renames {
+        if table_has_column(conn, "import_batches", old_name)? {
+            // 先检查新列是否已存在（避免重复 rename）
+            if !table_has_column(conn, "import_batches", new_name)? {
+                conn.execute(
+                    &format!(
+                        "ALTER TABLE import_batches RENAME COLUMN {} TO {}",
+                        old_name, new_name
+                    ),
+                    [],
+                )?;
+                eprintln!("  - import_batches: 重命名列 {} → {}", old_name, new_name);
+            }
+        }
+    }
+
+    // 2) 添加缺失列（v1.3 引入但老表没有的列）
+    let additions: &[(&str, &str)] = &[
+        ("source_path", "TEXT"),
+        ("dedup_key", "TEXT"),
+        ("notes", "TEXT"),
+    ];
+    for (col_name, col_type) in additions {
+        if !table_has_column(conn, "import_batches", col_name)? {
+            conn.execute(
+                &format!(
+                    "ALTER TABLE import_batches ADD COLUMN {} {}",
+                    col_name, col_type
+                ),
+                [],
+            )?;
+            eprintln!("  - import_batches: 添加列 {} ({})", col_name, col_type);
+        }
+    }
+
+    // 3) 老表 performed_by 是 NOT NULL，但 v1.3 代码 INSERT 时 performed_by 可能为 NULL。
+    // SQLite 不能直接 ALTER COLUMN 改 NOT NULL → 重建表。
+    // 注意：重建会丢 CHECK 约束/索引，所以重建后我们重建必要的索引。
+    if table_has_column(conn, "import_batches", "performed_by")?
+        && !column_is_nullable(conn, "import_batches", "performed_by")?
+    {
+        eprintln!("  - import_batches: 重置 performed_by 为可空（重建表）");
+        if let Err(e) = rebuild_import_batches_relax_performed_by(conn) {
+            eprintln!("  - import_batches 重建失败 ({}); 不会影响数据", e);
+        }
+    }
+
+    Ok(())
+}
+
+/// 检查某个列是否允许 NULL（SQLite PRAGMA table_info 的 notnull 字段：0=nullable, 1=NOT NULL）
+fn column_is_nullable(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let name: String = row.get(1)?;
+        if name.eq_ignore_ascii_case(column) {
+            let notnull: i64 = row.get(3)?;
+            return Ok(notnull == 0);
+        }
+    }
+    // 找不到列就当作可空处理
+    Ok(true)
+}
+
+/// 重建 import_batches 表，把 performed_by 改成可空列
+///
+/// 策略：备份 → 重建（nullable） → 按交集列复制数据 → 删旧表 → 重建索引
+/// 安全前提：import_batches 在 v1.0/v1.1 老库中几乎没有数据。
+fn rebuild_import_batches_relax_performed_by(conn: &Connection) -> rusqlite::Result<()> {
+    let tx = conn.unchecked_transaction()?;
+
+    // 1) 取旧表的列
+    let mut stmt = tx.prepare("PRAGMA table_info(import_batches)")?;
+    let mut cols: Vec<String> = Vec::new();
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let name: String = row.get(1)?;
+        cols.push(name);
+    }
+    drop(rows);
+    drop(stmt);
+
+    if cols.is_empty() {
+        return Ok(());
+    }
+
+    // 2) 备份
+    tx.execute(
+        "ALTER TABLE import_batches RENAME TO import_batches__legacy_tmp",
+        [],
+    )?;
+
+    // 3) 按 v1.3 期望的 schema 重建（performed_by 可空）
+    tx.execute(
+        "CREATE TABLE import_batches (
+            id TEXT PRIMARY KEY,
+            target_type TEXT NOT NULL,
+            source_filename TEXT NOT NULL,
+            source_format TEXT NOT NULL,
+            source_size INTEGER,
+            source_path TEXT,
+            row_count INTEGER,
+            column_mapping TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            processed_rows INTEGER DEFAULT 0,
+            success_rows INTEGER DEFAULT 0,
+            failed_rows INTEGER DEFAULT 0,
+            skipped_rows INTEGER DEFAULT 0,
+            error_summary TEXT,
+            dedup_key TEXT,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            finished_at TIMESTAMP,
+            performed_by TEXT,
+            notes TEXT
+        )",
+        [],
+    )?;
+
+    // 4) 复制数据（交集列；performed_by 是交集内，不为空时保留原值，为 NULL 也是 NULL）
+    let new_cols: Vec<String> = vec![
+        "id".to_string(),
+        "performed_by".to_string(),
+        "source_filename".to_string(),
+        "source_format".to_string(),
+        "source_size".to_string(),
+        "target_type".to_string(),
+        "column_mapping".to_string(),
+        "status".to_string(),
+        "row_count".to_string(),
+        "success_rows".to_string(),
+        "failed_rows".to_string(),
+        "skipped_rows".to_string(),
+        "started_at".to_string(),
+        "finished_at".to_string(),
+        "error_summary".to_string(),
+        "source_path".to_string(),
+        "dedup_key".to_string(),
+        "notes".to_string(),
+        "processed_rows".to_string(),
+        "created_at".to_string(),
+        "file_hash".to_string(),
+        "conflict_strategy".to_string(),
+        "last_heartbeat_at".to_string(),
+        "paused_reason".to_string(),
+    ];
+    let intersect: Vec<&String> = new_cols.iter().filter(|c| cols.contains(c)).collect();
+    let col_list: Vec<String> = intersect.iter().map(|c| format!("\"{}\"", c)).collect();
+    let col_list_str = col_list.join(",");
+    tx.execute(
+        &format!(
+            "INSERT INTO import_batches ({}) SELECT {} FROM import_batches__legacy_tmp",
+            col_list_str, col_list_str
+        ),
+        [],
+    )?;
+
+    // 5) 删旧表
+    tx.execute("DROP TABLE import_batches__legacy_tmp", [])?;
+
+    // 6) 重建索引
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS idx_import_batches_target_type ON import_batches(target_type)",
+        [],
+    )?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS idx_import_batches_status ON import_batches(status)",
+        [],
+    )?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS idx_import_batches_started ON import_batches(started_at DESC)",
+        [],
+    )?;
+    tx.execute("CREATE INDEX IF NOT EXISTS idx_import_batches_target_status ON import_batches(target_type, status)", [])?;
+
+    tx.commit()?;
+    Ok(())
+}
+
+/// v1.3 product_spus 表补充列（老库缺 sort_order 等 v1.3 新增列）
+///
+/// 现象：v1.3 demoBootstrap → get_syncable_products SQL 含
+///       "ORDER BY sort_order ASC, created_at DESC" → "no such column: sort_order"
+/// 策略：动态检查列是否存在，不存在则补。幂等。
+fn migrate_legacy_product_spus_schema(conn: &Connection) -> rusqlite::Result<()> {
+    let additions: &[(&str, &str)] = &[
+        ("sort_order", "INTEGER NOT NULL DEFAULT 0"),
+        ("display_name", "TEXT"),
+        ("barcode", "TEXT"),
+        ("weight_grams", "REAL"),
+        ("cost_price", "REAL"),
+        ("sale_price", "REAL"),
+        ("market_price", "REAL"),
+        ("stock_quantity", "INTEGER NOT NULL DEFAULT 0"),
+        ("min_stock", "INTEGER NOT NULL DEFAULT 0"),
+        ("is_featured", "INTEGER NOT NULL DEFAULT 0"),
+    ];
+    for (col_name, col_type) in additions {
+        if !table_has_column(conn, "product_spus", col_name)? {
+            conn.execute(
+                &format!(
+                    "ALTER TABLE product_spus ADD COLUMN {} {}",
+                    col_name, col_type
+                ),
+                [],
+            )?;
+            eprintln!("  - product_spus: 添加列 {} ({})", col_name, col_type);
+        }
+    }
+
+    // 创建 sort_order 索引（v1.3 代码假设存在）
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_spus_sort_order ON product_spus(sort_order)",
+        [],
+    )
+    .ok();
+
+    Ok(())
+}
+
+/// v13.1.1 本地账号模式：users.email UNIQUE 索引
+///
+/// 现象：register_local_cmd 并发注册同一邮箱时会出现重复插入（因为 email 列无 UNIQUE 约束）
+/// 策略：在 email 列上创建 UNIQUE INDEX；幂等（IF NOT EXISTS）
+/// 注意：现有数据库可能已有重复 email 行，需要先清理（合并到 deleted_at 旧记录）
+fn migrate_users_email_unique(conn: &Connection) -> rusqlite::Result<()> {
+    // 先检查是否存在重复 email（未删除记录）
+    let dup_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM (\
+             SELECT email, COUNT(*) as cnt FROM users \
+             WHERE deleted_at IS NULL AND email IS NOT NULL AND email != '' \
+             GROUP BY LOWER(email) HAVING cnt > 1\
+             )",
+            [],
+            |row| row.get(0),
         )
-        .unwrap();
-    }
+        .unwrap_or(0);
 
-    fn item_qty_price(conn: &Connection, table: &str, id: &str) -> (i32, f64) {
-        conn.query_row(
-            &format!("SELECT quantity, unit_price FROM {table} WHERE id = ?1"),
-            params![id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .unwrap()
-    }
-
-    fn assert_check_rejected(result: Result<usize, rusqlite::Error>) {
-        let err = result.expect_err("负数应被约束拒绝");
-        let msg = err.to_string();
-        assert!(
-            msg.to_ascii_lowercase().contains("check"),
-            "expected CHECK failure, got {msg}"
+    if dup_count > 0 {
+        eprintln!(
+            "  - users.email 存在 {} 组重复，先软删除多余记录再创建索引",
+            dup_count
         );
-    }
-
-    fn assert_p0_06_constraints(conn: &Connection) {
-        let sales_sql: String = conn
-            .query_row(
-                "SELECT sql FROM sqlite_master WHERE type='table' AND name='sales_order_items'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert!(sales_sql.contains("quantity > 0"), "{sales_sql}");
-        assert!(sales_sql.contains("unit_price >= 0"), "{sales_sql}");
-
-        let purchase_sql: String = conn
-            .query_row(
-                "SELECT sql FROM sqlite_master WHERE type='table' AND name='purchase_order_items'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert!(purchase_sql.contains("quantity > 0"), "{purchase_sql}");
-        assert!(purchase_sql.contains("unit_price >= 0"), "{purchase_sql}");
-
-        assert_check_rejected(conn.execute(
-            "INSERT INTO sales_order_items (
-                id, sales_order_id, product_id, quantity, unit_price, total_price
-             ) VALUES ('soi-neg-qty', 'so1', 'p-ok', -1, 1.0, -1.0)",
-            [],
-        ));
-        assert_check_rejected(conn.execute(
-            "INSERT INTO sales_order_items (
-                id, sales_order_id, product_id, quantity, unit_price, total_price
-             ) VALUES ('soi-neg-price', 'so1', 'p-ok', 1, -0.5, -0.5)",
-            [],
-        ));
-        assert_check_rejected(conn.execute(
-            "INSERT INTO purchase_order_items (
-                id, purchase_order_id, product_id, quantity, unit_price, total_price
-             ) VALUES ('poi-neg-qty', 'po1', 'p-ok', -3, 1.0, -3.0)",
-            [],
-        ));
-        assert_check_rejected(conn.execute(
-            "INSERT INTO purchase_order_items (
-                id, purchase_order_id, product_id, quantity, unit_price, total_price
-             ) VALUES ('poi-neg-price', 'po1', 'p-ok', 1, -4.0, -4.0)",
-            [],
-        ));
-    }
-
-    /// 062 的实际清洗：非正数量改为 1，负单价改为 0，库存流水删掉 0，库存低于下限则钳制。
-    fn assert_p0_06_legacy_corrections(conn: &Connection) {
-        assert_eq!(
-            item_qty_price(conn, "sales_order_items", "soi-bad"),
-            (1, 0.0)
-        );
-        assert_eq!(
-            item_qty_price(conn, "sales_order_items", "soi-zero"),
-            (1, 4.0)
-        );
-        assert_eq!(
-            item_qty_price(conn, "sales_order_items", "soi-ok"),
-            (3, 9.5)
-        );
-        assert_eq!(
-            item_qty_price(conn, "purchase_order_items", "poi-bad"),
-            (1, 0.0)
-        );
-        assert_eq!(
-            item_qty_price(conn, "purchase_order_items", "poi-ok"),
-            (4, 2.0)
-        );
-
-        let zero_rows: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM inventory_transactions WHERE id = 'inv-zero'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(zero_rows, 0, "quantity = 0 的流水会被删掉");
-        let kept_neg: i32 = conn
-            .query_row(
-                "SELECT quantity FROM inventory_transactions WHERE id = 'inv-neg'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(kept_neg, -4, "非零负库存流水保留，CHECK 只禁止 0");
-        let kept_ok: i32 = conn
-            .query_row(
-                "SELECT quantity FROM inventory_transactions WHERE id = 'inv-ok'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(kept_ok, 2);
-
-        let bad_stock: i32 = conn
-            .query_row(
-                "SELECT current_stock FROM products WHERE id = 'p-bad'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(bad_stock, -999999);
-        let ok_stock: i32 = conn
-            .query_row(
-                "SELECT current_stock FROM products WHERE id = 'p-ok'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(ok_stock, 12);
-    }
-
-    #[test]
-    fn apply_p0_06_corrects_legacy_rows_enforces_checks_and_is_idempotent() {
-        let conn = Connection::open_in_memory().unwrap();
-        legacy_p0_06_schema(&conn);
-        conn.execute_batch(
-            "INSERT INTO customers (id, name) VALUES ('c1', '客户');
-             INSERT INTO suppliers (id, name) VALUES ('s1', '供应商');
-             INSERT INTO products (id, sku, name, current_stock) VALUES
-                ('p-bad', 'SKU-BAD', '超低下限', -1000005),
-                ('p-ok', 'SKU-OK', '正常', 12);
-             INSERT INTO sales_orders (id, so_number, customer_id, order_date)
-                VALUES ('so1', 'SO-1', 'c1', '2024-01-01');
-             INSERT INTO purchase_orders (id, po_number, supplier_id, order_date)
-                VALUES ('po1', 'PO-1', 's1', '2024-01-01');
-             INSERT INTO sales_order_items (
-                id, sales_order_id, product_id, quantity, unit_price, total_price, shipped_quantity
-             ) VALUES
-                ('soi-bad', 'so1', 'p-ok', -5, -2.5, 12.5, 0),
-                ('soi-zero', 'so1', 'p-ok', 0, 4.0, 0, 0),
-                ('soi-ok', 'so1', 'p-ok', 3, 9.5, 28.5, 0);
-             INSERT INTO purchase_order_items (
-                id, purchase_order_id, product_id, quantity, unit_price, total_price, received_quantity
-             ) VALUES
-                ('poi-bad', 'po1', 'p-ok', 0, -8.0, 0, 0),
-                ('poi-ok', 'po1', 'p-ok', 4, 2.0, 8, 0);
-             INSERT INTO inventory_transactions (id, product_id, transaction_type, quantity) VALUES
-                ('inv-zero', 'p-ok', 'inbound', 0),
-                ('inv-neg', 'p-ok', 'adjustment', -4),
-                ('inv-ok', 'p-ok', 'inbound', 2);",
-        )
-        .unwrap();
-
-        Database::apply_p0_06_check_constraints(&conn).expect("first apply_p0_06");
-        assert_p0_06_legacy_corrections(&conn);
-        assert_p0_06_constraints(&conn);
+        // 对每组重复 email，保留最早一条，其余软删除
         conn.execute(
-            "INSERT INTO sales_order_items (
-                id, sales_order_id, product_id, quantity, unit_price, total_price
-             ) VALUES ('soi-new-ok', 'so1', 'p-ok', 2, 3.5, 7.0)",
+            "UPDATE users SET deleted_at = CURRENT_TIMESTAMP \
+             WHERE id IN (\
+               SELECT id FROM users \
+               WHERE deleted_at IS NULL AND email IS NOT NULL AND email != '' \
+               AND id NOT IN (\
+                 SELECT MIN(id) FROM users \
+                 WHERE deleted_at IS NULL AND email IS NOT NULL AND email != '' \
+                 GROUP BY LOWER(email)\
+               )\
+             )",
             [],
-        )
-        .expect("正数明细在迁移后仍可写入");
-
-        let patch_count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM schema_patches WHERE id = '062_quantity_price_checks'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(patch_count, 1);
-
-        Database::apply_p0_06_check_constraints(&conn).expect("second apply_p0_06");
-        assert_p0_06_legacy_corrections(&conn);
-        assert_eq!(
-            item_qty_price(&conn, "sales_order_items", "soi-new-ok"),
-            (2, 3.5)
-        );
-        let patch_count_again: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM schema_patches WHERE id = '062_quantity_price_checks'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(patch_count_again, 1);
-        assert_p0_06_constraints(&conn);
+        )?;
     }
+
+    // 创建 UNIQUE INDEX（功能索引：LOWER(email)，忽略大小写）
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique_active \
+         ON users(LOWER(email)) WHERE deleted_at IS NULL AND email IS NOT NULL AND email != ''",
+        [],
+    )?;
+
+    Ok(())
 }

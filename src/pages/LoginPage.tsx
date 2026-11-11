@@ -1,36 +1,45 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Link,
-  TextField,
-  Typography,
-} from '@mui/material';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Alert, Box, Button, Card, CardContent, CircularProgress, TextField, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/authStore';
-import { MOCK_PASSWORD } from '../lib/authStore';
+import { checkPasswordStrength } from '../components/Auth/accountShared';
+import LoginAccountPicker from '../components/Auth/LoginAccountPicker';
+import { isDemoAccountUser } from '../components/Auth/loginAccounts';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, loginWithOidc, isLoading, error, clearError } = useAuthStore();
-
+  const { user, login, localUsers, refreshLocalUsers, switchAccount, isLoading, error, clearError } = useAuthStore();
+  // React 规则：所有 hooks 必须在 early return 之前调用，否则 user 从 null→object 切换时
+  // 会触发 "Rendered fewer hooks than expected" 错误并卸载组件（v13.1.1 P0-2 回归修复）
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isOidcLoading, setIsOidcLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    refreshLocalUsers().catch(() => {});
+  }, [refreshLocalUsers]);
+
+  // v13.1.1 P0-2：已登录用户访问 /login 自动跳首页
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
+
+  const pwdCheck = checkPasswordStrength(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError(null);
     clearError();
-
+    if (!pwdCheck.ok) {
+      setLocalError(pwdCheck.hint);
+      return;
+    }
     try {
       await login(email, password);
       navigate('/');
-    } catch (err) {
-      console.error('Login failed:', err);
+    } catch (err: any) {
+      // v13.1.1: 后端 keyring 失败时必须给用户看错误，否则静默“无法注册”
+      setLocalError(err?.message || '登录失败，请查看密码强度或重试');
     }
   };
 
@@ -44,7 +53,7 @@ export default function LoginPage() {
         bgcolor: 'background.default',
       }}
     >
-      <Card sx={{ maxWidth: 400, width: '100%', mx: 2 }}>
+      <Card sx={{ maxWidth: 440, width: '100%', mx: 2 }}>
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
             <img 
@@ -66,20 +75,43 @@ export default function LoginPage() {
             AI-Powered Business Operating System
           </Typography>
 
-          {/* 模拟账号提示 */}
+          {/* v13.1.1 提示：本地账号模式 - 首次启动将引导创建账号 */}
           <Alert severity="info" sx={{ mb: 2, bgcolor: 'rgba(0,0,0,0.03)', border: '1px solid #ddd' }}>
             <Typography variant="body2">
-              <strong>快速体验账号</strong>
+              <strong>本地账号模式</strong>
               <br />
-              用户名: <code>boss</code>
+              提交邮箱与密码即可创建本地账号并自动登录。
               <br />
-              密码: <code>{MOCK_PASSWORD}</code>
+              密码由系统原生凭据存储保护（Windows Credential Manager / macOS Keychain）。
             </Typography>
           </Alert>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={clearError}>
-              {error}
+          {(error || localError) && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => { clearError(); setLocalError(null); }}>
+              {error || localError}
+            </Alert>
+          )}
+
+          {localUsers.length > 0 && (
+            <LoginAccountPicker
+              accounts={localUsers}
+              isLoading={isLoading}
+              theme="light"
+              onSwitch={async (accountId) => {
+                setLocalError(null);
+                clearError();
+                try {
+                  await switchAccount(accountId);
+                  navigate('/');
+                } catch (err: any) {
+                  setLocalError(err?.message || '切换账号失败');
+                }
+              }}
+            />
+          )}
+          {localUsers.length > 0 && !localUsers.some(isDemoAccountUser) && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              还没有演示账号 boss@proclaw.demo。重新打开应用后会自动补上，进入后可以看到演示商品和订单。
             </Alert>
           )}
 
@@ -161,62 +193,22 @@ export default function LoginPage() {
               {isLoading ? <CircularProgress size={24} /> : '登录'}
             </Button>
 
-            {/* 快速登录按钮 */}
+            {/* 跳转到引导页创建完整账号（v13.1.1 首选入口） */}
             <Button
               fullWidth
-              variant="outlined"
-              size="medium"
-              onClick={async () => {
-                try {
-                  await login('boss', MOCK_PASSWORD);
-                  navigate('/');
-                } catch (err) {
-                  console.error('Quick login failed:', err);
-                }
-              }}
-              sx={{ mb: 2, borderColor: '#666', color: '#666' }}
+              variant="text"
+              size="small"
+              type="button"
+              onClick={() => navigate('/welcome')}
+              sx={{ mb: 1, color: '#1976d2' }}
             >
-              ⚡ 一键体验 (boss)
+              首次使用？创建新本地账号 →
             </Button>
 
-            {/* OIDC 登录区域 */}
-            <div data-testid="oidc-section-check" style={{display:'none'}}>OIDC section rendered</div>
-
-            <Box sx={{ my: 2, display: 'flex', alignItems: 'center' }}>
-              <Box sx={{ flex: 1, borderBottom: 1, borderColor: 'divider' }}></Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mx: 2 }}>
-                或
-              </Typography>
-              <Box sx={{ flex: 1, borderBottom: 1, borderColor: 'divider' }}></Box>
-            </Box>
-
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              data-testid="oidc-login-button"
-              onClick={async () => {
-                try {
-                  setIsOidcLoading(true);
-                  const authUrl = await loginWithOidc();
-                  window.open(authUrl, '_blank');
-                } catch (err) {
-                  console.error('OIDC login failed:', err);
-                } finally {
-                  setIsOidcLoading(false);
-                }
-              }}
-              sx={{ mb: 2, bgcolor: '#0F62FE', '&:hover': { bgcolor: '#0D47A1' } }}
-              disabled={isOidcLoading}
-            >
-              {isOidcLoading ? <CircularProgress size={24} /> : '🔑 使用 ProClaw 账号登录'}
-            </Button>
-
-            <Box sx={{ textAlign: 'center' }}>
-              <Link href="/register" variant="body2" underline="hover">
-                还没有账号? 立即注册
-              </Link>
-            </Box>
+            {/* v13.1.1：OIDC 登录已停用，本地账号模式不依赖外部服务 */}
+            <Typography variant="caption" align="center" sx={{ display: 'block', mt: 3, color: 'rgba(0,0,0,0.45)' }}>
+              本地账号模式 · 密码仅存储于本机系统凭据库
+            </Typography>
           </form>
         </CardContent>
       </Card>

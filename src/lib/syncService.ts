@@ -6,6 +6,7 @@ export interface DatabaseStats {
   categories: number;
   transactions: number;
   pending_sync: number;
+  customers: number;
 }
 
 export async function getDatabaseStats(): Promise<DatabaseStats> {
@@ -15,6 +16,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
       categories: 0,
       transactions: 0,
       pending_sync: 0,
+      customers: 0,
     };
   }
   return await invoke('get_database_stats');

@@ -637,6 +637,11 @@ pub mod inventory {
                     description: "获取供应商列表",
                 },
                 CommandDef {
+                    name: "update_supplier",
+                    module: "purchase",
+                    description: "更新供应商基础资料",
+                },
+                CommandDef {
                     name: "create_purchase_order",
                     module: "purchase",
                     description: "创建采购订单",
@@ -690,6 +695,11 @@ pub mod inventory {
                     name: "get_customers",
                     module: "sales",
                     description: "获取客户列表",
+                },
+                CommandDef {
+                    name: "update_customer",
+                    module: "sales",
+                    description: "更新客户基础资料",
                 },
                 CommandDef {
                     name: "create_sales_order",
@@ -800,6 +810,11 @@ pub mod inventory {
                     name: "get_cash_flow_report",
                     module: "finance",
                     description: "获取现金流量表",
+                },
+                CommandDef {
+                    name: "get_report_lines",
+                    module: "finance",
+                    description: "获取报表行明细",
                 },
                 CommandDef {
                     name: "get_financial_summary",
@@ -1368,6 +1383,71 @@ pub mod cloud {
                     name: "test_nvwax_connection",
                     module: "nvwax",
                     description: "测试连接",
+                },
+                CommandDef {
+                    name: "nvwax_search_vc_templates",
+                    module: "nvwax",
+                    description: "浏览 NvwaX 虚拟公司模板",
+                },
+                CommandDef {
+                    name: "nvwax_import_virtual_company_from_url",
+                    module: "nvwax",
+                    description: "从 URL 导入虚拟公司导出包",
+                },
+                CommandDef {
+                    name: "bootstrap_virtual_company_tables",
+                    module: "nvwax",
+                    description: "初始化虚拟公司本地 SQLite 表",
+                },
+                CommandDef {
+                    name: "open_virtual_company_page",
+                    module: "nvwax",
+                    description: "触发前端跳转到虚拟公司页面",
+                },
+                CommandDef {
+                    name: "nvwax_push_virtual_company_state",
+                    module: "nvwax",
+                    description: "把虚拟公司本地状态推送到 NvWaX 云端",
+                },
+                CommandDef {
+                    name: "nvwax_stream_session",
+                    module: "nvwax",
+                    description: "通过 SSE 流与 NvWaX 虚拟公司会话交互",
+                },
+                CommandDef {
+                    name: "nvwax_fetch_local_state",
+                    module: "nvwax",
+                    description: "从 NvWaX 拉取单个会话的最新 local_state（多设备同步）",
+                },
+                CommandDef {
+                    name: "nvwax_list_sessions_with_state",
+                    module: "nvwax",
+                    description: "列出用户最近的虚拟公司会话（含 local_state）",
+                },
+                CommandDef {
+                    name: "nvwax_set_agent_local_state",
+                    module: "nvwax",
+                    description: "把单个 Agent 的本地状态（启停/别名/角色）持久化到 SQLite（v1.4.0 引入，v1.5.0 返回 historyId 支持撤销）",
+                },
+                CommandDef {
+                    name: "nvwax_list_agent_state_history",
+                    module: "nvwax",
+                    description: "列出 agent 最近 N 条状态变更历史（v1.5.0 / Sprint 2.18 引入）",
+                },
+                CommandDef {
+                    name: "nvwax_undo_agent_state_change",
+                    module: "nvwax",
+                    description: "撤销单个 Agent 状态变更（按 historyId 回滚到旧值；v1.5.0 / Sprint 2.18 引入）",
+                },
+                CommandDef {
+                    name: "nvwax_stream_session_v2",
+                    module: "nvwax",
+                    description: "真实 SSE 流式创建会话（v1.4.0 引入，替代 500ms 轮询）",
+                },
+                CommandDef {
+                    name: "nvwax_publish_to_marketplace",
+                    module: "nvwax",
+                    description: "把虚拟公司发布到 NvWaX 市场（v1.4.0 引入）",
                 },
             ]
         }

@@ -11,8 +11,10 @@ import {
   Tune as TuneIcon,
   Mic as MicIcon,
   Info as InfoIcon,
+  Verified as VerifiedIcon,
 } from '@mui/icons-material';
 import {
+  Alert,
   Avatar,
   Box,
   Button,
@@ -37,13 +39,22 @@ import {
 } from '@mui/material';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { executeCommand, parseCommand } from '../../lib/commandParser';
-import { handleUserInput, checkLLMConnectionStatus, getConnectionGuideMessage, getPersonalizedRecommendations, recordUserBehavior } from '../../lib/aiGuide';
+import { checkLLMConnectionStatus, getConnectionGuideMessage, getPersonalizedRecommendations, recordUserBehavior } from '../../lib/aiGuide';
+import { routeAssistantTurn } from '../../lib/assistantRouter';
 import { useAppModeStore } from '../../config/appMode';
 import { getLightInitialMessage, getLightQuickCommands, queryLightAI } from '../../lib/lightAIAssistant';
 import { DEFAULT_SECRETARY_NAME, DEFAULT_AVATAR_KEY, SECRETARY_STORAGE_KEYS, AVATAR_PRESETS } from '../../types/secretary';
 import { getBapSummary } from '../../lib/secretaryBap';
 import { startBriefingScheduler } from '../../lib/secretaryBriefing';
-import { checkBoundary } from '../../lib/secretaryBoundary';
+import {
+  ASSISTANT_QUICK_COMMANDS,
+  getAssistantSystemPrompt,
+  getBossProfile,
+  submitDecisionProposal,
+  resolveDecision,
+  type DecisionProposal,
+  type BossProfile,
+} from '../../lib/assistantAgent';
 import { getLLMForTask } from '../../lib/llmProvider';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { isDemoAccount, getTokenBalance, deductTokens } from '../../lib/aiTeamTokenService';
@@ -55,32 +66,6 @@ import BapSettingsPanel from './BapSettingsPanel';
 // 补全 3：集成语音通话面板（任务 #3）
 import VoiceCallPanel from './VoiceCallPanel';
 import { isSpeechRecognitionSupported } from '../../lib/speechService';
-
-// ===== 秘书 LLM 系统提示词 =====
-const SECRETARY_SYSTEM_PROMPT = `你是「{name}」，ProClaw 系统的内置商务秘书 AI。
-
-## 你的身份
-- 你是老板的贴身秘书和数据参谋，专业、细致、高效
-- 你对系统内的业务数据有完整的只读访问权限
-- 你擅长数据查询、统计分析、报表呈报
-
-## 你的风格
-- 使用中文回答，语气亲切但不失专业
-- 回答简洁明了，重点突出
-- 涉及数据时尽量结构化呈现（列表、分类）
-- 对不清楚的问题要坦诚，不编造数据
-
-## 你的职责边界
-- ✅ 数据查询与分析：库存、销售、财务等业务数据
-- ✅ 系统功能解释：帮助用户了解系统功能和使用方法
-- ✅ 日常经营建议：基于数据的非决策性建议
-- ❌ 不参与决策：采购定价、人事任免、营销方案等决策类问题，礼貌引导至 CEO Agent
-- ❌ 不执行操作：不创建/修改/删除任何数据
-
-## 重要规则
-- 如果你不确定某个数据，请说"让我查一下"，而不是编造
-- 如果用户要求你做决策或执行操作，请礼貌告知需要联系 CEO Agent
-- 始终保持专业和耐心`;
 
 // ===== 团队上下文类型 =====
 export interface TeamChatContext {
@@ -100,12 +85,7 @@ export interface FloatingAgentChatProps {
  */
 export function getTeamQuickCommands(teamContext?: TeamChatContext, isLight?: boolean): Array<{ label: string; command: string }> {
   if (!teamContext) {
-    return isLight ? getLightQuickCommands() : [
-      { label: '所有产品', command: '查询产品' },
-      { label: '库存统计', command: '查询库存' },
-      { label: '库存预警', command: '库存预警' },
-      { label: '入库', command: '入库' },
-    ];
+    return isLight ? getLightQuickCommands() : ASSISTANT_QUICK_COMMANDS;
   }
 
   // 根据团队名称特征返回不同的快捷指令
@@ -201,6 +181,13 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
   const [secretaryAvatar, setSecretaryAvatar] = useState<string>(DEFAULT_AVATAR_KEY);
   const [bapTopKpis, setBapTopKpis] = useState<string[]>([]);
   
+  // ===== 统一助理：老板画像 + 决策确认状态 =====
+  const [bossProfile, setBossProfile] = useState<BossProfile | null>(null);
+  const [pendingProposal, setPendingProposal] = useState<DecisionProposal | null>(null);
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [decisionFeedback, setDecisionFeedback] = useState('');
+  
   // ===== 右键菜单状态 =====
   const [contextMenuAnchor, setContextMenuAnchor] = useState<HTMLElement | null>(null);
   
@@ -229,6 +216,14 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
       }
     }).catch(() => {});
   }, []);
+
+  // 加载老板画像（统一记忆层：BAP + CEO 偏好 + PCP 目标）
+  useEffect(() => {
+    if (teamContext || mode === 'light') return;
+    getBossProfile().then(profile => {
+      setBossProfile(profile);
+    }).catch(() => {});
+  }, [teamContext, mode]);
 
   // 启动简报调度器
   useEffect(() => {
@@ -473,35 +468,34 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
     // 记录用户查询行为
     recordUserBehavior('query');
 
-    // 碰壁话术检测：如果用户请求越界，拒绝并引导
-    const boundaryResponse = checkBoundary(userInput);
-    if (boundaryResponse) {
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: boundaryResponse,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // 先检查是否是引导类问题
-      const guideResult = await handleUserInput(userInput);
-      
-      if (guideResult.response) {
-        // 引导类问题，直接返回响应
+      const pushAssistant = (content: string) => {
         const assistantMessage: Message = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: guideResult.response,
+          content,
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, assistantMessage]);
-      } else if (mode === 'light') {
-        // Light 版使用四库联动 AI 助手
+        if (!isOpen) {
+          setUnreadCount(prev => prev + 1);
+        }
+      };
+
+      const routed = await routeAssistantTurn(userInput, { secretaryName });
+      if (routed?.kind === 'decision') {
+        const proposal = await submitDecisionProposal(routed.proposal);
+        setPendingProposal(proposal);
+        pushAssistant(`📋 检测到「${proposal.intentSummary}」属于经营决策请求。作为您的全能助理，我已生成决策建议并记录，请在弹窗中确认或拒绝。`);
+        setDecisionOpen(true);
+        return;
+      }
+      if (routed?.kind === 'message') {
+        pushAssistant(routed.content);
+        return;
+      }
+
+      if (mode === 'light') {
         const result = await queryLightAI(userInput);
         let responseText = result.text;
         if (result.sources.length > 0) {
@@ -509,132 +503,62 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
             `- [${s.type}] ${s.title}`
           ).join('\n');
         }
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: responseText,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      } else {
-        // 标准版：先尝试 commandParser 业务查询
-        const command = parseCommand(userInput);
+        pushAssistant(responseText);
+        return;
+      }
 
-        if (command.action === 'unknown') {
-          // 命令不识别，走 LLM 智能对话
-
-          // 演示账号 Token 额度校验
-          if (isDemoAccount()) {
-            const balance = getTokenBalance();
-            if (balance <= 0) {
-              const assistantMessage: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: '⚠️ 您的演示 Token 余额已用完（10,000 PT）。如需继续测试，请联系我们获取更多 Token。',
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, assistantMessage]);
-              return;
-            }
-          }
-
-          try {
-            abortControllerRef.current = new AbortController();
-            const userSignal = abortControllerRef.current.signal;
-            // 合并用户取消信号与 30s 超时信号
-            const { signal: timedSignal, dispose } = withTimeout(userSignal, DEFAULT_OUTBOUND_TIMEOUT_MS);
-            try {
-              const llm = await getLLMForTask('business_insight');
-              const systemPrompt = SECRETARY_SYSTEM_PROMPT.replace('{name}', secretaryName);
-              const systemMsg = new SystemMessage({ content: systemPrompt });
-              const userMsg = new HumanMessage({ content: userInput });
-              const llmResponse = await llm.invoke([systemMsg, userMsg], { signal: timedSignal });
-              const replyContent = typeof llmResponse.content === 'string'
-                ? llmResponse.content
-                : JSON.stringify(llmResponse.content);
-
-              // 演示账号扣减 Token
-              let finalContent = replyContent;
-              if (isDemoAccount()) {
-                const outputTokens = (llmResponse.response_metadata as any)?.tokenUsage?.completionTokens
-                  ?? estimateTokens(replyContent);
-                const totalUsed = estimateTokens(userInput + systemPrompt) + outputTokens;
-                try {
-                  const remaining = deductTokens(totalUsed);
-                  finalContent += `\n\n---\n💳 本次消耗 ${totalUsed} PT，剩余 ${remaining} PT`;
-                } catch {
-                  finalContent += `\n\n---\n⚠️ Token 余额不足（剩余 ${getTokenBalance()} PT），部分额度可能超支。`;
-                }
-              }
-
-              const assistantMessage: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: finalContent,
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, assistantMessage]);
-            } finally {
-              dispose();
-            }
-          } catch (_llmErr) {
-            // 用户主动取消
-            const userAborted = abortControllerRef.current?.signal.aborted;
-            if (isAbortError(_llmErr) && userAborted) {
-              abortControllerRef.current = null;
-              const assistantMessage: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: '⏹️ 已停止响应。',
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, assistantMessage]);
-            } else if (isNetworkError(_llmErr)) {
-              // 网络/DNS/连接类错误
-              const assistantMessage: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: `⚠️ ${OUTBOUND_ERROR_MESSAGE}\n\n请前往 **设置 → AI 设置** 配置大模型（如 DeepSeek API），配置后秘书即可使用智能对话。`,
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, assistantMessage]);
-            } else if (isAbortError(_llmErr)) {
-              // 超时（未在用户取消时）
-              const assistantMessage: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: `⏱️ ${OUTBOUND_ERROR_MESSAGE}\n\n可能是网络抖动或 AI 服务暂时不可达，请稍后重试。`,
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, assistantMessage]);
-            } else {
-              // 其他 LLM 错误，回退到 commandParser 的提示
-              const fallbackResponse = await executeCommand(command);
-              const assistantMessage: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: fallbackResponse,
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, assistantMessage]);
-            }
-          }
-        } else {
-          // 识别的业务命令，正常执行
-          const response = await executeCommand(command);
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: response,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, assistantMessage]);
+      if (isDemoAccount()) {
+        const balance = getTokenBalance();
+        if (balance <= 0) {
+          pushAssistant('⚠️ 您的演示 Token 余额已用完（10,000 PT）。如需继续测试，请联系我们获取更多 Token。');
+          return;
         }
       }
 
-      // 如果面板未打开,增加未读计数
-      if (!isOpen) {
-        setUnreadCount(prev => prev + 1);
+      try {
+        abortControllerRef.current = new AbortController();
+        const userSignal = abortControllerRef.current.signal;
+        const { signal: timedSignal, dispose } = withTimeout(userSignal, DEFAULT_OUTBOUND_TIMEOUT_MS);
+        try {
+          const llm = await getLLMForTask('business_insight');
+          const systemPrompt = getAssistantSystemPrompt(secretaryName, bossProfile ?? undefined);
+          const systemMsg = new SystemMessage({ content: systemPrompt });
+          const userMsg = new HumanMessage({ content: userInput });
+          const llmResponse = await llm.invoke([systemMsg, userMsg], { signal: timedSignal });
+          const replyContent = typeof llmResponse.content === 'string'
+            ? llmResponse.content
+            : JSON.stringify(llmResponse.content);
+
+          let finalContent = replyContent;
+          if (isDemoAccount()) {
+            const outputTokens = (llmResponse.response_metadata as any)?.tokenUsage?.completionTokens
+              ?? estimateTokens(replyContent);
+            const totalUsed = estimateTokens(userInput + systemPrompt) + outputTokens;
+            try {
+              const remaining = deductTokens(totalUsed);
+              finalContent += `\n\n---\n💳 本次消耗 ${totalUsed} PT，剩余 ${remaining} PT`;
+            } catch {
+              finalContent += `\n\n---\n⚠️ Token 余额不足（剩余 ${getTokenBalance()} PT），部分额度可能超支。`;
+            }
+          }
+
+          pushAssistant(finalContent);
+        } finally {
+          dispose();
+        }
+      } catch (_llmErr) {
+        const userAborted = abortControllerRef.current?.signal.aborted;
+        if (isAbortError(_llmErr) && userAborted) {
+          abortControllerRef.current = null;
+          pushAssistant('⏹️ 已停止响应。');
+        } else if (isNetworkError(_llmErr)) {
+          pushAssistant(`⚠️ ${OUTBOUND_ERROR_MESSAGE}\n\n请前往 **设置 → AI 设置** 配置大模型（如 DeepSeek API），配置后秘书即可使用智能对话。`);
+        } else if (isAbortError(_llmErr)) {
+          pushAssistant(`⏱️ ${OUTBOUND_ERROR_MESSAGE}\n\n可能是网络抖动或 AI 服务暂时不可达，请稍后重试。`);
+        } else {
+          const fallback = parseCommand(userInput, { recordUnknown: false });
+          pushAssistant(await executeCommand(fallback));
+        }
       }
     } catch (error) {
       console.error('[AgentChat] 处理指令失败:', error);
@@ -657,6 +581,46 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
       abortControllerRef.current = null;
     }
   }, []);
+
+  // ===== 统一助理：决策确认流程 =====
+  const handleDecisionConfirm = useCallback(async () => {
+    if (!pendingProposal || decisionLoading) return;
+    setDecisionLoading(true);
+    try {
+      await resolveDecision(pendingProposal, true);
+      const confirmMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `✅ 决策已确认：${pendingProposal.actionDescription}\n\n已记入决策日志，我会持续跟进执行情况。`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, confirmMsg]);
+      setDecisionOpen(false);
+      setPendingProposal(null);
+    } finally {
+      setDecisionLoading(false);
+    }
+  }, [pendingProposal, decisionLoading]);
+
+  const handleDecisionReject = useCallback(async () => {
+    if (!pendingProposal || decisionLoading) return;
+    setDecisionLoading(true);
+    try {
+      await resolveDecision(pendingProposal, false, decisionFeedback.trim() || '未说明原因');
+      const rejectMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `已收到，该决策已取消${decisionFeedback.trim() ? `（原因：${decisionFeedback.trim()}）` : ''}。如需调整方案，随时告诉我。`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, rejectMsg]);
+      setDecisionOpen(false);
+      setPendingProposal(null);
+      setDecisionFeedback('');
+    } finally {
+      setDecisionLoading(false);
+    }
+  }, [pendingProposal, decisionLoading, decisionFeedback]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -807,11 +771,11 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
             position: 'fixed',
             bottom: 24,
             right: 24,
-            width: isMinimized ? 64 : isMaximized ? 'calc(100vw - 240px - 48px)' : windowWidth,
+            width: isMinimized ? 64 : isMaximized ? 'calc(100vw - 192px - 48px)' : windowWidth,
             height: isMinimized ? 64 : isMaximized ? 'calc(100vh - 48px)' : windowHeight,
             maxHeight: isMaximized ? 'calc(100vh - 48px)' : 'calc(100vh - 100px)',
-            maxWidth: isMaximized ? 'calc(100vw - 240px - 48px)' : '100vw',
-            left: isMaximized ? 240 : 'auto',
+            maxWidth: isMaximized ? 'calc(100vw - 192px - 48px)' : '100vw',
+            left: isMaximized ? 192 : 'auto',
             zIndex: 1350,
             display: 'flex',
             flexDirection: 'column',
@@ -1257,6 +1221,82 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
         onSettingsChanged={handleBapSettingsChanged}
       />
       
+      {/* 决策确认对话框（统一助理：合并 CEO 决策确认能力） */}
+      <Dialog
+        open={decisionOpen}
+        onClose={() => { if (!decisionLoading) { setDecisionOpen(false); setPendingProposal(null); } }}
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <VerifiedIcon sx={{ color: '#7c4dff' }} />
+          <Typography variant="h6" fontWeight={600}>决策确认</Typography>
+        </DialogTitle>
+        <DialogContent>
+          {pendingProposal && (
+            <>
+              <Typography variant="body2" sx={{ lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                {`检测到一项经营决策请求，请您确认：\n\n**${pendingProposal.intentSummary}**\n\n`}
+                {`建议动作：${pendingProposal.actionDescription}\n`}
+              </Typography>
+              <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Chip
+                  size="small"
+                  label={`风险：${pendingProposal.estimatedImpact.riskLevel === 'high' ? '🔴 高' : pendingProposal.estimatedImpact.riskLevel === 'medium' ? '🟡 中' : '🟢 低'}`}
+                  sx={{ bgcolor: '#f5f0ff', color: '#7c4dff' }}
+                />
+                <Chip
+                  size="small"
+                  label={`资金影响：${pendingProposal.estimatedImpact.budget === 'high' ? '较大' : pendingProposal.estimatedImpact.budget === 'medium' ? '中等' : '较小'}`}
+                  sx={{ bgcolor: '#f5f0ff', color: '#7c4dff' }}
+                />
+                {pendingProposal.decisionId && (
+                  <Chip size="small" label={`决策日志已记录`} sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
+                )}
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                maxRows={4}
+                size="small"
+                margin="dense"
+                sx={{ mt: 2 }}
+                placeholder="拒绝时填写原因（选填）"
+                value={decisionFeedback}
+                onChange={(e) => setDecisionFeedback(e.target.value)}
+                disabled={decisionLoading}
+              />
+              <Box sx={{ mt: 1 }}>
+                <Alert severity="info" sx={{ py: 0.5 }}>
+                  确认后将记入决策日志；实际业务操作仍需您到对应模块执行。
+                </Alert>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            onClick={handleDecisionReject}
+            disabled={decisionLoading}
+            variant="outlined"
+            color="error"
+            size="small"
+          >
+            拒绝
+          </Button>
+          <Button
+            onClick={handleDecisionConfirm}
+            disabled={decisionLoading}
+            variant="contained"
+            size="small"
+            sx={{ bgcolor: '#7c4dff', '&:hover': { bgcolor: '#6a3ee0' } }}
+          >
+            {decisionLoading ? <CircularProgress size={16} color="inherit" /> : '确认执行'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
       {/* 关于秘书对话框 */}
       <Dialog open={aboutDialogOpen} onClose={() => setAboutDialogOpen(false)} maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle>
@@ -1264,10 +1304,12 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
-            {`我是「${secretaryName}」，您的专属商务秘书。\n\n`}
-            {`我的职责是帮您查看经营数据、做统计分析、监控异常。\n\n`}
-            {`我不做决策——决策是 CEO Agent 的职责。\n\n`}
-            {`右键我的头像可以给我换头像、改名字，还可以设置我重点帮您关注哪些数据。`}
+            {`我是「${secretaryName}」，您的全能助理，融合了商务秘书与 CEO 主控官能力。\n\n`}
+            {`我能帮您：\n`}
+            {`· 查询经营数据、统计分析、监控异常\n`}
+            {`· 提出采购/定价/人事/营销等决策建议（经您确认后执行）\n`}
+            {`· 记录公司目标、分派任务、生成经营报告\n\n`}
+            {`右键我的头像可以换头像、改名字、设置关注数据。`}
           </Typography>
           <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f5f5f5', borderRadius: 2 }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
@@ -1277,7 +1319,7 @@ export default function FloatingAgentChat({ teamContext, onClose }: FloatingAgen
               Agent ID: builtin:secretary
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-              版本: v1.0 (内置 Agent)
+              版本: v1.1 (全能助理，合并秘书 + CEO 能力)
             </Typography>
           </Box>
         </DialogContent>

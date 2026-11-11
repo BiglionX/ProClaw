@@ -8,6 +8,7 @@
  */
 
 import foreignCounterManifest from '../plugins/ma_foreign_counter/manifest.json';
+import virtualCompanyManifest from '../plugins/virtual-company/manifest.json';
 
 export interface PluginManifest {
   id: string;
@@ -50,6 +51,7 @@ export interface PluginManifest {
 
 const BUILTIN_MANIFESTS: PluginManifest[] = [
   foreignCounterManifest as PluginManifest,
+  virtualCompanyManifest as PluginManifest,
 ];
 
 // =============== 动态注册表 ===============
@@ -104,6 +106,25 @@ export function registerForeignCounterPlugin(): PluginManifest {
   if (existing) return existing;
   const manifest: PluginManifest = {
     ...(foreignCounterManifest as PluginManifest),
+    builtin: true,
+    source: 'builtin',
+  };
+  registerPluginManifest(manifest);
+  return manifest;
+}
+
+/**
+ * 注册「虚拟公司 · NvWaX」官方插件。
+ * 该插件是 NvWaX 生态与 ProClaw 桌面端的官方桥接，让用户在本地浏览 / 导入
+ * NvWaX 云端创建的虚拟公司。详见 docs/integration/virtual-company-package.schema.json。
+ *
+ * 由 demoBootstrap / App 启动流程调用；也可独立调用，幂等。
+ */
+export function registerVirtualCompanyPlugin(): PluginManifest {
+  const existing = getPluginManifest('virtual-company');
+  if (existing) return existing;
+  const manifest: PluginManifest = {
+    ...(virtualCompanyManifest as PluginManifest),
     builtin: true,
     source: 'builtin',
   };

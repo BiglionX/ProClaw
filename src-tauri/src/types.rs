@@ -111,6 +111,7 @@ pub struct DatabaseStats {
     pub categories: i64,
     pub transactions: i64,
     pub pending_sync: i64,
+    pub customers: i64,
 }
 
 // ==================== 迁移结果类型 ====================

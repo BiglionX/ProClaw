@@ -1,5 +1,6 @@
 use crate::api::quantity_price::{line_amount, round_money};
 use crate::database::Database;
+use crate::finance_ledger::post_sales_outbound_entries;
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use uuid::Uuid;
@@ -47,6 +48,59 @@ pub fn create_customer(
         "code": code,
         "message": "Customer created successfully"
     }))
+}
+
+/// 更新客户基础资料
+#[tauri::command]
+pub fn update_customer(
+    db: tauri::State<Mutex<Database>>,
+    id: String,
+    customer: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    let conn = db.connection();
+    let name = customer["name"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("客户名称不能为空")?;
+    let changed = conn
+        .execute(
+            "UPDATE customers SET
+                name = ?1, code = ?2, contact_person = ?3, phone = ?4, email = ?5,
+                address = ?6, website = ?7, customer_type = ?8, tax_number = ?9,
+                credit_limit = ?10, notes = ?11, is_active = ?12,
+                sync_status = 'pending', updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?13 AND deleted_at IS NULL",
+            params![
+                name,
+                customer.get("code").and_then(|v| v.as_str()).unwrap_or(""),
+                customer.get("contact_person").and_then(|v| v.as_str()),
+                customer.get("phone").and_then(|v| v.as_str()),
+                customer.get("email").and_then(|v| v.as_str()),
+                customer.get("address").and_then(|v| v.as_str()),
+                customer.get("website").and_then(|v| v.as_str()),
+                customer
+                    .get("customer_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("company"),
+                customer.get("tax_number").and_then(|v| v.as_str()),
+                customer
+                    .get("credit_limit")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0),
+                customer.get("notes").and_then(|v| v.as_str()),
+                customer
+                    .get("is_active")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true),
+                id,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err("客户不存在".to_string());
+    }
+    Ok(serde_json::json!({ "id": id, "name": name }))
 }
 
 /// 获取客户列表
@@ -536,7 +590,7 @@ pub fn submit_sales_order_on_conn(
         } else {
             // 销售后库存依然 >= 0，清除 negative_since
             tx.execute(
-                "UPDATE products SET negative_since = NULL WHERE id = ?1 AND current_stock >= 0",
+                "UPDATE products SET negative_since = NULL WHERE id = ?1",
                 params![pid],
             )
             .map_err(|e| e.to_string())?;
@@ -552,6 +606,8 @@ pub fn submit_sales_order_on_conn(
         params![order_id],
     )
     .map_err(|e| e.to_string())?;
+
+    post_sales_outbound_entries(&tx, order_id, None)?;
 
     tx.commit().map_err(|e| e.to_string())?;
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Dialog,
@@ -7,24 +7,45 @@ import {
   IconButton,
   Typography,
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import { AVATAR_PRESETS, DEFAULT_AVATAR_KEY, SECRETARY_STORAGE_KEYS } from '../../types/secretary';
 
 interface AIStatusBarProps {
   insight?: string;
   /** 洞察详细内容（日报） */
   dailyReport?: string[];
+  onRefresh?: () => void;
 }
 
-export default function AIStatusBar({ insight, dailyReport }: AIStatusBarProps) {
+function secretaryAvatarSrc() {
+  const key = localStorage.getItem(SECRETARY_STORAGE_KEYS.AVATAR) || DEFAULT_AVATAR_KEY;
+  return AVATAR_PRESETS.find((preset) => preset.key === key)?.src
+    ?? AVATAR_PRESETS[0].src;
+}
+
+export default function AIStatusBar({ insight, dailyReport, onRefresh }: AIStatusBarProps) {
   const [reportOpen, setReportOpen] = useState(false);
+  const [avatarSrc, setAvatarSrc] = useState(secretaryAvatarSrc);
+
+  useEffect(() => {
+    const sync = () => setAvatarSrc(secretaryAvatarSrc());
+    window.addEventListener('storage', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
   return (
     <>
       <Box
         onClick={() => insight && setReportOpen(true)}
         sx={{
+          position: 'relative',
           mb: 2.5,
-          px: 2.5,
+          pl: 2.5,
+          pr: 5,
           py: 1.5,
           borderRadius: 2,
           background: 'linear-gradient(135deg, rgba(255,59,48,0.05) 0%, rgba(99,102,241,0.03) 100%)',
@@ -40,24 +61,30 @@ export default function AIStatusBar({ insight, dailyReport }: AIStatusBarProps) 
           } : {},
         }}
       >
-        {/* 左侧 AI 秘书头像 */}
+        <IconButton
+          size="small"
+          aria-label="刷新分析"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRefresh?.();
+          }}
+          sx={{ position: 'absolute', top: 4, right: 4, color: '#FF3B30' }}
+        >
+          <RefreshIcon fontSize="small" />
+        </IconButton>
+
         <Box
+          component="img"
+          src={avatarSrc}
+          alt="小如"
           sx={{
             width: 36,
             height: 36,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #FF3B30 0%, #6366F1 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontSize: '1rem',
-            fontWeight: 700,
+            objectFit: 'cover',
             flexShrink: 0,
           }}
-        >
-          如
-        </Box>
+        />
 
         {/* 中间状态文字 */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -85,18 +112,6 @@ export default function AIStatusBar({ insight, dailyReport }: AIStatusBarProps) 
             {insight || '正在分析你的经营数据，请稍候...'}
           </Typography>
         </Box>
-
-        {/* 右侧更新时间 */}
-        <Typography
-          variant="caption"
-          sx={{
-            color: 'rgba(0,0,0,0.3)',
-            fontSize: '0.65rem',
-            flexShrink: 0,
-          }}
-        >
-          上次更新 2 分钟前
-        </Typography>
       </Box>
 
       {/* AI 日报弹窗 */}

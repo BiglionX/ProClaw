@@ -14,9 +14,12 @@ class DesktopWebSocketService {
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map();
   private isConnected: boolean = false;
   private isAuthenticated: boolean = false;
+  private disposed: boolean = false;
+  private pendingMessages: string[] = [];
   private onStatusChange: ((connected: boolean) => void) | null = null;
 
   connect(serverUrl: string, userId: string, token: string): void {
+    this.disposed = false;
     this.url = serverUrl
       .replace(/^https:\/\//, 'wss://')
       .replace(/^http:\/\//, 'ws://') + '/ws/chat';
@@ -26,20 +29,30 @@ class DesktopWebSocketService {
   }
 
   private doConnect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.disposed) return;
+    const state = this.ws?.readyState;
+    if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
 
-    this.ws = new WebSocket(this.url);
+    const socket = new WebSocket(this.url);
+    this.ws = socket;
 
-    this.ws.onopen = () => {
+    socket.onopen = () => {
+      if (this.disposed || this.ws !== socket) {
+        socket.close();
+        return;
+      }
+      if (socket.readyState !== WebSocket.OPEN) return;
       this.isAuthenticated = false;
-      this.ws!.send(JSON.stringify({
+      this.safeSend(JSON.stringify({
         type: 'auth',
         user_id: this.userId,
         token: this.token,
-      }));
+      }), socket);
+      this.flushPending(socket);
     };
 
-    this.ws.onmessage = (event) => {
+    socket.onmessage = (event) => {
+      if (this.disposed || this.ws !== socket) return;
       try {
         const msg = JSON.parse(event.data);
         const type = msg.type || 'unknown';
@@ -65,21 +78,46 @@ class DesktopWebSocketService {
       }
     };
 
-    this.ws.onclose = () => {
+    socket.onclose = () => {
+      if (this.ws !== socket) return;
+      this.ws = null;
       this.isConnected = false;
       this.isAuthenticated = false;
       this.stopHeartbeat();
       this.onStatusChange?.(false);
-      this.scheduleReconnect();
+      if (!this.disposed) this.scheduleReconnect();
     };
 
-    this.ws.onerror = (err) => {
+    socket.onerror = (err) => {
       console.error('[WS] Error:', err);
     };
   }
 
+  /** 仅在 OPEN 时发送；否则进入队列，等本次连接 onopen 后再发。 */
+  private safeSend(message: string, socket: WebSocket | null = this.ws): void {
+    if (this.disposed) return;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(message);
+      return;
+    }
+    this.pendingMessages.push(message);
+  }
+
+  private flushPending(socket: WebSocket): void {
+    if (this.disposed || socket.readyState !== WebSocket.OPEN) return;
+    const queued = this.pendingMessages.splice(0);
+    let sent = 0;
+    for (; sent < queued.length; sent++) {
+      if (this.disposed || socket.readyState !== WebSocket.OPEN) break;
+      socket.send(queued[sent]);
+    }
+    if (sent < queued.length) {
+      this.pendingMessages.unshift(...queued.slice(sent));
+    }
+  }
+
   private scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
+    if (this.disposed || this.reconnectTimer) return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.doConnect();
@@ -111,15 +149,22 @@ class DesktopWebSocketService {
   }
 
   send(type: string, payload?: any, toUserId?: string): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.isAuthenticated) return false;
+    if (this.disposed) return false;
     const msg: any = { type };
     if (payload) msg.payload = payload;
     if (toUserId) msg.to = toUserId;
-    this.ws.send(JSON.stringify(msg));
+    const text = JSON.stringify(msg);
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.pendingMessages.push(text);
+      return true;
+    }
+    if (!this.isAuthenticated) return false;
+    this.ws.send(text);
     return true;
   }
 
   sendRaw(text: string): void {
+    if (this.disposed) return;
     if (this.ws?.readyState === WebSocket.OPEN && this.isAuthenticated) {
       this.ws.send(text);
     }
@@ -138,10 +183,13 @@ class DesktopWebSocketService {
   }
 
   disconnect(): void {
+    this.disposed = true;
+    this.pendingMessages = [];
     this.stopHeartbeat();
     if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
-    this.ws?.close();
+    const socket = this.ws;
     this.ws = null;
+    socket?.close();
     this.isConnected = false;
     this.isAuthenticated = false;
   }

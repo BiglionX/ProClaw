@@ -73,6 +73,13 @@ export async function createCustomer(
   return await invoke('create_customer', { customer: finalInput });
 }
 
+export async function updateCustomer(
+  id: string,
+  input: CreateCustomerInput
+): Promise<{ id: string; name: string }> {
+  return await invoke('update_customer', { id, customer: input });
+}
+
 export async function getCustomers(options?: {
   search?: string;
 }): Promise<Customer[]> {
@@ -155,6 +162,78 @@ export async function getSalesOrders(options?: {
     return [];
   }
   return await invoke('get_sales_orders', { options });
+}
+
+export type SalesPeriod = 'today' | 'week' | 'month' | 'last_month' | 'year' | 'last_year';
+
+export function labelToSalesPeriod(label: string): SalesPeriod {
+  if (label === '本周') return 'week';
+  if (label === '上月') return 'last_month';
+  if (label === '今年') return 'year';
+  if (label === '去年') return 'last_year';
+  if (label === '今日' || label === '今天') return 'today';
+  return 'month';
+}
+
+export function salesPeriodBounds(period: SalesPeriod, now = new Date()): { start: Date; end: Date } {
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+
+  if (period === 'today') {
+    return { start, end };
+  }
+  if (period === 'week') {
+    const day = start.getDay() || 7;
+    start.setDate(start.getDate() - day + 1);
+    return { start, end };
+  }
+  if (period === 'month') {
+    start.setDate(1);
+    return { start, end };
+  }
+  if (period === 'last_month') {
+    start.setDate(1);
+    start.setMonth(start.getMonth() - 1);
+    return { start, end: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999) };
+  }
+  if (period === 'year') {
+    start.setMonth(0, 1);
+    return { start, end };
+  }
+  start.setFullYear(start.getFullYear() - 1, 0, 1);
+  return { start, end: new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999) };
+}
+
+export function summarizeOrdersInRange(
+  orders: SalesOrder[],
+  start: Date,
+  end: Date,
+): { count: number; amount: number } {
+  let count = 0;
+  let amount = 0;
+  for (const order of orders) {
+    if (order.status === 'cancelled') continue;
+    const time = new Date(order.order_date).getTime();
+    if (Number.isNaN(time) || time < start.getTime() || time > end.getTime()) continue;
+    count += 1;
+    amount += Number(order.total_amount) || 0;
+  }
+  return { count, amount };
+}
+
+/** 取不到订单时返回 null，和「0 笔」区分开。 */
+export async function summarizeSalesForPeriod(
+  period: SalesPeriod,
+): Promise<{ count: number; amount: number } | null> {
+  try {
+    const orders = await getSalesOrders();
+    const { start, end } = salesPeriodBounds(period);
+    return summarizeOrdersInRange(orders, start, end);
+  } catch {
+    return null;
+  }
 }
 
 export async function getSalesOrderDetail(

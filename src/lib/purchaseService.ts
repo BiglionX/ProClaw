@@ -78,6 +78,13 @@ export async function createSupplier(
 /**
  * 获取供应商列表
  */
+export async function updateSupplier(
+  id: string,
+  input: CreateSupplierInput
+): Promise<{ id: string; name: string }> {
+  return await invoke('update_supplier', { id, supplier: input });
+}
+
 export async function getSuppliers(options?: {
   search?: string;
 }): Promise<Supplier[]> {

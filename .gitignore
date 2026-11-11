@@ -115,3 +115,27 @@ test-list.txt
 playwright-browsers/
 src-tauri/src/import/legacy_import_e2e.rs
 src-tauri/src/import/parser_legacy_smoke.rs
+
+# 本地代理与编辑器缓存
+.cursor/
+
+# eslint 一次性输出
+eslint-all.txt
+eslint-clean.txt
+eslint-clean2.txt
+eslint-output.txt
+
+# 接口探测响应，不是源码
+scripts/probe_*
+scripts/resp_*
+agent-tools-hotfix-regress.py
+agent-tools-report-extract.txt
+
+# Rust 检查的临时输出和备份
+src-tauri/test_err.txt
+src-tauri/test_out.txt
+src-tauri/tests.txt
+src-tauri/src/lib.rs.full
+
+# 本地手机工程副本和构建产物
+apps/

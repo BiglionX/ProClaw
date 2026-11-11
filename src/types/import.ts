@@ -227,6 +227,16 @@ export interface SegmentTitle {
   end_col: number;
 }
 
+/**
+ * 预览接口实际返回的分段标题。
+ * 后端把列号写进 HashMap<String, String>，JSON 里 start_col / end_col 是字符串。
+ */
+export interface LegacySegmentTitle {
+  start_col: string;
+  title: string;
+  end_col: string;
+}
+
 /** 聚合规则（用户在 Step 4 编辑后传给后端） */
 export interface AggregationRule {
   /** 分组键（客户编号 / 商品 SPU 等） */
@@ -280,7 +290,7 @@ export interface LegacyParseResult {
   detected_format: 'xls' | 'xlsx';
   total_data_rows: number;
   field_names: string[];
-  segment_titles: string[];
+  segment_titles: LegacySegmentTitle[];
   customer_groups: CustomerAggregate[];
   product_groups: ProductAggregate[];
   /** 待建档类别：{ product: [...], supplier: [...], customer: [...] } */

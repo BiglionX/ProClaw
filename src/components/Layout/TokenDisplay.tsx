@@ -10,21 +10,62 @@ import {
   LinearProgress,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../lib/authStore';
+import {
+  getPlans,
+  getTokenSummary,
+  type Plan,
+  type TokenUsageSummary,
+} from '../../lib/subscriptionService';
+
+function formatQuota(value: number): string {
+  if (value >= 10000) return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}K`;
+  return value.toLocaleString();
+}
 
 export default function TokenDisplay() {
+  const navigate = useNavigate();
+  const userId = useAuthStore((s) => s.user?.id || '');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [summary, setSummary] = useState<TokenUsageSummary | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
 
-  // 模拟 Token 数据
-  const tokenData = {
-    used: 12500,
-    total: 50000,
-    percentage: 25,
-  };
+  useEffect(() => {
+    if (!userId) {
+      setSummary(null);
+      setPlans([]);
+      return;
+    }
+    let cancelled = false;
+    getTokenSummary(userId)
+      .then((data) => {
+        if (!cancelled) setSummary(data);
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null);
+      });
+    getPlans()
+      .then((data) => {
+        if (!cancelled) setPlans(data.filter((plan) => plan.is_active !== false));
+      })
+      .catch(() => {
+        if (!cancelled) setPlans([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const used = summary?.token_used ?? 0;
+  const total = summary?.token_quota ?? 0;
+  const percentage = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  const remaining = summary?.token_remaining ?? Math.max(total - used, 0);
 
   const handleRecharge = () => {
-    // 这里将来会跳转到充值页面或打开充值对话框
     setDialogOpen(false);
+    navigate('/token-billing');
   };
 
   return (
@@ -67,19 +108,18 @@ export default function TokenDisplay() {
                 fontWeight: 600,
               }}
             >
-              {(tokenData.used / 1000).toFixed(1)}K /{' '}
-              {(tokenData.total / 1000).toFixed(0)}K
+              {summary ? `${formatQuota(used)} / ${formatQuota(total)}` : '-- / --'}
             </Typography>
             <Chip
-              label={`${tokenData.percentage}%`}
+              label={summary ? `${percentage}%` : '--'}
               size="small"
               sx={{
                 height: 16,
                 fontSize: '0.65rem',
                 bgcolor:
-                  tokenData.percentage > 80
+                  percentage > 80
                     ? '#666'
-                    : tokenData.percentage > 60
+                    : percentage > 60
                       ? '#999'
                       : '#bbb',
                 color: '#fff',
@@ -92,17 +132,15 @@ export default function TokenDisplay() {
         </Box>
       </Box>
 
-      {/* Token 充值对话框 */}
       <Dialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ borderBottom: '1px solid #333' }}>💰 Token 充值</DialogTitle>
+        <DialogTitle sx={{ borderBottom: '1px solid #333' }}>Token 用量</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
-            {/* 当前用量 */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom>
                 当前用量
@@ -125,21 +163,21 @@ export default function TokenDisplay() {
                     已使用
                   </Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {(tokenData.used / 1000).toFixed(1)}K
+                    {summary ? used.toLocaleString() : '--'}
                   </Typography>
                 </Box>
                 <LinearProgress
                   variant="determinate"
-                  value={tokenData.percentage}
+                  value={percentage}
                   sx={{
                     height: 8,
                     borderRadius: 4,
                     bgcolor: 'rgba(255,255,255,0.1)',
                     '& .MuiLinearProgress-bar': {
                       bgcolor:
-                        tokenData.percentage > 80
+                        percentage > 80
                           ? '#666'
-                          : tokenData.percentage > 60
+                          : percentage > 60
                             ? '#999'
                             : '#bbb',
                     },
@@ -150,88 +188,60 @@ export default function TokenDisplay() {
                   color="text.secondary"
                   sx={{ display: 'block', mt: 0.5, textAlign: 'right' }}
                 >
-                  剩余 {(tokenData.total - tokenData.used).toLocaleString()}{' '}
-                  Tokens
+                  {summary
+                    ? `剩余 ${remaining.toLocaleString()} / 额度 ${total.toLocaleString()}`
+                    : '登录后显示套餐额度'}
                 </Typography>
               </Box>
             </Box>
 
-            {/* 充值套餐 */}
             <Typography variant="subtitle2" gutterBottom>
-              充值套餐
+              套餐额度
             </Typography>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
-                gap: 2,
-              }}
-            >
-              {[
-                { amount: '10K', price: '¥29', popular: false },
-                { amount: '50K', price: '¥129', popular: true },
-                { amount: '200K', price: '¥449', popular: false },
-              ].map((plan, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    p: 2,
-                    border: '2px solid',
-                    borderColor: plan.popular ? '#666' : '#444',
-                    borderRadius: 2,
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    '&:hover': {
-                      borderColor: '#888',
-                      bgcolor: 'rgba(255,255,255,0.05)',
-                    },
-                  }}
-                >
-                  {plan.popular && (
-                    <Chip
-                      label="热门"
-                      size="small"
-                      color="primary"
-                      sx={{
-                        position: 'absolute',
-                        top: -10,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                      }}
-                    />
-                  )}
-                  <Typography variant="h6" fontWeight={700}>
-                    {plan.amount}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Tokens
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    fontWeight={700}
-                    color="#e0e0e0"
-                    sx={{ mt: 1 }}
-                  >
-                    {plan.price}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-
-            {/* 说明 */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1 }}>
-              <Typography variant="caption" color="#aaa">
-                💡 Token 用于 AI 智能体对话、数据分析等 AI
-                功能。用完后将无法使用 AI 相关功能，但不影响基础业务操作。
+            {plans.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                暂无套餐数据
               </Typography>
-            </Box>
+            ) : (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                  gap: 2,
+                }}
+              >
+                {plans.map((plan) => (
+                  <Box
+                    key={plan.id}
+                    sx={{
+                      p: 2,
+                      border: '2px solid #444',
+                      borderRadius: 2,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={700}>
+                      {plan.name}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5 }}>
+                      {plan.token_quota.toLocaleString()}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      PT / 月
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700} color="#e0e0e0" sx={{ mt: 1 }}>
+                      ¥{plan.monthly_price}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>关闭</Button>
           <Button onClick={handleRecharge} variant="contained" color="primary">
-            立即充值
+            查看计费
           </Button>
         </DialogActions>
       </Dialog>

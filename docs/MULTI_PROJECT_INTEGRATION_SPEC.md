@@ -427,6 +427,117 @@ ProClaw 作为桌面应用，必须保证**核心进销存功能在无网络时�
 
 ---
 
+## 11. 虚拟公司闭环（Sprint 2.13–2.17，已交付 ✅ / v1.4.1）
+
+> 状态：**v1.3.2 已发布**。三个 Sprint 累计交付：8 个 Tauri 命令 / 10 个 TS 类型 / 1 套 JSON Schema / 2 套纯函数合并引擎 / 4 个 React 路由 / 67 个测试 / 220+ 行开发者文档。
+
+### 11.1 范围
+
+| 维度 | 内容 |
+|------|------|
+| **数据契约** | `VirtualCompanyPackage` JSON Schema v1.0.0（schemaVersion 1.0.0 起步） |
+| **数据流方向** | 双向：NvWaX → ProClaw（导入）+ ProClaw → NvWaX（local_state 回写） |
+| **冲突解决** | 字段级 Last-Write-Wins（每个字段独立比较时间戳） |
+| **多设备同步** | App 启动 5 秒后后台静默触发 + 用户手动"立即同步"按钮 |
+| **离线兼容** | ProClaw 始终是 source of truth；NvWaX 仅作同步目标 |
+
+### 11.2 跨包 API 端点
+
+#### NvWaX → ProClaw（导出 / 下载）
+
+| Method | Path | 用途 |
+|--------|------|------|
+| POST | `/api/aiteam-creation/sessions/:id/integrate-proclaw` | 生成 `.nvwax-vc.json`（写临时文件，返回 downloadUrl） |
+| GET  | `/api/aiteam-creation/packages/:packageId/download` | 下载导出包（128-bit UUID 不可枚举） |
+| GET  | `/api/aiteam-creation/sessions/:id/local-state` | 拉取单个 session 的 `local_state`（多设备同步） |
+| GET  | `/api/aiteam-creation/sessions` | 列表响应增加 `local_state` + `localStateLastSyncedAt` |
+
+#### ProClaw → NvWaX（回写）
+
+| Method | Path | 用途 |
+|--------|------|------|
+| PUT | `/api/aiteam-creation/sessions/:id/local-state` | 接收 ProClaw 推送的 Agent 启停/别名/负责人角色回写 |
+
+### 11.3 ProClaw Tauri 命令（虚拟公司专用）
+
+| 命令 | 引入 | 用途 |
+|------|------|------|
+| `nvwax_search_vc_templates` | 2.13 | 浏览 NvWaX 虚拟公司模板 |
+| `nvwax_import_virtual_company_from_url` | 2.13 | 拉取 `.nvwax-vc.json` 并导入本地 SQLite |
+| `bootstrap_virtual_company_tables` | 2.13 | 首次加载时建表（幂等） |
+| `open_virtual_company_page` | 2.14 | 触发前端跳转到 `/vc/{wizard,import,companies}` |
+| `nvwax_push_virtual_company_state` | 2.14 | 把本地状态变更回写到 NvWaX |
+| `nvwax_stream_session` | 2.14 | 通过 SSE 流与 NvWaX 虚拟公司会话交互 |
+| `nvwax_fetch_local_state` | 2.15 | 拉取单个 session 的最新 `local_state`（多设备同步） |
+| `nvwax_list_sessions_with_state` | 2.15 | 列出用户最近的虚拟公司会话（含 `local_state`） |
+
+### 11.4 字段级 Last-Write-Wins 合并
+
+```
+mergeAgentState(local, remote):
+  enabled = lww(local.enabled, local.lastModified, remote.enabled, remote.lastRunAt)
+  alias = lww(local.alias, local.lastModified, remote.alias, remote.lastRunAt)
+  ownerRole = lww(local.ownerRole, local.lastModified, remote.ownerRole, remote.lastRunAt)
+  winner = enabled 字段的胜出方（用户最关心的启停）
+
+lww(localVal, localTs, remoteVal, remoteTs):
+  if both ts == 0: return remoteVal; winner=remote   # 首次同步 → 云端权威
+  if remoteTs > localTs: return remoteVal; winner=remote
+  if localTs > remoteTs: return localVal; winner=local
+  if equal: return remoteVal; winner=remote   # tie → 云端优先
+```
+
+**全量对账**（`reconcileSync`）：
+
+```
+输入：cloudSessions: VirtualCompanySessionWithState[]
+     localCompanies: LocalVirtualCompanySnapshot[]
+输出：{ merged: MergedVirtualCompany[]
+       cloudOnly: VirtualCompanySessionWithState[]   # 需导入
+       localOnly: LocalVirtualCompanySnapshot[]      # 孤儿，保留
+       meta: { syncedAt, counts } }
+```
+
+匹配键：云端 `localState.importedPackageId` ↔ 本地 `virtual_companies.package_id`
+
+### 11.5 数据契约位置
+
+- ProClaw 端：`docs/integration/virtual-company-package.schema.json`
+- NvWaX 端：`packages/nvwax-server/src/schemas/virtual-company-package.schema.json`（镜像）
+- 任何字段增删必须**双端同步 PR**，由 ProClaw + NvWaX 双方 reviewer 共同批准
+- 主版本升级（1.x → 2.x）走 ADR 流程，不允许 minor 升级引入破坏性变更
+
+### 11.6 测试覆盖
+
+| 维度 | 文件 | 用例数 |
+|------|------|--------|
+| Schema 校验 | `src/lib/nvwaxClient.virtualCompany.test.ts` | 8 |
+| Plugin Frontend | `src/lib/pluginFrontend.test.ts` | 8 |
+| 意图识别 | `src/lib/assistantAgent.test.ts`（虚拟公司相关） | 9 |
+| 合并引擎 | `src/lib/virtualCompanySync.test.ts` | 14 |
+| Rust 持久化 | `src-tauri/src/services/nvwax_commands.rs::tests` | 4 |
+| NvWaX 组装 | `nvwax-server/src/services/proclaw.service.test.ts` | 4 |
+| **合计** | | **47** |
+
+### 11.7 已交付 Sprint 时间线
+
+| Sprint | 主题 | 关键里程碑 |
+|--------|------|-----------|
+| **2.13** | 最小闭环 | Schema v1.0.0 + 3 个 Tauri 命令 + 4 个 React 路由 + 修复 plugin frontend 加载 bug |
+| **2.14** | 4 项增强 | CEO Skill + 开发者文档 + 回写 API + 本地 SSE 流式对话 |
+| **2.15** | 多设备同步 | `mergeAgentState` + `reconcileSync` 纯函数合并 + 启动后台同步 + Companies 页报告卡片 |
+| **2.16** | 持久化 + 模板市场 | 启用/停用状态写 SQLite + 真实 SSE（轮询版） + 模板市场反向发布 + ALTER TABLE 旧库升级 |
+| **2.17** | 真实 SSE 收尾 | ProClaw 解析 `event:` 路由 6 种事件；NvWaX 端 `sse-progress.service` 新增 `broadcastAgentMessage()` + `broadcastComplete()` + 7 个 SSE 单元测试；端到端打通 wizard 流式显示 |
+
+### 11.8 后续计划（非本轮范围）
+
+- **虚拟公司模板市场反向发布详情页**（在 NvWaX 端）— 计划 v1.5.0
+- **多设备冲突 UI 撤销按钮**（CRDT 风格字段级合并）— 计划 v1.5.0
+- **虚拟公司端到端 e2e Playwright 套件** — 计划 v1.5.0
+- **多设备冲突 UI 提示**（撤销按钮 + CRDT 风格字段级合并）— 计划 v1.5.0
+
+---
+
 ## 9. 路线图要点
 
 | 阶段 | 内容 | 涉及项目 |

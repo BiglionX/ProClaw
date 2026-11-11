@@ -21,6 +21,17 @@ export default defineConfig({
   base: './',
   server: {
     port: 3000,
+    // 避免 Vite 监听 Rust target/ 与 dist/，这些目录在 Rust 编译期间会被锁住，导致 EBUSY
+    // （参考常见问题经验：Vite 在 Windows 下监听 Rust target 目录与 RELEASES 导致 EBUSY）
+    watch: {
+      ignored: [
+        '**/src-tauri/target/**',
+        '**/RELEASES/**',
+        '**/dist/**',
+        '**/dist-eas-build/**',
+        '**/node_modules/**',
+      ],
+    },
   },
   resolve: {
     alias: {

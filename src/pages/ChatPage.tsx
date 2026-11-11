@@ -54,6 +54,8 @@ import TaskCard, { TaskCardData } from '../components/CEO/TaskCard';
 import ConfirmationCard, { ConfirmationData } from '../components/CEO/ConfirmationCard';
 import DecisionHistoryPanel from '../components/CEO/DecisionHistoryPanel';
 import { proclawDecision } from '../lib/ceoController';
+import { replyToCeoChat } from '../lib/ceoChatReply';
+import { isAbortError } from '../lib/fetchWithTimeout';
 import { safeNumber } from '../lib/format';
 
 const CEO_AGENT_ID = 'ceo-agent';
@@ -66,11 +68,11 @@ const AI_TEAM_COMMANDS = [
   { label: '@all', desc: '通知所有AI Team成员' },
 ];
 
-// CEO Agent 快捷命令
+// CEO Agent 快捷命令：界面显示中文，点击后仍填入原命令
 const CEO_COMMANDS = [
-  { label: '/task list', desc: '查看最近任务' },
-  { label: '/context show', desc: '查看项目上下文' },
-  { label: '/report daily', desc: '查看日报' },
+  { label: '任务列表', command: '/task list', desc: '查看最近任务' },
+  { label: '公司目标', command: '/context show', desc: '查看项目上下文' },
+  { label: '今日简报', command: '/report daily', desc: '查看日报' },
 ];
 
 export default function ChatPage() {
@@ -150,7 +152,7 @@ export default function ChatPage() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !contactId || sending) return;
+    if (!input.trim() || !contactId || sending || aiResponding) return;
     const content = input.trim();
     setInput('');
     setSending(true);
@@ -179,6 +181,39 @@ export default function ChatPage() {
       }
       appendMessage(newMsg);
       scrollToBottom();
+
+      // 与 CEO Agent 单聊：命令走本地路由，其余交给大模型
+      if (isCEO) {
+        setSending(false);
+        setAiResponding(true);
+        setLastUserInput(content);
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        try {
+          const history = messages
+            .filter((msg) => msg.content_type === 'text' || msg.content_type == null)
+            .slice(-8)
+            .map((msg) => ({
+              role: (msg.from_user === 'self' ? 'user' : 'assistant') as 'user' | 'assistant',
+              content: msg.content,
+            }));
+          const reply = await replyToCeoChat(content, { signal: controller.signal, history });
+          if (controller.signal.aborted) return;
+          const aiMsg = await sendMessage('ceo-agent', contactId, reply);
+          aiMsg.from_user_name = 'CEO Agent';
+          appendMessage(aiMsg);
+          setAiError(null);
+          scrollToBottom();
+        } catch (aiErr) {
+          if (!(isAbortError(aiErr) && controller.signal.aborted)) {
+            console.error('CEO 响应失败:', aiErr);
+            setAiError(OUTBOUND_ERROR_MESSAGE);
+          }
+        } finally {
+          abortControllerRef.current = null;
+          setAiResponding(false);
+        }
+      }
 
       // 群聊模式：调用 LLM 让 CEO Agent 自动响应
       if (isGroupChat && groupConfig) {
@@ -829,26 +864,27 @@ export default function ChatPage() {
         {isCEO && !input.startsWith('/') && (
           <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
             {CEO_COMMANDS.map(cmd => (
-              <Chip
-                key={cmd.label}
-                label={cmd.label}
-                size="small"
-                variant="outlined"
-                onClick={() => setInput(cmd.label)}
-                sx={{
-                  height: 22,
-                  fontSize: '0.65rem',
-                  borderColor: '#ce93d8',
-                  color: '#7b1fa2',
-                  '&:hover': { bgcolor: '#f3e5f5' },
-                }}
-              />
+              <Tooltip key={cmd.command} title={cmd.desc}>
+                <Chip
+                  label={cmd.label}
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setInput(cmd.command)}
+                  sx={{
+                    height: 22,
+                    fontSize: '0.75rem',
+                    borderColor: '#ce93d8',
+                    color: '#7b1fa2',
+                    '&:hover': { bgcolor: '#f3e5f5' },
+                  }}
+                />
+              </Tooltip>
             ))}
           </Box>
         )}
 
         {/* AI 思考中提示 + 停止按钮 */}
-        {isGroupChat && aiResponding && (
+        {(isGroupChat || isCEO) && aiResponding && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, px: 1 }}>
             <CircularProgress size={14} sx={{ color: '#ff6d00' }} />
             <Typography variant="caption" sx={{ color: '#e65100', fontStyle: 'italic', flex: 1 }}>
@@ -974,7 +1010,7 @@ export default function ChatPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={isGroupChat && tokenBalance <= 0 && isDemoAccount() ? 'Token 已用完，无法发送消息' : isGroupChat && aiResponding ? 'CEO Agent 思考中，请稍候...' : isGroupChat ? '在 AI Team 群聊中发号施令...' : isCEO ? '向 CEO Agent 下达指令...' : '输入消息...'}
+            placeholder={isGroupChat && tokenBalance <= 0 && isDemoAccount() ? 'Token 已用完，无法发送消息' : (isGroupChat || isCEO) && aiResponding ? 'CEO Agent 思考中，请稍候...' : isGroupChat ? '在 AI Team 群聊中发号施令...' : isCEO ? '向 CEO Agent 下达指令...' : '输入消息...'}
             disabled={sending || aiResponding || (isGroupChat && isDemoAccount() && tokenBalance <= 0)}
             sx={{
               '& .MuiOutlinedInput-root': {

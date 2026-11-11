@@ -26,7 +26,6 @@ import {
 import {
   Translate as TranslateIcon,
   Refresh as RefreshIcon,
-  Send as SendIcon,
 } from '@mui/icons-material';
 import { safeInvoke } from '../../lib/tauri';
 
@@ -145,11 +144,12 @@ export default function TranslationsTab() {
             />
             <Button
               variant="contained"
-              startIcon={translating ? <CircularProgress size={16} /> : <SendIcon />}
               disabled={translating}
               onClick={handleAITranslate}
+              aria-label="AI 翻译"
+              sx={{ minWidth: 48, px: 1.5 }}
             >
-              {translating ? '翻译中...' : 'AI 翻译'}
+              {translating ? <CircularProgress size={18} color="inherit" /> : <TranslateIcon />}
             </Button>
           </Stack>
           {aiHint && (
@@ -176,7 +176,7 @@ export default function TranslationsTab() {
               <TableRow>
                 <TableCell colSpan={5} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                    暂无翻译记录，点击上方「AI 翻译」生成。
+                    暂无翻译记录，点击右侧翻译图标生成。
                   </Typography>
                 </TableCell>
               </TableRow>

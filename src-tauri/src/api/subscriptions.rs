@@ -3,16 +3,18 @@
 
 use crate::services::subscription_service;
 use axum::{
-    extract::{Json, Query, State},
+    extract::{Extension, Json, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use serde::Deserialize;
 
+use super::auth::Claims;
 use super::AppState;
 
 #[derive(Deserialize)]
 pub struct SubscribeRequest {
+    #[serde(default)]
     pub user_id: String,
     pub plan_id: String,
     pub billing_cycle: String,
@@ -20,6 +22,7 @@ pub struct SubscribeRequest {
 
 #[derive(Deserialize)]
 pub struct UsageQuery {
+    #[serde(default)]
     pub user_id: String,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
@@ -27,7 +30,21 @@ pub struct UsageQuery {
 
 #[derive(Deserialize)]
 pub struct UserQuery {
+    #[serde(default)]
     pub user_id: String,
+}
+
+fn owned_user_id(
+    requested: &str,
+    claims: &Claims,
+) -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+    if !requested.is_empty() && requested != claims.sub {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "Forbidden"})),
+        ));
+    }
+    Ok(claims.sub.clone())
 }
 
 // ========== 套餐 ==========
@@ -58,8 +75,13 @@ pub async fn get_plans(State(state): State<AppState>) -> impl IntoResponse {
 /// GET /api/subscriptions/me - 获取当前用户订阅信息
 pub async fn get_my_subscription(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(q): Query<UserQuery>,
 ) -> impl IntoResponse {
+    let user_id = match owned_user_id(&q.user_id, &claims) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
     let db = match state.db.lock() {
         Ok(d) => d,
         Err(_) => {
@@ -70,7 +92,7 @@ pub async fn get_my_subscription(
         }
     };
 
-    match subscription_service::get_user_subscription(&db, &q.user_id) {
+    match subscription_service::get_user_subscription(&db, &user_id) {
         Ok(Some(sub)) => (StatusCode::OK, Json(serde_json::json!({ "data": sub }))),
         Ok(None) => (
             StatusCode::OK,
@@ -86,8 +108,13 @@ pub async fn get_my_subscription(
 /// POST /api/subscriptions/subscribe - 订阅套餐
 pub async fn subscribe_plan(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Json(payload): Json<SubscribeRequest>,
 ) -> impl IntoResponse {
+    let user_id = match owned_user_id(&payload.user_id, &claims) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
     let db = match state.db.lock() {
         Ok(d) => d,
         Err(_) => {
@@ -100,7 +127,7 @@ pub async fn subscribe_plan(
 
     match subscription_service::subscribe_user(
         &db,
-        &payload.user_id,
+        &user_id,
         &payload.plan_id,
         &payload.billing_cycle,
     ) {
@@ -120,8 +147,13 @@ pub async fn subscribe_plan(
 /// POST /api/subscriptions/cancel - 取消订阅
 pub async fn cancel_subscription(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(q): Query<UserQuery>,
 ) -> impl IntoResponse {
+    let user_id = match owned_user_id(&q.user_id, &claims) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
     let db = match state.db.lock() {
         Ok(d) => d,
         Err(_) => {
@@ -132,7 +164,7 @@ pub async fn cancel_subscription(
         }
     };
 
-    match subscription_service::cancel_subscription(&db, &q.user_id) {
+    match subscription_service::cancel_subscription(&db, &user_id) {
         Ok(()) => (
             StatusCode::OK,
             Json(serde_json::json!({ "message": "Subscription cancelled" })),
@@ -149,8 +181,13 @@ pub async fn cancel_subscription(
 /// GET /api/subscriptions/token-summary - Token 用量摘要
 pub async fn get_token_summary(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(q): Query<UserQuery>,
 ) -> impl IntoResponse {
+    let user_id = match owned_user_id(&q.user_id, &claims) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
     let db = match state.db.lock() {
         Ok(d) => d,
         Err(_) => {
@@ -161,7 +198,7 @@ pub async fn get_token_summary(
         }
     };
 
-    match subscription_service::get_token_usage_summary(&db, &q.user_id) {
+    match subscription_service::get_token_usage_summary(&db, &user_id) {
         Ok(summary) => (StatusCode::OK, Json(serde_json::json!({ "data": summary }))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -173,8 +210,13 @@ pub async fn get_token_summary(
 /// GET /api/subscriptions/token-usage - Token 用量明细
 pub async fn get_token_usage(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(q): Query<UsageQuery>,
 ) -> impl IntoResponse {
+    let user_id = match owned_user_id(&q.user_id, &claims) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
     let db = match state.db.lock() {
         Ok(d) => d,
         Err(_) => {
@@ -185,10 +227,10 @@ pub async fn get_token_usage(
         }
     };
 
-    let limit = q.limit.unwrap_or(50);
-    let offset = q.offset.unwrap_or(0);
+    let limit = q.limit.unwrap_or(50).clamp(1, 200);
+    let offset = q.offset.unwrap_or(0).max(0);
 
-    match subscription_service::get_token_usage_details(&db, &q.user_id, limit, offset) {
+    match subscription_service::get_token_usage_details(&db, &user_id, limit, offset) {
         Ok(details) => (StatusCode::OK, Json(serde_json::json!({ "data": details }))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -200,8 +242,13 @@ pub async fn get_token_usage(
 /// GET /api/subscriptions/invoices - 账单列表
 pub async fn get_invoices(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(q): Query<UserQuery>,
 ) -> impl IntoResponse {
+    let user_id = match owned_user_id(&q.user_id, &claims) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
     let db = match state.db.lock() {
         Ok(d) => d,
         Err(_) => {
@@ -212,7 +259,7 @@ pub async fn get_invoices(
         }
     };
 
-    match subscription_service::get_invoices(&db, &q.user_id) {
+    match subscription_service::get_invoices(&db, &user_id) {
         Ok(invoices) => (
             StatusCode::OK,
             Json(serde_json::json!({ "data": invoices })),

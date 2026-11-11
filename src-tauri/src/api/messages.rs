@@ -1,9 +1,10 @@
 // 消息管理 HTTP API
 // Phase 3: 提供离线消息拉取、已读确认、历史查询等 REST 端点
 
+use super::auth::Claims;
 use super::AppState;
 use axum::{
-    extract::{Json, Path, Query, State},
+    extract::{Extension, Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -15,6 +16,7 @@ use uuid::Uuid;
 /// 消息查询参数
 #[derive(Debug, Deserialize)]
 pub struct MessageQueryParams {
+    #[serde(default)]
     pub user_id: String,
     /// 与哪个用户的对话
     pub with: Option<String>,
@@ -27,6 +29,7 @@ pub struct MessageQueryParams {
 /// 离线消息查询参数
 #[derive(Debug, Deserialize)]
 pub struct OfflineMessageParams {
+    #[serde(default)]
     pub user_id: String,
 }
 
@@ -47,7 +50,26 @@ fn default_content_type() -> String {
 /// 标记已读请求
 #[derive(Debug, Deserialize)]
 pub struct MarkReadParams {
+    #[serde(default)]
     pub user_id: String,
+}
+
+fn reject_foreign_user(
+    requested: &str,
+    subject: &str,
+) -> Option<(StatusCode, Json<serde_json::Value>)> {
+    if !requested.is_empty() && requested != subject {
+        return Some((StatusCode::FORBIDDEN, Json(json!({"error": "Forbidden"}))));
+    }
+    None
+}
+
+fn db_error(context: &str, err: impl std::fmt::Display) -> (StatusCode, Json<serde_json::Value>) {
+    eprintln!("[Messages] {}: {}", context, err);
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({"error": "Database error"})),
+    )
 }
 
 /// 消息响应结构
@@ -71,9 +93,14 @@ pub struct MessageResponse {
 /// 获取两个用户之间的聊天历史
 pub async fn get_messages(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(params): Query<MessageQueryParams>,
 ) -> impl IntoResponse {
-    let limit = params.limit.unwrap_or(50).min(200);
+    if let Some(resp) = reject_foreign_user(&params.user_id, &claims.sub) {
+        return resp;
+    }
+    let user_id = claims.sub.clone();
+    let limit = params.limit.unwrap_or(50).clamp(1, 200);
     let before = params.before.unwrap_or(i64::MAX);
 
     let db = match state.db.lock() {
@@ -87,88 +114,70 @@ pub async fn get_messages(
     };
     let conn = db.connection();
 
-    let messages: Vec<MessageResponse> =
-        if let Some(ref with_user) = params.with {
-            // 两个用户之间的对话（双向）
-            let mut stmt = match conn.prepare(
+    let messages: Vec<MessageResponse> = if let Some(ref with_user) = params.with {
+        // 两个用户之间的对话（双向）
+        let mut stmt = match conn.prepare(
             "SELECT id, from_user, to_user, content, content_type, is_offline, is_read, created_at
              FROM messages
              WHERE ((from_user = ?1 AND to_user = ?2) OR (from_user = ?2 AND to_user = ?1))
                AND created_at < ?3
              ORDER BY created_at DESC
-             LIMIT ?4"
+             LIMIT ?4",
         ) {
             Ok(stmt) => stmt,
-            Err(e) => return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Query prepare error: {}", e)})),
-            ),
+            Err(e) => return db_error("prepare messages", e),
         };
 
-            let rows = match stmt.query_map(
-                rusqlite::params![params.user_id, with_user, before, limit],
-                |row| {
-                    Ok(MessageResponse {
-                        id: row.get(0)?,
-                        from_user: row.get(1)?,
-                        to_user: row.get(2)?,
-                        content: row.get(3)?,
-                        content_type: row.get(4)?,
-                        is_offline: row.get(5)?,
-                        is_read: row.get(6)?,
-                        created_at: row.get(7)?,
-                    })
-                },
-            ) {
-                Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-                Err(e) => {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"error": format!("Query error: {}", e)})),
-                    )
-                }
-            };
-            rows
-        } else {
-            // 该用户的所有消息（收发双向）
-            let mut stmt = match conn.prepare(
+        let rows = match stmt.query_map(
+            rusqlite::params![user_id, with_user, before, limit],
+            |row| {
+                Ok(MessageResponse {
+                    id: row.get(0)?,
+                    from_user: row.get(1)?,
+                    to_user: row.get(2)?,
+                    content: row.get(3)?,
+                    content_type: row.get(4)?,
+                    is_offline: row.get(5)?,
+                    is_read: row.get(6)?,
+                    created_at: row.get(7)?,
+                })
+            },
+        ) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => return db_error("query messages", e),
+        };
+        rows
+    } else {
+        // 该用户的所有消息（收发双向）
+        let mut stmt = match conn.prepare(
             "SELECT id, from_user, to_user, content, content_type, is_offline, is_read, created_at
              FROM messages
              WHERE (from_user = ?1 OR to_user = ?1)
                AND created_at < ?2
              ORDER BY created_at DESC
-             LIMIT ?3"
+             LIMIT ?3",
         ) {
             Ok(stmt) => stmt,
-            Err(e) => return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Query prepare error: {}", e)})),
-            ),
+            Err(e) => return db_error("prepare messages", e),
         };
 
-            let rows =
-                match stmt.query_map(rusqlite::params![params.user_id, before, limit], |row| {
-                    Ok(MessageResponse {
-                        id: row.get(0)?,
-                        from_user: row.get(1)?,
-                        to_user: row.get(2)?,
-                        content: row.get(3)?,
-                        content_type: row.get(4)?,
-                        is_offline: row.get(5)?,
-                        is_read: row.get(6)?,
-                        created_at: row.get(7)?,
-                    })
-                }) {
-                    Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-                    Err(e) => {
-                        return (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(json!({"error": format!("Query error: {}", e)})),
-                        )
-                    }
-                };
-            rows
+        let rows = match stmt.query_map(rusqlite::params![user_id, before, limit], |row| {
+            Ok(MessageResponse {
+                id: row.get(0)?,
+                from_user: row.get(1)?,
+                to_user: row.get(2)?,
+                content: row.get(3)?,
+                content_type: row.get(4)?,
+                is_offline: row.get(5)?,
+                is_read: row.get(6)?,
+                created_at: row.get(7)?,
+            })
+        }) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => return db_error("query messages", e),
         };
+        rows
+    };
 
     (StatusCode::OK, Json(json!({ "messages": messages })))
 }
@@ -177,8 +186,13 @@ pub async fn get_messages(
 /// 获取指定用户的离线消息
 pub async fn get_offline_messages(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Query(params): Query<OfflineMessageParams>,
 ) -> impl IntoResponse {
+    if let Some(resp) = reject_foreign_user(&params.user_id, &claims.sub) {
+        return resp;
+    }
+    let user_id = claims.sub.clone();
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
@@ -199,40 +213,31 @@ pub async fn get_offline_messages(
          LIMIT 100"
     ) {
         Ok(stmt) => stmt,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Query prepare error: {}", e)})),
-        ),
+        Err(e) => return db_error("prepare offline messages", e),
     };
 
-    let messages: Vec<MessageResponse> =
-        match stmt.query_map(rusqlite::params![params.user_id], |row| {
-            Ok(MessageResponse {
-                id: row.get(0)?,
-                from_user: row.get(1)?,
-                to_user: row.get(2)?,
-                content: row.get(3)?,
-                content_type: row.get(4)?,
-                is_offline: row.get(5)?,
-                is_read: row.get(6)?,
-                created_at: row.get(7)?,
-            })
-        }) {
-            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": format!("Query error: {}", e)})),
-                )
-            }
-        };
+    let messages: Vec<MessageResponse> = match stmt.query_map(rusqlite::params![user_id], |row| {
+        Ok(MessageResponse {
+            id: row.get(0)?,
+            from_user: row.get(1)?,
+            to_user: row.get(2)?,
+            content: row.get(3)?,
+            content_type: row.get(4)?,
+            is_offline: row.get(5)?,
+            is_read: row.get(6)?,
+            created_at: row.get(7)?,
+        })
+    }) {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(e) => return db_error("query offline messages", e),
+    };
 
     (
         StatusCode::OK,
         Json(json!({
             "messages": messages,
             "count": messages.len(),
-            "user_id": params.user_id,
+            "user_id": user_id,
         })),
     )
 }
@@ -241,14 +246,19 @@ pub async fn get_offline_messages(
 /// 通过 HTTP 发送消息（非 WebSocket 回退）
 pub async fn send_message(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Json(payload): Json<SendMessageRequest>,
 ) -> impl IntoResponse {
+    if let Some(resp) = reject_foreign_user(&payload.from, &claims.sub) {
+        return resp;
+    }
     if payload.content.trim().is_empty() {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "Content cannot be empty"})),
         );
     }
+    let from_user = claims.sub.clone();
 
     let msg_id = Uuid::new_v4().to_string();
     let now = Utc::now().timestamp_millis();
@@ -272,7 +282,7 @@ pub async fn send_message(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
         rusqlite::params![
             msg_id,
-            payload.from,
+            from_user,
             payload.to,
             payload.content,
             payload.content_type,
@@ -280,10 +290,7 @@ pub async fn send_message(
             now,
         ],
     ) {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Insert error: {}", e)})),
-        );
+        return db_error("insert message", e);
     }
 
     // 如果对方离线，写入离线消息队列
@@ -305,7 +312,7 @@ pub async fn send_message(
         let ws_msg = json!({
             "type": "message",
             "id": msg_id,
-            "from": payload.from,
+            "from": from_user,
             "to": payload.to,
             "content": payload.content,
             "contentType": payload.content_type,
@@ -330,9 +337,14 @@ pub async fn send_message(
 /// 标记消息为已读
 pub async fn mark_message_read(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(msg_id): Path<String>,
     Query(params): Query<MarkReadParams>,
 ) -> impl IntoResponse {
+    if let Some(resp) = reject_foreign_user(&params.user_id, &claims.sub) {
+        return resp;
+    }
+    let user_id = claims.sub.clone();
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
@@ -349,15 +361,10 @@ pub async fn mark_message_read(
     let affected = match conn.execute(
         "UPDATE messages SET is_read = 1, updated_at = ?1
          WHERE id = ?2 AND to_user = ?3 AND is_read = 0",
-        rusqlite::params![now, msg_id, params.user_id],
+        rusqlite::params![now, msg_id, user_id],
     ) {
         Ok(n) => n,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Update error: {}", e)})),
-            )
-        }
+        Err(e) => return db_error("mark message read", e),
     };
 
     // 也更新 offline_messages 表

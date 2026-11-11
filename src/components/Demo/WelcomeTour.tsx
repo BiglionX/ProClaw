@@ -74,7 +74,6 @@ export default function WelcomeTour() {
 
   const flag = readDemoFlag();
   const productCount = flag?.productsCount ?? 20;
-  const storeSub = flag?.cloudStoreSubdomain ?? 'demo';
   const teamNames = flag?.teamNames ?? [
     'AI 经营团队',
     '国内社媒运营团队',
@@ -91,9 +90,9 @@ export default function WelcomeTour() {
     },
     {
       icon: <StorefrontIcon sx={{ color: '#F59E0B' }} />,
-      title: `已开通云商城（proclaw.cc/shop/${storeSub}）`,
-      desc: '点击「预览」按钮即可访问，支持 8 个管理 Tab',
-      action: { label: '查看云商城', path: '/shop' },
+      title: '云商城（开发中）',
+      desc: '独立域名、真实订单和在线支付尚未接通，入口已关闭。可在「设置 → 系统信息」查看状态。',
+      action: { label: '前往设置', path: '/settings' },
     },
     {
       icon: <GroupsIcon sx={{ color: '#10B981' }} />,

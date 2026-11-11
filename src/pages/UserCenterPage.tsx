@@ -178,7 +178,7 @@ export default function UserCenterPage() {
     if (newPwd !== confirmPwd) { setSnackbar('两次密码不一致'); return; }
     setChangingPwd(true);
     try {
-      await invoke('change_user_password_cmd', { userId, newPassword: newPwd });
+      await invoke('change_user_password_cmd', { userId, oldPassword: oldPwd, newPassword: newPwd });
       setSnackbar('密码修改成功');
       setOldPwd(''); setNewPwd(''); setConfirmPwd('');
     } catch (e: any) {

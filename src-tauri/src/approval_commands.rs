@@ -2,6 +2,7 @@
 // 采购/销售订单审批、付款记录
 
 use crate::database::Database;
+use crate::finance_ledger::apply_approval_side_effects;
 use rusqlite::params;
 use std::sync::Mutex;
 use uuid::Uuid;
@@ -13,12 +14,31 @@ pub fn create_approval_cmd(
     target_type: String,
     target_id: String,
     comments: Option<String>,
+    requested_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
 
     if !["purchase_order", "sales_order"].contains(&target_type.as_str()) {
         return Err("Invalid target_type".to_string());
+    }
+
+    let requester = requested_by
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "requested_by is required".to_string())?
+        .to_string();
+
+    let user_exists: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM users WHERE id = ?1)",
+            params![requester],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+    if !user_exists {
+        return Err("requested_by user not found".to_string());
     }
 
     let table = if target_type == "purchase_order" {
@@ -45,36 +65,38 @@ pub fn create_approval_cmd(
         ));
     }
 
-    // 检查是否已有待审批
-    let existing: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM approvals WHERE target_type = ?1 AND target_id = ?2 AND status = 'pending')",
-        params![target_type, target_id],
-        |row| row.get(0),
-    ).unwrap_or(false);
+    let existing: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM approvals WHERE target_type = ?1 AND target_id = ?2 AND status = 'pending')",
+            params![target_type, target_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
 
     if existing {
         return Err("A pending approval already exists".to_string());
     }
 
     let id = Uuid::new_v4().to_string();
-    conn.execute(
-        "INSERT INTO approvals (id, target_type, target_id, requested_by, status, comments) VALUES (?1, ?2, ?3, '', 'pending', ?4)",
-        params![id, target_type, target_id, comments],
-    ).map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
-    // 更新订单状态
-    if let Err(e) = conn.execute(
+    tx.execute(
+        "INSERT INTO approvals (id, target_type, target_id, requested_by, status, comments) \
+         VALUES (?1, ?2, ?3, ?4, 'pending', ?5)",
+        params![id, target_type, target_id, requester, comments],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.execute(
         &format!(
             "UPDATE {} SET status = 'submitted', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
             table
         ),
         params![target_id],
-    ) {
-        eprintln!(
-            "[Approval] Failed to update {} status to submitted: {}",
-            table, e
-        );
-    }
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({
         "id": id,
@@ -195,8 +217,9 @@ pub fn approve_request_cmd(
     db: tauri::State<Mutex<Database>>,
     approval_id: String,
     comments: Option<String>,
+    approved_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    process_approval_tx(db, approval_id, true, comments)
+    process_approval_tx(db, approval_id, true, comments, approved_by)
 }
 
 /// 拒绝审批
@@ -205,8 +228,9 @@ pub fn reject_request_cmd(
     db: tauri::State<Mutex<Database>>,
     approval_id: String,
     comments: Option<String>,
+    approved_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    process_approval_tx(db, approval_id, false, comments)
+    process_approval_tx(db, approval_id, false, comments, approved_by)
 }
 
 fn process_approval_tx(
@@ -214,9 +238,17 @@ fn process_approval_tx(
     approval_id: String,
     approved: bool,
     comments: Option<String>,
+    approved_by: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let db = db_mutex.lock().map_err(|e| e.to_string())?;
     let conn = db.connection();
+
+    let actor = approved_by
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "approved_by is required".to_string())?
+        .to_string();
 
     let (target_type, target_id, current_status): (String, String, String) = conn
         .query_row(
@@ -236,9 +268,9 @@ fn process_approval_tx(
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
     if let Err(e) = tx.execute(
-        "UPDATE approvals SET status = ?1, approved_by = '', resolved_at = CURRENT_TIMESTAMP, \
-         comments = CASE WHEN ?2 IS NOT NULL THEN ?2 ELSE comments END WHERE id = ?3",
-        params![new_status, comments, approval_id],
+        "UPDATE approvals SET status = ?1, approved_by = ?2, resolved_at = CURRENT_TIMESTAMP, \
+         comments = CASE WHEN ?3 IS NOT NULL THEN ?3 ELSE comments END WHERE id = ?4",
+        params![new_status, actor, comments, approval_id],
     ) {
         let _ = tx.rollback();
         return Err(format!("Failed to update approval: {}", e));
@@ -258,6 +290,13 @@ fn process_approval_tx(
     ) {
         let _ = tx.rollback();
         return Err(format!("Failed to update order status: {}", e));
+    }
+
+    if approved {
+        if let Err(e) = apply_approval_side_effects(&tx, &target_type, &target_id, Some(&actor)) {
+            let _ = tx.rollback();
+            return Err(e);
+        }
     }
 
     tx.commit().map_err(|e| e.to_string())?;

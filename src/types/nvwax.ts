@@ -277,3 +277,228 @@ export interface NvwaXCmdResponse<T> {
   data?: T;
   error?: string;
 }
+
+// ============================================================
+// 虚拟公司（Virtual Company）相关类型
+//
+// 对应 docs/integration/virtual-company-package.schema.json (schemaVersion 1.0.0)。
+// NvwaX 服务端按该 schema 生成导出包，ProClaw 桌面端按此 schema 导入。
+// 任何字段增删必须同步更新 schema 文件，两端保持二进制兼容。
+// ============================================================
+
+/** 虚拟公司导出包（VirtualCompanyPackage） */
+export interface VirtualCompanyPackage {
+  schemaVersion: string;
+  packageId: string;
+  exportedAt: string;
+  checksum?: string;
+  source: {
+    platform: 'nvwax';
+    sessionId: string;
+    userId?: string;
+    aiteamId?: string;
+  };
+  team: {
+    id: string;
+    name: string;
+    description?: string;
+    industry?: string;
+    tags?: string[];
+    ceoConfig?: Record<string, unknown>;
+    workflow?: Array<Record<string, unknown>>;
+    bindingRules?: Array<Record<string, unknown>>;
+  };
+  agents: VirtualCompanyAgent[];
+  skills?: VirtualCompanySkill[];
+  metadata?: Record<string, unknown>;
+}
+
+/** 虚拟公司成员 Agent */
+export interface VirtualCompanyAgent {
+  id: string;
+  name: string;
+  description?: string;
+  role: string;
+  avatarUrl?: string;
+  capabilities?: string[];
+  permissions?: string[];
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  modelConfig?: {
+    provider?: 'openai' | 'anthropic' | 'ollama' | 'proclaw-local' | 'custom';
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+  systemPrompt?: string;
+}
+
+/** 虚拟公司绑定技能 */
+export interface VirtualCompanySkill {
+  id: string;
+  name: string;
+  description?: string;
+  tags?: string[];
+  content?: string;
+}
+
+/** 虚拟公司模板摘要（来自 NvwaX 市场） */
+export interface VirtualCompanyTemplateSummary {
+  id: string;
+  name: string;
+  description?: string;
+  industry?: string;
+  member_count?: number;
+  author?: string;
+  tags?: string[];
+  rating?: number;
+  install_count?: number;
+  preview_image?: string;
+}
+
+/** 虚拟公司模板列表响应 */
+export interface VirtualCompanyTemplateListResponse {
+  templates: VirtualCompanyTemplateSummary[];
+  pagination?: PaginationInfo;
+}
+
+/** 从 URL 导入虚拟公司包命令的返回结果 */
+export interface VirtualCompanyImportResult {
+  package_id: string;
+  team_id: string;
+  team_name: string;
+  agents_imported: number;
+  skills_imported: number;
+  imported_at: string;
+}
+
+/** 单个 Agent 的本地状态（推送到 NvWaX） */
+export interface VirtualCompanyAgentState {
+  agentId: string;
+  enabled?: boolean;
+  alias?: string;
+  /** owner | shared | reviewer */
+  ownerRole?: string;
+  lastRunAt?: string;
+}
+
+/** 推送到 NvWaX 的本地状态整体 */
+export interface VirtualCompanyLocalStatePayload {
+  importedPackageId: string;
+  schemaVersion?: string;
+  proclawVersion?: string;
+  /** active | paused | archived */
+  teamStatus?: string;
+  agents: VirtualCompanyAgentState[];
+}
+
+/** 推送结果 */
+export interface VirtualCompanyLocalStatePushResult {
+  sessionId: string;
+  lastSyncedAt: string;
+  agentsCount: number;
+  teamStatus: string;
+}
+
+/** v1.4.0：单个 Agent 本地状态设置参数 */
+export interface SetAgentLocalStateParams {
+  packageId: string;
+  agentId: string;
+  enabled?: boolean;
+  alias?: string;
+  ownerRole?: string;
+}
+
+/** v1.4.0：单个 Agent 本地状态设置返回值（lastModifiedAt ISO 8601 UTC） */
+export interface SetAgentLocalStateResult {
+  lastModifiedAt: string;
+}
+
+/** v1.5.0 (Sprint 2.18)：扩展 setAgentLocalState 返回值，新增 `historyId` 支持撤销 */
+export interface SetAgentLocalStateResultNew {
+  lastModifiedAt: string;
+  /** 新写入的状态变更历史行 id（无字段变化时为 undefined） */
+  historyId?: number;
+}
+
+/** v1.5.0：单条 Agent 状态变更历史记录 */
+export interface AgentStateHistoryEntry {
+  id: number;
+  packageId: string;
+  agentId: string;
+  fieldName: 'enabled' | 'alias' | 'ownerRole' | 'localModifiedAt';
+  oldValue?: string;
+  newValue?: string;
+  recordedAt: string;
+}
+
+/** v1.5.0：nvwax_list_agent_state_history 返回包装 */
+export interface AgentStateHistoryList {
+  entries: AgentStateHistoryEntry[];
+}
+
+/** v1.5.0：nvwax_undo_agent_state_change 返回 */
+export interface UndoAgentStateChangeResult {
+  /** 恢复后的最终值（已写入主表） */
+  restoredValue?: string;
+  /** 新生成的 historyId（记录这次撤销本身，便于无限次撤销链） */
+  historyId: number;
+}
+
+/** v1.4.0：发布到 NvWaX 市场的结果 */
+export interface PublishMarketplaceResult {
+  teamSkillId: string;
+  teamName: string;
+  message?: string;
+}
+
+/** SSE 流式响应（前端 wizard 页用） */
+export interface StreamSessionResponse {
+  session_id: string;
+  content: string;
+  final_progress: number;
+  done: boolean;
+}
+
+// ============================================================
+// 多设备同步（Sprint 2.15）
+// ============================================================
+
+/** 远程 Agent 状态（从 NvWaX 拉取的 local_state.agents[] 单项） */
+export interface VirtualCompanyAgentRemoteState {
+  agentId: string;
+  enabled?: boolean;
+  alias?: string;
+  ownerRole?: string;
+  lastRunAt?: string;
+}
+
+/** 单个 session 的 local_state 拉取结果 */
+export interface VirtualCompanyLocalStateResponse {
+  sessionId: string;
+  /** 即 NvWaX 数据库 aiteam_creation_sessions.local_state JSONB 字段 */
+  localState: {
+    schemaVersion?: string;
+    lastSyncedAt?: string;
+    proclawVersion?: string;
+    importedPackageId?: string;
+    teamStatus?: string;
+    agents?: VirtualCompanyAgentRemoteState[];
+  };
+  fetchedAt: string;
+}
+
+/** 列出会话响应（每项带 local_state） */
+export interface VirtualCompanySessionWithState {
+  sessionId: string;
+  status: string;
+  finalTeamSkillId?: string;
+  localState?: VirtualCompanyLocalStateResponse['localState'];
+  localStateLastSyncedAt?: string;
+  updatedAt: string;
+}
+
+export interface VirtualCompanySessionListResponse {
+  sessions: VirtualCompanySessionWithState[];
+  totalCount: number;
+}

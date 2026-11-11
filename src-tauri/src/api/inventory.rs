@@ -119,19 +119,26 @@ pub async fn get_inventory(
 
     let rows = match stmt.query_map(params_refs.as_slice(), |row| {
         // SQL: id(0), sku(1), name(2), unit(3), cost_price(4), sell_price(5), current_stock(6), min_stock(7), max_stock(8), image_url(9), barcode(10), is_active(11), created_at(12), updated_at(13)
-        let cost_price: f64 = row.get(4)?;
-        let current_stock: i32 = row.get(6)?;
-        let min_stock: i32 = row.get(7)?;
+        // NULL 单位/价格不能把整行丢掉，否则部分更新写空后商品会从库存列表消失
+        let unit = row
+            .get::<_, Option<String>>(3)?
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "件".to_string());
+        let cost_price: f64 = row.get::<_, Option<f64>>(4)?.unwrap_or(0.0);
+        let sell_price: f64 = row.get::<_, Option<f64>>(5)?.unwrap_or(0.0);
+        let current_stock: i32 = row.get::<_, Option<i32>>(6)?.unwrap_or(0);
+        let min_stock: i32 = row.get::<_, Option<i32>>(7)?.unwrap_or(0);
+        let max_stock: i32 = row.get::<_, Option<i32>>(8)?.unwrap_or(0);
         Ok(serde_json::json!({
             "id": row.get::<_, String>(0)?,
             "sku": row.get::<_, String>(1)?,
             "name": row.get::<_, String>(2)?,
-            "unit": row.get::<_, String>(3)?,
+            "unit": unit,
             "cost_price": cost_price,
-            "sell_price": row.get::<_, f64>(5)?,
+            "sell_price": sell_price,
             "current_stock": current_stock,
             "min_stock": min_stock,
-            "max_stock": row.get::<_, i32>(8)?,
+            "max_stock": max_stock,
             "image_url": row.get::<_, Option<String>>(9)?,
             "barcode": row.get::<_, Option<String>>(10)?,
             "is_active": row.get::<_, bool>(11)?,

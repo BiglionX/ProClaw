@@ -40,6 +40,7 @@ import AISettings from '../components/Settings/AISettings';
 import DatabaseSettings from '../components/Settings/DatabaseSettings';
 import InviteManager from '../components/Settings/InviteManager';
 import UpdaterSettings from '../components/Settings/UpdaterSettings';
+import SettingsAccountTab from './settings/SettingsAccountTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -181,6 +182,7 @@ export default function SettingsPage() {
           {mode !== 'light' && <Tab label="📧 邀请管理" value={4} {...a11yProps(4)} />}
           {isDemo && <Tab label="🧪 数据管理" value={5} {...a11yProps(5)} />}
           <Tab label="🔄 自动更新" value={6} {...a11yProps(6)} />
+          <Tab label="👤 账号管理" value={7} {...a11yProps(7)} />
         </Tabs>
       </Paper>
 
@@ -326,7 +328,22 @@ export default function SettingsPage() {
             </Grid>
 
             <Divider sx={{ my: 3 }} />
-            
+
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                功能状态
+              </Typography>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Typography sx={{ fontWeight: 600 }}>云商城</Typography>
+                  <Chip label="开发中" color="warning" size="small" />
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  独立域名商城、真实访问量和在线支付尚未接通。当前数据是演示数字，侧栏不再提供入口。
+                </Typography>
+              </Paper>
+            </Box>
+
             {/* 重新配置公司 */}
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -419,8 +436,8 @@ export default function SettingsPage() {
                   <ListItem>
                     <ListItemIcon sx={{ minWidth: 32 }}>🏪</ListItemIcon>
                     <ListItemText
-                      primary={`已开通云商城（proclaw.cc/shop/${demoFlag?.cloudStoreSubdomain ?? 'demo'}）`}
-                      secondary="云商城 8 个管理 Tab + 预览"
+                      primary="云商城"
+                      secondary="开发中，侧栏入口已关闭"
                     />
                   </ListItem>
                   <ListItem>
@@ -536,6 +553,11 @@ export default function SettingsPage() {
           </Dialog>
         </TabPanel>
       )}
+
+      {/* Tab 7: v13.1.1 本地账号管理 */}
+      <TabPanel value={tabValue} index={7}>
+        <SettingsAccountTab />
+      </TabPanel>
     </Box>
   );
 }

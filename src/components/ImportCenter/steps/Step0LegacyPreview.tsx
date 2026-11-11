@@ -34,7 +34,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import type { LegacyParseResult } from '../../../types/import';
+import type { ImportTarget, LegacyParseResult } from '../../../types/import';
 import {
   buildCategoryReviewList,
   countAggregationTotals,
@@ -43,11 +43,19 @@ import {
 
 export interface Step0LegacyPreviewProps {
   preview: LegacyParseResult;
+  /** 当前导入对象。传入后只展示该对象的聚合组和类别，避免客户预览里出现商品。 */
+  target?: ImportTarget;
   onConfirm?: () => void;
   onBack?: () => void;
   /** 紧凑模式（嵌入 Step 0 区域时使用） */
   compact?: boolean;
 }
+
+const CATEGORY_TYPE_BY_TARGET: Partial<Record<ImportTarget, 'product' | 'supplier' | 'customer'>> = {
+  products: 'product',
+  suppliers: 'supplier',
+  customers: 'customer',
+};
 
 const TYPE_LABELS: Record<string, string> = {
   product: '商品类别',
@@ -57,11 +65,26 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function Step0LegacyPreview({
   preview,
+  target,
   compact = false,
 }: Step0LegacyPreviewProps) {
   const totals = countAggregationTotals(preview);
-  const needsReview = needsAggregationReview(preview);
-  const categoryList = buildCategoryReviewList(preview.categories_to_create);
+  const categoryType = target ? CATEGORY_TYPE_BY_TARGET[target] : undefined;
+  const categoryList = buildCategoryReviewList(preview.categories_to_create).filter(
+    (item) => !categoryType || item.category_type === categoryType,
+  );
+  const multiCustomers = preview.customer_groups.filter((g) => g.contacts.length > 1).length;
+  const multiProducts = preview.product_groups.filter((g) => g.variants.length > 1).length;
+  const showCustomers = totals.customer_groups > 0 && (!target || target === 'customers');
+  const showProducts = totals.product_groups > 0 && (!target || target === 'products');
+  const reviewLabel =
+    target === 'customers' && multiCustomers > 0
+      ? `${multiCustomers} 个客户有多个联系人，执行前会确认`
+      : target === 'products' && multiProducts > 0
+        ? `${multiProducts} 个商品有多个 SKU，执行前会确认`
+        : !target && needsAggregationReview(preview)
+          ? '有多条记录需要合并，执行前会确认'
+          : null;
 
   return (
     <Stack spacing={2}>
@@ -75,13 +98,7 @@ export default function Step0LegacyPreview({
         <Typography variant="body2" color="text.secondary">
           共 {preview.total_data_rows} 行数据 · {preview.field_names.length} 个字段
         </Typography>
-        {needsReview && (
-          <Chip
-            label="⚠️ 需要在 Step 4 确认聚合规则"
-            color="warning"
-            size="small"
-          />
-        )}
+        {reviewLabel && <Chip label={reviewLabel} color="warning" size="small" />}
       </Stack>
 
       {/* 2. 分段标题（如果有） */}
@@ -91,8 +108,8 @@ export default function Step0LegacyPreview({
             分段标题（{preview.segment_titles.length} 个）
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-            {preview.segment_titles.map((s, i) => (
-              <Chip key={i} label={s} variant="outlined" size="small" />
+            {preview.segment_titles.map((section, i) => (
+              <Chip key={i} label={section.title} variant="outlined" size="small" />
             ))}
           </Stack>
         </Box>
@@ -140,7 +157,7 @@ export default function Step0LegacyPreview({
       <Divider />
 
       {/* 4. 客户聚合组 */}
-      {totals.customer_groups > 0 && (
+      {showCustomers && (
         <Box>
           <Typography variant="overline" color="text.secondary">
             客户聚合组（{totals.customer_groups} 个客户 ·{' '}
@@ -206,7 +223,7 @@ export default function Step0LegacyPreview({
       )}
 
       {/* 5. 商品聚合组 */}
-      {totals.product_groups > 0 && (
+      {showProducts && (
         <Box>
           <Typography variant="overline" color="text.secondary">
             商品聚合组（{totals.product_groups} 个 SPU ·{' '}
@@ -261,10 +278,12 @@ export default function Step0LegacyPreview({
       {categoryList.length > 0 && (
         <Box>
           <Typography variant="overline" color="text.secondary">
-            类别审核清单（{categoryList.length} 项）
+            {categoryType ? TYPE_LABELS[categoryType] : '类别'}（{categoryList.length} 项）
           </Typography>
           <Alert severity="info" sx={{ mt: 1 }}>
-            以下类别将自动建档（可在 Step 4 关闭）。已存在的类别会跳过。
+            {categoryType
+              ? `以下${TYPE_LABELS[categoryType]}会在导入时自动建档，可在本页关闭。已有的同名类别会跳过。`
+              : '以下类别会在导入时自动建档，可在本页关闭。已有的同名类别会跳过。'}
           </Alert>
           <Box sx={{ mt: 1 }}>
             {(['product', 'supplier', 'customer'] as const).map((ct) => {

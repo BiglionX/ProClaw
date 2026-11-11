@@ -1,10 +1,11 @@
 // 文件上传下载 API 处理器
 // Phase 4: 实现 multipart 文件上传、磁盘存储、元数据管理、下载和缩略图
 
+use crate::api::auth::Claims;
 use crate::api::AppState;
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::{header, Request, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -83,6 +84,16 @@ const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
 /// POST /api/files/upload
 /// 接收 multipart/form-data，保存文件到磁盘，记录元数据到数据库
 pub async fn upload_file(State(state): State<AppState>, request: Request<Body>) -> Response {
+    let owner_id = match request.extensions().get::<Claims>().map(|c| c.sub.clone()) {
+        Some(id) if !id.is_empty() => id,
+        _ => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "Not authenticated"})),
+            )
+                .into_response();
+        }
+    };
     let upload_dir = get_upload_dir();
     let mut uploaded_files: Vec<FileUploadResponse> = Vec::new();
 
@@ -222,8 +233,8 @@ pub async fn upload_file(State(state): State<AppState>, request: Request<Body>) 
         let conn = db.connection();
 
         if let Err(e) = conn.execute(
-            "INSERT INTO files (id, original_name, file_name, file_path, file_size, mime_type, thumbnail_path)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO files (id, original_name, file_name, file_path, file_size, mime_type, thumbnail_path, uploaded_by)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
                 file_id,
                 original_name,
@@ -232,6 +243,7 @@ pub async fn upload_file(State(state): State<AppState>, request: Request<Body>) 
                 file_size as i64,
                 mime_type,
                 None::<String>,
+                owner_id,
             ],
         ) {
             if let Err(e) = std::fs::remove_file(&file_path) {
@@ -278,7 +290,11 @@ pub async fn upload_file(State(state): State<AppState>, request: Request<Body>) 
 
 /// GET /api/files/download/:id
 /// 根据文件 ID 下载文件
-pub async fn download_file(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+pub async fn download_file(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    Path(id): Path<String>,
+) -> Response {
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
@@ -292,8 +308,8 @@ pub async fn download_file(State(state): State<AppState>, Path(id): Path<String>
     let conn = db.connection();
 
     let file_info = match conn.query_row(
-        "SELECT original_name, file_name, file_path, mime_type, file_size FROM files WHERE id = ?1",
-        rusqlite::params![id],
+        "SELECT original_name, file_name, file_path, mime_type, file_size FROM files WHERE id = ?1 AND uploaded_by = ?2",
+        rusqlite::params![id, claims.sub],
         |row| {
             Ok((
                 row.get::<_, String>(0)?,
@@ -349,7 +365,11 @@ pub async fn download_file(State(state): State<AppState>, Path(id): Path<String>
 
 /// GET /api/files/thumb/:id
 /// 获取文件缩略图（图片返回原图，非图片返回 404）
-pub async fn get_file_thumbnail(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+pub async fn get_file_thumbnail(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    Path(id): Path<String>,
+) -> Response {
     let db = match state.db.lock() {
         Ok(db) => db,
         Err(_) => {
@@ -363,8 +383,8 @@ pub async fn get_file_thumbnail(State(state): State<AppState>, Path(id): Path<St
     let conn = db.connection();
 
     let file_info = match conn.query_row(
-        "SELECT original_name, file_name, file_path, mime_type, thumbnail_path FROM files WHERE id = ?1",
-        rusqlite::params![id],
+        "SELECT original_name, file_name, file_path, mime_type, thumbnail_path FROM files WHERE id = ?1 AND uploaded_by = ?2",
+        rusqlite::params![id, claims.sub],
         |row| {
             Ok((
                 row.get::<_, String>(0)?,
