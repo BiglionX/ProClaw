@@ -283,6 +283,9 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     needs:
       - hermes-fast
       - hermes-integration
@@ -321,8 +324,6 @@ jobs:
           (needs.hermes-fast.result == 'failure' ||
            needs.hermes-integration.result == 'failure' ||
            needs.rust-clippy.result == 'failure')
-        permissions:
-          pull-requests: write
         uses: actions/github-script@v7
         with:
           script: |

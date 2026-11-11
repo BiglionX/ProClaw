@@ -845,7 +845,11 @@ fn sales_lines(
         };
         let party = customer_name(conn, &order.customer_id)?;
         lines.push(report_line(
-            format!("fallback-{}-{}", if use_order_cogs { "cogs" } else { "revenue" }, order.id),
+            format!(
+                "fallback-{}-{}",
+                if use_order_cogs { "cogs" } else { "revenue" },
+                order.id
+            ),
             order.date,
             order.doc_no,
             party,
@@ -1498,15 +1502,26 @@ mod tests {
         let revenue_lines = report_lines(&conn, &day, &day, "revenue").unwrap();
         let cogs_lines = report_lines(&conn, &day, &day, "cogs").unwrap();
         let expense_lines = report_lines(&conn, &day, &day, "operating_expense").unwrap();
-        assert_eq!(sum_line_amounts(&revenue_lines), report["revenue"].as_f64().unwrap());
-        assert_eq!(sum_line_amounts(&cogs_lines), report["cost_of_goods_sold"].as_f64().unwrap());
-        assert_eq!(sum_line_amounts(&expense_lines), report["operating_expenses"].as_f64().unwrap());
+        assert_eq!(
+            sum_line_amounts(&revenue_lines),
+            report["revenue"].as_f64().unwrap()
+        );
+        assert_eq!(
+            sum_line_amounts(&cogs_lines),
+            report["cost_of_goods_sold"].as_f64().unwrap()
+        );
+        assert_eq!(
+            sum_line_amounts(&expense_lines),
+            report["operating_expenses"].as_f64().unwrap()
+        );
         assert_eq!(report["revenue"].as_f64(), Some(280.0));
         assert_eq!(report["cost_of_goods_sold"].as_f64(), Some(80.0));
         assert_eq!(expense_lines.len(), 1);
         assert!(revenue_lines.iter().any(|line| line["source"] == "凭证"));
         assert!(revenue_lines.iter().any(|line| line["source"] == "回退"));
-        assert!(revenue_lines.iter().all(|line| line["doc_no"] != "so-draft"));
+        assert!(revenue_lines
+            .iter()
+            .all(|line| line["doc_no"] != "so-draft"));
 
         let cash = cash_flow_report(&conn, &day, &day).unwrap();
         let cash_in = report_lines(&conn, &day, &day, "cash_in").unwrap();
