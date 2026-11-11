@@ -8,10 +8,10 @@ import RouteSEO from '../components/RouteSEO';
 import { getPublishedPlugins } from '../lib/pluginService';
 import type { IndustryPlugin } from '../types';
 
-const DESKTOP_151_NSIS =
-  'https://github.com/BiglionX/ProClaw/releases/download/v1.5.1/ProClaw_1.5.1_x64-setup.exe';
-const DESKTOP_151_MSI =
-  'https://github.com/BiglionX/ProClaw/releases/download/v1.5.1/ProClaw_1.5.1_x64_en-US.msi';
+const DESKTOP_NSIS =
+  'https://github.com/BiglionX/ProClaw/releases/download/v1.6.0/ProClaw_1.6.0_x64-setup.exe';
+const DESKTOP_MSI =
+  'https://github.com/BiglionX/ProClaw/releases/download/v1.6.0/ProClaw_1.6.0_x64_en-US.msi';
 
 const productCards = [
   {
@@ -32,8 +32,8 @@ const productCards = [
       '本地数据存储',
       '离线完全可用',
     ],
-    cta: '下载 Windows 1.5.1',
-    ctaLink: DESKTOP_151_NSIS,
+    cta: '下载 Windows 1.6.0',
+    ctaLink: DESKTOP_NSIS,
     platforms: 'Windows x64 安装包 · 未签名',
     highlighted: true,
     color: 'black',
@@ -56,8 +56,8 @@ const productCards = [
       '本地数据存储',
       '离线完全可用',
     ],
-    cta: '下载 Windows 1.5.1',
-    ctaLink: DESKTOP_151_NSIS,
+    cta: '下载 Windows 1.6.0',
+    ctaLink: DESKTOP_NSIS,
     platforms: 'Windows x64 安装包 · 未签名',
     highlighted: false,
     color: 'gray',
@@ -224,7 +224,7 @@ const DownloadPage: React.FC = () => {
       <PageHeader
         title="下载 ProClaw"
         description="ProClaw Plus / Light 桌面端 · Cloud 云商城 · 手机端 App"
-        subtitle="桌面端 1.5.1 · Windows x64 · 未签名"
+        subtitle="桌面端 1.6.0 · Windows x64 · 未签名"
       />
 
       {/* 四产品并列卡片 */}
@@ -534,8 +534,8 @@ const DownloadPage: React.FC = () => {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">下载安装包</h3>
                   <p className="text-sm text-gray-600">
-                    Plus 和 Light 是同一个 Windows 安装包，按钮直接下载 ProClaw_1.5.1_x64-setup.exe。也可以改用{' '}
-                    <a href={DESKTOP_151_MSI} className="text-blue-600 hover:underline">MSI</a>
+                    Plus 和 Light 是同一个 Windows 安装包，按钮直接下载 ProClaw_1.6.0_x64-setup.exe。也可以改用{' '}
+                    <a href={DESKTOP_MSI} className="text-blue-600 hover:underline">MSI</a>
                     。包未签名，Windows 会提示。
                   </p>
                 </div>
@@ -561,7 +561,7 @@ const DownloadPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">文件校验 (SHA256)</h2>
             <p className="text-sm text-gray-500 mb-4">
-              1.5.1 还没有公布 SHA256，不要沿用下面的历史校验值。
+              1.6.0 安装包的校验值如下。更早的版本不要拿来核对这次的文件。
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -572,6 +572,14 @@ const DownloadPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw_1.6.0_x64-setup.exe</td>
+                    <td className="py-3 text-sm text-gray-900 font-mono break-all">ab196da872bc8bc701c790f4975c6c9ec8d18916cbb68db7414d635afe5112f4</td>
+                  </tr>
+                  <tr className="border-b border-gray-100">
+                    <td className="py-3 pr-4 text-sm text-gray-900 font-medium whitespace-nowrap">ProClaw_1.6.0_x64_en-US.msi</td>
+                    <td className="py-3 text-sm text-gray-900 font-mono break-all">9efe0943b9a0668c7934cf6b44b1ab270f340f97be49114f2b194e82325fb1dc</td>
+                  </tr>
                   <tr className="border-b border-gray-100">
                     <td className="py-3 pr-4 text-sm text-gray-500 whitespace-nowrap">ProClaw (桌面端 v1.1.1 hotfix，历史)</td>
                     <td className="py-3 text-sm text-gray-500 font-mono break-all">fc48a6217532fd414cd6d294b901e01c901a88bc69cf6ce7539a9ae113d3fff1</td>
@@ -607,7 +615,7 @@ const DownloadPage: React.FC = () => {
 
           <p className="text-center text-gray-400 text-sm mt-8">
             也可以直接下载{' '}
-            <a href={DESKTOP_151_MSI} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ProClaw_1.5.1_x64_en-US.msi</a>
+            <a href={DESKTOP_MSI} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ProClaw_1.6.0_x64_en-US.msi</a>
             。历史版本请查看{' '}
             <a href="https://github.com/BigLionX/ProClaw/releases" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
               GitHub Releases
